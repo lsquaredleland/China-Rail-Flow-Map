@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const CORE: &[&str] = &[
     "北京",
@@ -768,9 +768,11 @@ fn dp_keep(pts: &[[f64; 2]], tol: f64) -> Vec<[f64; 2]> {
 /// English for a station name: curated specials, else base place EN from the
 /// city gazetteer plus a suffix word (East/South/West/North/Airport).
 fn station_en(name: &str, city_en: &HashMap<String, String>) -> String {
-    static STATION_EN: std::sync::LazyLock<HashMap<String, String>> = std::sync::LazyLock::new(|| {
-        serde_json::from_str(include_str!("../../../../data/station_en.json")).unwrap_or_default()
-    });
+    static STATION_EN: std::sync::LazyLock<HashMap<String, String>> =
+        std::sync::LazyLock::new(|| {
+            serde_json::from_str(include_str!("../../../../data/station_en.json"))
+                .unwrap_or_default()
+        });
     if let Some(v) = STATION_EN.get(name) {
         return v.clone();
     }
@@ -838,7 +840,10 @@ fn station_en(name: &str, city_en: &HashMap<String, String>) -> String {
         }
     }
     let base_en = |b: &str| -> Option<String> {
-        STATION_EN.get(b).cloned().or_else(|| city_en.get(b).cloned())
+        STATION_EN
+            .get(b)
+            .cloned()
+            .or_else(|| city_en.get(b).cloned())
     };
     if let Some(b) = name.strip_suffix("国际机场") {
         if let Some(e) = base_en(b) {
@@ -1263,14 +1268,17 @@ type LegPathMap = HashMap<String, (Vec<Vec<i64>>, f64)>;
 
 static LEG_PATHS: std::sync::OnceLock<LegPathMap> = std::sync::OnceLock::new();
 
-/// Load ATLAS_LEG_PATHS (if set) into the override map and LEG_PATHS.
+/// Load ATLAS_LEG_PATHS (or default corridor-v3 leg_paths) into the override map and LEG_PATHS.
 /// Keyed by train_no; by public code only when train_no is absent
 /// (codes are reused across physical trains).
-fn load_leg_paths(map: &mut OverrideMap) {
+fn load_leg_paths(map: &mut OverrideMap, data_dir: &Path) {
     let mut paths: LegPathMap = HashMap::new();
-    if let Ok(p) = env::var("ATLAS_LEG_PATHS") {
-        let recs: Vec<LegPath> = serde_json::from_str(&fs::read_to_string(&p).unwrap()).unwrap();
-        println!("leg paths loaded: {} from {}", recs.len(), p);
+    let p_path = env::var("ATLAS_LEG_PATHS").map(PathBuf::from).unwrap_or_else(|_| {
+        data_dir.join("derived/corridor-v3/leg_paths.json")
+    });
+    if p_path.exists() {
+        let recs: Vec<LegPath> = serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
+        println!("leg paths loaded: {} from {}", recs.len(), p_path.display());
         for r in recs {
             let key_id = if r.train_no.is_empty() {
                 r.code
@@ -1474,7 +1482,7 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|_| data_dir.join("leg_overrides.json"));
     let mut override_map = load_overrides(&overrides_path);
-    load_leg_paths(&mut override_map);
+    load_leg_paths(&mut override_map, &data_dir);
     let override_map = override_map;
 
     let load = |p: &PathBuf| -> Deliverable {
@@ -1529,13 +1537,19 @@ fn main() {
     // ---- pair paths ----
     let mut path_map: PathMap = HashMap::new();
     // ATLAS_PAIR_PATHS (comma-separated files) replaces the production
-    // pair geometry, e.g. a staged double-track-canonical set.
+    // pair geometry. Defaults to canonical double-track paths + base pair geometry.
     let pp_files: Vec<PathBuf> = match env::var("ATLAS_PAIR_PATHS") {
         Ok(v) => v.split(',').map(PathBuf::from).collect(),
-        Err(_) => vec![
-            data_dir.join("derived/pair_paths.json"),
-            data_dir.join("derived/cs_out/pair_paths.json"),
-        ],
+        Err(_) => {
+            let canon = data_dir.join("derived/corridor-v3/pair_paths_canonical.json");
+            let mut list = Vec::new();
+            if canon.exists() {
+                list.push(canon);
+            }
+            list.push(data_dir.join("derived/pair_paths.json"));
+            list.push(data_dir.join("derived/cs_out/pair_paths.json"));
+            list
+        }
     };
     for pth in pp_files {
         let pp: PPFile = serde_json::from_str(&fs::read_to_string(&pth).unwrap()).unwrap();
@@ -1580,16 +1594,24 @@ fn main() {
                 let get_f64 = |key: &[u8]| -> Option<f64> {
                     let mut k = 0;
                     while k + key.len() + 2 <= tag.len() {
-                        if &tag[k..k + key.len()] == key && tag[k + key.len()] == b'=' && tag[k + key.len() + 1] == b'"' {
+                        if &tag[k..k + key.len()] == key
+                            && tag[k + key.len()] == b'='
+                            && tag[k + key.len() + 1] == b'"'
+                        {
                             let start = k + key.len() + 2;
                             let len = tag[start..].iter().position(|&b| b == b'"')?;
-                            return std::str::from_utf8(&tag[start..start + len]).ok()?.parse().ok();
+                            return std::str::from_utf8(&tag[start..start + len])
+                                .ok()?
+                                .parse()
+                                .ok();
                         }
                         k += 1;
                     }
                     None
                 };
-                if let (Some(idf), Some(lat), Some(lon)) = (get_f64(b"id"), get_f64(b"lat"), get_f64(b"lon")) {
+                if let (Some(idf), Some(lat), Some(lon)) =
+                    (get_f64(b"id"), get_f64(b"lat"), get_f64(b"lon"))
+                {
                     let id = idf as i64;
                     if needed.contains(&id) {
                         coords.insert(id, [lon, lat]);
@@ -1751,13 +1773,19 @@ fn main() {
     let mut selected: Vec<String> = ranked.iter().take(top_n).map(|(c, _)| c.clone()).collect();
     if !selected.contains(&"拉萨".to_string()) {
         if let Some((_, n)) = lhasa_entry {
-            println!("Adding Lhasa (拉萨) as a special featured origin city ({} outbound trains)", n);
+            println!(
+                "Adding Lhasa (拉萨) as a special featured origin city ({} outbound trains)",
+                n
+            );
             selected.push("拉萨".to_string());
         }
     }
     if !selected.contains(&"香港".to_string()) {
         if let Some((_, n)) = hk_entry {
-            println!("Adding Hong Kong (香港) as a special featured origin city ({} outbound trains)", n);
+            println!(
+                "Adding Hong Kong (香港) as a special featured origin city ({} outbound trains)",
+                n
+            );
             selected.push("香港".to_string());
         }
     }
