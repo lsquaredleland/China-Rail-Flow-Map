@@ -114,6 +114,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     H: 0,
     DPR: 1,
     interacted: false,
+    initialViewApplied: false,
     hover: null as Hit | null,
     pinned: false,
     pointers: new Map<number, Pt>(),
@@ -214,6 +215,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const e = atlas.extent;
     fitExtent(e.lon0, e.lat0, e.lon1, e.lat1, 0.97);
     S.current.fitScale = S.current.view.scale;
+  }
+  function fitGuangzhouInitialCalc() {
+    fitCountryCalc();
+    // Regional extent matching initial launch: Guangzhou near bottom,
+    // Hunan/Hubei/Henan corridors extending north.
+    fitExtent(102.0, 20.8, 122.5, 36.8, 0.96);
   }
   function fitHomeCalc() {
     const cur = P.current.cur;
@@ -1232,8 +1239,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     canvas.width = Math.round(st.W * st.DPR);
     canvas.height = Math.round(st.H * st.DPR);
     if (P.current.atlas && P.current.cur) {
-      if (!st.interacted) fitCountryCalc();
-      else if (keepCentre) {
+      if (!st.interacted) {
+        if (!st.initialViewApplied && P.current.cur.o.zh === "广州") {
+          fitGuangzhouInitialCalc();
+        } else {
+          fitCountryCalc();
+        }
+      } else if (keepCentre) {
         st.view.tx = st.W / 2 - keepCentre.lon * st.view.scale;
         st.view.ty = st.H / 2 + keepCentre.lat * st.view.scale;
       }
@@ -1528,6 +1540,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       fitCountry() {
         const st = S.current;
         st.interacted = false;
+        st.initialViewApplied = true;
         hideTooltip();
         st.hover = null;
         fitCountryCalc();
@@ -1643,11 +1656,15 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       draw();
       return;
     }
+    const isFirstOrigin = curRef.current === null;
     curRef.current = props.cur;
     const st = S.current;
     st.hover = null;
     hideTooltip();
     st.interacted = false;
+    if (!isFirstOrigin) {
+      st.initialViewApplied = true;
+    }
     resize();
     setSwitching(true);
     const raf = requestAnimationFrame(() =>

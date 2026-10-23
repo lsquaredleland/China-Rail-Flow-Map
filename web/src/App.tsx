@@ -149,14 +149,20 @@ function initialDirection(): Direction {
 
 function initialDark(): boolean {
   try {
-    const saved = window.localStorage && localStorage.getItem("crfa-theme");
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get("theme");
+    if (p === "dark" || p === "night") return true;
+    if (p === "light" || p === "day") return false;
+    const saved = window.sessionStorage && sessionStorage.getItem("crfa-theme");
     if (saved === "dark") return true;
     if (saved === "light") return false;
   } catch {
     /* storage unavailable */
   }
   return !!(
-    window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
   );
 }
 
@@ -326,7 +332,7 @@ export default function App() {
         const decoded = prepAtlas(data);
         let def = 0;
         for (let j = 0; j < data.origins.length; j++) {
-          if (data.origins[j].zh === "成都") {
+          if (data.origins[j].zh === "广州") {
             def = j;
             break;
           }
@@ -471,15 +477,20 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
+    try {
+      localStorage.removeItem("crfa-theme");
+    } catch {
+      /* storage unavailable */
+    }
     if (!window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
+    const onChange = (e: MediaQueryListEvent) => {
       try {
-        if (localStorage.getItem("crfa-theme")) return;
+        if (sessionStorage.getItem("crfa-theme")) return;
       } catch {
         /* storage unavailable */
       }
-      setDarkState(mq.matches);
+      setDarkState(e.matches);
     };
     if (mq.addEventListener) mq.addEventListener("change", onChange);
     return () => {
@@ -591,8 +602,9 @@ export default function App() {
     if (d === dark) return;
     setDarkState(d);
     try {
-      if (window.localStorage)
-        localStorage.setItem("crfa-theme", d ? "dark" : "light");
+      if (window.sessionStorage)
+        sessionStorage.setItem("crfa-theme", d ? "dark" : "light");
+      if (window.localStorage) localStorage.removeItem("crfa-theme");
     } catch {
       /* storage unavailable */
     }

@@ -2,7 +2,7 @@
    dist/index.html carries. Run with: bun bundle.mjs
    Produces dist/index.html from index.template.html (head + CSS verbatim)
    and copies public/assets into dist/assets. */
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 
 const result = await Bun.build({
   entrypoints: ["src/main.tsx"],
@@ -32,8 +32,10 @@ if (!tpl.includes("/*__BUNDLE__*/")) {
   process.exit(1);
 }
 
-mkdirSync("dist/assets", { recursive: true });
-cpSync("public/assets", "dist/assets", { recursive: true });
+mkdirSync("dist", { recursive: true });
+for (const f of readdirSync("public")) {
+  cpSync(`public/${f}`, `dist/${f}`, { recursive: true });
+}
 writeFileSync(
   "dist/index.html",
   tpl.replace("/*__BUNDLE__*/", () => js),

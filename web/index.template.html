@@ -4,16 +4,37 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="icon" type="image/png" href="og-image.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
-    <title>China Rail Flow Map</title>
+    <title>China Rail Flow Map · 中国铁路客流图</title>
+    <meta name="description" content="Minard-style passenger rail flow maps for China's top rail cities. Explore train frequencies, speeds, and direct connections across China's 48,000 km high-speed network." />
+
+    <!-- Open Graph / Facebook / WeChat -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://china-rail-flow-map-web.vercel.app/" />
+    <meta property="og:title" content="China Rail Flow Map · 中国铁路客流图" />
+    <meta property="og:description" content="Minard-style passenger rail flow maps for China's top rail cities. Explore train frequencies, speeds, and direct connections across China's 48,000 km high-speed network." />
+    <meta property="og:image" content="https://china-rail-flow-map-web.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="twitter:domain" content="china-rail-flow-map-web.vercel.app" />
+    <meta property="twitter:url" content="https://china-rail-flow-map-web.vercel.app/" />
+    <meta name="twitter:title" content="China Rail Flow Map · 中国铁路客流图" />
+    <meta name="twitter:description" content="Minard-style passenger rail flow maps for China's top rail cities. Explore train frequencies, speeds, and direct connections across China's 48,000 km high-speed network." />
+    <meta name="twitter:image" content="https://china-rail-flow-map-web.vercel.app/og-image.png" />
+
     <script>
       (function () {
         try {
-          var s = localStorage.getItem("crfa-theme");
-          var d = s ? s === "dark" : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var p = new URLSearchParams(window.location.search).get("theme");
+          var s = sessionStorage.getItem("crfa-theme");
+          var d = (p === "dark" || p === "night") ? true : (p === "light" || p === "day") ? false : s ? s === "dark" : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
           document.documentElement.setAttribute("data-theme", d ? "dark" : "light");
         } catch (e) {}
       })();
