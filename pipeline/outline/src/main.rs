@@ -88,8 +88,23 @@ fn hav_km(a: [f64; 2], b: [f64; 2]) -> f64 {
 type Chains = Vec<Vec<[f64; 2]>>;
 
 fn snap_chains(chains: Chains, tol_km: f64) -> (Chains, Chains) {
-    let mut pool: Vec<Vec<[f64; 2]>> = chains;
+    let mut pool: Vec<Vec<[f64; 2]>> = Vec::new();
     let mut rings: Vec<Vec<[f64; 2]>> = Vec::new();
+
+    // Separate already-closed rings immediately to keep snapping O(k^2) over open chains only
+    for mut c in chains {
+        if c.len() < 2 {
+            continue;
+        }
+        if hav_km(c[0], *c.last().unwrap()) < 0.1 {
+            let start = c[0];
+            *c.last_mut().unwrap() = start;
+            rings.push(c);
+        } else {
+            pool.push(c);
+        }
+    }
+
     loop {
         let mut best: Option<(f64, usize, usize, usize, usize)> = None;
         for i in 0..pool.len() {
@@ -289,42 +304,70 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     println!(
-        "ways: PRC outer {} inner {}, Taiwan {}, Hainan {}",
+        "ways in relations: PRC outer {} inner {}, Taiwan {}, Hainan {}",
         outer_ways_prc.len(), inner_ways_prc.len(), ways_tw.len(), ways_hn.len()
     );
 
-    let mut wanted: HashSet<i64> = HashSet::new();
-    wanted.extend(&outer_ways_prc);
-    wanted.extend(&inner_ways_prc);
-    wanted.extend(&ways_tw);
-    wanted.extend(&ways_hn);
-
-    // Pass 2: node refs for member ways
-    let (way_refs, need_nodes) = {
+    // Pass 2: node refs for member ways (filtering out maritime straight baselines) + natural=coastline
+    let (way_refs, need_nodes, land_ways_prc, coast_ways) = {
         let reader = ElementReader::from_path(&input)?;
         reader.par_map_reduce(
             |el| {
                 let mut refs_map = HashMap::new();
                 let mut nodes = HashSet::new();
+                let mut land_prc = HashSet::new();
+                let mut coast = HashSet::new();
                 if let Element::Way(w) = el {
-                    if wanted.contains(&w.id()) {
+                    let wid = w.id();
+                    let is_prc_out = outer_ways_prc.contains(&wid);
+                    let is_prc_in = inner_ways_prc.contains(&wid);
+                    let is_tw = ways_tw.contains(&wid);
+                    let is_hn = ways_hn.contains(&wid);
+
+                    let mut is_maritime = false;
+                    let mut is_coastline = false;
+                    for (k, v) in w.tags() {
+                        if k == "maritime" && v == "yes" {
+                            is_maritime = true;
+                        }
+                        if k == "natural" && v == "coastline" {
+                            is_coastline = true;
+                        }
+                    }
+
+                    // Keep land borders of PRC (exclude straight maritime baseline treaty lines)
+                    if is_prc_out && !is_maritime {
+                        land_prc.insert(wid);
+                    }
+                    if is_coastline {
+                        coast.insert(wid);
+                    }
+
+                    if (is_prc_out && !is_maritime) || is_prc_in || is_tw || is_hn || is_coastline {
                         let refs: Vec<i64> = w.refs().collect();
                         for n in refs.iter() {
                             nodes.insert(*n);
                         }
-                        refs_map.insert(w.id(), refs);
+                        refs_map.insert(wid, refs);
                     }
                 }
-                (refs_map, nodes)
+                (refs_map, nodes, land_prc, coast)
             },
-            || (HashMap::new(), HashSet::new()),
+            || (HashMap::new(), HashSet::new(), HashSet::new(), HashSet::new()),
             |mut a, b| {
                 a.0.extend(b.0);
                 a.1.extend(b.1);
+                a.2.extend(b.2);
+                a.3.extend(b.3);
                 a
             },
         )?
     };
+
+    println!(
+        "extracted: PRC land border ways {}, natural coastline ways {}, total nodes {}",
+        land_ways_prc.len(), coast_ways.len(), need_nodes.len()
+    );
 
     // Pass 3: node coordinates
     let coords: HashMap<i64, [f64; 2]> = {
@@ -355,21 +398,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?
     };
 
-    // Chain and snap each territorial unit separately to prevent accidental bridging across straits
+    // Chain and snap:
+    // 1. Mainland China: land border ways + natural coastline ways
+    let mut mainland_ways = land_ways_prc;
+    mainland_ways.extend(coast_ways);
+
     let tol_km = 5.0f64;
-    let (mut rings_prc, mut lines_prc) = snap_chains(chain(&outer_ways_prc, &way_refs, &coords), tol_km);
+    let (mut rings_mainland, mut lines_mainland) = snap_chains(chain(&mainland_ways, &way_refs, &coords), tol_km);
     let (in_rings, in_lines) = snap_chains(chain(&inner_ways_prc, &way_refs, &coords), tol_km);
     let (rings_tw, lines_tw) = snap_chains(chain(&ways_tw, &way_refs, &coords), tol_km);
     let (rings_hn, lines_hn) = snap_chains(chain(&ways_hn, &way_refs, &coords), tol_km);
 
     let mut all_rings: Vec<Vec<[f64; 2]>> = Vec::new();
-    all_rings.append(&mut rings_prc);
+    all_rings.append(&mut rings_mainland);
     all_rings.extend(in_rings);
     all_rings.extend(rings_tw);
     all_rings.extend(rings_hn);
 
     let mut all_lines: Vec<Vec<[f64; 2]>> = Vec::new();
-    all_lines.append(&mut lines_prc);
+    all_lines.append(&mut lines_mainland);
     all_lines.extend(in_lines);
     all_lines.extend(lines_tw);
     all_lines.extend(lines_hn);

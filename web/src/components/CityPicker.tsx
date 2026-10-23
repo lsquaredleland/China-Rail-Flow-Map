@@ -94,7 +94,7 @@ export default function CityPicker({ origins, curIdx, onSelect }: Props) {
         aria-activedescendant=""
         autoComplete="off"
         spellCheck={false}
-        placeholder="Search 100 cities…"
+        placeholder="Search cities…"
         aria-label="Search and choose the origin city"
         ref={inputRef}
         value={value}

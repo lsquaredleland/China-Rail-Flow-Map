@@ -1713,8 +1713,15 @@ fn main() {
     }
     let mut ranked: Vec<(String, u64)> = outbound_count.into_iter().collect();
     ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let lhasa_entry = ranked.iter().find(|(c, _)| c == "拉萨").cloned();
     let top_n = 100usize;
-    let selected: Vec<String> = ranked.iter().take(top_n).map(|(c, _)| c.clone()).collect();
+    let mut selected: Vec<String> = ranked.iter().take(top_n).map(|(c, _)| c.clone()).collect();
+    if !selected.contains(&"拉萨".to_string()) {
+        if let Some((_, n)) = lhasa_entry {
+            println!("Adding Lhasa (拉萨) as a special featured origin city ({} outbound trains)", n);
+            selected.push("拉萨".to_string());
+        }
+    }
     for th in [300u64, 200, 150, 100, 75, 50, 25, 10] {
         println!(
             "TIER outbound >= {}: {} cities",

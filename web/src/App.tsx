@@ -625,7 +625,7 @@ export default function App() {
           </h1>
           <p className="subtitle">
             Flow diagram of trains departing and arriving across China&rsquo;s
-            top 100 rail cities. The width of each line refers to the number of
+            top rail cities (plus Lhasa). The width of each line refers to the number of
             daily trains along that particular piece of track &mdash; spanning{" "}
             <b>7,253</b> scheduled daily passenger services (of over{" "}
             <b>12,000</b> nationwide) across China&rsquo;s{" "}

@@ -398,28 +398,38 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.stroke();
     }
 
-    // 2. Nine-dash line in the South China Sea (dashed maritime boundary)
+    // 2. Open boundary lines & Nine-dash line in the South China Sea
     if (lines && lines.len.length > 0) {
       ctx.strokeStyle = pal.outline;
-      const lw = Math.max(1.0, S.current.view.scale * 0.02);
-      ctx.lineWidth = lw;
-      ctx.lineCap = "butt";
-      ctx.setLineDash([Math.max(6, lw * 2.2), Math.max(4, lw * 1.8)]);
-      ctx.beginPath();
+      const lw = Math.max(0.65, S.current.view.scale * 0.015);
+      const dashLw = Math.max(1.0, S.current.view.scale * 0.02);
+
       for (let i = 0; i < lines.len.length; i++) {
         if (
-          inViewBB(
+          !inViewBB(
             lines.bb[i * 4],
             lines.bb[i * 4 + 1],
             lines.bb[i * 4 + 2],
             lines.bb[i * 4 + 3],
             0.2,
           )
-        ) {
-          traceInto(ctx, lines.pts, lines.off[i], lines.len[i]);
+        )
+          continue;
+
+        const isNineDash = lines.len[i] <= 4;
+        ctx.beginPath();
+        if (isNineDash) {
+          ctx.lineWidth = dashLw;
+          ctx.lineCap = "butt";
+          ctx.setLineDash([Math.max(6, dashLw * 2.2), Math.max(4, dashLw * 1.8)]);
+        } else {
+          ctx.lineWidth = lw;
+          ctx.lineCap = "round";
+          ctx.setLineDash([]);
         }
+        traceInto(ctx, lines.pts, lines.off[i], lines.len[i]);
+        ctx.stroke();
       }
-      ctx.stroke();
       ctx.lineCap = "round";
       ctx.setLineDash([]);
     }
