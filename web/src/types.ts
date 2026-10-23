@@ -195,6 +195,8 @@ export interface DecodedAtlas {
   extent: Extent;
 }
 
+export type AtlasVM = DecodedAtlas;
+
 export interface BBox {
   x0: number;
   y0: number;
@@ -250,6 +252,8 @@ export interface DepVM {
   cls: string;
   dep: string; // "HH:MM" (zero-padded, formatted from minutes at build time)
   arr: string; // "HH:MM"
+  depMins: number;
+  arrMins: number;
   dur: number;
   stops: number;
   tcIdx: number;
@@ -282,6 +286,8 @@ export interface ArrVM {
   cls: string;
   dep: string; // departure "HH:MM" at the true origin
   arr: string; // arrival "HH:MM" in the selected city
+  depMins: number;
+  arrMins: number;
   dur: number; // minutes
   stops: number; // stops before the selected city
   dayOff: number; // arrival day offset from the departure day
@@ -311,6 +317,24 @@ export interface InCallVM {
   secCnt: number; // number of section indices from arrival back to boarding stop
 }
 
+export interface ActiveTrainVM {
+  lon: number;
+  lat: number;
+  heading: number; // in radians
+  cls: string;     // train class e.g. "G", "D", "K", etc.
+  code: string;
+}
+
+export interface DayTimelineVM {
+  stepMins: number; // 5
+  numSteps: number; // 288
+  secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(288) of cumulative train count
+  maxFlowSteps: Uint16Array; // length 288: max flow count across all sections at each step
+  getActiveTrains: (tMins: number) => ActiveTrainVM[];
+  totalTrains: number;
+  getDepartedCount: (tMins: number) => number;
+}
+
 export interface OriginVM {
   o: RawOrigin;
   en: string; // display English name (romanization fixes applied)
@@ -323,6 +347,8 @@ export interface OriginVM {
   srcs: SrcVM[]; // sorted by trains/day desc
   arrs: ArrVM[];
   maxInFlow: number;
+  timeline?: DayTimelineVM;
+  inTimeline?: DayTimelineVM;
 }
 
 export type DistUnit = "km" | "mi";

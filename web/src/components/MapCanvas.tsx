@@ -42,6 +42,16 @@ import type { LegendHandle } from "./Legend";
    crisp hairline tracing every corridor at any scale. */
 const INFRA_WIDTH = 1.25;
 
+export interface AnimState {
+  time: number; // 0 to 1440 minutes
+  isPlaying: boolean;
+  speed: number; // seconds per 24h cycle (e.g. 15, 30, 60), default 30
+  departed: number;
+  total: number;
+  enabled: boolean;
+}
+export type AnimListener = (state: AnimState) => void;
+
 /** Camera/tooltip controls the toolbar drives through a ref. */
 export interface MapApi {
   fitCountry: () => void;
@@ -51,6 +61,13 @@ export interface MapApi {
   clearStationHover: () => void;
   selectDestByZh: (zh: string) => void;
   panZoomTo: (lon: number, lat: number, scale: number) => void;
+  setTime: (tMins: number) => void;
+  setPlaying: (playing: boolean) => void;
+  togglePlaying: () => void;
+  setSpeed: (secPerDay: number) => void;
+  setAnimEnabled: (enabled: boolean) => void;
+  getAnimState: () => AnimState;
+  subscribeAnim: (listener: AnimListener) => () => void;
 }
 
 interface Props {
@@ -138,6 +155,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       dir: Direction;
       counts: Map<number, number> | null;
     } | null,
+    animTime: 360,
+    animPlaying: false,
+    animSpeed: 30,
+    animEnabled: true,
+    animListeners: new Set<AnimListener>(),
+    lastRafTimestamp: null as number | null,
+    animRafId: null as number | null,
   });
 
   /* ---------- camera helpers ---------- */
@@ -540,13 +564,27 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const flows = flowsList();
     const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
 
+    const timeline =
+      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const isAnimated = S.current.animEnabled && !!timeline;
+    const step = isAnimated
+      ? Math.min(287, Math.max(0, Math.floor(S.current.animTime / 5)))
+      : 0;
+    const curMaxN =
+      isAnimated && timeline ? timeline.maxFlowSteps[step] || maxN : maxN;
+    const effectiveMaxN = Math.max(1, curMaxN);
+
     const isFerry = (s: number) =>
       bb[s * 4 + 1] < 20.15 &&
       bb[s * 4 + 3] > 20.20 &&
       bb[s * 4] > 110.0 &&
       bb[s * 4 + 2] < 110.3;
 
-    function strokeFlowList(items: { s: number; n: number }[], alpha: number) {
+    function strokeFlowList(
+      items: { s: number; n: number }[],
+      alpha: number,
+      normMaxN: number,
+    ) {
       ctx.globalAlpha = alpha;
       let curW = -1,
         curCol = "",
@@ -556,6 +594,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
       for (let i = 0; i < items.length; i++) {
         const f = items[i];
+        if (f.n <= 0) continue;
         if (
           !inViewBB(
             bb[f.s * 4],
@@ -567,7 +606,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         )
           continue;
         const bw0 = Math.round(widthOf(f.n) * 4) / 4;
-        const col = flowColor(f.n, maxN, pal);
+        const col = flowColor(f.n, normMaxN, pal);
         if (bw0 !== curW || col !== curCol) {
           if (open) ctx.stroke();
           ctx.beginPath();
@@ -589,6 +628,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const ferryBlue = P.current.dark ? "#38BDF8" : "#0284C7";
       for (let i = 0; i < items.length; i++) {
         const f = items[i];
+        if (f.n <= 0) continue;
         if (!isFerry(f.s)) continue;
         if (
           !inViewBB(
@@ -615,25 +655,61 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.setLineDash([]);
     }
 
+    let activeFlows: { s: number; n: number }[];
+    if (isAnimated && timeline) {
+      activeFlows = [];
+      for (let i = 0; i < flows.length; i++) {
+        const f = flows[i];
+        const n = timeline.secFlowSteps.get(f.s)?.[step] ?? 0;
+        if (n > 0) {
+          activeFlows.push({ s: f.s, n });
+        }
+      }
+      activeFlows.sort((a, b) => b.n - a.n);
+    } else {
+      activeFlows = flows;
+    }
+
     if (destSecCounts) {
-      // Pass 1: faded background of ALL flows at full origin width f.n
-      strokeFlowList(flows, P.current.dark ? 0.16 : 0.18);
-      // Pass 2: exact city-pair flow on top at widthOf(subN) and flowColor(subN, maxN, pal)
+      // Pass 1: faded background of ALL flows at current trunk width
+      strokeFlowList(activeFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
+      // Pass 2: exact city-pair flow on top at widthOf(subN) and flowColor(subN, effectiveMaxN, pal)
       if (destSecCounts.size > 0) {
         const subFlows: { s: number; n: number }[] = [];
-        for (let i = 0; i < flows.length; i++) {
-          const f = flows[i];
-          const subN = destSecCounts.get(f.s) || 0;
-          if (subN > 0) {
-            subFlows.push({ s: f.s, n: subN });
+        if (isAnimated && timeline) {
+          const staticFlowMap = new Map<number, number>();
+          for (let i = 0; i < flows.length; i++) {
+            staticFlowMap.set(flows[i].s, flows[i].n);
+          }
+          for (let i = 0; i < activeFlows.length; i++) {
+            const af = activeFlows[i];
+            const destN = destSecCounts.get(af.s) || 0;
+            if (destN > 0) {
+              const totalN = staticFlowMap.get(af.s) || af.n;
+              const subN = Math.min(
+                destN,
+                Math.max(1, Math.round(af.n * (destN / totalN))),
+              );
+              if (subN > 0) {
+                subFlows.push({ s: af.s, n: subN });
+              }
+            }
+          }
+        } else {
+          for (let i = 0; i < flows.length; i++) {
+            const f = flows[i];
+            const subN = destSecCounts.get(f.s) || 0;
+            if (subN > 0) {
+              subFlows.push({ s: f.s, n: subN });
+            }
           }
         }
         subFlows.sort((a, b) => b.n - a.n);
-        strokeFlowList(subFlows, 1.0);
+        strokeFlowList(subFlows, 1.0, effectiveMaxN);
       }
       ctx.globalAlpha = 1.0;
     } else {
-      strokeFlowList(flows, 1.0);
+      strokeFlowList(activeFlows, 1.0, effectiveMaxN);
     }
   }
 
@@ -815,6 +891,68 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     ctx.lineCap = "round";
     ctx.setLineDash([]);
+  }
+  function drawTrains(ctx: CanvasRenderingContext2D, _pal: Palette) {
+    const cur = P.current.cur;
+    if (!cur) return;
+    const timeline =
+      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    if (!timeline) return;
+
+    const activeTrains = timeline.getActiveTrains(S.current.animTime);
+    if (!activeTrains || activeTrains.length === 0) return;
+
+    const { W, H } = S.current;
+    const tailLen = 12;
+
+    for (let i = 0; i < activeTrains.length; i++) {
+      const tr = activeTrains[i];
+      const px = X(tr.lon);
+      const py = Y(tr.lat);
+      if (px < -20 || px > W + 20 || py < -20 || py > H + 20) continue;
+
+      const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
+      const isConv =
+        tr.cls === "Z" || tr.cls === "T" || tr.cls === "K" || tr.cls === "S";
+
+      const glowColor = isHighSpeed
+        ? "#F59E0B"
+        : isConv
+          ? "#06B6D4"
+          : "#E2E8F0";
+
+      // Tail vector pointing backwards from the movement direction
+      // screen vx = cos(heading), vy = -sin(heading) due to equirectangular latitude inversion
+      const vx = Math.cos(tr.heading);
+      const vy = -Math.sin(tr.heading);
+      const tailX = px - vx * tailLen;
+      const tailY = py - vy * tailLen;
+
+      // Draw tapered motion tail
+      const grad = ctx.createLinearGradient(tailX, tailY, px, py);
+      grad.addColorStop(0, "rgba(255, 255, 255, 0)");
+      grad.addColorStop(1, glowColor);
+
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(px, py);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      // Outer glow
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, 6.2832);
+      ctx.fillStyle = glowColor;
+      ctx.fill();
+
+      // Inner white core
+      ctx.beginPath();
+      ctx.arc(px, py, 2, 0, 6.2832);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+    }
   }
   function drawStations(ctx: CanvasRenderingContext2D, pal: Palette) {
     const cur = P.current.cur;
@@ -1204,6 +1342,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     // The Infrastructure overlay is superimposed on the flows (below
     // the hover highlight, dots and labels).
     if (P.current.showInfra) drawInfra(ctx, pal, destSecCounts);
+    if (st.animEnabled) drawTrains(ctx, pal);
     if (st.hover && st.hover.kind === "seg")
       drawHighlightSeg(
         ctx,
@@ -1303,6 +1442,106 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       st.rafPending = false;
       draw();
     });
+  }
+
+  /* ---------- 24h timeline animation controls ---------- */
+  function getAnimState(): AnimState {
+    const st = S.current;
+    const cur = P.current.cur;
+    const tl =
+      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const total = tl ? tl.totalTrains : 0;
+    const departed = tl ? tl.getDepartedCount(st.animTime) : 0;
+    return {
+      time: st.animTime,
+      isPlaying: st.animPlaying,
+      speed: st.animSpeed,
+      departed,
+      total,
+      enabled: st.animEnabled,
+    };
+  }
+
+  function notifyAnimListeners() {
+    const state = getAnimState();
+    S.current.animListeners.forEach((listener) => {
+      try {
+        listener(state);
+      } catch (err) {
+        console.error("AnimListener error:", err);
+      }
+    });
+  }
+
+  function animLoop(timestamp: number) {
+    const st = S.current;
+    if (!st.animPlaying) {
+      st.animRafId = null;
+      st.lastRafTimestamp = null;
+      return;
+    }
+    if (st.lastRafTimestamp !== null) {
+      const dt = (timestamp - st.lastRafTimestamp) / 1000;
+      if (dt > 0 && dt < 2) {
+        const deltaMins = (dt / Math.max(1, st.animSpeed)) * 1440;
+        st.animTime = (st.animTime + deltaMins) % 1440;
+        draw();
+        notifyAnimListeners();
+      }
+    }
+    st.lastRafTimestamp = timestamp;
+    st.animRafId = requestAnimationFrame(animLoop);
+  }
+
+  function setPlaying(playing: boolean) {
+    const st = S.current;
+    if (st.animPlaying === playing) return;
+    st.animPlaying = playing;
+    if (playing) {
+      st.lastRafTimestamp = null;
+      if (st.animRafId !== null) {
+        cancelAnimationFrame(st.animRafId);
+      }
+      st.animRafId = requestAnimationFrame(animLoop);
+    } else {
+      if (st.animRafId !== null) {
+        cancelAnimationFrame(st.animRafId);
+        st.animRafId = null;
+      }
+      st.lastRafTimestamp = null;
+    }
+    notifyAnimListeners();
+  }
+
+  function togglePlaying() {
+    setPlaying(!S.current.animPlaying);
+  }
+
+  function setTime(tMins: number) {
+    const st = S.current;
+    st.animTime = Math.max(0, Math.min(1440, tMins));
+    draw();
+    notifyAnimListeners();
+  }
+
+  function setSpeed(secPerDay: number) {
+    S.current.animSpeed = Math.max(1, secPerDay);
+    notifyAnimListeners();
+  }
+
+  function setAnimEnabled(enabled: boolean) {
+    const st = S.current;
+    st.animEnabled = enabled;
+    draw();
+    notifyAnimListeners();
+  }
+
+  function subscribeAnim(listener: AnimListener): () => void {
+    S.current.animListeners.add(listener);
+    listener(getAnimState());
+    return () => {
+      S.current.animListeners.delete(listener);
+    };
   }
 
   /* ---------- hit testing & tooltip ---------- */
@@ -1629,11 +1868,26 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         st.view.ty = st.H / 2 + lat * scale;
         draw();
       },
+      setTime,
+      setPlaying,
+      togglePlaying,
+      setSpeed,
+      setAnimEnabled,
+      getAnimState,
+      subscribeAnim,
     }),
     [],
   );
 
   /* ---------- lifecycle ---------- */
+  useEffect(() => {
+    return () => {
+      if (S.current.animRafId !== null) {
+        cancelAnimationFrame(S.current.animRafId);
+        S.current.animRafId = null;
+      }
+    };
+  }, []);
   // Wheel zoom needs a non-passive listener (React attaches passive ones).
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1699,6 +1953,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (curRef.current && props.cur.o === curRef.current.o) {
       curRef.current = props.cur;
       draw();
+      notifyAnimListeners();
       return;
     }
     const isFirstOrigin = curRef.current === null;
@@ -1711,6 +1966,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       st.initialViewApplied = true;
     }
     resize();
+    notifyAnimListeners();
     setSwitching(true);
     const raf = requestAnimationFrame(() =>
       requestAnimationFrame(() => setSwitching(false)),
@@ -1722,6 +1978,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   // Toggle / theme / direction / selected-station changes just need a redraw.
   useEffect(() => {
     draw();
+    notifyAnimListeners();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     props.showNetwork,

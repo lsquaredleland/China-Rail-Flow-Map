@@ -32,6 +32,7 @@ import Legend, { type LegendHandle } from "./components/Legend";
 import DestinationPanel from "./components/DestinationPanel";
 import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
+import TimelineScrubber from "./components/TimelineScrubber";
 
 // The v2 atlas dataset ships in five split files (same origin order
 // throughout): the shared tables and geometry, and per direction a map
@@ -238,6 +239,15 @@ export default function App() {
   const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [dark, setDarkState] = useState<boolean>(initialDark);
+  const [showTimeline, setShowTimeline] = useState<boolean>(true);
+
+  const toggleTimeline = () => {
+    setShowTimeline((prev) => {
+      const next = !prev;
+      mapRef.current?.setAnimEnabled?.(next);
+      return next;
+    });
+  };
 
   const mapRef = useRef<MapApi | null>(null);
   const legendRef = useRef<LegendHandle | null>(null);
@@ -920,6 +930,26 @@ export default function App() {
               Infrastructure
             </button>
             <button
+              id="tglTimeline"
+              type="button"
+              aria-pressed={showTimeline ? "true" : "false"}
+              onClick={toggleTimeline}
+              title="Toggle 24-hour train flow animation and timeline scrubber"
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm.5 4.5v3.25l2.5 1.5-.75 1.25L7 8.5V4.5h1.5z" />
+                </svg>
+                24h Flow
+              </span>
+            </button>
+            <button
               id="btnOut"
               type="button"
               aria-label="Zoom out"
@@ -1023,6 +1053,14 @@ export default function App() {
               }
             />
           </div>
+          {showTimeline && (
+            <TimelineScrubber
+              mapRef={mapRef}
+              dark={dark}
+              direction={direction}
+              originZh={cur?.o.zh}
+            />
+          )}
         </MapCanvas>
 
       </div>

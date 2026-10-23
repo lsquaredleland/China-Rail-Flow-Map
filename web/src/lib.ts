@@ -2,14 +2,18 @@
    palettes, the travel-time ramp, and value formatting. No DOM in here
    except where a function's whole job is producing tooltip HTML. */
 import type {
+  ActiveTrainVM,
   ArrVM,
   AtlasData,
+  AtlasVM,
   BBox,
+  DayTimelineVM,
   DecodedAtlas,
   DecodedOutline,
   DecodedSet,
   DepVM,
   DestVM,
+  Direction,
   DistUnit,
   OriginVM,
   OutlineData,
@@ -526,6 +530,8 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       cls: t.class,
       dep: fmtClock(d[2]),
       arr: fmtClock(d[5]),
+      depMins: d[2],
+      arrMins: d[5],
       dur: d[6],
       stops: d[7],
       tcIdx: d[4],
@@ -656,6 +662,8 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       cls: t.class,
       dep: fmtClock(a[3]),
       arr: fmtClock(a[5]),
+      depMins: a[3],
+      arrMins: a[5],
       dur: a[6],
       stops: a[7],
       dayOff: a[6] >= 0 ? Math.floor((a[3] + a[6]) / 1440) : 0,
@@ -745,7 +753,7 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
     }
     srcs[si].nn = Math.sqrt(best2);
   }
-  return {
+  const res: OriginVM = {
     o,
     en: enName(o.en),
     flows,
@@ -757,6 +765,279 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
     srcs,
     arrs,
     maxInFlow: inFlows.length ? inFlows[0].n : 0,
+  };
+
+  let timelineCache: DayTimelineVM | undefined;
+  let inTimelineCache: DayTimelineVM | undefined;
+
+  Object.defineProperty(res, "timeline", {
+    get() {
+      if (!timelineCache && deps.length > 0) {
+        timelineCache = buildDayTimeline(res, atlas, "out");
+      }
+      return timelineCache;
+    },
+    set(v) {
+      timelineCache = v;
+    },
+    configurable: true,
+    enumerable: true,
+  });
+
+  Object.defineProperty(res, "inTimeline", {
+    get() {
+      if (!inTimelineCache && arrs.length > 0) {
+        inTimelineCache = buildDayTimeline(res, atlas, "in");
+      }
+      return inTimelineCache;
+    },
+    set(v) {
+      inTimelineCache = v;
+    },
+    configurable: true,
+    enumerable: true,
+  });
+
+  return res;
+}
+
+export const prepOrigin = buildOrigin;
+
+interface SecGeometryCache {
+  secLengths: Float64Array;
+  secCumLens: Float64Array[];
+}
+
+function getSecGeometry(secSet: DecodedSet): SecGeometryCache {
+  const cached = (secSet as any)._geoCache as SecGeometryCache | undefined;
+  if (cached) return cached;
+  const numSections = secSet.len.length;
+  const secLengths = new Float64Array(numSections);
+  const secCumLens: Float64Array[] = new Array(numSections);
+  for (let s = 0; s < numSections; s++) {
+    const off = secSet.off[s];
+    const cnt = secSet.len[s];
+    if (cnt <= 1) {
+      secLengths[s] = 0;
+      secCumLens[s] = new Float64Array(cnt);
+      continue;
+    }
+    const cum = new Float64Array(cnt);
+    let sum = 0;
+    for (let k = 0; k < cnt - 1; k++) {
+      const p0x = secSet.pts[off + k * 2];
+      const p0y = secSet.pts[off + k * 2 + 1];
+      const p1x = secSet.pts[off + (k + 1) * 2];
+      const p1y = secSet.pts[off + (k + 1) * 2 + 1];
+      sum += haversineKm([p0x, p0y], [p1x, p1y]);
+      cum[k + 1] = sum;
+    }
+    secLengths[s] = sum;
+    secCumLens[s] = cum;
+  }
+  const result: SecGeometryCache = { secLengths, secCumLens };
+  (secSet as any)._geoCache = result;
+  return result;
+}
+
+export function buildDayTimeline(
+  cur: OriginVM,
+  atlas: AtlasVM,
+  dir: Direction,
+): DayTimelineVM {
+  const isOut = dir === "out";
+  const secSet = isOut ? atlas.sec : atlas.inSec;
+  const stepMins = 5;
+  const numSteps = 288;
+  const secFlowSteps = new Map<number, Uint16Array>();
+  const maxFlowSteps = new Uint16Array(numSteps);
+
+  if (!secSet || !secSet.len) {
+    return {
+      stepMins,
+      numSteps,
+      secFlowSteps,
+      maxFlowSteps,
+      getActiveTrains: () => [],
+      totalTrains: 0,
+      getDepartedCount: () => 0,
+    };
+  }
+
+  const { secLengths, secCumLens } = getSecGeometry(secSet);
+  const rawTrains = isOut ? cur.deps || [] : cur.arrs || [];
+  const totalTrains = rawTrains.length;
+
+  // Initialize flow sections from cur.flows / cur.inFlows
+  const flows = isOut ? cur.flows || [] : cur.inFlows || [];
+  for (let i = 0; i < flows.length; i++) {
+    const s = flows[i].s;
+    if (!secFlowSteps.has(s)) {
+      secFlowSteps.set(s, new Uint16Array(numSteps));
+    }
+  }
+
+  interface PrepTrain {
+    code: string;
+    cls: string;
+    depMins: number;
+    arrMins: number;
+    dur: number;
+    totalDist: number;
+    secs: number[];
+    secStarts: Float64Array;
+  }
+
+  const prepTrains: PrepTrain[] = [];
+
+  for (let ti = 0; ti < rawTrains.length; ti++) {
+    const train = rawTrains[ti];
+    const rawSecs = train.secs || [];
+    // Outbound secs are in travel order.
+    // Inbound secs are stored arrival to origin, so reverse them for travel order.
+    const routeSecs = isOut ? rawSecs : rawSecs.slice().reverse();
+
+    let totalDist = 0;
+    const secStarts = new Float64Array(routeSecs.length);
+    for (let i = 0; i < routeSecs.length; i++) {
+      secStarts[i] = totalDist;
+      totalDist += secLengths[routeSecs[i]] || 0;
+    }
+
+    const dur = train.dur > 0 ? train.dur : 1;
+    const depMins =
+      typeof train.depMins === "number" && train.depMins >= 0
+        ? train.depMins
+        : 0;
+    const arrMins = depMins + dur;
+
+    prepTrains.push({
+      code: train.code,
+      cls: train.cls,
+      depMins,
+      arrMins,
+      dur,
+      totalDist,
+      secs: routeSecs,
+      secStarts,
+    });
+
+    // Populate secFlowSteps
+    for (let i = 0; i < routeSecs.length; i++) {
+      const s_i = routeSecs[i];
+      const distBefore = secStarts[i];
+      const frac = totalDist > 0 ? distBefore / totalDist : 0;
+      const tEnter = depMins + frac * dur;
+
+      let stepArr = secFlowSteps.get(s_i);
+      if (!stepArr) {
+        stepArr = new Uint16Array(numSteps);
+        secFlowSteps.set(s_i, stepArr);
+      }
+
+      const startStep = Math.max(0, Math.ceil(tEnter / stepMins));
+      for (let step = startStep; step < numSteps; step++) {
+        stepArr[step]++;
+      }
+    }
+  }
+
+  // Max flow across all sections at each 5-min step
+  for (let step = 0; step < numSteps; step++) {
+    let m = 0;
+    for (const arr of secFlowSteps.values()) {
+      if (arr[step] > m) m = arr[step];
+    }
+    maxFlowSteps[step] = m;
+  }
+
+  function getActiveTrains(tMins: number): ActiveTrainVM[] {
+    const active: ActiveTrainVM[] = [];
+    for (let i = 0; i < prepTrains.length; i++) {
+      const pt = prepTrains[i];
+      if (
+        tMins < pt.depMins ||
+        tMins > pt.arrMins ||
+        pt.totalDist <= 0 ||
+        pt.secs.length === 0
+      ) {
+        continue;
+      }
+      const alpha = Math.max(0, Math.min(1, (tMins - pt.depMins) / pt.dur));
+      const targetDist = alpha * pt.totalDist;
+
+      // Find which section in the route
+      let secIdx = 0;
+      while (
+        secIdx < pt.secs.length - 1 &&
+        pt.secStarts[secIdx + 1] <= targetDist
+      ) {
+        secIdx++;
+      }
+      const s = pt.secs[secIdx];
+      const distInSec = targetDist - pt.secStarts[secIdx];
+
+      // Find which segment within section s
+      const off = secSet.off[s];
+      const cnt = secSet.len[s];
+      if (cnt <= 1) {
+        if (cnt === 1) {
+          active.push({
+            lon: secSet.pts[off],
+            lat: secSet.pts[off + 1],
+            heading: 0,
+            cls: pt.cls,
+            code: pt.code,
+          });
+        }
+        continue;
+      }
+
+      const cum = secCumLens[s];
+      let k = 0;
+      while (k < cnt - 2 && cum[k + 1] < distInSec) {
+        k++;
+      }
+      const segLen = cum[k + 1] - cum[k];
+      const segAlpha =
+        segLen > 0 ? Math.max(0, Math.min(1, (distInSec - cum[k]) / segLen)) : 0;
+      const lon0 = secSet.pts[off + k * 2];
+      const lat0 = secSet.pts[off + k * 2 + 1];
+      const lon1 = secSet.pts[off + (k + 1) * 2];
+      const lat1 = secSet.pts[off + (k + 1) * 2 + 1];
+      const lon = lon0 + segAlpha * (lon1 - lon0);
+      const lat = lat0 + segAlpha * (lat1 - lat0);
+      const heading = Math.atan2(lat1 - lat0, lon1 - lon0);
+
+      active.push({
+        lon,
+        lat,
+        heading,
+        cls: pt.cls,
+        code: pt.code,
+      });
+    }
+    return active;
+  }
+
+  function getDepartedCount(tMins: number): number {
+    let count = 0;
+    for (let i = 0; i < prepTrains.length; i++) {
+      if (prepTrains[i].depMins <= tMins) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  return {
+    stepMins,
+    numSteps,
+    secFlowSteps,
+    maxFlowSteps,
+    getActiveTrains,
+    totalTrains,
+    getDepartedCount,
   };
 }
 
@@ -864,5 +1145,7 @@ export function filterOriginByClasses(
     srcs,
     arrs,
     maxInFlow: inFlows.length ? inFlows[0].n : 0,
+    timeline: cur.timeline,
+    inTimeline: cur.inTimeline,
   };
 }
