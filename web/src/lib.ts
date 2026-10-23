@@ -609,6 +609,7 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
               : deps[call[0]]
                 ? deps[call[0]].secs.length
                 : 0,
+          arrMins: call[1] >= 0 ? call[3] * 1440 + call[1] : -1,
         };
       }),
     };
@@ -749,6 +750,8 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
               : arrs[call[0]]
                 ? arrs[call[0]].secs.length
                 : 0,
+          boardMins: call[1],
+          arrMins: call[2] >= 0 ? call[3] * 1440 + call[2] : -1,
         };
       }),
     };

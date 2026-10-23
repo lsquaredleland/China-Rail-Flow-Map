@@ -956,15 +956,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     ctx.setLineDash([]);
   }
   function getAllowedTrainCodes(): Set<string> | null {
+    if (P.current.isolatedTrainCode) {
+      return new Set([P.current.isolatedTrainCode]);
+    }
     const pd = P.current.panelDest;
     const cur = P.current.cur;
     if (!pd || !cur) return null;
 
     const allowed = new Set<string>();
     if (P.current.direction === "out") {
-      const dest = (pd as DestVM).calls
-        ? (pd as DestVM)
-        : cur.dests.find((d) => d.idx === pd.idx);
+      const dest = cur.dests.find((d) => d.idx === pd.idx) || (pd as DestVM);
       if (dest && dest.calls) {
         for (let i = 0; i < dest.calls.length; i++) {
           const c = dest.calls[i];
@@ -974,9 +975,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         }
       }
     } else {
-      const src = (pd as SrcVM).inCalls
-        ? (pd as SrcVM)
-        : cur.srcs.find((s) => s.idx === pd.idx);
+      const src = cur.srcs.find((s) => s.idx === pd.idx) || (pd as SrcVM);
       if (src && src.inCalls) {
         for (let i = 0; i < src.inCalls.length; i++) {
           const c = src.inCalls[i];
@@ -987,6 +986,59 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       }
     }
     return allowed;
+  }
+
+  function getCityAllowedArrivalTimes(
+    c: CityPointVM,
+    allowedCodes: Set<string> | null,
+  ): number[] | null {
+    if (!allowedCodes) return c.arrTimes || null;
+    const cur = P.current.cur;
+    if (!cur) return null;
+
+    if (P.current.direction === "out") {
+      const dest = cur.dests.find((d) => d.idx === c.idx) || (c as DestVM);
+      const calls = dest?.calls;
+      if (!calls || calls.length === 0) return [];
+      const times: number[] = [];
+      for (let i = 0; i < calls.length; i++) {
+        const call = calls[i];
+        if (call.dep && allowedCodes.has(call.dep.code)) {
+          const m =
+            call.arrMins !== undefined
+              ? call.arrMins
+              : call.dayOff * 1440 +
+                parseInt(call.arr.slice(0, 2), 10) * 60 +
+                parseInt(call.arr.slice(3, 5), 10);
+          if (typeof m === "number" && !isNaN(m) && m >= 0) {
+            times.push(m);
+          }
+        }
+      }
+      times.sort((a, b) => a - b);
+      return times;
+    } else {
+      const src = cur.srcs.find((s) => s.idx === c.idx) || (c as SrcVM);
+      const inCalls = src?.inCalls;
+      if (!inCalls || inCalls.length === 0) return [];
+      const times: number[] = [];
+      for (let i = 0; i < inCalls.length; i++) {
+        const call = inCalls[i];
+        if (call.arr && allowedCodes.has(call.arr.code)) {
+          const m =
+            call.arrMins !== undefined
+              ? call.arrMins
+              : call.dayOff * 1440 +
+                parseInt(call.arrTime.slice(0, 2), 10) * 60 +
+                parseInt(call.arrTime.slice(3, 5), 10);
+          if (typeof m === "number" && !isNaN(m) && m >= 0) {
+            times.push(m);
+          }
+        }
+      }
+      times.sort((a, b) => a - b);
+      return times;
+    }
   }
 
   function drawTrains(ctx: CanvasRenderingContext2D, _pal: Palette) {
@@ -1119,24 +1171,32 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       )
         return;
 
-      // Dynamic city circle sizing: circle grows only when a train arrives at this city
-      let effectiveTrains = c.trains;
+      const allowedCodes = getAllowedTrainCodes();
+      const cityArrTimes = getCityAllowedArrivalTimes(c, allowedCodes);
+      const totalCityTrains = allowedCodes
+        ? cityArrTimes
+          ? cityArrTimes.length
+          : 0
+        : c.trains;
+
+      // Dynamic city circle sizing: circle grows only when an allowed train arrives at this city
+      let effectiveTrains = totalCityTrains;
       let recentArrival = false;
       let pulseDt = 0;
       if (isAnimated && timeline) {
         const t = S.current.animTime;
         if (t >= timeline.totalMins) {
           // Finished: all trips completed
-          effectiveTrains = c.trains;
-        } else if (c.arrTimes && c.arrTimes.length > 0) {
+          effectiveTrains = totalCityTrains;
+        } else if (cityArrTimes && cityArrTimes.length > 0) {
           let count = 0;
-          for (let k = 0; k < c.arrTimes.length; k++) {
-            if (c.arrTimes[k] <= t) count++;
+          for (let k = 0; k < cityArrTimes.length; k++) {
+            if (cityArrTimes[k] <= t) count++;
             else break;
           }
           effectiveTrains = count;
           if (count > 0) {
-            const lastArr = c.arrTimes[count - 1];
+            const lastArr = cityArrTimes[count - 1];
             const dt = t - lastArr;
             if (dt >= 0 && dt <= 20) {
               recentArrival = true;
@@ -1161,8 +1221,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.strokeStyle = pal.dotEdge;
       ctx.stroke();
 
-      // Golden arrival pulse ripple when a train has arrived at this city (never before)
-      if (recentArrival && isAnimated) {
+      // Golden arrival pulse ripple when an allowed train has arrived at this city (never outside allowed trains)
+      if (recentArrival && isAnimated && (!allowedCodes || totalCityTrains > 0)) {
         const frac = pulseDt / 20;
         ctx.save();
         ctx.beginPath();

@@ -279,6 +279,7 @@ export interface CallVM {
   dayOff: number; // arrival day offset relative to the boarding day
   term: boolean; // true when the train's final destination is this city
   secCnt: number; // number of section indices from origin to this stop
+  arrMins?: number; // total arrival minutes from midnight including dayOff
 }
 
 /** One train arriving in the selected city, joined to its tables. */
@@ -316,6 +317,8 @@ export interface InCallVM {
   bsZh: string; // boarding station in the source city
   bsEn: string;
   secCnt: number; // number of section indices from arrival back to boarding stop
+  arrMins?: number; // total arrival minutes in selected city
+  boardMins?: number; // boarding minutes in source city
 }
 
 export interface ActiveTrainVM {

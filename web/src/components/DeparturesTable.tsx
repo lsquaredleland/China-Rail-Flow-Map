@@ -33,6 +33,7 @@ interface Props {
   onSelectTrain?: (code: string) => void;
   isolatedTrainCode?: string | null;
   onClearTrainIsolation?: () => void;
+  onSelectCity?: (city: CityPointVM | null) => void;
 }
 
 type SortKey = "dep" | "dur" | "km";
@@ -177,6 +178,7 @@ export default function DeparturesTable({
   onSelectTrain,
   isolatedTrainCode,
   onClearTrainIsolation,
+  onSelectCity,
 }: Props) {
   const [query, setQuery] = useState("");
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
@@ -223,6 +225,12 @@ export default function DeparturesTable({
         : matchCityFromQuery(cur, direction, rawQ),
     [cur, direction, panelCity, rawQ],
   );
+
+  useEffect(() => {
+    if (!panelCity && matched.city) {
+      onSelectCity?.(matched.city);
+    }
+  }, [matched.city, panelCity, onSelectCity]);
 
   const activeCity: CityPointVM | null = useMemo(() => {
     const raw = panelCity || matched.city;
@@ -328,11 +336,9 @@ export default function DeparturesTable({
   }, [srcFilter]);
 
   const handleClearChip = () => {
-    if (matched.city && !panelCity) {
-      setQuery("");
-    } else {
-      onClearFilter();
-    }
+    setQuery("");
+    onClearFilter();
+    onSelectCity?.(null);
   };
 
   /* ---------------- tables still in flight ---------------- */

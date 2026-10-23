@@ -1205,6 +1205,7 @@ export default function App() {
         onSelectTrain={setSelectedTrainCode}
         isolatedTrainCode={isolatedTrainCode}
         onClearTrainIsolation={() => setIsolatedTrainCode(null)}
+        onSelectCity={(c) => handleSelectDest(c)}
       />
 
       <footer id="pageFooter">
