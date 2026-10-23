@@ -145,6 +145,13 @@ function initialDirection(): Direction {
 }
 
 function initialDark(): boolean {
+  try {
+    const saved = window.localStorage && localStorage.getItem("crfa-theme");
+    if (saved === "dark") return true;
+    if (saved === "light") return false;
+  } catch {
+    /* storage unavailable */
+  }
   return !!(
     window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -182,7 +189,7 @@ export default function App() {
   // as long as the panel does.
   const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-  const [dark, setDark] = useState<boolean>(initialDark);
+  const [dark, setDarkState] = useState<boolean>(initialDark);
 
   const mapRef = useRef<MapApi | null>(null);
   const legendRef = useRef<LegendHandle | null>(null);
@@ -450,9 +457,20 @@ export default function App() {
 
   /* ---------- theme ---------- */
   useEffect(() => {
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  }, [dark]);
+
+  useEffect(() => {
     if (!window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setDark(mq.matches);
+    const onChange = () => {
+      try {
+        if (localStorage.getItem("crfa-theme")) return;
+      } catch {
+        /* storage unavailable */
+      }
+      setDarkState(mq.matches);
+    };
     if (mq.addEventListener) mq.addEventListener("change", onChange);
     return () => {
       if (mq.removeEventListener) mq.removeEventListener("change", onChange);
@@ -545,6 +563,17 @@ export default function App() {
     }
     // The open panel re-renders from state; refresh a visible tooltip too.
     if (mapRef.current) mapRef.current.refreshTooltip();
+  };
+
+  const setDark = (d: boolean) => {
+    if (d === dark) return;
+    setDarkState(d);
+    try {
+      if (window.localStorage)
+        localStorage.setItem("crfa-theme", d ? "dark" : "light");
+    } catch {
+      /* storage unavailable */
+    }
   };
 
   const origins = atlas ? atlas.data.origins : [];
@@ -793,6 +822,31 @@ export default function App() {
               onClick={() => setDistUnit("mi")}
             >
               mi
+            </button>
+          </div>
+          <div
+            id="themeToggle"
+            className="group theme-toggle"
+            role="group"
+            aria-label="Day or night mode"
+          >
+            <button
+              id="themeDay"
+              type="button"
+              aria-pressed={!dark ? "true" : "false"}
+              onClick={() => setDark(false)}
+              title="Day mode"
+            >
+              Day
+            </button>
+            <button
+              id="themeNight"
+              type="button"
+              aria-pressed={dark ? "true" : "false"}
+              onClick={() => setDark(true)}
+              title="Night mode"
+            >
+              Night
             </button>
           </div>
           <span className="hint">

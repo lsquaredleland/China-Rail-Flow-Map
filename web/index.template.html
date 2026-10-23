@@ -6,8 +6,19 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="data:," />
     <title>China Rail Flow Map</title>
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem("crfa-theme");
+          var d = s ? s === "dark" : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", d ? "dark" : "light");
+        } catch (e) {}
+      })();
+    </script>
     <style>
-      :root {
+      :root,
+      :root[data-theme="light"] {
+        color-scheme: light;
         --paper: #f7f5f0;
         --paper-deep: #efece5;
         --ink: #40231a;
@@ -30,7 +41,8 @@
         --shadow-pop: 0 2px 6px rgba(64, 35, 26, 0.12), 0 16px 40px rgba(64, 35, 26, 0.22);
       }
       @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme="light"]) {
+          color-scheme: dark;
           --paper: #221b11;
           --paper-deep: #1b150d;
           --ink: #ecdfc2;
@@ -52,6 +64,29 @@
           --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px rgba(0, 0, 0, 0.45);
           --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.55);
         }
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --paper: #221b11;
+        --paper-deep: #1b150d;
+        --ink: #ecdfc2;
+        --ink-soft: #b8a67f;
+        --rust: #ff8c42;
+        --rust-dark: #ffab73;
+        --indigo: #9aa1e0;
+        --teal: #3dc49b;
+        --rule: #55452a;
+        --panel: rgba(38, 30, 18, 0.94);
+        --panel-edge: #55452a;
+        --btn-bg: #322817;
+        --btn-on: #ff8c42;
+        --btn-on-ink: #1d1509;
+        --field: #2b2113;
+        --row-alt: rgba(236, 223, 194, 0.05);
+        --tooltip-bg: #f3ead2;
+        --tooltip-ink: #2e2114;
+        --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px rgba(0, 0, 0, 0.45);
+        --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.55);
       }
       * { box-sizing: border-box; }
       html, body { overflow-x: hidden; }
@@ -148,6 +183,11 @@
       .units button { min-width: 40px; }
       .units button:first-child { border-radius: 6px 0 0 6px; }
       .units button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+      /* Segmented Day | Night switcher: two toolbar buttons joined into one pill. */
+      .toolbar .theme-toggle { display: inline-flex; gap: 0; }
+      .theme-toggle button { min-width: 42px; }
+      .theme-toggle button:first-child { border-radius: 6px 0 0 6px; }
+      .theme-toggle button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
       .city-picker { display: flex; align-items: center; gap: 7px; }
       .city-picker label { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
       .combo { position: relative; }
@@ -301,9 +341,12 @@
       #legend .lg-steps { fill: var(--rust); }
       #legend .lg-dot { fill: var(--ink); fill-opacity: 0.3; stroke: var(--ink); }
       @media (prefers-color-scheme: dark) {
-        #legend .lg-steps { fill: var(--rust); }
-        #legend .lg-dot { fill: var(--ink); stroke: var(--ink); }
+        :root:not([data-theme="light"]) #legend .lg-steps { fill: var(--rust); }
+        :root:not([data-theme="light"]) #legend .lg-dot { fill: var(--ink); fill-opacity: 1; stroke: var(--ink); }
       }
+      :root[data-theme="dark"] #legend .lg-steps { fill: var(--rust); }
+      :root[data-theme="dark"] #legend .lg-dot { fill: var(--ink); fill-opacity: 1; stroke: var(--ink); }
+      :root[data-theme="light"] #legend .lg-dot { fill-opacity: 0.3; }
       /* The explanatory notes are the page's closing footnote, below
          everything else (after the departures table). */
       #legendNotes {
@@ -320,13 +363,14 @@
       }
       #legendNotes .note:last-child { margin-bottom: 0; }
       #legendNotes .dash {
-        display: inline-block; width: 20px; border-top: 2px dashed #9a7d55;
+        display: inline-block; width: 20px; border-top: 2px dashed #c9b8a6;
         vertical-align: middle; margin-right: 5px;
       }
-      @media (prefers-color-scheme: light) {
-        /* The footnote's dashed sample matches the chord colour. */
-        #legendNotes .dash { border-top-color: #c9b8a6; }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) #legendNotes .dash { border-top-color: #9a7d55; }
       }
+      :root[data-theme="dark"] #legendNotes .dash { border-top-color: #9a7d55; }
+      :root[data-theme="light"] #legendNotes .dash { border-top-color: #c9b8a6; }
       #legend h2 {
         margin: 0 0 5px;
         font-size: 11px;
