@@ -775,7 +775,7 @@ export default function App() {
                   </div>
                   <div>
                     <b>{viewCur.maxFlow}</b>{" "}
-                    <span>trains/day on the busiest sections</span>
+                    <span>trains/day on the busiest corridors</span>
                   </div>
                 </>
               ) : (
@@ -804,7 +804,7 @@ export default function App() {
                   </div>
                   <div>
                     <b>{viewCur.maxInFlow}</b>{" "}
-                    <span>trains/day on the busiest sections</span>
+                    <span>trains/day on the busiest corridors</span>
                   </div>
                 </>
               ))}
