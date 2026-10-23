@@ -335,6 +335,28 @@ export interface DayTimelineVM {
   getDepartedCount: (tMins: number) => number;
 }
 
+export interface DistBinFilter {
+  bin: number;
+  nb: number;
+  size: number;
+  label: string;
+}
+
+export interface DurBinFilter {
+  bin: number;
+  nb: number;
+  size: number; // in minutes (60 = 1h)
+  label: string;
+}
+
+export interface OriginFilterCriteria {
+  classes?: string[];
+  hour?: number | null;
+  distBin?: DistBinFilter | null;
+  durBin?: DurBinFilter | null;
+  unit?: DistUnit;
+}
+
 export interface OriginVM {
   o: RawOrigin;
   en: string; // display English name (romanization fixes applied)

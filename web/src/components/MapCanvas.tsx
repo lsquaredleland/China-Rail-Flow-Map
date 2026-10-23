@@ -155,7 +155,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       dir: Direction;
       counts: Map<number, number> | null;
     } | null,
-    animTime: 360,
+    animTime: 1440,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: true,
@@ -1498,6 +1498,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (st.animPlaying === playing) return;
     st.animPlaying = playing;
     if (playing) {
+      if (st.animTime >= 1440) {
+        st.animTime = 0;
+      }
       st.lastRafTimestamp = null;
       if (st.animRafId !== null) {
         cancelAnimationFrame(st.animRafId);

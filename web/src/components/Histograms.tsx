@@ -3,24 +3,14 @@ import type {
   CityPointVM,
   DestVM,
   Direction,
+  DistBinFilter,
   DistUnit,
+  DurBinFilter,
   OriginVM,
   SrcVM,
 } from "../types";
 
-export interface DistBinFilter {
-  bin: number;
-  nb: number;
-  size: number;
-  label: string;
-}
-
-export interface DurBinFilter {
-  bin: number;
-  nb: number;
-  size: number; // in minutes (60 = 1h)
-  label: string;
-}
+export type { DistBinFilter, DurBinFilter };
 
 interface Props {
   cur: OriginVM;
@@ -314,10 +304,8 @@ export default function Histograms({
           cls: d.cls,
         }));
 
-    let subRows: { time: string; distKm: number; dur: number; cls: string }[] | null =
-      null;
-    if (fullCity) {
-      const cityRows = inbound
+    const baseSubRows = fullCity
+      ? inbound
         ? ((fullCity as SrcVM).inCalls || []).map((c) => ({
             time: c.arr.arr,
             distKm: c.arr.distKm,
@@ -329,22 +317,69 @@ export default function Histograms({
             distKm: c.dep.distKm,
             dur: c.dep.dur,
             cls: c.dep.cls,
-          }));
-      subRows = hasClassFilter
-        ? cityRows.filter((r) => selectedClasses!.includes(r.cls))
-        : cityRows;
-    } else if (hasClassFilter) {
-      subRows = rows.filter((r) => selectedClasses!.includes(r.cls));
-    }
+          }))
+      : rows;
+
+    const matchesClass = (r: { cls: string }) =>
+      !hasClassFilter || selectedClasses!.includes(r.cls);
+
+    const matchesHour = (r: { time: string }) => {
+      if (selectedHour === null || selectedHour === undefined) return true;
+      const h = parseInt(r.time.slice(0, 2), 10);
+      return h === selectedHour;
+    };
+
+    const matchesDist = (r: { distKm: number }) => {
+      if (!selectedDistBin) return true;
+      const v = unit === "km" ? r.distKm : r.distKm * 0.621371;
+      const b = Math.min(
+        selectedDistBin.nb - 1,
+        Math.max(0, Math.floor(v / selectedDistBin.size)),
+      );
+      return b === selectedDistBin.bin;
+    };
+
+    const matchesDur = (r: { dur: number }) => {
+      if (!selectedDurBin) return true;
+      const b = Math.min(
+        selectedDurBin.nb - 1,
+        Math.max(0, Math.floor(r.dur / selectedDurBin.size)),
+      );
+      return b === selectedDurBin.bin;
+    };
+
+    const hasOtherForHour =
+      fullCity || hasClassFilter || selectedDistBin || selectedDurBin;
+    const subRowsHour = hasOtherForHour
+      ? baseSubRows.filter(
+          (r) => matchesClass(r) && matchesDist(r) && matchesDur(r),
+        )
+      : null;
+
+    const hasOtherForDist =
+      fullCity || hasClassFilter || (selectedHour !== null && selectedHour !== undefined) || selectedDurBin;
+    const subRowsDist = hasOtherForDist
+      ? baseSubRows.filter(
+          (r) => matchesClass(r) && matchesHour(r) && matchesDur(r),
+        )
+      : null;
+
+    const hasOtherForDur =
+      fullCity || hasClassFilter || (selectedHour !== null && selectedHour !== undefined) || selectedDistBin;
+    const subRowsDur = hasOtherForDur
+      ? baseSubRows.filter(
+          (r) => matchesClass(r) && matchesHour(r) && matchesDist(r),
+        )
+      : null;
 
     const hours = new Array<number>(24).fill(0);
     for (const d of rows) {
       const h = parseInt(d.time.slice(0, 2), 10);
       if (h >= 0 && h < 24) hours[h]++;
     }
-    const subHours = subRows ? new Array<number>(24).fill(0) : null;
-    if (subRows && subHours) {
-      for (const d of subRows) {
+    const subHours = subRowsHour ? new Array<number>(24).fill(0) : null;
+    if (subRowsHour && subHours) {
+      for (const d of subRowsHour) {
         const h = parseInt(d.time.slice(0, 2), 10);
         if (h >= 0 && h < 24) subHours[h]++;
       }
@@ -355,13 +390,13 @@ export default function Histograms({
       : clsText;
     const hTitles = hours.map((c, h) => {
       const base = pad2(h) + ":00–" + pad2(h + 1) + ":00 · ";
-      if (subHours && subDesc) {
+      if (subHours && (subDesc || hasOtherForHour)) {
         const sc = subHours[h];
         return (
           base +
           sc +
           " " +
-          subDesc +
+          (subDesc || "filtered") +
           " (of " +
           c +
           trainsWord(c) +
@@ -385,9 +420,9 @@ export default function Histograms({
       const b = Math.min(nb - 1, Math.floor(v / size));
       dist[b]++;
     }
-    const subDist = subRows ? new Array<number>(nb).fill(0) : null;
-    if (subRows && subDist) {
-      for (const d of subRows) {
+    const subDist = subRowsDist ? new Array<number>(nb).fill(0) : null;
+    if (subRowsDist && subDist) {
+      for (const d of subRowsDist) {
         const v = unit === "km" ? d.distKm : d.distKm * 0.621371;
         const b = Math.min(nb - 1, Math.max(0, Math.floor(v / size)));
         subDist[b]++;
@@ -408,14 +443,14 @@ export default function Histograms({
     );
     const dTitles = dist.map((c, b) => {
       const range = ranges[b];
-      if (subDist && subDesc) {
+      if (subDist && (subDesc || hasOtherForDist)) {
         const sc = subDist[b];
         return (
           range +
           " · " +
           sc +
           " " +
-          subDesc +
+          (subDesc || "filtered") +
           " (of " +
           c +
           trainsWord(c) +
@@ -455,9 +490,9 @@ export default function Histograms({
         dur[b]++;
       }
     }
-    const subDur = subRows ? new Array<number>(dNb).fill(0) : null;
-    if (subRows && subDur) {
-      for (const r of subRows) {
+    const subDur = subRowsDur ? new Array<number>(dNb).fill(0) : null;
+    if (subRowsDur && subDur) {
+      for (const r of subRowsDur) {
         if (r.dur >= 0) {
           const b = Math.min(dNb - 1, Math.floor(r.dur / durSize));
           subDur[b]++;
@@ -471,14 +506,14 @@ export default function Histograms({
     );
     const tTitles = dur.map((c, b) => {
       const range = dRanges[b];
-      if (subDur && subDesc) {
+      if (subDur && (subDesc || hasOtherForDur)) {
         const sc = subDur[b];
         return (
           range +
           " · " +
           sc +
           " " +
-          subDesc +
+          (subDesc || "filtered") +
           " (of " +
           c +
           trainsWord(c) +
@@ -520,7 +555,18 @@ export default function Histograms({
       durTicks: tTicks,
       durTitles: tTitles,
     };
-  }, [cur, unit, inbound, panelCity, hasClassFilter, selectedClasses, clsText]);
+  }, [
+    cur,
+    unit,
+    inbound,
+    panelCity,
+    hasClassFilter,
+    selectedClasses,
+    clsText,
+    selectedHour,
+    selectedDistBin,
+    selectedDurBin,
+  ]);
 
   if ((inbound ? cur.arrs.length : cur.deps.length) === 0) return null;
 

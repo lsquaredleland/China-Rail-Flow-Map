@@ -74,7 +74,10 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
       // 4. Time period / Rush hour badge
       if (rushBadgeRef.current) {
-        if (t >= 420 && t <= 570) {
+        if (t >= 1440) {
+          rushBadgeRef.current.textContent = "Full 24h Day";
+          rushBadgeRef.current.className = "ts-badge";
+        } else if (t >= 420 && t <= 570) {
           rushBadgeRef.current.textContent = "Morning Rush";
           rushBadgeRef.current.className = "ts-badge ts-badge-rush";
         } else if (t >= 1050 && t <= 1230) {

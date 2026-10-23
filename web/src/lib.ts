@@ -15,6 +15,8 @@ import type {
   DestVM,
   Direction,
   DistUnit,
+  FlowVM,
+  OriginFilterCriteria,
   OriginVM,
   OutlineData,
   Palette,
@@ -985,7 +987,13 @@ export function buildDayTimeline(
         secFlowSteps.set(s_i, stepArr);
       }
 
-      const startStep = Math.max(0, Math.ceil(tEnter / stepMins));
+      // Clamp startStep to [0, numSteps - 1] so that late-departing trains that
+      // traverse sections into the following day contribute their full flow count
+      // by the end of the 24-hour cycle (step 287 / 24:00).
+      const startStep = Math.min(
+        numSteps - 1,
+        Math.max(0, Math.ceil(tEnter / stepMins)),
+      );
       for (let step = startStep; step < numSteps; step++) {
         stepArr[step]++;
       }
@@ -1103,45 +1111,157 @@ export function buildDayTimeline(
   };
 }
 
-/** Return a derived OriginVM filtered to the selected train classes
-    (e.g. ["G", "D"]). Preserves `o` reference identity so MapCanvas
-    redraws in place without resetting camera zoom/pan. */
-export function filterOriginByClasses(
+/** Return a derived OriginVM filtered to the selected train classes,
+    departure/arrival hour, journey distance bin, or journey duration bin.
+    Preserves `o` reference identity so MapCanvas redraws in place without
+    resetting camera zoom/pan. */
+export function filterOrigin(
   cur: OriginVM,
-  selectedClasses: string[],
+  criteria: OriginFilterCriteria,
 ): OriginVM {
-  if (!selectedClasses.length) return cur;
-  const clsIndices = Array.from(new Set(selectedClasses.map(classIndex)));
+  const {
+    classes = [],
+    hour = null,
+    distBin = null,
+    durBin = null,
+    unit = "km",
+  } = criteria;
+
+  const hasClassFilter = classes.length > 0;
+  const hasHourFilter = hour !== null && hour !== undefined;
+  const hasDistFilter = distBin !== null && distBin !== undefined;
+  const hasDurFilter = durBin !== null && durBin !== undefined;
+
+  const hasAnyFilter =
+    hasClassFilter || hasHourFilter || hasDistFilter || hasDurFilter;
+  if (!hasAnyFilter) return cur;
+
+  const clsIndices = Array.from(new Set(classes.map(classIndex)));
   const hasClass = (cls: string) =>
-    selectedClasses.includes(cls) ||
-    (selectedClasses.includes("plain") && classIndex(cls) === 7);
+    !hasClassFilter ||
+    classes.includes(cls) ||
+    (classes.includes("plain") && classIndex(cls) === 7);
 
-  const flows = cur.flows
-    .map((f) => {
-      let n = 0;
-      for (const ci of clsIndices) n += f.byClass[ci] || 0;
-      return { s: f.s, n, byClass: f.byClass };
-    })
-    .filter((f) => f.n > 0)
-    .sort((a, b) => b.n - a.n);
+  const matchesDep = (d: DepVM) => {
+    if (!hasClass(d.cls)) return false;
+    if (hasHourFilter) {
+      const h = parseInt(d.dep.slice(0, 2), 10);
+      if (h !== hour) return false;
+    }
+    if (hasDistFilter) {
+      const v = unit === "km" ? d.distKm : d.distKm * 0.621371;
+      const b = Math.min(
+        distBin.nb - 1,
+        Math.max(0, Math.floor(v / distBin.size)),
+      );
+      if (b !== distBin.bin) return false;
+    }
+    if (hasDurFilter) {
+      const b = Math.min(
+        durBin.nb - 1,
+        Math.max(0, Math.floor(d.dur / durBin.size)),
+      );
+      if (b !== durBin.bin) return false;
+    }
+    return true;
+  };
 
-  const inFlows = cur.inFlows
-    .map((f) => {
-      let n = 0;
-      for (const ci of clsIndices) n += f.byClass[ci] || 0;
-      return { s: f.s, n, byClass: f.byClass };
-    })
-    .filter((f) => f.n > 0)
-    .sort((a, b) => b.n - a.n);
+  const matchesArr = (a: ArrVM) => {
+    if (!hasClass(a.cls)) return false;
+    if (hasHourFilter) {
+      const h = parseInt(a.arr.slice(0, 2), 10);
+      if (h !== hour) return false;
+    }
+    if (hasDistFilter) {
+      const v = unit === "km" ? a.distKm : a.distKm * 0.621371;
+      const b = Math.min(
+        distBin.nb - 1,
+        Math.max(0, Math.floor(v / distBin.size)),
+      );
+      if (b !== distBin.bin) return false;
+    }
+    if (hasDurFilter) {
+      const b = Math.min(
+        durBin.nb - 1,
+        Math.max(0, Math.floor(a.dur / durBin.size)),
+      );
+      if (b !== durBin.bin) return false;
+    }
+    return true;
+  };
 
-  const deps = cur.deps.filter((d) => hasClass(d.cls));
-  const arrs = cur.arrs.filter((a) => hasClass(a.cls));
+  const deps = cur.deps.filter(matchesDep);
+  const arrs = cur.arrs.filter(matchesArr);
+
+  let flows: FlowVM[];
+  if (cur.deps.length > 0 && (hasHourFilter || hasDistFilter || hasDurFilter)) {
+    const secMap = new Map<number, { n: number; byClass: number[] }>();
+    for (const d of deps) {
+      const ci = classIndex(d.cls);
+      for (const s of d.secs) {
+        let entry = secMap.get(s);
+        if (!entry) {
+          entry = { n: 0, byClass: new Array(8).fill(0) };
+          secMap.set(s, entry);
+        }
+        entry.n++;
+        if (ci >= 0 && ci < 8) entry.byClass[ci]++;
+      }
+    }
+    flows = Array.from(secMap.entries()).map(([s, { n, byClass }]) => ({
+      s,
+      n,
+      byClass,
+    }));
+    flows.sort((a, b) => b.n - a.n);
+  } else {
+    flows = cur.flows
+      .map((f) => {
+        let n = 0;
+        for (const ci of clsIndices) n += f.byClass[ci] || 0;
+        return { s: f.s, n, byClass: f.byClass };
+      })
+      .filter((f) => f.n > 0)
+      .sort((a, b) => b.n - a.n);
+  }
+
+  let inFlows: FlowVM[];
+  if (cur.arrs.length > 0 && (hasHourFilter || hasDistFilter || hasDurFilter)) {
+    const secMap = new Map<number, { n: number; byClass: number[] }>();
+    for (const a of arrs) {
+      const ci = classIndex(a.cls);
+      for (const s of a.secs) {
+        let entry = secMap.get(s);
+        if (!entry) {
+          entry = { n: 0, byClass: new Array(8).fill(0) };
+          secMap.set(s, entry);
+        }
+        entry.n++;
+        if (ci >= 0 && ci < 8) entry.byClass[ci]++;
+      }
+    }
+    inFlows = Array.from(secMap.entries()).map(([s, { n, byClass }]) => ({
+      s,
+      n,
+      byClass,
+    }));
+    inFlows.sort((a, b) => b.n - a.n);
+  } else {
+    inFlows = cur.inFlows
+      .map((f) => {
+        let n = 0;
+        for (const ci of clsIndices) n += f.byClass[ci] || 0;
+        return { s: f.s, n, byClass: f.byClass };
+      })
+      .filter((f) => f.n > 0)
+      .sort((a, b) => b.n - a.n);
+  }
 
   let dests = cur.dests;
   if (cur.deps.length > 0) {
     dests = [];
     for (const d of cur.dests) {
-      const calls = d.calls.filter((c) => c.dep && hasClass(c.dep.cls));
+      const calls = d.calls.filter((c) => c.dep && matchesDep(c.dep));
       if (!calls.length) continue;
       let fast = 0;
       let terminating = 0;
@@ -1170,7 +1290,7 @@ export function filterOriginByClasses(
   if (cur.arrs.length > 0) {
     srcs = [];
     for (const s of cur.srcs) {
-      const inCalls = s.inCalls.filter((c) => c.arr && hasClass(c.arr.cls));
+      const inCalls = s.inCalls.filter((c) => c.arr && matchesArr(c.arr));
       if (!inCalls.length) continue;
       let fast = 0;
       let originating = 0;
@@ -1210,4 +1330,11 @@ export function filterOriginByClasses(
     timeline: cur.timeline,
     inTimeline: cur.inTimeline,
   };
+}
+
+export function filterOriginByClasses(
+  cur: OriginVM,
+  selectedClasses: string[],
+): OriginVM {
+  return filterOrigin(cur, { classes: selectedClasses });
 }
