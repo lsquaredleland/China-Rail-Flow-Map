@@ -246,6 +246,7 @@ export default function App() {
   const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
   const [selectedTrainCode, setSelectedTrainCode] = useState<string | null>(null);
   const [isolatedTrainCode, setIsolatedTrainCode] = useState<string | null>(null);
+  const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(true);
 
   const mapRef = useRef<MapApi | null>(null);
   const legendRef = useRef<LegendHandle | null>(null);
@@ -1121,14 +1122,71 @@ export default function App() {
               }
             />
           </div>
+
+          {isTimelineCollapsed && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 30,
+                pointerEvents: "auto",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTimelineCollapsed(false);
+                  mapRef.current?.setAnimEnabled?.(true);
+                  mapRef.current?.setTime?.(0);
+                  mapRef.current?.setPlaying?.(true);
+                }}
+                style={{
+                  background: dark ? "#27272A" : "#FFFFFF",
+                  color: dark ? "#EDEDEA" : "#111111",
+                  border: dark
+                    ? "1.5px solid rgba(255, 255, 255, 0.25)"
+                    : "1.5px solid #111111",
+                  borderRadius: "20px",
+                  padding: "6px 20px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.25)",
+                  transition: "transform 0.12s ease, background 0.15s ease",
+                }}
+                title="Expand 24h train flow animation controls"
+              >
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: "#C8302A",
+                    boxShadow: "0 0 8px #C8302A",
+                  }}
+                />
+                <span>24h Flow Animation · Expand ▴</span>
+              </button>
+            </div>
+          )}
         </MapCanvas>
 
-        {showTimeline && (
+        {showTimeline && !isTimelineCollapsed && (
           <TimelineScrubber
             mapRef={mapRef}
             dark={dark}
             direction={direction}
             originZh={cur?.o.zh}
+            onCollapse={() => {
+              setIsTimelineCollapsed(true);
+              mapRef.current?.setPlaying?.(false);
+              mapRef.current?.setAnimEnabled?.(false);
+            }}
           />
         )}
       </div>
@@ -1145,6 +1203,8 @@ export default function App() {
         inTablesReady={inTablesReady}
         onClearFilter={closePanel}
         onSelectTrain={setSelectedTrainCode}
+        isolatedTrainCode={isolatedTrainCode}
+        onClearTrainIsolation={() => setIsolatedTrainCode(null)}
       />
 
       <footer id="pageFooter">
@@ -1159,6 +1219,7 @@ export default function App() {
         schedulesData={schedulesData}
         stationTable={atlas ? atlas.data.station_table : []}
         dark={dark}
+        unit={distUnit}
         trainVM={selectedTrainVM}
         isIsolated={isolatedTrainCode === selectedTrainCode}
         onToggleIsolate={(c) => {

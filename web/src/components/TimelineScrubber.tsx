@@ -13,6 +13,7 @@ export interface TimelineScrubberProps {
   dark: boolean;
   direction: Direction;
   originZh?: string;
+  onCollapse?: () => void;
 }
 
 // 75% of slider track visual width is dedicated to Day 1 (0–24h)
@@ -63,6 +64,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   mapRef,
   dark,
   direction,
+  onCollapse,
 }) => {
   const timeDayRef = useRef<HTMLSpanElement | null>(null);
   const timeDisplayRef = useRef<HTMLSpanElement | null>(null);
@@ -302,7 +304,11 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   };
 
   const handleCollapse = () => {
-    setIsCollapsed(true);
+    if (onCollapse) {
+      onCollapse();
+    } else {
+      setIsCollapsed(true);
+    }
     mapRef.current?.setPlaying?.(false);
     mapRef.current?.setAnimEnabled?.(false);
   };
@@ -315,8 +321,8 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
     mapRef.current?.setPlaying?.(true);
   };
 
-  // If user collapsed the timeline in-place: show only the clean expand button right below map
-  if (isCollapsed) {
+  // If user collapsed the timeline in-place without parent controlling collapse
+  if (isCollapsed && !onCollapse) {
     return (
       <div
         className="timeline-collapsed-bar"

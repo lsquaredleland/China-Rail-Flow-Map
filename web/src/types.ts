@@ -342,11 +342,12 @@ export interface ScheduleStop {
   depMins: number;
   dayOff: number;
   dwellMins: number;
+  legKm?: number;
 }
 
 export interface SchedulesData {
   extra_stations: string[];
-  schedules: Record<string, [number, number, number, number][]>;
+  schedules: Record<string, [number, number, number, number, number?][]>;
 }
 
 export interface DayTimelineVM {

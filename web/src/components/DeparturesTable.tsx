@@ -31,6 +31,8 @@ interface Props {
   inTablesReady: boolean;
   onClearFilter: () => void;
   onSelectTrain?: (code: string) => void;
+  isolatedTrainCode?: string | null;
+  onClearTrainIsolation?: () => void;
 }
 
 type SortKey = "dep" | "dur" | "km";
@@ -173,6 +175,8 @@ export default function DeparturesTable({
   inTablesReady,
   onClearFilter,
   onSelectTrain,
+  isolatedTrainCode,
+  onClearTrainIsolation,
 }: Props) {
   const [query, setQuery] = useState("");
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
@@ -276,7 +280,11 @@ export default function DeparturesTable({
     distKm: number,
     durMins: number,
     cls: string,
+    code?: string,
   ) => {
+    if (isolatedTrainCode && (!code || code !== isolatedTrainCode)) {
+      return false;
+    }
     if (selectedClasses.length > 0 && !selectedClasses.includes(cls)) {
       return false;
     }
@@ -305,6 +313,7 @@ export default function DeparturesTable({
 
   const hasExtraFilters =
     !!q ||
+    Boolean(isolatedTrainCode) ||
     selectedClasses.length > 0 ||
     selectedHour !== null ||
     selectedDistBin !== null ||
@@ -440,7 +449,15 @@ export default function DeparturesTable({
     const calls = destFilter.calls;
     const termCount = destFilter.terminating;
     const list = calls.filter((c) => {
-      if (!matchesRowFilters(c.dep.dep, c.dep.distKm, c.dep.dur, c.dep.cls))
+      if (
+        !matchesRowFilters(
+          c.dep.dep,
+          c.dep.distKm,
+          c.dep.dur,
+          c.dep.cls,
+          c.dep.code,
+        )
+      )
         return false;
       if (!q) return true;
       if (c.dep.hay.indexOf(q) !== -1) return true;
@@ -643,7 +660,15 @@ export default function DeparturesTable({
     /* ---------------- inbound source mode ---------------- */
     const calls = srcFilter.inCalls;
     const list = calls.filter((c) => {
-      if (!matchesRowFilters(c.arr.arr, c.arr.distKm, c.arr.dur, c.arr.cls))
+      if (
+        !matchesRowFilters(
+          c.arr.arr,
+          c.arr.distKm,
+          c.arr.dur,
+          c.arr.cls,
+          c.arr.code,
+        )
+      )
         return false;
       if (!q) return true;
       if (c.arr.hay.indexOf(q) !== -1) return true;
@@ -852,7 +877,7 @@ export default function DeparturesTable({
     const arrs = cur.arrs;
     const list: ArrVM[] = arrs.filter(
       (a) =>
-        matchesRowFilters(a.arr, a.distKm, a.dur, a.cls) &&
+        matchesRowFilters(a.arr, a.distKm, a.dur, a.cls, a.code) &&
         (!q || a.hay.indexOf(q) !== -1),
     );
     const { key: ak, dir: adir } = arrSort;
@@ -1026,7 +1051,7 @@ export default function DeparturesTable({
     const deps = cur ? cur.deps : [];
     const list = deps.filter(
       (d) =>
-        matchesRowFilters(d.dep, d.distKm, d.dur, d.cls) &&
+        matchesRowFilters(d.dep, d.distKm, d.dur, d.cls, d.code) &&
         (!q || d.hay.indexOf(q) !== -1),
     );
     const { key, dir } = sort;
@@ -1256,6 +1281,31 @@ export default function DeparturesTable({
             );
           })}
         </div>
+        {isolatedTrainCode ? (
+          <span
+            className="dep-chip"
+            style={{
+              background: "#2563EB",
+              color: "#FFFFFF",
+              borderColor: "#1D4ED8",
+            }}
+          >
+            Isolated:{" "}
+            <b style={{ marginLeft: 4, color: "#FFFFFF" }}>
+              {isolatedTrainCode}
+            </b>
+            {onClearTrainIsolation ? (
+              <button
+                type="button"
+                aria-label="Clear train isolation"
+                onClick={onClearTrainIsolation}
+                style={{ color: "#FFFFFF" }}
+              >
+                &times;
+              </button>
+            ) : null}
+          </span>
+        ) : null}
         {chipNode}
         {selectedHour !== null ? (
           <span className="dep-chip">

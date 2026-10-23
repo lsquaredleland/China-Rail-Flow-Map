@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
-import type { DepVM, ArrVM, SchedulesData } from "../types";
+import type { DepVM, ArrVM, DistUnit, SchedulesData } from "../types";
 import type { MapApi } from "./MapCanvas";
 import { formatScheduleStops } from "../lib";
 
@@ -9,6 +9,7 @@ interface Props {
   schedulesData: SchedulesData | null;
   stationTable: { zh: string; en: string }[];
   dark: boolean;
+  unit?: DistUnit;
   trainVM?: DepVM | ArrVM | null;
   currentTime?: number;
   isIsolated?: boolean;
@@ -31,6 +32,7 @@ export default function TrainScheduleModal({
   schedulesData,
   stationTable,
   dark,
+  unit = "km",
   trainVM,
   currentTime,
   isIsolated = false,
@@ -627,6 +629,7 @@ export default function TrainScheduleModal({
                 >
                   <th style={{ padding: "8px 16px", textAlign: "center", width: "40px" }}>#</th>
                   <th style={{ padding: "8px 16px", textAlign: "left" }}>Station</th>
+                  <th style={{ padding: "8px 16px", textAlign: "right" }}>Distance</th>
                   <th style={{ padding: "8px 16px", textAlign: "center" }}>Arrive</th>
                   <th style={{ padding: "8px 16px", textAlign: "center" }}>Depart</th>
                   <th style={{ padding: "8px 16px", textAlign: "right" }}>Dwell</th>
@@ -774,6 +777,32 @@ export default function TrainScheduleModal({
                       <td
                         style={{
                           padding: "9px 16px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "12px",
+                          color:
+                            isPast && !isOriginCity
+                              ? dark
+                                ? "#6B7280"
+                                : "#94A3B8"
+                              : "inherit",
+                        }}
+                      >
+                        {idx === 0 ? (
+                          <span style={{ opacity: 0.4 }}>—</span>
+                        ) : s.legKm && s.legKm > 0 ? (
+                          unit === "mi" ? (
+                            `${(s.legKm * 0.621371).toFixed(1)} mi`
+                          ) : (
+                            `${s.legKm} km`
+                          )
+                        ) : (
+                          <span style={{ opacity: 0.4 }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "9px 16px",
                           textAlign: "center",
                           fontFamily: "monospace",
                           color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit",
@@ -853,7 +882,7 @@ export default function TrainScheduleModal({
                           borderLeft: "4px solid #F59E0B",
                         }}
                       >
-                        <td colSpan={5} style={{ padding: "8px 16px 8px 18px" }}>
+                        <td colSpan={6} style={{ padding: "8px 16px 8px 18px" }}>
                           <div
                             style={{
                               display: "flex",
@@ -874,6 +903,11 @@ export default function TrainScheduleModal({
                               >
                                 <span>
                                   EN ROUTE: {s.stZh} ➔ {alignedStops[idx + 1].stZh}
+                                  {alignedStops[idx + 1].legKm && alignedStops[idx + 1].legKm > 0 ? (
+                                    <span style={{ opacity: 0.85, fontWeight: 500, marginLeft: 6 }}>
+                                      ({unit === "mi" ? `${(alignedStops[idx + 1].legKm * 0.621371).toFixed(1)} mi` : `${alignedStops[idx + 1].legKm} km`})
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span>
                                   {Math.round(legProgress * 100)}% · {currentStatus.eta}m to arrival

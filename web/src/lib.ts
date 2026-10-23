@@ -1512,7 +1512,7 @@ export function formatScheduleStops(
   const rawStops = schedulesData.schedules[code];
   if (!rawStops || rawStops.length === 0) return null;
 
-  return rawStops.map(([stIdx, arrMins, depMins, dayOff]) => {
+  return rawStops.map(([stIdx, arrMins, depMins, dayOff, legKm]) => {
     let stZh = "";
     let stEn = "";
     if (stIdx < stationTable.length) {
@@ -1539,6 +1539,7 @@ export function formatScheduleStops(
       depMins,
       dayOff,
       dwellMins,
+      legKm: typeof legKm === "number" ? legKm : 0,
     };
   });
 }

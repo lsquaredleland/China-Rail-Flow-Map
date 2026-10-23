@@ -1011,10 +1011,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       }
       const isIsolated = isolatedCode === tr.code;
       if (isolatedCode && !isIsolated) {
-        ctx.globalAlpha = 0.08;
-      } else {
-        ctx.globalAlpha = 1.0;
+        continue;
       }
+      ctx.globalAlpha = 1.0;
 
       const px = X(tr.lon);
       const py = Y(tr.lat);
