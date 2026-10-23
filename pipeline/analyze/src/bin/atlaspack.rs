@@ -25,7 +25,6 @@
 //! 1e4 step). Any mismatch aborts with a nonzero exit.
 
 use serde_json::{json, Map, Value};
-use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -207,11 +206,11 @@ fn pack_sections(secs: &Value) -> Value {
     )
 }
 
-fn write_with_br(path: &Path, bytes: &[u8]) -> (usize, usize) {
+fn write_with_br(path: &Path, bytes: &[u8], quality: u32) -> (usize, usize) {
     std::fs::write(path, bytes).expect("write json");
     let br_path = path.with_extension("json.br");
     let f = std::fs::File::create(&br_path).expect("create br");
-    let mut w = brotli::CompressorWriter::new(std::io::BufWriter::new(f), 8192, 11, 22);
+    let mut w = brotli::CompressorWriter::new(std::io::BufWriter::new(f), 8192, quality, 22);
     w.write_all(bytes).expect("brotli write");
     w.flush().expect("brotli flush");
     drop(w);
@@ -370,6 +369,9 @@ fn main() {
     let argval = |name: &str| -> Option<String> {
         args.windows(2).find(|w| w[0] == name).map(|w| w[1].clone())
     };
+    let quality: u32 = argval("--quality")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(11);
     let default_out_dir = if let Ok(d) = std::env::var("CRFM_OUTPUT_DIR") {
         d
     } else if PathBuf::from("output").exists() {
@@ -380,6 +382,7 @@ fn main() {
     let in_path =
         argval("--in").unwrap_or_else(|| format!("{default_out_dir}/china-flow-atlas-data.json"));
     let out_dir = PathBuf::from(argval("--out-dir").unwrap_or(default_out_dir));
+    std::fs::create_dir_all(&out_dir).expect("create out_dir");
     let v1: Value = serde_json::from_str(&std::fs::read_to_string(&in_path).expect("read v1"))
         .expect("parse v1");
 
@@ -483,19 +486,32 @@ fn main() {
     }
     println!("five-file partition: PASS (all origins reconstruct exactly)");
 
-    let mut by_name: BTreeMap<&str, Value> = BTreeMap::new();
-    by_name.insert("china-flow-atlas-data-v2.json", combined);
-    by_name.insert("atlas-v2-shared.json", shared);
-    by_name.insert("atlas-v2-out.json", json!({ "origins": out_origins }));
-    by_name.insert("atlas-v2-in.json", json!({ "origins": in_origins }));
-    by_name.insert("atlas-v2-out-map.json", json!({ "origins": out_map }));
-    by_name.insert("atlas-v2-out-tables.json", json!({ "origins": out_tables }));
-    by_name.insert("atlas-v2-in-map.json", json!({ "origins": in_map }));
-    by_name.insert("atlas-v2-in-tables.json", json!({ "origins": in_tables }));
+    use rayon::prelude::*;
 
-    for (name, val) in &by_name {
-        let bytes = serde_json::to_string(val).unwrap().into_bytes();
-        let (raw, br) = write_with_br(&out_dir.join(name), &bytes);
+    let mut by_name: Vec<(&str, Value)> = Vec::new();
+    by_name.push(("china-flow-atlas-data-v2.json", combined));
+    by_name.push(("atlas-v2-shared.json", shared));
+    by_name.push(("atlas-v2-out.json", json!({ "origins": out_origins })));
+    by_name.push(("atlas-v2-in.json", json!({ "origins": in_origins })));
+    by_name.push(("atlas-v2-out-map.json", json!({ "origins": out_map })));
+    by_name.push(("atlas-v2-out-tables.json", json!({ "origins": out_tables })));
+    by_name.push(("atlas-v2-in-map.json", json!({ "origins": in_map })));
+    by_name.push(("atlas-v2-in-tables.json", json!({ "origins": in_tables })));
+
+    let items: Vec<(&str, Vec<u8>)> = by_name
+        .into_iter()
+        .map(|(name, val)| (name, serde_json::to_string(&val).unwrap().into_bytes()))
+        .collect();
+
+    let results: Vec<(&str, usize, usize)> = items
+        .par_iter()
+        .map(|(name, bytes)| {
+            let (raw, br) = write_with_br(&out_dir.join(name), bytes, quality);
+            (*name, raw, br)
+        })
+        .collect();
+
+    for (name, raw, br) in results {
         println!("{name}: raw {} bytes, brotli {}", raw, br);
     }
 }

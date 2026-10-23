@@ -191,39 +191,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| format!("{out_dir}/china-outline.json"));
 
     // ---- Pass 1: relations -> China's boundary member ways by role ----
-    let mut outer_ways: HashSet<i64> = HashSet::new();
-    let mut inner_ways: HashSet<i64> = HashSet::new();
-    let mut found: Option<i64> = None;
-    let reader = ElementReader::from_path(&input)?;
-    reader.for_each(|el| {
-        if let Element::Relation(r) = el {
-            let is_china = r.id() == 270056 || {
-                let b = tag(r.tags(), "boundary");
-                let al = tag(r.tags(), "admin_level");
-                let nm = tag(r.tags(), "name");
-                let ne = tag(r.tags(), "name:en");
-                b.as_deref() == Some("administrative")
-                    && al.as_deref() == Some("2")
-                    && (nm.as_deref() == Some("中国") || ne.as_deref() == Some("China"))
-            };
-            if is_china {
-                found = Some(r.id());
-                for m in r.members() {
-                    if m.member_type != RelMemberType::Way {
-                        continue;
-                    }
-                    match m.role().unwrap_or("") {
-                        "inner" => {
-                            inner_ways.insert(m.member_id);
-                        }
-                        _ => {
-                            outer_ways.insert(m.member_id);
+    let (outer_ways, inner_ways, found) = {
+        let reader = ElementReader::from_path(&input)?;
+        reader.par_map_reduce(
+            |el| {
+                let mut out = HashSet::new();
+                let mut inn = HashSet::new();
+                let mut f = None;
+                if let Element::Relation(r) = el {
+                    let is_china = r.id() == 270056 || {
+                        let b = tag(r.tags(), "boundary");
+                        let al = tag(r.tags(), "admin_level");
+                        let nm = tag(r.tags(), "name");
+                        let ne = tag(r.tags(), "name:en");
+                        b.as_deref() == Some("administrative")
+                            && al.as_deref() == Some("2")
+                            && (nm.as_deref() == Some("中国") || ne.as_deref() == Some("China"))
+                    };
+                    if is_china {
+                        f = Some(r.id());
+                        for m in r.members() {
+                            if m.member_type != RelMemberType::Way {
+                                continue;
+                            }
+                            match m.role().unwrap_or("") {
+                                "inner" => {
+                                    inn.insert(m.member_id);
+                                }
+                                _ => {
+                                    out.insert(m.member_id);
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
-    })?;
+                (out, inn, f)
+            },
+            || (HashSet::new(), HashSet::new(), None),
+            |mut a, b| {
+                a.0.extend(b.0);
+                a.1.extend(b.1);
+                let f = a.2.or(b.2);
+                (a.0, a.1, f)
+            },
+        )?
+    };
     println!(
         "relation: {:?} outer ways {} inner ways {}",
         found,
@@ -233,20 +245,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ---- Pass 2: member ways -> ordered node refs ----
     let wanted: HashSet<i64> = outer_ways.union(&inner_ways).copied().collect();
-    let mut way_refs: HashMap<i64, Vec<i64>> = HashMap::new();
-    let mut need_nodes: HashSet<i64> = HashSet::new();
-    let reader = ElementReader::from_path(&input)?;
-    reader.for_each(|el| {
-        if let Element::Way(w) = el {
-            if wanted.contains(&w.id()) {
-                let refs: Vec<i64> = w.refs().collect();
-                for n in refs.iter() {
-                    need_nodes.insert(*n);
+    let (way_refs, need_nodes) = {
+        let reader = ElementReader::from_path(&input)?;
+        reader.par_map_reduce(
+            |el| {
+                let mut refs_map = HashMap::new();
+                let mut nodes = HashSet::new();
+                if let Element::Way(w) = el {
+                    if wanted.contains(&w.id()) {
+                        let refs: Vec<i64> = w.refs().collect();
+                        for n in refs.iter() {
+                            nodes.insert(*n);
+                        }
+                        refs_map.insert(w.id(), refs);
+                    }
                 }
-                way_refs.insert(w.id(), refs);
-            }
-        }
-    })?;
+                (refs_map, nodes)
+            },
+            || (HashMap::new(), HashSet::new()),
+            |mut a, b| {
+                a.0.extend(b.0);
+                a.1.extend(b.1);
+                a
+            },
+        )?
+    };
     println!(
         "ways captured {} of {} wanted; nodes needed {}",
         way_refs.len(),
@@ -255,19 +278,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // ---- Pass 3: node coords ----
-    let mut coords: HashMap<i64, [f64; 2]> = HashMap::new();
-    let reader = ElementReader::from_path(&input)?;
-    reader.for_each(|el| match el {
-        Element::Node(n) => {
-            if need_nodes.contains(&n.id()) {
-                coords.insert(n.id(), [n.lon(), n.lat()]);
-            }
-        }
-        Element::DenseNode(n) if need_nodes.contains(&n.id()) => {
-            coords.insert(n.id(), [n.lon(), n.lat()]);
-        }
-        _ => {}
-    })?;
+    let coords: HashMap<i64, [f64; 2]> = {
+        let reader = ElementReader::from_path(&input)?;
+        reader.par_map_reduce(
+            |el| {
+                let mut map = HashMap::new();
+                match el {
+                    Element::Node(n) => {
+                        if need_nodes.contains(&n.id()) {
+                            map.insert(n.id(), [n.lon(), n.lat()]);
+                        }
+                    }
+                    Element::DenseNode(n) => {
+                        if need_nodes.contains(&n.id()) {
+                            map.insert(n.id(), [n.lon(), n.lat()]);
+                        }
+                    }
+                    _ => {}
+                }
+                map
+            },
+            HashMap::new,
+            |mut a, b| {
+                a.extend(b);
+                a
+            },
+        )?
+    };
     println!("coords captured {}", coords.len());
 
     // ---- chain ways into polylines by shared endpoint node ids ----

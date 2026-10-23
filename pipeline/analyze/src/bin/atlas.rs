@@ -1544,15 +1544,20 @@ fn main() {
                 while end < n && data[end] != b'>' {
                     end += 1;
                 }
-                let tag = std::str::from_utf8(&data[i..end]).unwrap_or("");
-                let get = |k: &str| -> Option<f64> {
-                    let pat = format!("{}=\"", k);
-                    let pos = tag.find(&pat)? + pat.len();
-                    let rest = &tag[pos..];
-                    let e = rest.find('"')?;
-                    rest[..e].parse().ok()
+                let tag = &data[i..end];
+                let get_f64 = |key: &[u8]| -> Option<f64> {
+                    let mut k = 0;
+                    while k + key.len() + 2 <= tag.len() {
+                        if &tag[k..k + key.len()] == key && tag[k + key.len()] == b'=' && tag[k + key.len() + 1] == b'"' {
+                            let start = k + key.len() + 2;
+                            let len = tag[start..].iter().position(|&b| b == b'"')?;
+                            return std::str::from_utf8(&tag[start..start + len]).ok()?.parse().ok();
+                        }
+                        k += 1;
+                    }
+                    None
                 };
-                if let (Some(idf), Some(lat), Some(lon)) = (get("id"), get("lat"), get("lon")) {
+                if let (Some(idf), Some(lat), Some(lon)) = (get_f64(b"id"), get_f64(b"lat"), get_f64(b"lon")) {
                     let id = idf as i64;
                     if needed.contains(&id) {
                         coords.insert(id, [lon, lat]);

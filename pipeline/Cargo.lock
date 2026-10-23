@@ -38,6 +38,7 @@ version = "0.1.0"
 dependencies = [
  "brotli",
  "quick-xml",
+ "rayon",
  "serde",
  "serde_json",
 ]
