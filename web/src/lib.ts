@@ -587,6 +587,10 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       crow: d[6],
       rail: d[7],
       nn: 0,
+      arrTimes: ((o.calls || [])[di] || [])
+        .map((call) => (call[1] >= 0 ? call[3] * 1440 + call[1] : -1))
+        .filter((t) => t >= 0)
+        .sort((a, b) => a - b),
       calls: ((o.calls || [])[di] || []).map((call) => {
         const rawDep = (o.deps || [])[call[0]];
         const depMins = rawDep ? rawDep[2] : -1;
@@ -720,6 +724,10 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       crow: s[6],
       rail: s[7],
       nn: 0,
+      arrTimes: ((o.in_calls || [])[si] || [])
+        .map((call) => call[1])
+        .filter((t) => t >= 0)
+        .sort((a, b) => a - b),
       inCalls: ((o.in_calls || [])[si] || []).map((call) => {
         const bs = data.station_table[call[5]];
         const dur =
@@ -852,7 +860,22 @@ export function buildDayTimeline(
   const isOut = dir === "out";
   const secSet = isOut ? atlas.sec : atlas.inSec;
   const stepMins = 5;
-  const numSteps = 288;
+
+  const rawTrains = isOut ? cur.deps || [] : cur.arrs || [];
+  const totalTrains = rawTrains.length;
+
+  // Track max arrival time across all services (which may arrive on Day 2 or Day 3)
+  let maxArrMins = 1440;
+  for (let ti = 0; ti < rawTrains.length; ti++) {
+    const t = rawTrains[ti];
+    const dm = t.depMins >= 0 ? t.depMins : 0;
+    const dur = t.dur > 0 ? t.dur : 1;
+    const am = dm + dur;
+    if (am > maxArrMins) maxArrMins = am;
+  }
+  const totalDays = Math.max(1, Math.ceil(maxArrMins / 1440));
+  const totalMins = totalDays * 1440;
+  const numSteps = Math.ceil(totalMins / stepMins);
   const secFlowSteps = new Map<number, Uint16Array>();
   const maxFlowSteps = new Uint16Array(numSteps);
 
@@ -860,17 +883,18 @@ export function buildDayTimeline(
     return {
       stepMins,
       numSteps,
+      totalMins,
+      totalDays,
       secFlowSteps,
       maxFlowSteps,
       getActiveTrains: () => [],
       totalTrains: 0,
       getDepartedCount: () => 0,
+      getArrivedCount: () => 0,
     };
   }
 
   const { secLengths, secCumLens } = getSecGeometry(secSet);
-  const rawTrains = isOut ? cur.deps || [] : cur.arrs || [];
-  const totalTrains = rawTrains.length;
 
   // Initialize flow sections from cur.flows / cur.inFlows
   const flows = isOut ? cur.flows || [] : cur.inFlows || [];
@@ -1174,14 +1198,27 @@ export function buildDayTimeline(
     return count;
   }
 
+  function getArrivedCount(tMins: number): number {
+    let count = 0;
+    for (let i = 0; i < prepTrains.length; i++) {
+      if (prepTrains[i].arrMins <= tMins) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   return {
     stepMins,
     numSteps,
+    totalMins,
+    totalDays,
     secFlowSteps,
     maxFlowSteps,
     getActiveTrains,
     totalTrains,
     getDepartedCount,
+    getArrivedCount,
   };
 }
 

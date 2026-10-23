@@ -15,13 +15,19 @@ export interface TimelineScrubberProps {
   originZh?: string;
 }
 
-/** Format minutes from midnight (0..1440) as "HH:MM". */
-function fmtClock(mins: number): string {
-  const m = Math.max(0, Math.min(1440, Math.floor(mins)));
-  if (m === 1440) return "24:00";
-  const hh = Math.floor(m / 60);
-  const mm = m % 60;
-  return `${hh < 10 ? "0" : ""}${hh}:${mm < 10 ? "0" : ""}${mm}`;
+/** Format minutes from midnight across multiple days (Day 1, Day 2, Day 3). */
+function fmtTimelineClock(mins: number, totalMins: number = 1440): string {
+  const m = Math.max(0, Math.floor(mins));
+  const day = Math.floor(m / 1440) + 1;
+  const minsInDay = m % 1440;
+  const hh = Math.floor(minsInDay / 60);
+  const mm = minsInDay % 60;
+  const clock = `${hh < 10 ? "0" : ""}${hh}:${mm < 10 ? "0" : ""}${mm}`;
+  if (totalMins > 1440) {
+    return `Day ${day} · ${clock}`;
+  }
+  if (m >= 1440) return "24:00";
+  return clock;
 }
 
 export const TimelineScrubber: FC<TimelineScrubberProps> = ({
@@ -39,56 +45,84 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   const currentPlayingRef = useRef(false);
   const currentTimeRef = useRef(360); // default 06:00 AM
   const currentSpeedRef = useRef(30);
+  const totalMinsRef = useRef(1440);
+  const totalDaysRef = useRef(1);
 
   // Minimal React state — only toggled on user interactions or discrete state flips
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(30);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Subscribe to MapCanvas animation ticks with direct DOM updates (0% React re-render overhead)
   useEffect(() => {
     const handleAnimUpdate = (state: AnimState) => {
-      const t = Math.max(0, Math.min(1440, state.time));
+      const totM = state.totalMins || 1440;
+      totalMinsRef.current = totM;
+      totalDaysRef.current = state.totalDays || Math.max(1, Math.ceil(totM / 1440));
+
+      const t = Math.max(0, Math.min(totM, state.time));
       currentTimeRef.current = t;
 
       // 1. Time display clock
       if (timeDisplayRef.current) {
-        timeDisplayRef.current.textContent = fmtClock(t);
+        timeDisplayRef.current.textContent = fmtTimelineClock(t, totM);
       }
 
-      // 2. Slider input value & fill progress bar
+      // 2. Slider input value, max & fill progress bar
       if (sliderRef.current) {
+        sliderRef.current.max = String(totM);
         sliderRef.current.value = String(Math.round(t));
       }
       if (fillTrackRef.current) {
-        const pct = (t / 1440) * 100;
+        const pct = (t / totM) * 100;
         fillTrackRef.current.style.width = `${pct}%`;
       }
 
       // 3. Trains counter HUD
       if (counterRef.current) {
-        const dep = state.departed ?? (state as any).departedCount ?? 0;
-        const tot = state.total ?? (state as any).totalTrains ?? 0;
-        const verb = direction === "out" ? "Departed" : "Arrived";
-        counterRef.current.textContent = `${dep.toLocaleString("en-US")} / ${tot.toLocaleString("en-US")} Trains ${verb}`;
+        const dep = state.departed ?? 0;
+        const arr = state.arrived ?? 0;
+        const tot = state.total ?? 0;
+        if (t <= 1440) {
+          const verb = direction === "out" ? "Departed" : "Boarded";
+          counterRef.current.textContent = `${dep.toLocaleString("en-US")} ${verb} · ${arr.toLocaleString("en-US")} Arrived / ${tot.toLocaleString("en-US")} Total`;
+        } else if (t >= totM) {
+          counterRef.current.textContent = `All ${tot.toLocaleString("en-US")} Trains Arrived · 100% Complete`;
+        } else {
+          const pct = Math.round((arr / Math.max(1, tot)) * 100);
+          counterRef.current.textContent = `${arr.toLocaleString("en-US")} / ${tot.toLocaleString("en-US")} Arrived (${pct}%) · In Transit`;
+        }
       }
 
       // 4. Time period / Rush hour badge
       if (rushBadgeRef.current) {
-        if (t >= 1440) {
-          rushBadgeRef.current.textContent = "Full 24h Day";
-          rushBadgeRef.current.className = "ts-badge";
-        } else if (t >= 420 && t <= 570) {
-          rushBadgeRef.current.textContent = "Morning Rush";
-          rushBadgeRef.current.className = "ts-badge ts-badge-rush";
-        } else if (t >= 1050 && t <= 1230) {
-          rushBadgeRef.current.textContent = "Evening Rush";
-          rushBadgeRef.current.className = "ts-badge ts-badge-rush";
-        } else if (t < 360) {
-          rushBadgeRef.current.textContent = "Night Services";
+        if (t >= totM) {
+          rushBadgeRef.current.textContent = "All Trips Completed";
           rushBadgeRef.current.className = "ts-badge";
         } else {
-          rushBadgeRef.current.textContent = "Day Regular";
-          rushBadgeRef.current.className = "ts-badge";
+          const day = Math.floor(t / 1440) + 1;
+          const minsInDay = t % 1440;
+          if (day === 1) {
+            if (minsInDay >= 420 && minsInDay <= 570) {
+              rushBadgeRef.current.textContent = "Morning Rush";
+              rushBadgeRef.current.className = "ts-badge ts-badge-rush";
+            } else if (minsInDay >= 1050 && minsInDay <= 1230) {
+              rushBadgeRef.current.textContent = "Evening Rush";
+              rushBadgeRef.current.className = "ts-badge ts-badge-rush";
+            } else if (minsInDay < 360) {
+              rushBadgeRef.current.textContent = "Night Services";
+              rushBadgeRef.current.className = "ts-badge";
+            } else {
+              rushBadgeRef.current.textContent = "Day 1 Regular";
+              rushBadgeRef.current.className = "ts-badge";
+            }
+          } else if (day === 2) {
+            rushBadgeRef.current.textContent = "Day 2 Cross-Country";
+            rushBadgeRef.current.className = "ts-badge ts-badge-rush";
+          } else {
+            rushBadgeRef.current.textContent = `Day ${day} Distal Terminus`;
+            rushBadgeRef.current.className = "ts-badge";
+          }
         }
       }
 
@@ -99,7 +133,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       }
 
       // 6. Sync speed preset button if changed externally
-      const spd = state.speed ?? (state as any).speedSec;
+      const spd = state.speed;
       if (spd && spd !== currentSpeedRef.current) {
         currentSpeedRef.current = spd;
         setSpeed(spd);
@@ -149,6 +183,8 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         }
       }
 
+      const totM = totalMinsRef.current || 1440;
+
       if (e.code === "Space") {
         e.preventDefault();
         mapRef.current?.togglePlaying?.();
@@ -157,22 +193,22 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         const prev = Math.max(0, currentTimeRef.current - 15);
         currentTimeRef.current = prev;
         mapRef.current?.setTime?.(prev);
-        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtClock(prev);
+        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtTimelineClock(prev, totM);
         if (sliderRef.current) sliderRef.current.value = String(prev);
-        if (fillTrackRef.current) fillTrackRef.current.style.width = `${(prev / 1440) * 100}%`;
+        if (fillTrackRef.current) fillTrackRef.current.style.width = `${(prev / totM) * 100}%`;
       } else if (e.code === "ArrowRight") {
         e.preventDefault();
-        const next = Math.min(1440, currentTimeRef.current + 15);
+        const next = Math.min(totM, currentTimeRef.current + 15);
         currentTimeRef.current = next;
         mapRef.current?.setTime?.(next);
-        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtClock(next);
+        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtTimelineClock(next, totM);
         if (sliderRef.current) sliderRef.current.value = String(next);
-        if (fillTrackRef.current) fillTrackRef.current.style.width = `${(next / 1440) * 100}%`;
+        if (fillTrackRef.current) fillTrackRef.current.style.width = `${(next / totM) * 100}%`;
       } else if (e.code === "Home") {
         e.preventDefault();
         currentTimeRef.current = 0;
         mapRef.current?.setTime?.(0);
-        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtClock(0);
+        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtTimelineClock(0, totM);
         if (sliderRef.current) sliderRef.current.value = "0";
         if (fillTrackRef.current) fillTrackRef.current.style.width = "0%";
       }
@@ -185,11 +221,12 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   const handleSliderInput = (val: number) => {
     currentTimeRef.current = val;
     mapRef.current?.setTime?.(val);
+    const totM = totalMinsRef.current || 1440;
     if (timeDisplayRef.current) {
-      timeDisplayRef.current.textContent = fmtClock(val);
+      timeDisplayRef.current.textContent = fmtTimelineClock(val, totM);
     }
     if (fillTrackRef.current) {
-      fillTrackRef.current.style.width = `${(val / 1440) * 100}%`;
+      fillTrackRef.current.style.width = `${(val / totM) * 100}%`;
     }
   };
 
@@ -198,70 +235,143 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   };
 
   const handleSetSpeed = (s: number) => {
-    currentSpeedRef.current = s;
     setSpeed(s);
+    currentSpeedRef.current = s;
     mapRef.current?.setSpeed?.(s);
   };
 
-  const handleJumpTo = (t: number) => {
-    currentTimeRef.current = t;
-    mapRef.current?.setTime?.(t);
+  const handleJumpTo = (tMins: number) => {
+    currentTimeRef.current = tMins;
+    mapRef.current?.setTime?.(tMins);
+    const totM = totalMinsRef.current || 1440;
     if (timeDisplayRef.current) {
-      timeDisplayRef.current.textContent = fmtClock(t);
+      timeDisplayRef.current.textContent = fmtTimelineClock(tMins, totM);
     }
     if (sliderRef.current) {
-      sliderRef.current.value = String(t);
+      sliderRef.current.value = String(tMins);
     }
     if (fillTrackRef.current) {
-      fillTrackRef.current.style.width = `${(t / 1440) * 100}%`;
+      fillTrackRef.current.style.width = `${(tMins / totM) * 100}%`;
     }
   };
 
+  // If user collapsed the timeline in-place, render a sleek floating pill dock
+  if (isCollapsed) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          bottom: "16px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 40,
+          background: dark ? "rgba(17, 24, 39, 0.92)" : "rgba(255, 255, 255, 0.92)",
+          backdropFilter: "blur(12px)",
+          border: `1px solid ${dark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.12)"}`,
+          borderRadius: "30px",
+          padding: "6px 14px",
+          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.35)",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          cursor: "pointer",
+          color: dark ? "#F3F4F6" : "#111827",
+          fontSize: "12px",
+        }}
+        onClick={() => setIsCollapsed(false)}
+        title="Click to expand timeline scrubber"
+      >
+        <span
+          style={{
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            background: isPlaying ? "#10B981" : "#F59E0B",
+            boxShadow: `0 0 8px ${isPlaying ? "#10B981" : "#F59E0B"}`,
+          }}
+        />
+        <span style={{ fontWeight: 700 }}>24h+ Flow Simulation</span>
+        <span
+          ref={timeDisplayRef}
+          style={{
+            fontFamily: "monospace",
+            fontWeight: 800,
+            padding: "2px 6px",
+            borderRadius: "4px",
+            background: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)",
+          }}
+        >
+          {fmtTimelineClock(currentTimeRef.current, totalMinsRef.current)}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsCollapsed(false);
+          }}
+          style={{
+            border: "none",
+            background: dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+            color: "inherit",
+            cursor: "pointer",
+            padding: "3px 8px",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: 700,
+          }}
+        >
+          Expand ▴
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`timeline-scrubber-dock ${dark ? "theme-dark" : "theme-light"}`}
+      className={`timeline-scrubber-dock ${dark ? "ts-dark" : "ts-light"}`}
       role="region"
-      aria-label="24-hour train flow timeline playback"
+      aria-label="24-hour train flow simulation controls"
     >
       <style>{`
         .timeline-scrubber-dock {
           position: absolute;
-          bottom: 22px;
+          bottom: 20px;
           left: 50%;
           transform: translateX(-50%);
-          z-index: 100;
           width: calc(100% - 32px);
-          max-width: 760px;
+          max-width: 920px;
           border-radius: 14px;
-          box-sizing: border-box;
-          padding: 10px 16px 10px;
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+          padding: 10px 16px 8px 16px;
           display: flex;
           flex-direction: column;
           gap: 6px;
+          z-index: 40;
           user-select: none;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
-          backdrop-filter: blur(18px);
-          -webkit-backdrop-filter: blur(18px);
+          box-sizing: border-box;
           transition: background 0.2s ease, border-color 0.2s ease;
         }
 
-        .timeline-scrubber-dock.theme-light {
-          background: rgba(246, 245, 241, 0.88);
-          border: 1.5px solid rgba(17, 17, 17, 0.18);
-          color: #111111;
+        .timeline-scrubber-dock.ts-dark {
+          background: rgba(26, 27, 30, 0.88);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #EDEDEA;
         }
 
-        .timeline-scrubber-dock.theme-dark {
-          background: rgba(26, 27, 30, 0.88);
-          border: 1.5px solid rgba(237, 237, 234, 0.22);
-          color: #EDEDEA;
+        .timeline-scrubber-dock.ts-light {
+          background: rgba(255, 255, 255, 0.90);
+          border: 1px solid rgba(0, 0, 0, 0.10);
+          color: #111111;
         }
 
         .ts-top-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 8px;
+          flex-wrap: nowrap;
         }
 
         .ts-left-group {
@@ -271,8 +381,8 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         }
 
         .ts-play-btn {
-          width: 34px;
-          height: 34px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
           border: none;
           background: var(--rust, #C8302A);
@@ -281,48 +391,42 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          box-shadow: 0 2px 6px rgba(200, 48, 42, 0.35);
-          transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-          padding: 0;
+          transition: transform 0.1s ease, background 0.15s ease;
+          box-shadow: 0 2px 8px rgba(200, 48, 42, 0.4);
           flex-shrink: 0;
         }
 
         .ts-play-btn:hover {
           transform: scale(1.06);
-          background: var(--rust-dark, #8E1B17);
-          box-shadow: 0 4px 10px rgba(200, 48, 42, 0.5);
-        }
-
-        .ts-play-btn:active {
-          transform: scale(0.96);
+          background: #E54035;
         }
 
         .ts-clock {
-          font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-          font-size: 21px;
-          font-weight: 800;
+          font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
           font-variant-numeric: tabular-nums;
-          letter-spacing: -0.02em;
-          line-height: 1;
+          font-weight: 800;
+          font-size: 19px;
+          letter-spacing: -0.3px;
+          min-width: 110px;
         }
 
         .ts-badge {
-          font-size: 10.5px;
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 7px;
+          border-radius: 4px;
+          font-size: 11px;
           font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          padding: 2.5px 7px;
-          border-radius: 9999px;
-          line-height: 1;
+          letter-spacing: 0.2px;
           background: rgba(128, 128, 128, 0.15);
-          color: var(--ink-soft, #666666);
-          transition: all 0.2s ease;
+          color: inherit;
+          white-space: nowrap;
         }
 
-        .ts-badge.ts-badge-rush {
-          background: rgba(200, 48, 42, 0.16);
-          color: var(--rust, #C8302A);
-          border: 1px solid rgba(200, 48, 42, 0.3);
+        .ts-badge-rush {
+          background: rgba(227, 166, 63, 0.22);
+          color: #E3A63F;
+          border: 1px solid rgba(227, 166, 63, 0.35);
         }
 
         .ts-right-group {
@@ -332,17 +436,18 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         }
 
         .ts-counter-wrap {
-          font-size: 12.5px;
-          font-weight: 600;
           font-variant-numeric: tabular-nums;
+          font-size: 12px;
+          font-weight: 600;
+          opacity: 0.85;
           white-space: nowrap;
-          color: inherit;
         }
 
         .ts-speed-control {
           display: flex;
-          background: rgba(128, 128, 128, 0.15);
+          align-items: center;
           border-radius: 6px;
+          background: rgba(128, 128, 128, 0.12);
           padding: 2px;
           gap: 2px;
         }
@@ -351,22 +456,24 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           border: none;
           background: transparent;
           font-size: 11px;
-          font-weight: 600;
-          padding: 3px 7px;
+          font-weight: 700;
+          padding: 3px 6px;
           border-radius: 4px;
           cursor: pointer;
           color: inherit;
-          transition: background 0.15s ease, color 0.15s ease;
+          opacity: 0.7;
+          transition: background 0.12s ease, opacity 0.12s ease;
         }
 
         .ts-speed-btn.active {
-          background: var(--btn-on, #111111);
-          color: var(--btn-on-ink, #FFFFFF);
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+          background: var(--rust, #C8302A);
+          color: #FFFFFF;
+          opacity: 1;
         }
 
         .ts-jump-group {
           display: flex;
+          align-items: center;
           gap: 3px;
         }
 
@@ -384,6 +491,27 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         }
 
         .ts-jump-btn:hover {
+          background: rgba(128, 128, 128, 0.16);
+        }
+
+        .ts-collapse-btn {
+          border: 1px solid rgba(128, 128, 128, 0.26);
+          background: transparent;
+          border-radius: 5px;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 3px 8px;
+          cursor: pointer;
+          color: inherit;
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          opacity: 0.8;
+          transition: opacity 0.15s ease, background 0.15s ease;
+        }
+
+        .ts-collapse-btn:hover {
+          opacity: 1;
           background: rgba(128, 128, 128, 0.16);
         }
 
@@ -412,22 +540,6 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           background: rgba(128, 128, 128, 0.22);
           overflow: hidden;
           pointer-events: none;
-        }
-
-        .ts-zone-am {
-          position: absolute;
-          left: 29.17%;
-          width: 10.42%;
-          height: 100%;
-          background: rgba(227, 166, 63, 0.42);
-        }
-
-        .ts-zone-pm {
-          position: absolute;
-          left: 72.92%;
-          width: 12.5%;
-          height: 100%;
-          background: rgba(227, 166, 63, 0.42);
         }
 
         .ts-track-fill {
@@ -517,13 +629,14 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             gap: 5px;
           }
           .ts-clock {
-            font-size: 18px;
+            font-size: 16px;
+            min-width: 80px;
           }
           .ts-badge {
             display: none;
           }
           .ts-counter-wrap {
-            font-size: 11.5px;
+            font-size: 11px;
           }
           .ts-jump-group {
             display: none;
@@ -554,7 +667,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           </button>
 
           <span ref={timeDisplayRef} className="ts-clock">
-            06:00
+            Day 1 · 06:00
           </span>
 
           <span ref={rushBadgeRef} className="ts-badge">
@@ -565,7 +678,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         <div className="ts-right-group">
           <div className="ts-counter-wrap">
             <span ref={counterRef}>
-              0 / 0 Trains {direction === "out" ? "Departed" : "Arrived"}
+              0 Departed · 0 / 0 Arrived
             </span>
           </div>
 
@@ -578,7 +691,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               type="button"
               className={`ts-speed-btn ${speed === 15 ? "active" : ""}`}
               onClick={() => handleSetSpeed(15)}
-              title="15 seconds per 24 hours (Fast)"
+              title="15s per day (Fast)"
             >
               15s
             </button>
@@ -586,7 +699,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               type="button"
               className={`ts-speed-btn ${speed === 30 ? "active" : ""}`}
               onClick={() => handleSetSpeed(30)}
-              title="30 seconds per 24 hours (Standard)"
+              title="30s per day (Standard)"
             >
               30s
             </button>
@@ -594,7 +707,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               type="button"
               className={`ts-speed-btn ${speed === 60 ? "active" : ""}`}
               onClick={() => handleSetSpeed(60)}
-              title="60 seconds per 24 hours (Relaxed)"
+              title="60s per day (Relaxed)"
             >
               60s
             </button>
@@ -605,19 +718,36 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               type="button"
               className="ts-jump-btn"
               onClick={() => handleJumpTo(360)}
-              title="Jump to 06:00 (Start of high-speed morning rush)"
+              title="Jump to Day 1 06:00 (Start of morning rush)"
             >
-              06:00
+              D1 06:00
             </button>
             <button
               type="button"
               className="ts-jump-btn"
-              onClick={() => handleJumpTo(0)}
-              title="Reset to 00:00 midnight (Home key)"
+              onClick={() => handleJumpTo(1440)}
+              title="Jump to 24:00 (End of Day 1 departures)"
             >
-              00:00
+              24h
+            </button>
+            <button
+              type="button"
+              className="ts-jump-btn"
+              onClick={() => handleJumpTo(totalMinsRef.current)}
+              title="Jump to finish when all trans-continental trains arrive"
+            >
+              Finish
             </button>
           </div>
+
+          <button
+            type="button"
+            className="ts-collapse-btn"
+            onClick={() => setIsCollapsed(true)}
+            title="Collapse animation controls into a compact dock"
+          >
+            ▾ Collapse
+          </button>
         </div>
       </div>
 
@@ -625,8 +755,6 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       <div className="ts-slider-container">
         <div className="ts-slider-track-wrap">
           <div className="ts-track-bg">
-            <div className="ts-zone-am" title="Morning Rush Hour (07:00 – 09:30)" />
-            <div className="ts-zone-pm" title="Evening Rush Hour (17:30 – 20:30)" />
             <div ref={fillTrackRef} className="ts-track-fill" />
           </div>
 
@@ -645,28 +773,32 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         </div>
 
         <div className="ts-ticks-row">
-          <span className="ts-tick" onClick={() => handleJumpTo(0)} title="Jump to 00:00">
-            00:00
+          <span className="ts-tick" onClick={() => handleJumpTo(0)} title="Jump to Day 1 00:00">
+            D1 00:00
           </span>
           <span
             className="ts-tick ts-tick-highlight"
             onClick={() => handleJumpTo(360)}
-            title="Jump to 06:00 (AM Peak)"
+            title="Jump to Day 1 06:00 (Peak)"
           >
-            06:00 Peak
+            D1 06:00 Peak
           </span>
-          <span className="ts-tick" onClick={() => handleJumpTo(720)} title="Jump to 12:00">
-            12:00 Midday
+          <span className="ts-tick" onClick={() => handleJumpTo(1440)} title="Jump to Day 1 24:00">
+            D1 24:00
           </span>
           <span
             className="ts-tick ts-tick-highlight"
-            onClick={() => handleJumpTo(1080)}
-            title="Jump to 18:00 (PM Peak)"
+            onClick={() => handleJumpTo(Math.min(totalMinsRef.current, 2880))}
+            title="Jump to Day 2 24:00"
           >
-            18:00 Peak
+            D2 24:00
           </span>
-          <span className="ts-tick" onClick={() => handleJumpTo(1440)} title="Jump to 24:00">
-            24:00
+          <span
+            className="ts-tick"
+            onClick={() => handleJumpTo(totalMinsRef.current)}
+            title="Jump to complete terminus arrivals"
+          >
+            All Arrived
           </span>
         </div>
       </div>

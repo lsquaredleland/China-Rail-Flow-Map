@@ -15,6 +15,9 @@ interface Props {
   onToggleIsolate?: (code: string) => void;
   onJumpToTime?: (mins: number) => void;
   mapRef?: RefObject<MapApi | null>;
+  originCityZh?: string;
+  originCityEn?: string;
+  direction?: string;
 }
 
 export default function TrainScheduleModal({
@@ -29,6 +32,8 @@ export default function TrainScheduleModal({
   onToggleIsolate,
   onJumpToTime,
   mapRef,
+  originCityZh,
+  originCityEn,
 }: Props) {
   const [minimized, setMinimized] = useState(false);
   const [liveTime, setLiveTime] = useState<number>(() => currentTime ?? 360);
@@ -54,6 +59,25 @@ export default function TrainScheduleModal({
     if (!code || !schedulesData) return null;
     return formatScheduleStops(schedulesData, stationTable, code);
   }, [code, schedulesData, stationTable]);
+
+  // Identify the station corresponding to the currently selected city (e.g. Guangzhou, Wuhan, Beijing)
+  const originStationZh = trainVM
+    ? ((trainVM as any).fsZh || (trainVM as any).tsZh || "")
+    : "";
+
+  const originStop = useMemo(() => {
+    if (!stops) return null;
+    return (
+      stops.find(
+        (s) =>
+          (originStationZh && (s.stZh === originStationZh || s.stEn === originStationZh)) ||
+          (originCityZh && (s.stZh === originCityZh || s.stZh.startsWith(originCityZh))) ||
+          (originCityEn &&
+            (s.stEn.toLowerCase() === originCityEn.toLowerCase() ||
+              s.stEn.toLowerCase().startsWith(originCityEn.toLowerCase()))),
+      ) || null
+    );
+  }, [stops, originStationZh, originCityZh, originCityEn]);
 
   // Determine current active trip status
   const currentStatus = useMemo(() => {
@@ -366,6 +390,30 @@ export default function TrainScheduleModal({
                 ▶ Jump to dep ({trainVM.dep})
               </button>
             )}
+            {originStop && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  background: dark
+                    ? "rgba(59, 130, 246, 0.25)"
+                    : "rgba(59, 130, 246, 0.15)",
+                  color: dark ? "#93C5FD" : "#1D4ED8",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  border: `1px solid ${dark ? "rgba(59, 130, 246, 0.4)" : "rgba(59, 130, 246, 0.3)"}`,
+                }}
+              >
+                <span>📍</span>
+                <span>
+                  {originStop.stZh}: {originStop.arr !== "—" ? `Arr ${originStop.arr} · ` : ""}Dep {originStop.dep}
+                  {originStop.dwellMins > 0 ? ` (${originStop.dwellMins}m dwell)` : ""}
+                </span>
+              </span>
+            )}
           </div>
 
           {currentStatus && (
@@ -414,6 +462,7 @@ export default function TrainScheduleModal({
               </thead>
               <tbody>
                 {stops.map((s, idx) => {
+                  const isOriginCity = originStop && s.stIdx === originStop.stIdx;
                   const isCurrent =
                     typeof liveTime === "number" &&
                     s.arrMins >= 0 &&
@@ -432,29 +481,34 @@ export default function TrainScheduleModal({
                       key={idx}
                       onClick={() => {
                         if (jumpTime >= 0 && onJumpToTime) {
-                          onJumpToTime(jumpTime % 1440);
+                          onJumpToTime(jumpTime);
                         }
                       }}
                       title={onJumpToTime ? `Click to jump simulation to ${s.stZh} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
                       style={{
                         borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)"}`,
+                        borderLeft: isOriginCity ? "4px solid #3B82F6" : "4px solid transparent",
                         background: isCurrent
                           ? dark
-                            ? "rgba(245, 158, 11, 0.22)"
-                            : "rgba(245, 158, 11, 0.15)"
-                          : "transparent",
+                            ? "rgba(245, 158, 11, 0.26)"
+                            : "rgba(245, 158, 11, 0.18)"
+                          : isOriginCity
+                            ? dark
+                              ? "rgba(59, 130, 246, 0.18)"
+                              : "rgba(59, 130, 246, 0.12)"
+                            : "transparent",
                         cursor: onJumpToTime ? "pointer" : "default",
                         transition: "background 0.15s ease",
                       }}
                       onMouseEnter={(e) => {
-                        if (!isCurrent) {
+                        if (!isCurrent && !isOriginCity) {
                           e.currentTarget.style.background = dark
                             ? "rgba(255,255,255,0.04)"
                             : "rgba(0,0,0,0.03)";
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!isCurrent) {
+                        if (!isCurrent && !isOriginCity) {
                           e.currentTarget.style.background = "transparent";
                         }
                       }}
@@ -471,8 +525,25 @@ export default function TrainScheduleModal({
                         {isCurrent ? "●" : idx + 1}
                       </td>
                       <td style={{ padding: "9px 16px" }}>
-                        <div style={{ fontWeight: 600, color: isPast ? (dark ? "#6B7280" : "#94A3B8") : "inherit" }}>
+                        <div style={{ fontWeight: 600, color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit" }}>
                           {s.stZh}
+                          {isOriginCity && (
+                            <span
+                              style={{
+                                marginLeft: "8px",
+                                fontSize: "10px",
+                                fontWeight: 800,
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                background: "#3B82F6",
+                                color: "#FFFFFF",
+                                letterSpacing: "0.5px",
+                                display: "inline-block",
+                              }}
+                            >
+                              📍 SELECTED ORIGIN
+                            </span>
+                          )}
                           {isCurrent && (
                             <span
                               style={{
@@ -500,10 +571,26 @@ export default function TrainScheduleModal({
                           padding: "9px 16px",
                           textAlign: "center",
                           fontFamily: "monospace",
-                          color: isPast ? (dark ? "#6B7280" : "#94A3B8") : "inherit",
+                          color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit",
                         }}
                       >
-                        {s.arr}
+                        <span
+                          style={
+                            isOriginCity
+                              ? {
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  background: dark
+                                    ? "rgba(59, 130, 246, 0.28)"
+                                    : "rgba(59, 130, 246, 0.18)",
+                                  fontWeight: 800,
+                                  color: dark ? "#93C5FD" : "#1D4ED8",
+                                }
+                              : undefined
+                          }
+                        >
+                          {s.arr}
+                        </span>
                       </td>
                       <td
                         style={{
@@ -511,10 +598,26 @@ export default function TrainScheduleModal({
                           textAlign: "center",
                           fontFamily: "monospace",
                           fontWeight: 600,
-                          color: isPast ? (dark ? "#6B7280" : "#94A3B8") : "inherit",
+                          color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit",
                         }}
                       >
-                        {s.dep}
+                        <span
+                          style={
+                            isOriginCity
+                              ? {
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  background: dark
+                                    ? "rgba(59, 130, 246, 0.28)"
+                                    : "rgba(59, 130, 246, 0.18)",
+                                  fontWeight: 800,
+                                  color: dark ? "#93C5FD" : "#1D4ED8",
+                                }
+                              : undefined
+                          }
+                        >
+                          {s.dep}
+                        </span>
                       </td>
                       <td
                         style={{

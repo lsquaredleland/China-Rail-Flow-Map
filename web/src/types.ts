@@ -226,6 +226,7 @@ export interface CityPointVM {
   crow: number; // crow-flies km
   rail: number; // rail km, -1 when unknown
   nn: number; // nearest-neighbour distance in degrees (label placement order)
+  arrTimes?: number[]; // sorted arrival minutes for dynamic circle expansion
 }
 
 export interface DestVM extends CityPointVM {
@@ -350,12 +351,15 @@ export interface SchedulesData {
 
 export interface DayTimelineVM {
   stepMins: number; // 5
-  numSteps: number; // 288
-  secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(288) of cumulative train count
-  maxFlowSteps: Uint16Array; // length 288: max flow count across all sections at each step
+  numSteps: number; // total steps across all days
+  totalMins: number; // total duration until all trains arrive (e.g. 1440, 2880, 4320)
+  totalDays: number; // number of 24h cycles needed for all trains to complete
+  secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(numSteps) of cumulative train count
+  maxFlowSteps: Uint16Array; // length numSteps: max flow count across all sections at each step
   getActiveTrains: (tMins: number) => ActiveTrainVM[];
   totalTrains: number;
   getDepartedCount: (tMins: number) => number;
+  getArrivedCount: (tMins: number) => number;
 }
 
 export interface DistBinFilter {

@@ -44,10 +44,13 @@ import type { LegendHandle } from "./Legend";
 const INFRA_WIDTH = 1.25;
 
 export interface AnimState {
-  time: number; // 0 to 1440 minutes
+  time: number; // minutes from midnight (0 up to totalMins)
+  totalMins: number; // total duration until all trains arrive (e.g. 1440, 2880, 4320)
+  totalDays: number; // number of 24h days needed for complete journeys
   isPlaying: boolean;
   speed: number; // seconds per 24h cycle (e.g. 15, 30, 60), default 30
   departed: number;
+  arrived: number;
   total: number;
   enabled: boolean;
 }
@@ -572,8 +575,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const timeline =
       P.current.direction === "out" ? cur.timeline : cur.inTimeline;
     const isAnimated = S.current.animEnabled && !!timeline;
-    const step = isAnimated
-      ? Math.min(287, Math.max(0, Math.floor(S.current.animTime / 5)))
+    const step = isAnimated && timeline
+      ? Math.min(
+          timeline.numSteps - 1,
+          Math.max(0, Math.floor(S.current.animTime / timeline.stepMins)),
+        )
       : 0;
     const curMaxN =
       isAnimated && timeline ? timeline.maxFlowSteps[step] || maxN : maxN;
@@ -1036,6 +1042,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const { W, H, hover } = S.current;
     const pts = points();
 
+    const timeline =
+      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const isAnimated = S.current.animEnabled && !!timeline;
+
     function drawDot(c: CityPointVM) {
       if (
         c.pt[0] < toLon(-30) ||
@@ -1044,9 +1054,29 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         c.pt[1] > toLat(-30)
       )
         return;
+
+      // Dynamic city circle sizing: circle grows as trains arrive at this city
+      let effectiveTrains = c.trains;
+      let recentArrival = false;
+      if (isAnimated && timeline && c.arrTimes && c.arrTimes.length > 0) {
+        const t = S.current.animTime;
+        let count = 0;
+        for (let k = 0; k < c.arrTimes.length; k++) {
+          if (c.arrTimes[k] <= t) count++;
+          else break;
+        }
+        effectiveTrains = count;
+        if (count > 0) {
+          const lastArr = c.arrTimes[count - 1];
+          if (t - lastArr >= 0 && t - lastArr <= 20) {
+            recentArrival = true;
+          }
+        }
+      }
+
       const x = X(c.pt[0]),
         y = Y(c.pt[1]),
-        r = stationR(c.trains);
+        r = stationR(effectiveTrains);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 6.2832);
       // Dot colour is the fastest-time band — always on, no toggle.
@@ -1056,6 +1086,15 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.lineWidth = P.current.dark ? 3.0 : 1.5;
       ctx.strokeStyle = pal.dotEdge;
       ctx.stroke();
+
+      // Golden arrival pulse ring when a train has recently arrived at this city
+      if (recentArrival && isAnimated) {
+        ctx.beginPath();
+        ctx.arc(x, y, r + 4, 0, 6.2832);
+        ctx.strokeStyle = P.current.dark ? "#F59E0B" : "#D97706";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     }
 
     const pd = P.current.panelDest;
@@ -1528,11 +1567,17 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
     const total = tl ? tl.totalTrains : 0;
     const departed = tl ? tl.getDepartedCount(st.animTime) : 0;
+    const arrived = tl ? tl.getArrivedCount(st.animTime) : 0;
+    const totalMins = tl ? tl.totalMins : 1440;
+    const totalDays = tl ? tl.totalDays : 1;
     return {
       time: st.animTime,
+      totalMins,
+      totalDays,
       isPlaying: st.animPlaying,
       speed: st.animSpeed,
       departed,
+      arrived,
       total,
       enabled: st.animEnabled,
     };
@@ -1556,11 +1601,19 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       st.lastRafTimestamp = null;
       return;
     }
+    const cur = P.current.cur;
+    const tl =
+      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const totalMins = tl ? tl.totalMins : 1440;
+
     if (st.lastRafTimestamp !== null) {
       const dt = (timestamp - st.lastRafTimestamp) / 1000;
       if (dt > 0 && dt < 2) {
         const deltaMins = (dt / Math.max(1, st.animSpeed)) * 1440;
-        st.animTime = (st.animTime + deltaMins) % 1440;
+        st.animTime = st.animTime + deltaMins;
+        if (st.animTime >= totalMins) {
+          st.animTime = 0;
+        }
         draw();
         notifyAnimListeners();
       }
@@ -1573,8 +1626,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const st = S.current;
     if (st.animPlaying === playing) return;
     st.animPlaying = playing;
+    const cur = P.current.cur;
+    const tl =
+      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const totalMins = tl ? tl.totalMins : 1440;
+
     if (playing) {
-      if (st.animTime >= 1440) {
+      if (st.animTime >= totalMins) {
         st.animTime = 0;
       }
       st.lastRafTimestamp = null;
@@ -1598,7 +1656,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
   function setTime(tMins: number) {
     const st = S.current;
-    st.animTime = Math.max(0, Math.min(1440, tMins));
+    const cur = P.current.cur;
+    const tl =
+      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const totalMins = tl ? tl.totalMins : 1440;
+    st.animTime = Math.max(0, Math.min(totalMins, tMins));
     draw();
     notifyAnimListeners();
   }
