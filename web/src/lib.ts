@@ -6,11 +6,13 @@ import type {
   AtlasData,
   BBox,
   DecodedAtlas,
+  DecodedOutline,
   DecodedSet,
   DepVM,
   DestVM,
   DistUnit,
   OriginVM,
+  OutlineData,
   Palette,
   RampStop,
   SrcVM,
@@ -85,6 +87,9 @@ export function palette(dark: boolean): Palette {
       legendInk: "#A3A3A0",
       legendLine: "#C8302A",
       ramp: TIME_BANDS_NIGHT,
+      outline: "rgba(255,255,255,0.13)",
+      dashLine: "rgba(56,189,248,0.40)",
+      landFill: "rgba(255,255,255,0.015)",
     };
   return {
     paper: "#ffffff",
@@ -110,6 +115,9 @@ export function palette(dark: boolean): Palette {
     legendInk: "#555555",
     legendLine: "#C8302A",
     ramp: TIME_BANDS,
+    outline: "rgba(160,155,145,0.60)",
+    dashLine: "rgba(2,132,199,0.50)",
+    landFill: "rgba(0,0,0,0.012)",
   };
 }
 
@@ -405,6 +413,14 @@ export function prepAtlas(data: AtlasData): DecodedAtlas {
   e.lat0 -= 1.0;
   e.lat1 += 1.0;
   return { data, sec, inSec, net, extent: e };
+}
+
+/** Decode the China + islands outline rings and Nine-dash line once. */
+export function prepOutline(data: OutlineData): DecodedOutline {
+  return {
+    rings: decodeSet(data.rings),
+    lines: decodeSet(data.lines),
+  };
 }
 
 /* ---------- station lookups ---------- */

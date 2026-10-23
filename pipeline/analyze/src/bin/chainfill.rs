@@ -157,7 +157,13 @@ fn main() {
                     Some(v) => v,
                     None => continue,
                 };
-                let dur = arr_j - dep_i;
+                let intermediate_dwells: i64 = (i + 1..j)
+                    .map(|k| match (abs[k].0, abs[k].1) {
+                        (Some(a), Some(d)) if d > a => d - a,
+                        _ => 0,
+                    })
+                    .sum();
+                let dur = (arr_j - dep_i).saturating_sub(intermediate_dwells);
                 if dur <= 0 {
                     continue;
                 }

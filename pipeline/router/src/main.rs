@@ -151,10 +151,10 @@ fn gen_candidates(
     let mut cands: Vec<Cand> = Vec::new();
     let mut sets: Vec<Shape> = Vec::new();
     let no_pen: HashMap<(u32, u32), f64> = HashMap::new();
-    let time_cap = (MAX_LEN_CHORD * p.chord + 40.0) / 40.0;
-    let dist_cap = MAX_LEN_CHORD * p.chord + 40.0;
+    let dist_cap = (MAX_LEN_CHORD * p.chord + 40.0).max(p.chord * 2.5 + 5.0);
+    let time_cap = dist_cap / 40.0;
     let accept = |c: Cand, cands: &mut Vec<Cand>, sets: &mut Vec<Shape>| {
-        if c.km > MAX_LEN_CHORD * p.chord + 30.0 {
+        if c.km > dist_cap {
             return;
         }
         let kmin = cands.iter().map(|k| k.km).fold(c.km, f64::min);
@@ -289,12 +289,17 @@ fn min_gap_bridge(g: &Graph, p: &PairInfo, sa: &Snap, sb: &Snap) -> Option<Cand>
         _ => true,
     };
     let mut best: Option<(f64, f64, u32, u32)> = None; // (gap, total, a-node, b-node)
-    let mut scan = |from: &HashMap<u32, (f64, u32)>,
+    let scan = |from: &HashMap<u32, (f64, u32)>,
                     other: &HashMap<u32, (f64, u32)>,
                     grid: &HashMap<(i32, i32), Vec<u32>>,
-                    a_side: bool| {
+                    a_side: bool,
+                    dangling_only: bool,
+                    best: &mut Option<(f64, f64, u32, u32)>| {
         for (&u, &(du, _)) in from {
-            if g.degree[u as usize] != 1 {
+            if dangling_only && g.degree[u as usize] != 1 {
+                continue;
+            }
+            if !dangling_only && du > 4.0 {
                 continue;
             }
             let cu = g.coords[u as usize];
@@ -311,14 +316,14 @@ fn min_gap_bridge(g: &Graph, p: &PairInfo, sa: &Snap, sb: &Snap) -> Option<Cand>
                         if ratio < BRIDGE_RATIO.0 || ratio > BRIDGE_RATIO.1 || !speed_ok(total) {
                             continue;
                         }
-                        let better = match best {
+                        let better = match *best {
                             None => true,
                             Some((bg, bt, _, _)) => {
                                 gap < bg - 0.05 || ((gap - bg).abs() <= 0.05 && total < bt)
                             }
                         };
                         if better {
-                            best = Some(if a_side {
+                            *best = Some(if a_side {
                                 (gap, total, u, v)
                             } else {
                                 (gap, total, v, u)
@@ -329,8 +334,12 @@ fn min_gap_bridge(g: &Graph, p: &PairInfo, sa: &Snap, sb: &Snap) -> Option<Cand>
             }
         }
     };
-    scan(&ta, &tb, &gb, true);
-    scan(&tb, &ta, &ga, false);
+    scan(&ta, &tb, &gb, true, true, &mut best);
+    scan(&tb, &ta, &ga, false, true, &mut best);
+    if best.is_none() {
+        scan(&ta, &tb, &gb, true, false, &mut best);
+        scan(&tb, &ta, &ga, false, false, &mut best);
+    }
     let (_, _, u, v) = best?;
     let mut nodes = graph::reach_path(&ta, u);
     let mut tail = graph::reach_path(&tb, v);
@@ -795,11 +804,16 @@ fn main() {
                         if bg <= 0.0 {
                             return None;
                         }
-                        pc.iter()
-                            .position(|c| {
-                                c.source == "min-gap-bridge" && c.gap_km < bg - BRIDGE_GAP_GAIN_KM
+                        (0..pc.len())
+                            .filter(|&i| {
+                                feasible(i)
+                                    && (pc[i].gap_km < bg - BRIDGE_GAP_GAIN_KM
+                                        || (pc[i].gap_km == 0.0 && bg > 0.0))
                             })
-                            .filter(|&i| feasible(i))
+                            .min_by(|&a, &b| {
+                                pc[a].gap_km.total_cmp(&pc[b].gap_km)
+                                    .then_with(|| post[b].total_cmp(&post[a]))
+                            })
                     });
                     let (chosen, decision) = match (best, base) {
                         (None, _) => (None, "no-candidates"),
@@ -819,7 +833,10 @@ fn main() {
                             }
                         }
                         (Some(b), None) => {
-                            if post[b] >= model::params().fill_post && feasible(b) {
+                            let fill_ok = feasible(b)
+                                && (post[b] >= model::params().fill_post
+                                    || (pc[b].gap_km < 1.0 && post[b] >= 0.35));
+                            if fill_ok {
                                 (Some(b), "filled")
                             } else {
                                 (None, "chord")
@@ -873,11 +890,18 @@ fn main() {
     // (two rounds, so "busiest" is judged on already-merged usage), then
     // every chosen non-production corridor is redrawn the same way ----
     let weight = |pi: usize| pair_legs[&pairs[pi].key].len() as u32;
+    let best_for_canon = |pi: usize| -> Option<&Cand> {
+        cands[pi]
+            .iter()
+            .filter(|c| c.gap_km == 0.0)
+            .min_by(|a, b| a.km.total_cmp(&b.km))
+            .or_else(|| cands[pi].iter().find(|c| c.is_base))
+    };
     let mut usage = edge_usage(
         cands
             .iter()
             .enumerate()
-            .filter_map(|(pi, cs)| cs.iter().find(|c| c.is_base).map(|b| (b, weight(pi)))),
+            .filter_map(|(pi, _)| best_for_canon(pi).map(|b| (b, weight(pi)))),
     );
     let mut canon: Vec<Option<Cand>> = vec![None; cands.len()];
     for _round in 0..REDRAW_ROUNDS {
@@ -886,10 +910,7 @@ fn main() {
             .map_init(
                 || Buffers::new(g.coords.len()),
                 |buf, pi| {
-                    cands[pi]
-                        .iter()
-                        .find(|c| c.is_base)
-                        .map(|b| redraw(&g, &fine, buf, b, &usage))
+                    best_for_canon(pi).map(|b| redraw(&g, &fine, buf, b, &usage))
                 },
             )
             .collect();
@@ -970,15 +991,23 @@ fn main() {
         serde_json::to_string(&leg_paths).unwrap(),
     )
     .unwrap();
-    let mut pp_keys: Vec<&Key> = base_paths.keys().collect();
+    let mut all_keys: HashSet<&Key> = base_paths.keys().collect();
+    for key in pair_idx.keys() {
+        if canon[pair_idx[key]].is_some() {
+            all_keys.insert(key);
+        }
+    }
+    let mut pp_keys: Vec<&Key> = all_keys.into_iter().collect();
     pp_keys.sort();
     let pp_rows: Vec<Value> = pp_keys
         .into_iter()
         .map(|key| {
-            let (status, segs) = &base_paths[key];
+            let base_info = base_paths.get(key);
+            let status = base_info.map(|(s, _)| s.as_str()).unwrap_or("ok");
+            let segs = base_info.map(|(_, s)| s.clone()).unwrap_or_default();
             let segments = match pair_idx.get(key).and_then(|&pi| canon[pi].as_ref()) {
                 Some(c) => osm_segments(&g, c),
-                None => segs.clone(),
+                None => segs,
             };
             json!({"from": key.0, "to": key.1, "status": status, "segments": segments})
         })

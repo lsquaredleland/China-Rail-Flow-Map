@@ -11,6 +11,7 @@ import type {
   ChordVM,
   CityPointVM,
   DecodedAtlas,
+  DecodedOutline,
   DecodedSet,
   DestVM,
   Direction,
@@ -48,10 +49,15 @@ export interface MapApi {
   zoomCenter: (factor: number) => void;
   refreshTooltip: () => void;
   clearStationHover: () => void;
+  selectDestByZh: (zh: string) => void;
+  panZoomTo: (lon: number, lat: number, scale: number) => void;
 }
 
 interface Props {
   atlas: DecodedAtlas | null;
+  outline?: DecodedOutline | null;
+  showOutline?: boolean;
+  connectorMode?: "solid" | "dashed" | "none";
   cur: OriginVM | null;
   direction: Direction;
   dark: boolean;
@@ -271,6 +277,154 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ly = y;
     }
   }
+  function distKm(lon1: number, lat1: number, lon2: number, lat2: number): number {
+    const dx = (lon1 - lon2) * 111.0 * Math.cos(((lat1 + lat2) / 2) * 0.017453292519943295);
+    const dy = (lat1 - lat2) * 111.0;
+    return Math.hypot(dx, dy);
+  }
+
+  function getIntraCityConnector(): {
+    netIdx: number;
+    subN: number;
+    bw0: number;
+    col: string;
+  } | null {
+    const dest = P.current.panelDest;
+    const atlas = P.current.atlas;
+    const cur = P.current.cur;
+    const destSecCounts = getDestSectionCounts();
+    if (!dest || !atlas || !cur || !destSecCounts || destSecCounts.size === 0) return null;
+    const mode = P.current.connectorMode ?? "solid";
+    if (mode === "none") return null;
+
+    const set = flowsSet();
+    if (!set) return null;
+
+    const [destLon, destLat] = dest.pt;
+
+    let bestArrLon = 0,
+      bestArrLat = 0,
+      minTermDist = 1e9;
+
+    for (const [s, count] of destSecCounts.entries()) {
+      if (count <= 0) continue;
+      const o = set.off[s];
+      const l = set.len[s];
+      if (l <= 0) continue;
+      const x0 = set.pts[o];
+      const y0 = set.pts[o + 1];
+      const x1 = set.pts[o + (l - 1) * 2];
+      const y1 = set.pts[o + (l - 1) * 2 + 1];
+
+      const d0 = distKm(x0, y0, destLon, destLat);
+      const d1 = distKm(x1, y1, destLon, destLat);
+      if (d0 < minTermDist) {
+        minTermDist = d0;
+        bestArrLon = x0;
+        bestArrLat = y0;
+      }
+      if (d1 < minTermDist) {
+        minTermDist = d1;
+        bestArrLon = x1;
+        bestArrLat = y1;
+      }
+    }
+
+    if (minTermDist < 2.5 || minTermDist > 70.0) return null;
+
+    const { pts, off, len } = atlas.net;
+    let bestNetIdx = -1;
+    let minNetErr = 1e9;
+
+    for (let i = 0; i < len.length; i++) {
+      const o = off[i];
+      const l = len[i];
+      if (l <= 0) continue;
+      const nx0 = pts[o];
+      const ny0 = pts[o + 1];
+      const nx1 = pts[o + (l - 1) * 2];
+      const ny1 = pts[o + (l - 1) * 2 + 1];
+
+      const err1 = distKm(nx0, ny0, bestArrLon, bestArrLat) + distKm(nx1, ny1, destLon, destLat);
+      const err2 = distKm(nx1, ny1, bestArrLon, bestArrLat) + distKm(nx0, ny0, destLon, destLat);
+      const err = Math.min(err1, err2);
+      if (err < minNetErr) {
+        minNetErr = err;
+        bestNetIdx = i;
+      }
+    }
+
+    if (bestNetIdx >= 0 && minNetErr < 5.0) {
+      const subN = (dest as DestVM).trains || (dest as SrcVM).trains || 5;
+      const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
+      const pal = makePalette(P.current.dark);
+      const bw0 = Math.round(widthOf(subN) * 4) / 4;
+      const col = flowColor(subN, maxN, pal);
+      return { netIdx: bestNetIdx, subN, bw0, col };
+    }
+
+    return null;
+  }
+
+  function drawOutline(ctx: CanvasRenderingContext2D, pal: Palette) {
+    const outline = P.current.outline;
+    if (!outline) return;
+    const { rings, lines } = outline;
+
+    // 1. Boundary rings (PRC mainland, Taiwan, Hainan, islands)
+    if (rings && rings.len.length > 0) {
+      ctx.fillStyle = pal.landFill;
+      ctx.strokeStyle = pal.outline;
+      ctx.lineWidth = Math.max(0.65, S.current.view.scale * 0.015);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let i = 0; i < rings.len.length; i++) {
+        if (
+          inViewBB(
+            rings.bb[i * 4],
+            rings.bb[i * 4 + 1],
+            rings.bb[i * 4 + 2],
+            rings.bb[i * 4 + 3],
+            0.2,
+          )
+        ) {
+          traceInto(ctx, rings.pts, rings.off[i], rings.len[i]);
+          ctx.closePath();
+        }
+      }
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // 2. Nine-dash line in the South China Sea (dashed maritime boundary)
+    if (lines && lines.len.length > 0) {
+      ctx.strokeStyle = pal.outline;
+      const lw = Math.max(1.0, S.current.view.scale * 0.02);
+      ctx.lineWidth = lw;
+      ctx.lineCap = "butt";
+      ctx.setLineDash([Math.max(6, lw * 2.2), Math.max(4, lw * 1.8)]);
+      ctx.beginPath();
+      for (let i = 0; i < lines.len.length; i++) {
+        if (
+          inViewBB(
+            lines.bb[i * 4],
+            lines.bb[i * 4 + 1],
+            lines.bb[i * 4 + 2],
+            lines.bb[i * 4 + 3],
+            0.2,
+          )
+        ) {
+          traceInto(ctx, lines.pts, lines.off[i], lines.len[i]);
+        }
+      }
+      ctx.stroke();
+      ctx.lineCap = "round";
+      ctx.setLineDash([]);
+    }
+  }
+
   function drawGraticule(ctx: CanvasRenderingContext2D, pal: Palette) {
     const { W, H } = S.current;
     ctx.strokeStyle = pal.graticule;
@@ -296,13 +450,40 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const { pts, off, len, bb } = atlas.net;
     ctx.strokeStyle = pal.network;
     ctx.lineWidth = Math.max(0.45, S.current.view.scale * 0.016);
+
+    const isFerry = (i: number) =>
+      bb[i * 4 + 1] < 20.15 &&
+      bb[i * 4 + 3] > 20.20 &&
+      bb[i * 4] > 110.0 &&
+      bb[i * 4 + 2] < 110.3;
+
+    // Solid track network
+    ctx.setLineDash([]);
     ctx.beginPath();
     for (let i = 0; i < len.length; i++) {
+      if (isFerry(i)) continue;
       if (inViewBB(bb[i * 4], bb[i * 4 + 1], bb[i * 4 + 2], bb[i * 4 + 3], 0.3)) {
         traceInto(ctx, pts, off[i], len[i]);
       }
     }
     ctx.stroke();
+
+    // Dashed ferry crossing line across Qiongzhou strait (maritime water blue)
+    const netW = Math.max(0.65, S.current.view.scale * 0.02);
+    ctx.strokeStyle = P.current.dark ? "#38BDF8" : "#0284C7";
+    ctx.lineWidth = netW;
+    ctx.lineCap = "butt";
+    ctx.setLineDash([Math.max(8, netW * 2.5), Math.max(6, netW * 2.0)]);
+    ctx.beginPath();
+    for (let i = 0; i < len.length; i++) {
+      if (!isFerry(i)) continue;
+      if (inViewBB(bb[i * 4], bb[i * 4 + 1], bb[i * 4 + 2], bb[i * 4 + 3], 0.3)) {
+        traceInto(ctx, pts, off[i], len[i]);
+      }
+    }
+    ctx.stroke();
+    ctx.lineCap = "round";
+    ctx.setLineDash([]);
   }
   /* ---------- exact per-train section counts for a selected station ---------- */
   function getDestSectionCounts(): Map<number, number> | null {
@@ -375,10 +556,17 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const flows = flowsList();
     const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
 
+    const isFerry = (s: number) =>
+      bb[s * 4 + 1] < 20.15 &&
+      bb[s * 4 + 3] > 20.20 &&
+      bb[s * 4] > 110.0 &&
+      bb[s * 4 + 2] < 110.3;
+
     function strokeFlowList(items: { s: number; n: number }[], alpha: number) {
       ctx.globalAlpha = alpha;
       let curW = -1,
         curCol = "",
+        curDash = false,
         open = false;
       for (let i = 0; i < items.length; i++) {
         const f = items[i];
@@ -393,19 +581,38 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         )
           continue;
         const bw0 = Math.round(widthOf(f.n) * 4) / 4;
-        const col = flowColor(f.n, maxN, pal);
-        if (bw0 !== curW || col !== curCol) {
+        const ferry = isFerry(f.s);
+        // Water crossing blue: luminous azure in dark mode, vibrant ocean blue in light mode
+        const col = ferry
+          ? P.current.dark
+            ? "#38BDF8"
+            : "#0284C7"
+          : flowColor(f.n, maxN, pal);
+        if (bw0 !== curW || col !== curCol || ferry !== curDash) {
           if (open) ctx.stroke();
           ctx.beginPath();
           ctx.lineWidth = bw0;
           ctx.strokeStyle = col;
+          if (ferry) {
+            // Use butt cap and scale dash/gap with stroke width so dashes never merge at high zoom
+            ctx.lineCap = "butt";
+            const dashLen = Math.max(12, bw0 * 2.5);
+            const gapLen = Math.max(9, bw0 * 1.8);
+            ctx.setLineDash([dashLen, gapLen]);
+          } else {
+            ctx.lineCap = "round";
+            ctx.setLineDash([]);
+          }
           curW = bw0;
           curCol = col;
+          curDash = ferry;
           open = true;
         }
         traceInto(ctx, pts, off[f.s], len[f.s]);
       }
       if (open) ctx.stroke();
+      ctx.lineCap = "round";
+      ctx.setLineDash([]);
     }
 
     if (destSecCounts) {
@@ -423,6 +630,33 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         }
         subFlows.sort((a, b) => b.n - a.n);
         strokeFlowList(subFlows, 1.0);
+
+        // Intra-city track connector (bridges gap to metropolitan city marker)
+        const conn = getIntraCityConnector();
+        if (conn) {
+          const mode = P.current.connectorMode ?? "solid";
+          ctx.beginPath();
+          if (mode === "dashed") {
+            ctx.lineWidth = Math.max(1.8, conn.bw0 * 0.75);
+            ctx.strokeStyle = conn.col;
+            ctx.lineCap = "butt";
+            ctx.setLineDash([8, 6]);
+          } else {
+            ctx.lineWidth = conn.bw0;
+            ctx.strokeStyle = conn.col;
+            ctx.lineCap = "round";
+            ctx.setLineDash([]);
+          }
+          traceInto(
+            ctx,
+            atlas.net.pts,
+            atlas.net.off[conn.netIdx],
+            atlas.net.len[conn.netIdx],
+          );
+          ctx.stroke();
+          ctx.lineCap = "round";
+          ctx.setLineDash([]);
+        }
       }
       ctx.globalAlpha = 1.0;
     } else {
@@ -449,6 +683,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
     function infraPass(wantConnected: boolean | null, alpha: number) {
       ctx.globalAlpha = alpha;
+      const isFerry = (s: number) =>
+        bb[s * 4 + 1] < 20.15 &&
+        bb[s * 4 + 3] > 20.20 &&
+        bb[s * 4] > 110.0 &&
+        bb[s * 4 + 2] < 110.3;
+
       for (let pass = 0; pass < 2; pass++) {
         const wantHsr = pass === 1 ? 1 : 0;
         ctx.strokeStyle = pass === 1 ? pal.infraHsr : pal.infraConv;
@@ -462,6 +702,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           )
             continue;
           if ((hsr[f.s] ? 1 : 0) !== wantHsr) continue;
+          if (pass === 0 && isFerry(f.s)) continue;
           if (
             !inViewBB(
               bb[f.s * 4],
@@ -476,6 +717,39 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           any = true;
         }
         if (any) ctx.stroke();
+
+        // Depict train ferry crossing with a maritime dashed line in water blue
+        if (pass === 0) {
+          ctx.beginPath();
+          ctx.lineCap = "butt";
+          ctx.strokeStyle = P.current.dark ? "#38BDF8" : "#0284C7";
+          ctx.setLineDash([7, 6]);
+          let anyFerry = false;
+          for (let i = 0; i < flows.length; i++) {
+            const f = flows[i];
+            if (
+              wantConnected !== null &&
+              (destSecCounts ? destSecCounts.has(f.s) : false) !== wantConnected
+            )
+              continue;
+            if (!isFerry(f.s)) continue;
+            if (
+              !inViewBB(
+                bb[f.s * 4],
+                bb[f.s * 4 + 1],
+                bb[f.s * 4 + 2],
+                bb[f.s * 4 + 3],
+                0.35,
+              )
+            )
+              continue;
+            traceInto(ctx, pts, off[f.s], len[f.s]);
+            anyFerry = true;
+          }
+          if (anyFerry) ctx.stroke();
+          ctx.lineCap = "round";
+          ctx.setLineDash([]);
+        }
       }
     }
 
@@ -529,12 +803,30 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   ) {
     const set = flowsSet();
     if (!set) return;
-    ctx.lineWidth = widthOf(n) + 1.6;
-    ctx.strokeStyle = pal.flowHi;
-    ctx.setLineDash([]);
+    const isFerry =
+      set.bb[sIdx * 4 + 1] < 20.15 &&
+      set.bb[sIdx * 4 + 3] > 20.20 &&
+      set.bb[sIdx * 4] > 110.0 &&
+      set.bb[sIdx * 4 + 2] < 110.3;
+    const hw = widthOf(n) + 1.6;
+    ctx.lineWidth = hw;
+    ctx.strokeStyle = isFerry
+      ? P.current.dark
+        ? "#7DD3FC"
+        : "#0284C7"
+      : pal.flowHi;
+    if (isFerry) {
+      ctx.lineCap = "butt";
+      ctx.setLineDash([Math.max(12, hw * 2.5), Math.max(9, hw * 1.8)]);
+    } else {
+      ctx.lineCap = "round";
+      ctx.setLineDash([]);
+    }
     ctx.beginPath();
     traceInto(ctx, set.pts, set.off[sIdx], set.len[sIdx]);
     ctx.stroke();
+    ctx.lineCap = "round";
+    ctx.setLineDash([]);
   }
   function drawStations(ctx: CanvasRenderingContext2D, pal: Palette) {
     const cur = P.current.cur;
@@ -905,6 +1197,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     ctx.fillRect(0, 0, st.W, st.H);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    if (P.current.showOutline) drawOutline(ctx, pal);
     drawGraticule(ctx, pal);
     if (P.current.showNetwork) drawNetwork(ctx, pal);
     const destSecCounts = getDestSectionCounts();
@@ -1188,6 +1481,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         "</table>" +
         "<div class='t-sub'>No track routing &mdash; drawn straight</div>";
     } else if (hit.kind === "seg") {
+      const set = flowsSet();
+      const isFerry =
+        set &&
+        set.bb[hit.s * 4 + 1] < 20.15 &&
+        set.bb[hit.s * 4 + 3] > 20.20 &&
+        set.bb[hit.s * 4] > 110.0 &&
+        set.bb[hit.s * 4 + 2] < 110.3;
+
       if (hit.subN !== undefined && hit.subN > 0 && P.current.panelDest) {
         const destName = P.current.panelDest.en;
         html =
@@ -1205,6 +1506,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           hit.n +
           (hit.n === 1 ? " train" : " trains") +
           " per day on this section</div>";
+      }
+      if (isFerry) {
+        const blueCol = P.current.dark ? "#38BDF8" : "#0284C7";
+        html +=
+          `<div class='t-sub' style='color:${blueCol};font-weight:600'>` +
+          "粤海铁路轮渡 (Guangdong–Hainan Train Ferry) &middot; Qiongzhou Strait crossing</div>";
       }
     }
     tooltip.innerHTML = html;
@@ -1269,6 +1576,22 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           st.hover = null;
           draw();
         }
+      },
+      selectDestByZh(zh: string) {
+        const pts = points();
+        const pt = pts.find((p) => p.zh === zh);
+        if (pt) {
+          P.current.onSelectDest(pt);
+          draw();
+        }
+      },
+      panZoomTo(lon: number, lat: number, scale: number) {
+        const st = S.current;
+        st.interacted = true;
+        st.view.scale = scale;
+        st.view.tx = st.W / 2 - lon * scale;
+        st.view.ty = st.H / 2 + lat * scale;
+        draw();
       },
     }),
     [],
@@ -1361,6 +1684,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     props.showNetwork,
     props.showLabels,
     props.showInfra,
+    props.showOutline,
+    props.outline,
+    props.connectorMode,
     props.dark,
     props.direction,
     props.panelDest,

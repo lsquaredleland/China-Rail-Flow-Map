@@ -177,6 +177,16 @@ export interface Extent {
   lat1: number;
 }
 
+export interface OutlineData {
+  rings: string[];
+  lines: string[];
+}
+
+export interface DecodedOutline {
+  rings: DecodedSet;
+  lines: DecodedSet;
+}
+
 export interface DecodedAtlas {
   data: AtlasData;
   sec: DecodedSet;
@@ -350,4 +360,7 @@ export interface Palette {
   legendInk: string;
   legendLine: string;
   ramp: RampStop[];
+  outline: string;
+  dashLine: string;
+  landFill: string;
 }

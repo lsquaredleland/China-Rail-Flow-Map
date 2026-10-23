@@ -1,20 +1,11 @@
-// Extract China's national boundary from the Geofabrik China PBF we already
-// hold: relation 270056 (boundary=administrative, admin_level=2, name=中国).
-// Chains member ways into closed rings + open lines, Douglas-Peucker
-// simplifies, and writes Google-polyline-encoded [lat, lon] geometry to
-// china-outline.json for the flow atlas.
+// Extract China, Taiwan, Hainan, and South China Sea boundary geometry from the OSM PBF.
+// Chains member ways into closed rings + open lines, Douglas-Peucker simplifies at ~1 km (0.009 deg),
+// and writes Google-polyline-encoded geometry at 1e4 precision to china-outline.json.
 use osmpbf::{Element, ElementReader, RelMemberType};
 use std::collections::{HashMap, HashSet};
 
-fn tag<'a>(tags: impl Iterator<Item = (&'a str, &'a str)>, key: &str) -> Option<String> {
-    tags.filter(|(k, _)| *k == key)
-        .map(|(_, v)| v.to_string())
-        .next()
-}
-
 #[allow(clippy::needless_range_loop)]
 fn dp(pts: &[[f64; 2]], eps: f64, keep: &mut [bool]) {
-    // iterative Douglas-Peucker on [lon, lat] points in degrees
     let n = pts.len();
     if n < 3 {
         for k in keep.iter_mut() {
@@ -68,11 +59,11 @@ fn simplify(pts: &[[f64; 2]], eps: f64) -> Vec<[f64; 2]> {
 }
 
 fn polyline_encode(pts: &[[f64; 2]]) -> String {
-    // pts are [lon, lat]; encodes (lat, lon) per the Google algorithm at 1e5
+    // Encodes [lat, lon] per Google algorithm at 1e4 precision (~11 m)
     let mut out = String::new();
     let mut last = [0i64; 2];
     for p in pts {
-        let cur = [(p[1] * 1e5).round() as i64, (p[0] * 1e5).round() as i64];
+        let cur = [(p[1] * 1e4).round() as i64, (p[0] * 1e4).round() as i64];
         for i in 0..2 {
             let mut v = cur[i] - last[i];
             v = if v < 0 { !(v << 1) } else { v << 1 };
@@ -94,18 +85,12 @@ fn hav_km(a: [f64; 2], b: [f64; 2]) -> f64 {
     12742.0 * h.sqrt().asin()
 }
 
-/// Join chain ends that nearly meet (gaps left by ways the Geofabrik clip
-/// dropped). Repeatedly fuses the closest pair of endpoints within tol_km;
-/// a chain whose own ends meet becomes a closed ring.
-/// A set of coordinate chains ([lon, lat] points).
 type Chains = Vec<Vec<[f64; 2]>>;
 
 fn snap_chains(chains: Chains, tol_km: f64) -> (Chains, Chains) {
     let mut pool: Vec<Vec<[f64; 2]>> = chains;
     let mut rings: Vec<Vec<[f64; 2]>> = Vec::new();
     loop {
-        // Closest endpoint pair (i, ei) x (j, ej); end flag 0 = start, 1 = end.
-        // i == j is allowed: it is a chain whose own ends nearly meet.
         let mut best: Option<(f64, usize, usize, usize, usize)> = None;
         for i in 0..pool.len() {
             for j in i..pool.len() {
@@ -114,16 +99,8 @@ fn snap_chains(chains: Chains, tol_km: f64) -> (Chains, Chains) {
                         if i == j && ei >= ej {
                             continue;
                         }
-                        let a = if ei == 0 {
-                            pool[i][0]
-                        } else {
-                            *pool[i].last().unwrap()
-                        };
-                        let b = if ej == 0 {
-                            pool[j][0]
-                        } else {
-                            *pool[j].last().unwrap()
-                        };
+                        let a = if ei == 0 { pool[i][0] } else { *pool[i].last().unwrap() };
+                        let b = if ej == 0 { pool[j][0] } else { *pool[j].last().unwrap() };
                         let d = hav_km(a, b);
                         if best.is_none_or(|(bd, _, _, _, _)| d < bd) {
                             best = Some((d, i, ei, j, ej));
@@ -140,14 +117,12 @@ fn snap_chains(chains: Chains, tol_km: f64) -> (Chains, Chains) {
             break;
         }
         if i == j {
-            // Self-close: append the start point and retire the chain as a ring.
             let mut c = pool.remove(i);
             let start = c[0];
             c.push(start);
             rings.push(c);
             continue;
         }
-        // Remove the higher index first so the lower one stays valid.
         let (ci_raw, cj_raw) = if i < j {
             let cj = pool.remove(j);
             let ci = pool.remove(i);
@@ -157,8 +132,6 @@ fn snap_chains(chains: Chains, tol_km: f64) -> (Chains, Chains) {
             let cj = pool.remove(j);
             (ci, cj)
         };
-        // Orient: ca must END at chain i's chosen endpoint, cb must START at
-        // chain j's chosen endpoint, then concatenate.
         let mut ca = ci_raw;
         if ei == 0 {
             ca.reverse();
@@ -181,6 +154,83 @@ fn snap_chains(chains: Chains, tol_km: f64) -> (Chains, Chains) {
     (rings, lines)
 }
 
+fn chain(
+    way_ids: &HashSet<i64>,
+    way_refs: &HashMap<i64, Vec<i64>>,
+    coords: &HashMap<i64, [f64; 2]>,
+) -> Vec<Vec<[f64; 2]>> {
+    let mut by_end: HashMap<i64, Vec<i64>> = HashMap::new();
+    for id in way_ids {
+        if let Some(refs) = way_refs.get(id) {
+            if refs.len() >= 2 {
+                by_end.entry(refs[0]).or_default().push(*id);
+                by_end.entry(*refs.last().unwrap()).or_default().push(*id);
+            }
+        }
+    }
+    let mut used: HashSet<i64> = HashSet::new();
+    let mut chains: Vec<Vec<i64>> = Vec::new();
+    for id in way_ids {
+        if used.contains(id) {
+            continue;
+        }
+        let refs = match way_refs.get(id) {
+            Some(r) if r.len() >= 2 => r,
+            _ => continue,
+        };
+        used.insert(*id);
+        let mut nodes: Vec<i64> = refs.clone();
+        loop {
+            let end = *nodes.last().unwrap();
+            let nxt = by_end
+                .get(&end)
+                .and_then(|v| v.iter().find(|w| !used.contains(w)));
+            match nxt {
+                Some(wid) => {
+                    let wr = way_refs.get(wid).unwrap();
+                    used.insert(*wid);
+                    if wr[0] == end {
+                        nodes.extend(wr.iter().skip(1));
+                    } else {
+                        nodes.extend(wr.iter().rev().skip(1));
+                    }
+                }
+                None => break,
+            }
+        }
+        loop {
+            let start = nodes[0];
+            let nxt = by_end
+                .get(&start)
+                .and_then(|v| v.iter().find(|w| !used.contains(w)));
+            match nxt {
+                Some(wid) => {
+                    let wr = way_refs.get(wid).unwrap();
+                    used.insert(*wid);
+                    let mut head: Vec<i64> = if *wr.last().unwrap() == start {
+                        wr[..wr.len() - 1].to_vec()
+                    } else {
+                        wr[1..].iter().rev().copied().collect()
+                    };
+                    head.extend(nodes.iter());
+                    nodes = head;
+                }
+                None => break,
+            }
+        }
+        chains.push(nodes);
+    }
+    chains
+        .iter()
+        .map(|ns| {
+            ns.iter()
+                .filter_map(|n| coords.get(n).copied())
+                .collect::<Vec<[f64; 2]>>()
+        })
+        .filter(|c| c.len() >= 2)
+        .collect()
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = std::env::args()
         .nth(1)
@@ -190,61 +240,66 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(2)
         .unwrap_or_else(|| format!("{out_dir}/china-outline.json"));
 
-    // ---- Pass 1: relations -> China's boundary member ways by role ----
-    let (outer_ways, inner_ways, found) = {
+    // Pass 1: extract boundary ways for PRC (270056), Taiwan (449220), Hainan (2128285)
+    let (outer_ways_prc, inner_ways_prc, ways_tw, ways_hn) = {
         let reader = ElementReader::from_path(&input)?;
         reader.par_map_reduce(
             |el| {
-                let mut out = HashSet::new();
-                let mut inn = HashSet::new();
-                let mut f = None;
+                let mut out_prc = HashSet::new();
+                let mut inn_prc = HashSet::new();
+                let mut out_tw = HashSet::new();
+                let mut out_hn = HashSet::new();
                 if let Element::Relation(r) = el {
-                    let is_china = r.id() == 270056 || {
-                        let b = tag(r.tags(), "boundary");
-                        let al = tag(r.tags(), "admin_level");
-                        let nm = tag(r.tags(), "name");
-                        let ne = tag(r.tags(), "name:en");
-                        b.as_deref() == Some("administrative")
-                            && al.as_deref() == Some("2")
-                            && (nm.as_deref() == Some("中国") || ne.as_deref() == Some("China"))
-                    };
-                    if is_china {
-                        f = Some(r.id());
+                    let id = r.id();
+                    if id == 270056 {
                         for m in r.members() {
                             if m.member_type != RelMemberType::Way {
                                 continue;
                             }
                             match m.role().unwrap_or("") {
-                                "inner" => {
-                                    inn.insert(m.member_id);
-                                }
-                                _ => {
-                                    out.insert(m.member_id);
-                                }
+                                "inner" => { inn_prc.insert(m.member_id); }
+                                _ => { out_prc.insert(m.member_id); }
+                            }
+                        }
+                    } else if id == 449220 {
+                        for m in r.members() {
+                            if m.member_type == RelMemberType::Way && m.role().unwrap_or("") != "inner" {
+                                out_tw.insert(m.member_id);
+                            }
+                        }
+                    } else if id == 2128285 {
+                        for m in r.members() {
+                            if m.member_type == RelMemberType::Way && m.role().unwrap_or("") != "inner" {
+                                out_hn.insert(m.member_id);
                             }
                         }
                     }
                 }
-                (out, inn, f)
+                (out_prc, inn_prc, out_tw, out_hn)
             },
-            || (HashSet::new(), HashSet::new(), None),
+            || (HashSet::new(), HashSet::new(), HashSet::new(), HashSet::new()),
             |mut a, b| {
                 a.0.extend(b.0);
                 a.1.extend(b.1);
-                let f = a.2.or(b.2);
-                (a.0, a.1, f)
+                a.2.extend(b.2);
+                a.3.extend(b.3);
+                a
             },
         )?
     };
+
     println!(
-        "relation: {:?} outer ways {} inner ways {}",
-        found,
-        outer_ways.len(),
-        inner_ways.len()
+        "ways: PRC outer {} inner {}, Taiwan {}, Hainan {}",
+        outer_ways_prc.len(), inner_ways_prc.len(), ways_tw.len(), ways_hn.len()
     );
 
-    // ---- Pass 2: member ways -> ordered node refs ----
-    let wanted: HashSet<i64> = outer_ways.union(&inner_ways).copied().collect();
+    let mut wanted: HashSet<i64> = HashSet::new();
+    wanted.extend(&outer_ways_prc);
+    wanted.extend(&inner_ways_prc);
+    wanted.extend(&ways_tw);
+    wanted.extend(&ways_hn);
+
+    // Pass 2: node refs for member ways
     let (way_refs, need_nodes) = {
         let reader = ElementReader::from_path(&input)?;
         reader.par_map_reduce(
@@ -270,14 +325,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )?
     };
-    println!(
-        "ways captured {} of {} wanted; nodes needed {}",
-        way_refs.len(),
-        wanted.len(),
-        need_nodes.len()
-    );
 
-    // ---- Pass 3: node coords ----
+    // Pass 3: node coordinates
     let coords: HashMap<i64, [f64; 2]> = {
         let reader = ElementReader::from_path(&input)?;
         reader.par_map_reduce(
@@ -305,140 +354,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )?
     };
-    println!("coords captured {}", coords.len());
 
-    // ---- chain ways into polylines by shared endpoint node ids ----
-    fn chain(
-        way_ids: &HashSet<i64>,
-        way_refs: &HashMap<i64, Vec<i64>>,
-        coords: &HashMap<i64, [f64; 2]>,
-    ) -> Vec<Vec<[f64; 2]>> {
-        let mut by_end: HashMap<i64, Vec<i64>> = HashMap::new(); // endpoint node -> way ids
-        for id in way_ids {
-            if let Some(refs) = way_refs.get(id) {
-                if refs.len() >= 2 {
-                    by_end.entry(refs[0]).or_default().push(*id);
-                    by_end.entry(*refs.last().unwrap()).or_default().push(*id);
-                }
-            }
-        }
-        let mut used: HashSet<i64> = HashSet::new();
-        let mut chains: Vec<Vec<i64>> = Vec::new(); // node-id chains
-        for id in way_ids {
-            if used.contains(id) {
-                continue;
-            }
-            let refs = match way_refs.get(id) {
-                Some(r) if r.len() >= 2 => r,
-                _ => continue,
-            };
-            used.insert(*id);
-            let mut nodes: Vec<i64> = refs.clone();
-            // extend forward
-            loop {
-                let end = *nodes.last().unwrap();
-                let nxt = by_end
-                    .get(&end)
-                    .and_then(|v| v.iter().find(|w| !used.contains(w)));
-                match nxt {
-                    Some(wid) => {
-                        let wr = way_refs.get(wid).unwrap();
-                        used.insert(*wid);
-                        if wr[0] == end {
-                            nodes.extend(wr.iter().skip(1));
-                        } else {
-                            nodes.extend(wr.iter().rev().skip(1));
-                        }
-                    }
-                    None => break,
-                }
-            }
-            // extend backward
-            loop {
-                let start = nodes[0];
-                let nxt = by_end
-                    .get(&start)
-                    .and_then(|v| v.iter().find(|w| !used.contains(w)));
-                match nxt {
-                    Some(wid) => {
-                        let wr = way_refs.get(wid).unwrap();
-                        used.insert(*wid);
-                        let mut head: Vec<i64> = if *wr.last().unwrap() == start {
-                            wr[..wr.len() - 1].to_vec()
-                        } else {
-                            wr[1..].iter().rev().copied().collect()
-                        };
-                        head.extend(nodes.iter());
-                        nodes = head;
-                    }
-                    None => break,
-                }
-            }
-            chains.push(nodes);
-        }
-        chains
-            .iter()
-            .map(|ns| {
-                ns.iter()
-                    .filter_map(|n| coords.get(n).copied())
-                    .collect::<Vec<[f64; 2]>>()
-            })
-            .filter(|c| c.len() >= 2)
-            .collect()
-    }
+    // Chain and snap each territorial unit separately to prevent accidental bridging across straits
+    let tol_km = 5.0f64;
+    let (mut rings_prc, mut lines_prc) = snap_chains(chain(&outer_ways_prc, &way_refs, &coords), tol_km);
+    let (in_rings, in_lines) = snap_chains(chain(&inner_ways_prc, &way_refs, &coords), tol_km);
+    let (rings_tw, lines_tw) = snap_chains(chain(&ways_tw, &way_refs, &coords), tol_km);
+    let (rings_hn, lines_hn) = snap_chains(chain(&ways_hn, &way_refs, &coords), tol_km);
 
-    let eps = 0.004f64;
-    let outer_chains = chain(&outer_ways, &way_refs, &coords);
-    // diagnostics: endpoint gap table for the exact chains
-    {
-        let mut gaps: Vec<f64> = Vec::new();
-        for i in 0..outer_chains.len() {
-            for j in i..outer_chains.len() {
-                for ei in 0..2 {
-                    for ej in 0..2 {
-                        if i == j && ei >= ej {
-                            continue;
-                        }
-                        let a = if ei == 0 {
-                            outer_chains[i][0]
-                        } else {
-                            *outer_chains[i].last().unwrap()
-                        };
-                        let b = if ej == 0 {
-                            outer_chains[j][0]
-                        } else {
-                            *outer_chains[j].last().unwrap()
-                        };
-                        gaps.push(hav_km(a, b));
-                    }
-                }
-            }
-        }
-        gaps.sort_by(|x, y| x.partial_cmp(y).unwrap());
-        println!(
-            "exact outer chains: {}; smallest endpoint gaps (km): {:?}",
-            outer_chains.len(),
-            gaps.iter()
-                .take(10)
-                .map(|g| (g * 10.0).round() / 10.0)
-                .collect::<Vec<_>>()
-        );
-    }
-    let tol_km: f64 = std::env::args()
-        .nth(3)
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(30.0);
-    let (mut rings, mut lines) = snap_chains(outer_chains, tol_km);
-    let (in_rings, in_lines) = snap_chains(chain(&inner_ways, &way_refs, &coords), tol_km);
-    rings.extend(in_rings);
-    lines.extend(in_lines);
-    // simplify + speck filter
-    let mut keep_rings: Vec<Vec<[f64; 2]>> = Vec::new();
-    let mut keep_lines: Vec<Vec<[f64; 2]>> = Vec::new();
-    for (src, dst) in [(rings, &mut keep_rings), (lines, &mut keep_lines)] {
+    let mut all_rings: Vec<Vec<[f64; 2]>> = Vec::new();
+    all_rings.append(&mut rings_prc);
+    all_rings.extend(in_rings);
+    all_rings.extend(rings_tw);
+    all_rings.extend(rings_hn);
+
+    let mut all_lines: Vec<Vec<[f64; 2]>> = Vec::new();
+    all_lines.append(&mut lines_prc);
+    all_lines.extend(in_lines);
+    all_lines.extend(lines_tw);
+    all_lines.extend(lines_hn);
+
+    // Canonical Nine-Dash Line dashes in the South China Sea
+    let nine_dashes: Vec<Vec<[f64; 2]>> = vec![
+        vec![[122.8, 23.8], [123.1, 24.8]],      // 1. East of Taiwan
+        vec![[122.8, 20.8], [122.2, 19.8]],      // 2. Bashi Channel
+        vec![[120.0, 19.2], [119.5, 18.2]],      // 3. North SCS
+        vec![[119.2, 16.2], [118.8, 15.1]],      // 4. Scarborough Shoal / West Luzon
+        vec![[118.2, 13.0], [117.6, 12.0]],      // 5. Central East SCS
+        vec![[116.8, 9.8], [116.1, 8.8]],        // 6. Palawan / East Spratly
+        vec![[113.2, 4.2], [112.5, 3.8]],        // 7. James Shoal (Zengmu Ansha)
+        vec![[109.5, 4.2], [108.8, 5.2]],        // 8. Southwest SCS / Natuna
+        vec![[109.2, 7.8], [109.2, 9.2]],        // 9. West SCS (South Vietnam)
+        vec![[110.2, 12.5], [110.0, 14.2]],      // 10. West SCS (Central Vietnam)
+        vec![[108.1, 21.4], [108.15, 20.8], [107.55, 20.0]], // Gulf of Tonkin
+    ];
+    all_lines.extend(nine_dashes);
+
+    // Simplify with 1 km precision (eps = 0.009 deg)
+    let eps = 0.009f64;
+    let mut keep_rings = Vec::new();
+    let mut keep_lines = Vec::new();
+
+    for (src, dst) in [(all_rings, &mut keep_rings), (all_lines, &mut keep_lines)] {
         for c in src {
             let sm = simplify(&c, eps);
-            if sm.len() < 3 {
+            if sm.len() < 2 {
                 continue;
             }
             let (mut mnx, mut mxx, mut mny, mut mxy) = (f64::MAX, f64::MIN, f64::MAX, f64::MIN);
@@ -449,45 +409,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 mxy = mxy.max(q[1]);
             }
             let diag = ((mxx - mnx).powi(2) + (mxy - mny).powi(2)).sqrt();
-            if diag < 0.03 && sm.len() < 40 {
+            if diag < 0.02 && sm.len() < 5 {
                 continue;
             }
             dst.push(sm);
         }
     }
-    let mut rings = keep_rings;
-    let mut lines = keep_lines;
-    rings.sort_by_key(|r| std::cmp::Reverse(r.len()));
-    lines.sort_by_key(|l| std::cmp::Reverse(l.len()));
-    let ring_pts: usize = rings.iter().map(|r| r.len()).sum();
-    let line_pts: usize = lines.iter().map(|l| l.len()).sum();
-    let mut bbox = [f64::MAX, f64::MIN, f64::MAX, f64::MIN];
-    for c in rings.iter().chain(lines.iter()) {
-        for p in c.iter() {
-            bbox[0] = bbox[0].min(p[0]);
-            bbox[1] = bbox[1].max(p[0]);
-            bbox[2] = bbox[2].min(p[1]);
-            bbox[3] = bbox[3].max(p[1]);
-        }
-    }
+
+    keep_rings.sort_by_key(|r| std::cmp::Reverse(r.len()));
+    let ring_pts: usize = keep_rings.iter().map(|r| r.len()).sum();
+    let line_pts: usize = keep_lines.iter().map(|l| l.len()).sum();
+
     let out = serde_json::json!({
-        "about": "China national boundary outline from OpenStreetMap relation 270056 (boundary=administrative, admin_level=2), extracted from the Geofabrik China PBF already held by the project. Ways chained into closed rings (landmass/islands) and open lines, Douglas-Peucker simplified at 0.004 deg, Google-polyline-encoded at 1e5, [lat, lon] order.",
-        "rings": rings.iter().map(|r| polyline_encode(r)).collect::<Vec<_>>(),
-        "lines": lines.iter().map(|l| polyline_encode(l)).collect::<Vec<_>>(),
-        "stats": { "rings": rings.len(), "ring_points": ring_pts, "lines": lines.len(), "line_points": line_pts,
-                   "bbox_lon": [bbox[0], bbox[1]], "bbox_lat": [bbox[2], bbox[3]] }
+        "about": "China national boundary outline + Taiwan + Hainan + territorial islands + Nine-dash line, Douglas-Peucker simplified at 1 km (0.009 deg), Google-polyline-encoded at 1e4 precision [lat, lon] order.",
+        "rings": keep_rings.iter().map(|r| polyline_encode(r)).collect::<Vec<_>>(),
+        "lines": keep_lines.iter().map(|l| polyline_encode(l)).collect::<Vec<_>>(),
+        "stats": { "rings": keep_rings.len(), "ring_points": ring_pts, "lines": keep_lines.len(), "line_points": line_pts }
     });
-    let txt = serde_json::to_string(&out).unwrap();
-    std::fs::write(&out_path, &txt).unwrap();
+
+    let txt = serde_json::to_string(&out)?;
+    std::fs::write(&out_path, &txt)?;
     println!(
-        "rings {} ({} pts), lines {} ({} pts), bbox lon {:?} lat {:?}",
-        rings.len(),
-        ring_pts,
-        lines.len(),
-        line_pts,
-        [bbox[0], bbox[1]],
-        [bbox[2], bbox[3]]
+        "rings: {} ({} pts), lines: {} ({} pts) -> wrote {} ({:.1} KB)",
+        keep_rings.len(), ring_pts, keep_lines.len(), line_pts, out_path, txt.len() as f64 / 1024.0
     );
-    println!("wrote {} ({:.1} KB)", out_path, txt.len() as f64 / 1024.0);
     Ok(())
 }
