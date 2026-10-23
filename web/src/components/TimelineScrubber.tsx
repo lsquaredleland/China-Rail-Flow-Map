@@ -101,7 +101,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       currentTimeRef.current = t;
 
       const day = Math.floor(t / 1440) + 1;
-      const minsInDay = t % 1440;
+      const minsInDay = Math.floor(t % 1440);
       const hh = Math.floor(minsInDay / 60);
       const mm = minsInDay % 60;
       const clockStr = `${hh < 10 ? "0" : ""}${hh}:${mm < 10 ? "0" : ""}${mm}`;
@@ -378,11 +378,11 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         background: dark ? "#18181B" : "#FFFFFF",
         color: dark ? "#EDEDEA" : "#111111",
         borderTop: dark ? "1px solid rgba(255,255,255,0.18)" : "1.5px solid #111111",
-        boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.12)",
-        padding: "16px 32px 14px 32px",
+        boxShadow: "0 -4px 16px rgba(0, 0, 0, 0.10)",
+        padding: "8px 24px 6px 24px",
         display: "flex",
         flexDirection: "column",
-        gap: "10px",
+        gap: "6px",
         zIndex: 40,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         userSelect: "none",
@@ -391,34 +391,34 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
     >
       <style>{`
         .tb-day-label {
-          font-size: 11px;
+          font-size: 9px;
           font-weight: 700;
           letter-spacing: 0.8px;
           color: ${dark ? "#A1A1AA" : "#71717A"};
           text-transform: uppercase;
         }
         .tb-clock {
-          font-size: 40px;
+          font-size: 24px;
           font-weight: 800;
           line-height: 1;
           color: ${dark ? "#EDEDEA" : "#111111"};
           font-variant-numeric: tabular-nums;
-          letter-spacing: -1px;
+          letter-spacing: -0.5px;
         }
         .tb-badge {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
+          gap: 5px;
           border: 1.5px solid ${redAccent};
           color: ${redAccent};
-          padding: 6px 12px;
-          font-size: 11px;
+          padding: 3px 8px;
+          font-size: 9px;
           font-weight: 800;
-          letter-spacing: 0.8px;
+          letter-spacing: 0.6px;
           text-transform: uppercase;
         }
         .tb-badge-icon {
-          font-size: 8px;
+          font-size: 7px;
           line-height: 1;
         }
         .tb-metric-col {
@@ -427,34 +427,34 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           align-items: center;
         }
         .tb-metric-val {
-          font-size: 32px;
+          font-size: 20px;
           font-weight: 800;
           line-height: 1;
           font-variant-numeric: tabular-nums;
           letter-spacing: -0.5px;
         }
         .tb-metric-lbl {
-          font-size: 11px;
+          font-size: 9px;
           font-weight: 700;
-          letter-spacing: 0.8px;
+          letter-spacing: 0.6px;
           color: ${dark ? "#A1A1AA" : "#71717A"};
           text-transform: uppercase;
-          margin-top: 4px;
+          margin-top: 2px;
         }
         .tb-speed-caption {
-          font-size: 11px;
+          font-size: 9px;
           font-weight: 700;
           letter-spacing: 0.8px;
           color: ${dark ? "#A1A1AA" : "#71717A"};
           text-transform: uppercase;
         }
         .tb-speed-btn {
-          height: 38px;
-          padding: 0 16px;
+          height: 28px;
+          padding: 0 10px;
           border: none;
           background: transparent;
           color: ${dark ? "#EDEDEA" : "#111111"};
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 700;
           cursor: pointer;
           transition: background 0.12s ease, color 0.12s ease;
@@ -467,11 +467,11 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           color: ${dark ? "#111111" : "#FFFFFF"};
         }
         .tb-btn-action {
-          height: 38px;
+          height: 28px;
           border: 1.5px solid ${dark ? "rgba(255,255,255,0.25)" : "#111111"};
           background: transparent;
           color: ${dark ? "#EDEDEA" : "#111111"};
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 700;
           cursor: pointer;
           display: inline-flex;
@@ -486,7 +486,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           position: absolute;
           cursor: pointer;
           white-space: nowrap;
-          font-size: 11px;
+          font-size: 9px;
           font-weight: 700;
           color: ${dark ? "#EDEDEA" : "#111111"};
           transition: color 0.15s ease;
@@ -510,19 +510,19 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "20px",
+          gap: "16px",
         }}
       >
         {/* Left: Play button + Clock + Rush Badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <button
             type="button"
             onClick={handleTogglePlay}
             aria-label={isPlaying ? "Pause timeline" : "Play timeline"}
             title={isPlaying ? "Pause (Space)" : "Play (Space)"}
             style={{
-              width: "52px",
-              height: "52px",
+              width: "36px",
+              height: "36px",
               background: dark ? "#EDEDEA" : "#111111",
               color: dark ? "#111111" : "#FFFFFF",
               border: "none",
@@ -535,12 +535,12 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             }}
           >
             {isPlaying ? (
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <rect x="6" y="4" width="4" height="16" />
                 <rect x="14" y="4" width="4" height="16" />
               </svg>
             ) : (
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <polygon points="7,4 20,12 7,20" />
               </svg>
             )}
@@ -551,13 +551,13 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               DAY 1
             </span>
             <span ref={timeDisplayRef} className="tb-clock">
-              19:31
+              00:00
             </span>
           </div>
 
           <div ref={rushBadgeRef} className="tb-badge">
             <span className="tb-badge-icon">■</span>
-            <span ref={rushBadgeTextRef}>EVENING RUSH</span>
+            <span ref={rushBadgeTextRef}>DAY 1 REGULAR</span>
           </div>
         </div>
 
@@ -567,7 +567,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "36px",
+            gap: "24px",
           }}
         >
           <div className="tb-metric-col">
@@ -576,7 +576,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               className="tb-metric-val"
               style={{ color: redAccent }}
             >
-              638
+              0
             </span>
             <span className="tb-metric-lbl">
               {direction === "out" ? "DEPARTED" : "BOARDED"}
@@ -589,7 +589,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               className="tb-metric-val"
               style={{ color: dark ? "#EDEDEA" : "#111111" }}
             >
-              421
+              0
             </span>
             <span className="tb-metric-lbl">ARRIVED</span>
           </div>
@@ -600,14 +600,14 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               className="tb-metric-val"
               style={{ color: dark ? "#9CA3AF" : "#4B5563" }}
             >
-              758
+              0
             </span>
             <span className="tb-metric-lbl">TOTAL</span>
           </div>
         </div>
 
         {/* Right: A DAY IN / 15s 30s 60s / Finish / Collapse */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span className="tb-speed-caption">A DAY IN</span>
 
           <div
@@ -650,7 +650,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             type="button"
             className="tb-btn-action"
             onClick={handleJumpToFinish}
-            style={{ padding: "0 18px" }}
+            style={{ padding: "0 12px" }}
             title="Jump simulation to finish when all trains have arrived"
           >
             Finish
@@ -660,13 +660,13 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             type="button"
             className="tb-btn-action"
             onClick={handleCollapse}
-            style={{ width: "38px" }}
+            style={{ width: "28px" }}
             title="Collapse animation bar"
           >
             <svg
               viewBox="0 0 24 24"
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               fill="none"
               stroke="currentColor"
               strokeWidth="2.5"
@@ -680,7 +680,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       {/* Bottom Scrubber: Zones Header + Track with Hatched Tail + Tick Labels */}
       <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
         {/* Zones row (Morning Rush, Evening Rush, Arrivals Only) */}
-        <div style={{ position: "relative", width: "100%", height: "18px", marginBottom: "4px" }}>
+        <div style={{ position: "relative", width: "100%", height: "14px", marginBottom: "2px" }}>
           {/* Morning Rush (07:00–09:30): 07:00 / 24 * 75% = 21.875%, width 7.8125% */}
           <div
             style={{
@@ -691,13 +691,13 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               background: dark ? "rgba(229, 64, 53, 0.16)" : "rgba(200, 48, 42, 0.12)",
               display: "flex",
               alignItems: "center",
-              padding: "0 6px",
+              padding: "0 4px",
               boxSizing: "border-box",
             }}
           >
             <span
               style={{
-                fontSize: "10px",
+                fontSize: "8px",
                 fontWeight: 800,
                 color: redAccent,
                 letterSpacing: "0.5px",
@@ -718,13 +718,13 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               background: dark ? "rgba(229, 64, 53, 0.16)" : "rgba(200, 48, 42, 0.12)",
               display: "flex",
               alignItems: "center",
-              padding: "0 6px",
+              padding: "0 4px",
               boxSizing: "border-box",
             }}
           >
             <span
               style={{
-                fontSize: "10px",
+                fontSize: "8px",
                 fontWeight: 800,
                 color: redAccent,
                 letterSpacing: "0.5px",
@@ -747,7 +747,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           >
             <span
               style={{
-                fontSize: "10px",
+                fontSize: "8px",
                 fontWeight: 800,
                 color: dark ? "#A1A1AA" : "#71717A",
                 letterSpacing: "0.6px",
@@ -760,7 +760,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         </div>
 
         {/* Track Bar */}
-        <div style={{ position: "relative", width: "100%", height: "12px" }}>
+        <div style={{ position: "relative", width: "100%", height: "8px" }}>
           {/* Track Background: Day 1 (0-75%) + Diagonally Hatched Tail (75-100%) */}
           <div
             style={{
@@ -807,7 +807,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               left: "75%",
               top: "-2px",
               width: "2px",
-              height: "16px",
+              height: "12px",
               background: dark ? "#EDEDEA" : "#111111",
               zIndex: 3,
             }}
@@ -819,7 +819,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             style={{
               position: "absolute",
               left: "0%",
-              top: "-8px",
+              top: "-6px",
               transform: "translateX(-50%)",
               pointerEvents: "none",
               zIndex: 5,
@@ -831,8 +831,8 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           >
             <div
               style={{
-                width: "12px",
-                height: "12px",
+                width: "10px",
+                height: "10px",
                 background: dark ? "#EDEDEA" : "#111111",
                 borderRadius: "1px",
               }}
@@ -840,7 +840,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             <div
               style={{
                 width: "2px",
-                height: "16px",
+                height: "12px",
                 background: dark ? "#EDEDEA" : "#111111",
               }}
             />
@@ -859,7 +859,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               left: 0,
               top: "-6px",
               width: "100%",
-              height: "24px",
+              height: "20px",
               opacity: 0,
               cursor: "pointer",
               zIndex: 10,
@@ -876,8 +876,8 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           style={{
             position: "relative",
             width: "100%",
-            height: "18px",
-            marginTop: "6px",
+            height: "14px",
+            marginTop: "4px",
           }}
         >
           <span
