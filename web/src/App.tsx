@@ -7,7 +7,9 @@ import type {
   DecodedOutline,
   DestVM,
   Direction,
+  DistBinFilter,
   DistUnit,
+  DurBinFilter,
   InMapData,
   InTablesData,
   OriginVM,
@@ -21,6 +23,7 @@ import {
   buildOrigin,
   classIndex,
   enName,
+  filterOrigin,
   filterOriginByClasses,
   FLOW_CLASSES,
   prepAtlas,
@@ -238,6 +241,12 @@ export default function App() {
   // as long as the panel does.
   const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [selectedDistBin, setSelectedDistBin] =
+    useState<DistBinFilter | null>(null);
+  const [selectedDurBin, setSelectedDurBin] = useState<DurBinFilter | null>(
+    null,
+  );
   const [dark, setDarkState] = useState<boolean>(initialDark);
   const [showTimeline, setShowTimeline] = useState<boolean>(true);
 
@@ -462,8 +471,24 @@ export default function App() {
   );
 
   const viewCur: OriginVM | null = useMemo(
-    () => (cur ? filterOriginByClasses(cur, selectedClasses) : null),
-    [cur, selectedClasses],
+    () =>
+      cur
+        ? filterOrigin(cur, {
+            classes: selectedClasses,
+            hour: selectedHour,
+            distBin: selectedDistBin,
+            durBin: selectedDurBin,
+            unit: distUnit,
+          })
+        : null,
+    [
+      cur,
+      selectedClasses,
+      selectedHour,
+      selectedDistBin,
+      selectedDurBin,
+      distUnit,
+    ],
   );
 
   const availableClasses: Set<string> = useMemo(() => {
@@ -603,6 +628,9 @@ export default function App() {
 
   const selectOrigin = (idx: number) => {
     setPanelCity(null);
+    setSelectedHour(null);
+    setSelectedDistBin(null);
+    setSelectedDurBin(null);
     setOriginIdx(idx);
     syncUrl(idx);
   };
@@ -665,6 +693,9 @@ export default function App() {
     if (d === "in") ensureInMap();
     else ensureOutTables();
     setPanelCity(null);
+    setSelectedHour(null);
+    setSelectedDistBin(null);
+    setSelectedDurBin(null);
     setDirectionState(d);
     try {
       if (window.localStorage) localStorage.setItem("crfa-direction", d);
@@ -759,65 +790,78 @@ export default function App() {
           <div className="stats" id="stats">
             {cur &&
               viewCur &&
-              (direction === "out" ? (
-                <>
-                  <div>
-                    <b>
-                      {(selectedClasses.length > 0 && outTablesReady
-                        ? viewCur.deps.length
-                        : cur.o.outbound
-                      ).toLocaleString("en-US")}
-                    </b>{" "}
-                    <span>
-                      {selectedClasses.length > 0
-                        ? selectedClasses
-                            .map((c) => (c === "plain" ? "普" : c))
-                            .join("/") +
-                          " trains Depart " +
-                          cur.en +
-                          " daily"
-                        : "trains Depart " + cur.en + " daily"}
-                    </span>
-                  </div>
-                  <div>
-                    <b>{viewCur.dests.length}</b>{" "}
-                    <span>cities with a direct connection</span>
-                  </div>
-                  <div>
-                    <b>{viewCur.maxFlow}</b>{" "}
-                    <span>trains/day on the busiest corridors</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <b>
-                      {(selectedClasses.length > 0 && inTablesReady
-                        ? viewCur.arrs.length
-                        : cur.o.inbound
-                      ).toLocaleString("en-US")}
-                    </b>{" "}
-                    <span>
-                      {selectedClasses.length > 0
-                        ? selectedClasses
-                            .map((c) => (c === "plain" ? "普" : c))
-                            .join("/") +
-                          " trains Arrive in " +
-                          cur.en +
-                          " daily"
-                        : "trains Arrive in " + cur.en + " daily"}
-                    </span>
-                  </div>
-                  <div>
-                    <b>{viewCur.srcs.length}</b>{" "}
-                    <span>cities with a direct connection</span>
-                  </div>
-                  <div>
-                    <b>{viewCur.maxInFlow}</b>{" "}
-                    <span>trains/day on the busiest corridors</span>
-                  </div>
-                </>
-              ))}
+              (() => {
+                const hasHistFilter =
+                  selectedHour !== null ||
+                  selectedDistBin !== null ||
+                  selectedDurBin !== null;
+                const hasAnyFilter =
+                  selectedClasses.length > 0 || hasHistFilter;
+
+                return direction === "out" ? (
+                  <>
+                    <div>
+                      <b>
+                        {(hasAnyFilter && outTablesReady
+                          ? viewCur.deps.length
+                          : cur.o.outbound
+                        ).toLocaleString("en-US")}
+                      </b>{" "}
+                      <span>
+                        {hasHistFilter
+                          ? "trains matching filter"
+                          : selectedClasses.length > 0
+                            ? selectedClasses
+                                .map((c) => (c === "plain" ? "普" : c))
+                                .join("/") +
+                              " trains Depart " +
+                              cur.en +
+                              " daily"
+                            : "trains Depart " + cur.en + " daily"}
+                      </span>
+                    </div>
+                    <div>
+                      <b>{viewCur.dests.length}</b>{" "}
+                      <span>cities with a direct connection</span>
+                    </div>
+                    <div>
+                      <b>{viewCur.maxFlow}</b>{" "}
+                      <span>trains/day on the busiest corridors</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <b>
+                        {(hasAnyFilter && inTablesReady
+                          ? viewCur.arrs.length
+                          : cur.o.inbound
+                        ).toLocaleString("en-US")}
+                      </b>{" "}
+                      <span>
+                        {hasHistFilter
+                          ? "trains matching filter"
+                          : selectedClasses.length > 0
+                            ? selectedClasses
+                                .map((c) => (c === "plain" ? "普" : c))
+                                .join("/") +
+                              " trains Arrive in " +
+                              cur.en +
+                              " daily"
+                            : "trains Arrive in " + cur.en + " daily"}
+                      </span>
+                    </div>
+                    <div>
+                      <b>{viewCur.srcs.length}</b>{" "}
+                      <span>cities with a direct connection</span>
+                    </div>
+                    <div>
+                      <b>{viewCur.maxInFlow}</b>{" "}
+                      <span>trains/day on the busiest corridors</span>
+                    </div>
+                  </>
+                );
+              })()}
           </div>
         </header>
 
@@ -1035,6 +1079,24 @@ export default function App() {
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
+          <ActiveFilterBar
+            classes={selectedClasses}
+            hour={selectedHour}
+            distBin={selectedDistBin}
+            durBin={selectedDurBin}
+            onClearClass={(cls) =>
+              setSelectedClasses((prev) => prev.filter((c) => c !== cls))
+            }
+            onClearHour={() => setSelectedHour(null)}
+            onClearDist={() => setSelectedDistBin(null)}
+            onClearDur={() => setSelectedDurBin(null)}
+            onClearAll={() => {
+              setSelectedClasses([]);
+              setSelectedHour(null);
+              setSelectedDistBin(null);
+              setSelectedDurBin(null);
+            }}
+          />
           <DestinationPanel
             point={panelCity}
             direction={direction}
@@ -1076,6 +1138,12 @@ export default function App() {
         outTablesReady={outTablesReady}
         inTablesReady={inTablesReady}
         onClearFilter={closePanel}
+        selectedHour={selectedHour}
+        onSelectHour={setSelectedHour}
+        selectedDistBin={selectedDistBin}
+        onSelectDistBin={setSelectedDistBin}
+        selectedDurBin={selectedDurBin}
+        onSelectDurBin={setSelectedDurBin}
       />
 
       <footer id="pageFooter">
@@ -1084,5 +1152,102 @@ export default function App() {
 
       <Footnote cur={cur} direction={direction} />
     </>
+  );
+}
+
+function ActiveFilterBar({
+  classes,
+  hour,
+  distBin,
+  durBin,
+  onClearClass,
+  onClearHour,
+  onClearDist,
+  onClearDur,
+  onClearAll,
+}: {
+  classes: string[];
+  hour: number | null;
+  distBin: DistBinFilter | null;
+  durBin: DurBinFilter | null;
+  onClearClass: (cls: string) => void;
+  onClearHour: () => void;
+  onClearDist: () => void;
+  onClearDur: () => void;
+  onClearAll: () => void;
+}) {
+  const hasAny =
+    classes.length > 0 ||
+    hour !== null ||
+    distBin !== null ||
+    durBin !== null;
+  if (!hasAny) return null;
+
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+
+  return (
+    <div
+      className="active-filter-bar"
+      role="status"
+      aria-label="Active map and table filters"
+    >
+      <span className="filter-pill-label">Filtered:</span>
+      {classes.map((cls) => (
+        <span key={cls} className="filter-pill">
+          Class: {cls === "plain" ? "普" : cls}
+          <button
+            type="button"
+            aria-label={`Remove class ${cls} filter`}
+            onClick={() => onClearClass(cls)}
+          >
+            &times;
+          </button>
+        </span>
+      ))}
+      {hour !== null && (
+        <span className="filter-pill">
+          Hour: {pad2(hour)}:00–{pad2(hour + 1)}:00
+          <button
+            type="button"
+            aria-label="Remove hour filter"
+            onClick={onClearHour}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      {distBin !== null && (
+        <span className="filter-pill">
+          Dist: {distBin.label}
+          <button
+            type="button"
+            aria-label="Remove distance filter"
+            onClick={onClearDist}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      {durBin !== null && (
+        <span className="filter-pill">
+          Time: {durBin.label}
+          <button
+            type="button"
+            aria-label="Remove duration filter"
+            onClick={onClearDur}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      <button
+        type="button"
+        className="filter-clear-all"
+        onClick={onClearAll}
+        title="Reset all filters"
+      >
+        Reset
+      </button>
+    </div>
   );
 }

@@ -30,6 +30,12 @@ interface Props {
   outTablesReady: boolean;
   inTablesReady: boolean;
   onClearFilter: () => void;
+  selectedHour?: number | null;
+  onSelectHour?: (h: number | null) => void;
+  selectedDistBin?: DistBinFilter | null;
+  onSelectDistBin?: (b: DistBinFilter | null) => void;
+  selectedDurBin?: DurBinFilter | null;
+  onSelectDurBin?: (b: DurBinFilter | null) => void;
 }
 
 type SortKey = "dep" | "dur" | "km";
@@ -137,15 +143,30 @@ export default function DeparturesTable({
   outTablesReady,
   inTablesReady,
   onClearFilter,
+  selectedHour: controlledHour,
+  onSelectHour,
+  selectedDistBin: controlledDistBin,
+  onSelectDistBin,
+  selectedDurBin: controlledDurBin,
+  onSelectDurBin,
 }: Props) {
   const [query, setQuery] = useState("");
-  const [selectedHour, setSelectedHour] = useState<number | null>(null);
-  const [selectedDistBin, setSelectedDistBin] = useState<DistBinFilter | null>(
+  const [internalHour, setInternalHour] = useState<number | null>(null);
+  const [internalDistBin, setInternalDistBin] =
+    useState<DistBinFilter | null>(null);
+  const [internalDurBin, setInternalDurBin] = useState<DurBinFilter | null>(
     null,
   );
-  const [selectedDurBin, setSelectedDurBin] = useState<DurBinFilter | null>(
-    null,
-  );
+
+  const selectedHour =
+    controlledHour !== undefined ? controlledHour : internalHour;
+  const setSelectedHour = onSelectHour || setInternalHour;
+  const selectedDistBin =
+    controlledDistBin !== undefined ? controlledDistBin : internalDistBin;
+  const setSelectedDistBin = onSelectDistBin || setInternalDistBin;
+  const selectedDurBin =
+    controlledDurBin !== undefined ? controlledDurBin : internalDurBin;
+  const setSelectedDurBin = onSelectDurBin || setInternalDurBin;
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({
     key: "dep",
     dir: 1,

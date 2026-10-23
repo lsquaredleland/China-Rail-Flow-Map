@@ -9,7 +9,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
 | # | Feature | Scope | Status |
 |---|---|---|---|
 | 1 | Corridor & Single-Train Route Inspector | Frontend-only | Proposed |
-| 2 | **Map-Coupled Histograms & Multi-Filter Flow Rendering** | Frontend-only | **Approved (Up Next)** |
+| 2 | **Map-Coupled Histograms & Multi-Filter Flow Rendering** | Frontend-only | Completed |
 | 3 | Isochrone / Travel-Time & Speed Shading Mode | Frontend-only | Proposed |
 | 4 | Intra-City Station Terminal Filter | Frontend-only | Proposed |
 | 5 | Two-City Comparison / "Sphere of Influence" View | Frontend-only | Proposed |
@@ -28,8 +28,8 @@ This document tracks potential features to explore for the **China Rail Flow Map
   - **Hover/click a train in `DeparturesTable`** to trace that single train's exact path on the map, highlighting all its calling cities and showing its commercial speed (`km / duration`).
   - **Click any track section on the map** to filter the timetable to only the trains running over that specific piece of track (answering *"Which trains cross this bridge or mountain pass?"*).
 
-### 2. Map-Coupled Histograms & Multi-Filter Flow Rendering ✅ *(Approved — To Work On Later)*
-- **Status:** **Approved**
+### 2. Map-Coupled Histograms & Multi-Filter Flow Rendering ✅ *(Completed)*
+- **Status:** **Completed**
 - **Data Available:** Clicking a bar in `Histograms` (hour of day, distance bin, or duration bin) currently filters only `DeparturesTable`, while `App.tsx` only recomputes map flows for train-class filters (`selectedClasses`). Because `DepVM.secs` and `ArrVM.secs` hold per-train section lists, `App.tsx` can recompute section flows (`FlowVM[]`) and destination/source aggregates (`DestVM[]` / `SrcVM[]`) across any combination of active histogram filters.
 - **Description:**
   - Lift histogram filter state (`selectedHour`, `selectedDistBin`, `selectedDurBin`) so that selecting any combination of hour, distance bracket, duration bracket, and train class dynamically updates **both** the `MapCanvas` proportional flow bands and the `Histograms` cross-filtered overlays.
