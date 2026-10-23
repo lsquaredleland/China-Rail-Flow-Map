@@ -36,7 +36,7 @@ interface Props {
   onSelectDurBin?: (bin: DurBinFilter | null) => void;
 }
 
-const FONT = "Georgia, 'Times New Roman', 'Songti SC', serif";
+const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif';
 const W = 560;
 const H = 106;
 const PAD_L = 4;
@@ -67,8 +67,8 @@ function Chart({
   subCounts?: number[] | null;
   ticks: Tick[];
   titles: string[];
-  barClass: string;
-  subBarClass?: string;
+  barClass: string | ((i: number) => string);
+  subBarClass?: string | ((i: number) => string);
   selectedBin?: number | null;
   onSelectBin?: (bin: number) => void;
   ariaLabel: string;
@@ -115,6 +115,12 @@ function Chart({
           !(isSelected && sc === c) &&
           !(isHovered && sc === c);
 
+        const bCls = typeof barClass === "function" ? barClass(i) : barClass;
+        const sbCls =
+          typeof subBarClass === "function"
+            ? subBarClass(i)
+            : subBarClass || bCls;
+
         return (
           <g
             key={i}
@@ -145,7 +151,7 @@ function Chart({
             {c > 0 ? (
               <rect
                 className={
-                  "hist-bar " + (hasSub ? barClass + " muted" : barClass)
+                  "hist-bar " + (hasSub ? bCls + " muted" : bCls)
                 }
                 x={x + gap / 2}
                 y={BASE - h}
@@ -164,7 +170,7 @@ function Chart({
             ) : null}
             {hasSub && sc > 0 ? (
               <rect
-                className={"hist-bar " + (subBarClass || barClass)}
+                className={"hist-bar " + sbCls}
                 x={x + gap / 2}
                 y={BASE - sh}
                 width={barW}
@@ -663,8 +669,22 @@ export default function Histograms({
           subCounts={subDurCounts}
           ticks={durTicks}
           titles={durTitles}
-          barClass="bar-t"
-          subBarClass="bar-t-sub"
+          barClass={(i) => {
+            const h = (i * durBinSize) / 60;
+            return h < 4
+              ? "bar-t bar-t-petrol"
+              : h < 12
+                ? "bar-t bar-t-saffron"
+                : "bar-t bar-t-ultra";
+          }}
+          subBarClass={(i) => {
+            const h = (i * durBinSize) / 60;
+            return h < 4
+              ? "bar-t-sub bar-t-petrol"
+              : h < 12
+                ? "bar-t-sub bar-t-saffron"
+                : "bar-t-sub bar-t-ultra";
+          }}
           selectedBin={selectedDurBin ? selectedDurBin.bin : null}
           onSelectBin={handleDurClick}
           ariaLabel={

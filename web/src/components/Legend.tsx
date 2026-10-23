@@ -49,16 +49,16 @@ const STEPS = [1, 10, 50, 100];
 // blend at the 4h / 12h joins — under three labels centred on their
 // blocks. BAR_H is tall enough to carry the labels inside the bar.
 const BAND_STOPS = [0, 210, 270, 690, 750, 1440];
-const BAND_HEX = ["#1b9e77", "#1b9e77", "#e69f00", "#e69f00", "#7570b3", "#7570b3"];
+const BAND_HEX = ["#14746F", "#14746F", "#E3A63F", "#E3A63F", "#34488C", "#34488C"];
 const BAND_LABELS: { label: string; mid: number; ink: string }[] = [
-  { label: "0–4h", mid: 120, ink: "#17211c" },
-  { label: "4–12h", mid: 480, ink: "#17211c" },
+  { label: "0–4h", mid: 120, ink: "#ffffff" },
+  { label: "4–12h", mid: 480, ink: "#111111" },
   { label: "12–24h", mid: 1080, ink: "#ffffff" },
 ];
 const BAR_H = 15;
 const TIMESEC_H = 8 + BAR_H + 6; // vertical room the band section takes
 const SAMPLES = [10, 50, 200];
-const FONT = "Georgia, 'Times New Roman', 'Songti SC', serif";
+const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif';
 
 const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   props,

@@ -559,7 +559,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.fillStyle =
         typeof c.fastest === "number" ? rampColor(c.fastest, pal) : pal.dot;
       ctx.fill();
-      ctx.lineWidth = 0.8;
+      ctx.lineWidth = 1.5;
       ctx.strokeStyle = pal.dotEdge;
       ctx.stroke();
     }
@@ -597,46 +597,68 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
     ctx.globalAlpha = 1.0;
 
-    // The origin: ringed diamond at its principal station point.
+    // The origin: solid black disc with centered white diamond in light mode,
+    // or ringed diamond in dark mode.
     const cx = X(cur.o.pt[0]),
       cy = Y(cur.o.pt[1]);
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = pal.origin;
-    ctx.strokeStyle = pal.paper;
-    ctx.lineWidth = 1.2;
-    const s = 6.2;
-    ctx.beginPath();
-    ctx.rect(-s / 1.6, -s / 1.6, s * 1.25, s * 1.25);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 11, 0, 6.2832);
-    ctx.strokeStyle = pal.origin;
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
+    if (!P.current.dark) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, 6.2832);
+      ctx.fillStyle = "#111111";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = "#ffffff";
+      const s = 4.4;
+      ctx.beginPath();
+      ctx.rect(-s / 2, -s / 2, s, s);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = pal.origin;
+      ctx.strokeStyle = pal.paper;
+      ctx.lineWidth = 1.2;
+      const s = 6.2;
+      ctx.beginPath();
+      ctx.rect(-s / 1.6, -s / 1.6, s * 1.25, s * 1.25);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 11, 0, 6.2832);
+      ctx.strokeStyle = pal.origin;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+
     if (P.current.panelDest) {
       const pd = P.current.panelDest;
       ctx.beginPath();
       ctx.arc(X(pd.pt[0]), Y(pd.pt[1]), stationR(pd.trains) + 3.8, 0, 6.2832);
-      ctx.strokeStyle = pal.flowHi;
-      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = P.current.dark ? pal.flowHi : "#111111";
+      ctx.lineWidth = P.current.dark ? 2.0 : 3.0;
       ctx.stroke();
     }
     if (hover && hover.kind === "station") {
       const hc = hover.station;
       ctx.beginPath();
       ctx.arc(X(hc.pt[0]), Y(hc.pt[1]), stationR(hc.trains) + 3.5, 0, 6.2832);
-      ctx.strokeStyle = pal.flowHi;
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = P.current.dark ? pal.flowHi : "#111111";
+      ctx.lineWidth = 2.0;
       ctx.stroke();
     } else if (hover && hover.kind === "origin") {
       ctx.beginPath();
       ctx.arc(cx, cy, 14.5, 0, 6.2832);
-      ctx.strokeStyle = pal.flowHi;
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = P.current.dark ? pal.flowHi : "#111111";
+      ctx.lineWidth = 2.0;
       ctx.stroke();
     }
     ctx.globalAlpha = 1.0;
@@ -678,6 +700,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       pad: number;
       off: number;
       far?: boolean;
+      isBoxed?: boolean;
     }
     function place(
       c: { zh: string; en: string; pt: [number, number] },
@@ -686,13 +709,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const x = X(c.pt[0]),
         y = Y(c.pt[1]);
       if (x < -90 || x > W + 90 || y < -30 || y > H + 30) return false;
-      const text = c.en + " " + c.zh;
+      const text = c.en + " · " + c.zh;
       const fs = style.fs;
       ctx.font =
         style.weight +
         " " +
         fs +
-        "px Georgia, 'Times New Roman', 'Songti SC', serif";
+        "px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif";
       const cacheKey = text + "|" + fs + "|" + style.weight;
       let tw = labelWidthCache.get(cacheKey);
       if (tw === undefined) {
@@ -746,9 +769,18 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         if (box.x < 2 || box.x + box.w > W - 2) continue;
         if (hits(box)) continue;
         placed.push(box);
-        ctx.fillStyle = pal.labelHalo;
-        ctx.fillRect(box.x, box.y, box.w, box.h);
-        ctx.fillStyle = pal.label;
+        if (style.isBoxed && !P.current.dark) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(box.x, box.y, box.w, box.h);
+          ctx.strokeStyle = "#111111";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(box.x, box.y, box.w, box.h);
+          ctx.fillStyle = "#111111";
+        } else {
+          ctx.fillStyle = pal.labelHalo;
+          ctx.fillRect(box.x, box.y, box.w, box.h);
+          ctx.fillStyle = pal.label;
+        }
         ctx.textAlign = o.align;
         ctx.fillText(text, x + o.dx, y + o.dy);
         return true;
@@ -759,8 +791,15 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     // only label drawn while destination labels are toggled off.
     place(
       { zh: cur.o.zh, en: cur.en, pt: cur.o.pt },
-      { fs: 15, weight: "700", pad: 4, off: 13 },
+      { fs: 13, weight: "700", pad: 5, off: 13, isBoxed: true },
     );
+    if (P.current.panelDest) {
+      const pd = P.current.panelDest;
+      place(
+        { zh: pd.zh, en: pd.en, pt: pd.pt },
+        { fs: 12.5, weight: "700", pad: 5, off: stationR(pd.trains) + 5, isBoxed: true },
+      );
+    }
     if (!showDest) return;
     // Candidate set by zoom (points are already sorted by trains/day).
     // "Termini" here are route ends in the current direction: trains

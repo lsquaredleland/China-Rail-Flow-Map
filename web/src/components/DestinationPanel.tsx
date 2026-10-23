@@ -28,6 +28,13 @@ export default function DestinationPanel({
     direction === "out"
       ? stationRows(point as DestVM, cityEn, unit)
       : sourceRows(point as SrcVM, cityEn, unit);
+
+  const scrollToDepartures = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const el = document.getElementById("departures");
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <div id="destPanel">
       <button
@@ -39,8 +46,9 @@ export default function DestinationPanel({
         &times;
       </button>
       <div id="destBody">
+        <div className="dp-badge">SELECTED</div>
         <div className="dp-title">
-          {point.zh} &middot; {point.en}
+          {point.en} &middot; {point.zh}
         </div>
         <div className="dp-sub">
           {direction === "out" ? "from " : "to "}
@@ -56,6 +64,17 @@ export default function DestinationPanel({
             ))}
           </tbody>
         </table>
+        {point.trains > 0 && (
+          <div className="dp-link-row">
+            <a
+              href="#departures"
+              className="dp-link"
+              onClick={scrollToDepartures}
+            >
+              See all {point.trains} trains &darr;
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

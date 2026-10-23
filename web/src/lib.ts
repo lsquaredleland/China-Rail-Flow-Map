@@ -37,19 +37,18 @@ export function esc(s: string): string {
 
 /* ---------- palettes ---------- */
 
-// Travel-time bands, shared by both colour schemes: three flat colours
-// on a fixed 0–24 hour scale — green #1b9e77 under 4h, amber #e69f00
-// from 4h to 12h, muted purple #7570b3 beyond 12h (times past 24h clamp
-// into the purple band). Each band's interior is flat; the doubled stops
+// Travel-time bands: three flat colours on a fixed 0–24 hour scale —
+// petrol #14746F under 4h, saffron #E3A63F from 4h to 12h, ultramarine
+// #34488C beyond 12h. Each band's interior is flat; the doubled stops
 // at 210/270 and 690/750 minutes soften each join over ±30 minutes
-// around the 4h and 12h boundaries instead of cutting razor-sharp.
+// around the 4h and 12h boundaries.
 const TIME_BANDS: RampStop[] = [
-  [0, [27, 158, 119]],
-  [210, [27, 158, 119]],
-  [270, [230, 159, 0]],
-  [690, [230, 159, 0]],
-  [750, [117, 112, 179]],
-  [1440, [117, 112, 179]],
+  [0, [20, 116, 111]],
+  [210, [20, 116, 111]],
+  [270, [227, 166, 63]],
+  [690, [227, 166, 63]],
+  [750, [52, 72, 140]],
+  [1440, [52, 72, 140]],
 ];
 
 export function palette(dark: boolean): Palette {
@@ -75,27 +74,28 @@ export function palette(dark: boolean): Palette {
       ramp: TIME_BANDS,
     };
   return {
-    paper: "#f7f5f0",
-    network: "#d8cfc4",
-    graticule: "rgba(216,207,196,0.55)",
-    flow: "rgb(212,58,34)",
-    flowHi: "#8f1d10",
+    paper: "#ffffff",
+    network: "#C9C8C2",
+    graticule: "rgba(201,200,194,0.45)",
+    flow: "rgb(200,48,42)",
+    flowHi: "#8E1B17",
     flowStops: [
-      [0, [240, 133, 107]],
-      [0.5, [212, 58, 34]],
-      [1, [143, 29, 16]],
+      [0, [240, 169, 159]],
+      [0.33, [229, 96, 79]],
+      [0.67, [200, 48, 42]],
+      [1, [142, 27, 23]],
     ],
     chord: "#c9b8a6",
-    infraLine: "#40231a",
-    infraHsr: "#0066cc",
-    infraConv: "#40231a",
-    dot: "#40231a",
-    dotEdge: "#f7f5f0",
-    label: "#40231a",
-    labelHalo: "rgba(247,245,240,0.88)",
-    origin: "#a33327",
-    legendInk: "#6d5b40",
-    legendLine: "#d43a22",
+    infraLine: "#111111",
+    infraHsr: "#C8302A",
+    infraConv: "#111111",
+    dot: "#111111",
+    dotEdge: "#ffffff",
+    label: "#111111",
+    labelHalo: "rgba(255,255,255,0.92)",
+    origin: "#111111",
+    legendInk: "#555555",
+    legendLine: "#C8302A",
     ramp: TIME_BANDS,
   };
 }

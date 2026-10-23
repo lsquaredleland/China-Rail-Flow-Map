@@ -109,9 +109,10 @@ function matchCityFromQuery(
 function TrainCell({ d }: { d: { code: string; cls: string } }) {
   const chip = d.cls === "plain" ? "普" : d.cls;
   const num = d.cls === "plain" ? d.code : d.code.replace(/^[A-Z]+/, "");
+  const isHs = d.cls === "G" || d.cls === "D" || d.cls === "C";
   return (
     <>
-      <span className="cls">{chip}</span>
+      <span className={"cls " + (isHs ? "cls-hs" : "cls-conv")}>{chip}</span>
       <b>{num || d.code}</b>
     </>
   );
