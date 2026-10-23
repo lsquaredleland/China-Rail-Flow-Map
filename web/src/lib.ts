@@ -886,6 +886,7 @@ export function buildDayTimeline(
     totalDist: number;
     secs: number[];
     secStarts: Float64Array;
+    secRevs: Uint8Array;
   }
 
   const prepTrains: PrepTrain[] = [];
@@ -904,6 +905,54 @@ export function buildDayTimeline(
       totalDist += secLengths[routeSecs[i]] || 0;
     }
 
+    // Determine traversal direction (forward vs reversed) for each track section in the route.
+    // Railway track sections in OSM have fixed digitization orientations; many are stored
+    // in reverse relative to an individual train's outbound or inbound travel path.
+    const secRevs = new Uint8Array(routeSecs.length);
+    if (isOut) {
+      let pExitLon = cur.o.pt[0];
+      let pExitLat = cur.o.pt[1];
+      for (let i = 0; i < routeSecs.length; i++) {
+        const s = routeSecs[i];
+        const off = secSet.off[s];
+        const cnt = secSet.len[s];
+        if (cnt <= 0) continue;
+        const p0Lon = secSet.pts[off];
+        const p0Lat = secSet.pts[off + 1];
+        const p1Lon = secSet.pts[off + (cnt - 1) * 2];
+        const p1Lat = secSet.pts[off + (cnt - 1) * 2 + 1];
+        const d0 = (p0Lon - pExitLon) ** 2 + (p0Lat - pExitLat) ** 2;
+        const d1 = (p1Lon - pExitLon) ** 2 + (p1Lat - pExitLat) ** 2;
+        // If end vertex p1 is closer to entry, train enters at p1 and exits at p0 (reversed)
+        const rev = d1 < d0;
+        secRevs[i] = rev ? 1 : 0;
+        pExitLon = rev ? p0Lon : p1Lon;
+        pExitLat = rev ? p0Lat : p1Lat;
+      }
+    } else {
+      // Inbound: routeSecs finishes at cur.o.pt (arrival in origin city). Trace backward from arrival.
+      let pExitLon = cur.o.pt[0];
+      let pExitLat = cur.o.pt[1];
+      for (let i = routeSecs.length - 1; i >= 0; i--) {
+        const s = routeSecs[i];
+        const off = secSet.off[s];
+        const cnt = secSet.len[s];
+        if (cnt <= 0) continue;
+        const p0Lon = secSet.pts[off];
+        const p0Lat = secSet.pts[off + 1];
+        const p1Lon = secSet.pts[off + (cnt - 1) * 2];
+        const p1Lat = secSet.pts[off + (cnt - 1) * 2 + 1];
+        const d0 = (p0Lon - pExitLon) ** 2 + (p0Lat - pExitLat) ** 2;
+        const d1 = (p1Lon - pExitLon) ** 2 + (p1Lat - pExitLat) ** 2;
+        // Section s exits at the point closer to pExit
+        // If p0 is closer to exit, train exits at p0 -> traversed p1 -> p0 (reversed)
+        const rev = d0 < d1;
+        secRevs[i] = rev ? 1 : 0;
+        pExitLon = rev ? p1Lon : p0Lon;
+        pExitLat = rev ? p1Lat : p0Lat;
+      }
+    }
+
     const dur = train.dur > 0 ? train.dur : 1;
     const depMins =
       typeof train.depMins === "number" && train.depMins >= 0
@@ -920,6 +969,7 @@ export function buildDayTimeline(
       totalDist,
       secs: routeSecs,
       secStarts,
+      secRevs,
     });
 
     // Populate secFlowSteps
@@ -976,6 +1026,12 @@ export function buildDayTimeline(
       }
       const s = pt.secs[secIdx];
       const distInSec = targetDist - pt.secStarts[secIdx];
+      const isSecRev = pt.secRevs[secIdx] === 1;
+      const sLen = secLengths[s] || 0;
+      // If traversed in reverse, effective distance along vertices starts from the end
+      const distInSecEffective = isSecRev
+        ? Math.max(0, Math.min(sLen, sLen - distInSec))
+        : distInSec;
 
       // Find which segment within section s
       const off = secSet.off[s];
@@ -995,19 +1051,25 @@ export function buildDayTimeline(
 
       const cum = secCumLens[s];
       let k = 0;
-      while (k < cnt - 2 && cum[k + 1] < distInSec) {
+      while (k < cnt - 2 && cum[k + 1] < distInSecEffective) {
         k++;
       }
       const segLen = cum[k + 1] - cum[k];
       const segAlpha =
-        segLen > 0 ? Math.max(0, Math.min(1, (distInSec - cum[k]) / segLen)) : 0;
+        segLen > 0
+          ? Math.max(0, Math.min(1, (distInSecEffective - cum[k]) / segLen))
+          : 0;
       const lon0 = secSet.pts[off + k * 2];
       const lat0 = secSet.pts[off + k * 2 + 1];
       const lon1 = secSet.pts[off + (k + 1) * 2];
       const lat1 = secSet.pts[off + (k + 1) * 2 + 1];
       const lon = lon0 + segAlpha * (lon1 - lon0);
       const lat = lat0 + segAlpha * (lat1 - lat0);
-      const heading = Math.atan2(lat1 - lat0, lon1 - lon0);
+
+      // Traversal heading: if reversed, movement vector is (lon0 - lon1, lat0 - lat1)
+      const dLon = isSecRev ? lon0 - lon1 : lon1 - lon0;
+      const dLat = isSecRev ? lat0 - lat1 : lat1 - lat0;
+      const heading = Math.atan2(dLat, dLon);
 
       active.push({
         lon,
