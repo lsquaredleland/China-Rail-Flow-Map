@@ -1,0 +1,8 @@
+[package]
+name = "filter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+osmpbf = "0.3"
+rustc-hash = "2"

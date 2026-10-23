@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>China Rail Flow Map</title>
+    <style>
+      :root {
+        --paper: #f7f5f0;
+        --paper-deep: #efece5;
+        --ink: #40231a;
+        --ink-soft: #7d5f52;
+        --rust: #d43a22;
+        --rust-dark: #8f1d10;
+        --indigo: #3d4478;
+        --teal: #1b9e77;
+        --rule: #ddd3c6;
+        --panel: rgba(253, 252, 249, 0.92);
+        --panel-edge: #d8cfc4;
+        --btn-bg: #f0ece4;
+        --btn-on: #d43a22;
+        --btn-on-ink: #fff7ee;
+        --field: #fefdfb;
+        --row-alt: rgba(64, 35, 26, 0.05);
+        --tooltip-bg: #40231a;
+        --tooltip-ink: #f7f5f0;
+        --shadow-panel: 0 1px 2px rgba(64, 35, 26, 0.10), 0 10px 30px rgba(64, 35, 26, 0.16);
+        --shadow-pop: 0 2px 6px rgba(64, 35, 26, 0.12), 0 16px 40px rgba(64, 35, 26, 0.22);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --paper: #221b11;
+          --paper-deep: #1b150d;
+          --ink: #ecdfc2;
+          --ink-soft: #b8a67f;
+          --rust: #ff8c42;
+          --rust-dark: #ffab73;
+          --indigo: #9aa1e0;
+          --teal: #3dc49b;
+          --rule: #55452a;
+          --panel: rgba(38, 30, 18, 0.94);
+          --panel-edge: #55452a;
+          --btn-bg: #322817;
+          --btn-on: #ff8c42;
+          --btn-on-ink: #1d1509;
+          --field: #2b2113;
+          --row-alt: rgba(236, 223, 194, 0.05);
+          --tooltip-bg: #f3ead2;
+          --tooltip-ink: #2e2114;
+          --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px rgba(0, 0, 0, 0.45);
+          --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.55);
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { overflow-x: hidden; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: Georgia, "Times New Roman", "Songti SC", "STSong", "SimSun", serif;
+      }
+      .stage {
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 14px 20px 10px;
+        border-top: 3px solid var(--rust);
+        border-bottom: 1.5px solid var(--ink);
+        position: relative;
+      }
+      header::after {
+        content: "";
+        position: absolute; left: 20px; right: 20px; bottom: 3px;
+        border-bottom: 0.5px solid var(--rule);
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(24px, 4.2vw, 40px);
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        line-height: 1.08;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .cr-logo {
+        width: 0.9em;
+        height: 1.035em;
+        flex: 0 0 auto;
+        color: var(--rust);
+        transform: translateY(-0.02em);
+      }
+      .subtitle {
+        margin: 6px 0 2px;
+        max-width: 920px;
+        font-size: clamp(12.5px, 1.6vw, 15px);
+        line-height: 1.45;
+        color: var(--ink-soft);
+        font-style: italic;
+      }
+      .stats {
+        margin-top: 7px;
+        display: flex; flex-wrap: wrap; gap: 4px 22px;
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
+      }
+      .stats b { font-size: 15px; color: var(--rust-dark); }
+      .stats span { color: var(--ink-soft); }
+      .toolbar {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+        padding: 8px 20px;
+        border-bottom: 0.5px solid var(--rule);
+        background: var(--paper-deep);
+      }
+      .toolbar .group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+      .toolbar .spacer { flex: 1; }
+      button, select {
+        font-family: inherit;
+        font-size: 12.5px;
+        color: var(--ink);
+        background: var(--btn-bg);
+        border: 1px solid var(--panel-edge);
+        border-radius: 6px;
+        padding: 6px 12px;
+        line-height: 1.2;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+      button { cursor: pointer; }
+      button:active { transform: translateY(0.5px); }
+      button:hover, select:hover { border-color: var(--ink-soft); }
+      button[aria-pressed="true"] {
+        background: var(--btn-on);
+        color: var(--btn-on-ink);
+        border-color: var(--btn-on);
+      }
+      button:focus-visible, select:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+      button:disabled {
+        opacity: 0.32;
+        cursor: not-allowed;
+        pointer-events: none;
+        transform: none;
+      }
+      /* Segmented km | mi switcher: two toolbar buttons joined into one pill. */
+      .toolbar .units { display: inline-flex; gap: 0; }
+      .units button { min-width: 40px; }
+      .units button:first-child { border-radius: 6px 0 0 6px; }
+      .units button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+      .city-picker { display: flex; align-items: center; gap: 7px; }
+      .city-picker label { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
+      .combo { position: relative; }
+      #originSearch {
+        font-family: inherit;
+        width: min(320px, 62vw);
+        background: var(--field);
+        color: var(--ink);
+        border: 1px solid var(--panel-edge);
+        border-radius: 6px;
+        font-size: 13.5px;
+        padding: 6px 8px;
+      }
+      #originSearch:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+      #originList {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        width: min(360px, 86vw);
+        max-height: 320px;
+        overflow-y: auto;
+        background: var(--field);
+        border: 1px solid var(--panel-edge);
+        border-radius: 8px;
+        box-shadow: var(--shadow-pop);
+        z-index: 30;
+        padding: 3px 0;
+      }
+      #originList .opt {
+        padding: 7px 11px;
+        font-size: 13px;
+        line-height: 1.35;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #originList .opt .rk { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+      #originList .opt .cnt { color: var(--ink-soft); }
+      #originList .opt.active {
+        background: var(--btn-on);
+        color: var(--btn-on-ink);
+      }
+      #originList .opt.active .rk, #originList .opt.active .cnt { color: inherit; opacity: 0.85; }
+      #originList .none {
+        padding: 8px 11px;
+        font-size: 13px;
+        color: var(--ink-soft);
+        font-style: italic;
+      }
+      .hint { font-size: 12px; color: var(--ink-soft); font-style: italic; }
+      /* The map stage is sized so that header + toolbar + map (plus its
+         bottom legend, scale bar and footer) fit within the desktop
+         viewport with the bottom of the map always visible above the fold. */
+      #mapwrap {
+        position: relative;
+        flex: none;
+        height: clamp(400px, calc(100vh - 230px), 680px);
+        height: clamp(400px, calc(100dvh - 230px), 680px);
+        touch-action: none;
+      }
+      #map {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%;
+        display: block;
+        cursor: grab;
+        transition: opacity 0.22s ease;
+      }
+      #map.switching { opacity: 0.25; }
+      #map.dragging { cursor: grabbing; }
+      #loading {
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-style: italic; color: var(--ink-soft); font-size: 15px;
+        text-align: center; padding: 20px;
+      }
+      #tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: var(--tooltip-bg);
+        color: var(--tooltip-ink);
+        border-radius: 8px;
+        padding: 8px 11px;
+        font-size: 13px;
+        line-height: 1.5;
+        max-width: 260px;
+        opacity: 0;
+        transition: opacity 0.12s ease;
+        z-index: 5;
+        box-shadow: var(--shadow-pop);
+      }
+      #tooltip.show { opacity: 1; }
+      #tooltip .t-title { font-weight: 700; font-size: 14px; }
+      #tooltip .t-sub { opacity: 0.85; font-size: 12px; }
+      #tooltip table { border-collapse: collapse; margin-top: 3px; }
+      #tooltip td { padding: 0 10px 0 0; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+      #tooltip td:last-child { padding-right: 0; text-align: right; font-weight: 700; }
+      #legendCol {
+        position: absolute;
+        left: 14px; bottom: 14px;
+        z-index: 4;
+        width: 220px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      /* Distance scale bar: pinned to the map's bottom-right corner,
+         sized by the renderer from the projection's true ground scale
+         (see MapCanvas.updateScaleBar). Never intercepts the map. */
+      #scalebar {
+        position: absolute;
+        right: 14px; bottom: 14px;
+        z-index: 4;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: var(--panel);
+        border: 1px solid var(--panel-edge);
+        border-radius: 8px;
+        box-shadow: var(--shadow-panel);
+        backdrop-filter: blur(2px);
+        padding: 6px 10px 8px;
+      }
+      #scalebar .sb-label {
+        font-size: 11.5px;
+        line-height: 1.2;
+        color: var(--ink-soft);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      #scalebar .sb-bar {
+        height: 5px;
+        border-left: 2px solid var(--ink);
+        border-right: 2px solid var(--ink);
+        border-bottom: 2px solid var(--ink);
+      }
+      #legend {
+        background: var(--panel);
+        border: 1px solid var(--panel-edge);
+        border-radius: 8px;
+        box-shadow: var(--shadow-panel);
+        padding: 9px 12px 10px;
+        backdrop-filter: blur(2px);
+        color: var(--ink-soft);
+      }
+      /* The legend scales are DOM text + inline SVG (see Legend.tsx) —
+         resolution-independent, sharp at any device pixel ratio. */
+      #legend svg { display: block; }
+      #legend .lg-steps { fill: var(--rust); }
+      #legend .lg-dot { fill: var(--ink); fill-opacity: 0.3; stroke: var(--ink); }
+      @media (prefers-color-scheme: dark) {
+        #legend .lg-steps { fill: var(--rust); }
+        #legend .lg-dot { fill: var(--ink); stroke: var(--ink); }
+      }
+      /* The explanatory notes are the page's closing footnote, below
+         everything else (after the departures table). */
+      #legendNotes {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 2px 20px 28px;
+      }
+      #legendNotes .note {
+        margin: 0 0 5px;
+        max-width: 860px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--ink-soft);
+      }
+      #legendNotes .note:last-child { margin-bottom: 0; }
+      #legendNotes .dash {
+        display: inline-block; width: 20px; border-top: 2px dashed #9a7d55;
+        vertical-align: middle; margin-right: 5px;
+      }
+      @media (prefers-color-scheme: light) {
+        /* The footnote's dashed sample matches the chord colour. */
+        #legendNotes .dash { border-top-color: #c9b8a6; }
+      }
+      #legend h2 {
+        margin: 0 0 5px;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--ink-soft);
+      }
+      #legendToggle { display: none; }
+      /* ---------- destination detail panel ---------- */
+      #destPanel {
+        position: absolute;
+        top: 14px; right: 14px;
+        width: 272px;
+        background: var(--panel);
+        border: 1px solid var(--panel-edge);
+        border-radius: 10px;
+        box-shadow: var(--shadow-panel);
+        backdrop-filter: blur(3px);
+        padding: 13px 15px 12px;
+        z-index: 6;
+      }
+      #destPanel .dp-title {
+        font-weight: 700;
+        font-size: 16.5px;
+        line-height: 1.25;
+        padding-right: 28px;
+      }
+      #destPanel .dp-sub { color: var(--ink-soft); font-size: 12px; margin-top: 2px; }
+      #destPanel table { border-collapse: collapse; margin-top: 7px; width: 100%; }
+      #destPanel td {
+        padding: 2.5px 8px 2.5px 0;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      #destPanel td:last-child {
+        padding-right: 0;
+        text-align: right;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      #destClose {
+        position: absolute; top: 6px; right: 6px;
+        width: 30px; height: 30px;
+        padding: 0;
+        font-size: 17px;
+        line-height: 1;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .dep-swipe { display: none; }
+      .dep-scrollwrap { position: relative; }
+      .dep-fade { display: none; }
+      .dep-scroll::-webkit-scrollbar, #originList::-webkit-scrollbar { height: 8px; width: 8px; }
+      .dep-scroll::-webkit-scrollbar-thumb, #originList::-webkit-scrollbar-thumb {
+        background: var(--rule);
+        border-radius: 4px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #map, button, #tooltip { transition: none !important; }
+        button:active { transform: none; }
+      }
+      footer {
+        padding: 7px 20px 9px;
+        border-top: 0.5px solid var(--rule);
+        font-size: 11.5px;
+        line-height: 1.5;
+        color: var(--ink-soft);
+      }
+      /* ---------- departures list ---------- */
+      #departures {
+        border-top: 1.5px solid var(--ink);
+        padding: 20px 20px 30px;
+        max-width: 1180px;
+        width: 100%;
+        margin: 0 auto;
+      }
+      #departures h2 {
+        margin: 0;
+        font-size: clamp(20px, 3vw, 28px);
+        font-weight: 700;
+        line-height: 1.15;
+      }
+      .dep-note {
+        margin: 8px 0 0;
+        max-width: 860px;
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--ink-soft);
+      }
+      /* ---------- departure histograms ---------- */
+      /* Two compact inline-SVG charts under the section heading:
+         departures by hour (indigo) and trains by journey distance
+         (the flow red). Side by side on wide screens, stacked
+         on phones. Colours and text run through the palette vars so
+         both colour schemes hold. */
+      .hist-strip {
+        display: flex;
+        gap: 22px;
+        margin: 16px 0 2px;
+      }
+      .hist { flex: 1 1 0; min-width: 0; margin: 0; }
+      .hist figcaption {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 1px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .hist-key {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11.5px;
+        font-weight: 400;
+        color: var(--ink-soft);
+      }
+      .hist-hint {
+        font-size: 11.5px;
+        font-weight: 400;
+        font-style: italic;
+        color: var(--ink-soft);
+      }
+      .hist-key .swatch {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 1.5px;
+        margin-left: 4px;
+      }
+      .hist-key .swatch:first-child { margin-left: 0; }
+      .hist-key .swatch-h-sub { background: var(--indigo); }
+      .hist-key .swatch-h-muted { background: var(--indigo); opacity: 0.25; }
+      .hist-key .swatch-d-sub { background: var(--rust); }
+      .hist-key .swatch-d-muted { background: var(--rust); opacity: 0.25; }
+      .hist-key .swatch-t-sub { background: var(--teal); }
+      .hist-key .swatch-t-muted { background: var(--teal); opacity: 0.25; }
+      .hist svg { display: block; width: 100%; height: auto; }
+      .hist .hist-col.clickable { cursor: pointer; }
+      .hist .hist-col-bg { fill: var(--ink); fill-opacity: 0; transition: fill-opacity 0.12s ease; }
+      .hist .hist-col.clickable:hover .hist-col-bg { fill-opacity: 0.08; }
+      .hist .hist-col.is-selected .hist-col-bg { fill-opacity: 0.13; }
+      .hist .hist-col.clickable:hover .hist-bar { filter: brightness(1.12); }
+      .hist .hist-col.is-selected .hist-bar { stroke: var(--ink); stroke-width: 1px; }
+      .hist .hist-col.is-dimmed .hist-bar { opacity: 0.32; }
+      .hist .bar-h { fill: var(--indigo); }
+      .hist .bar-h.muted { fill-opacity: 0.24; }
+      .hist .bar-h-sub { fill: var(--indigo); }
+      .hist .bar-d { fill: var(--rust); }
+      .hist .bar-d.muted { fill-opacity: 0.24; }
+      .hist .bar-d-sub { fill: var(--rust); }
+      .hist .bar-t { fill: var(--teal); }
+      .hist .bar-t.muted { fill-opacity: 0.24; }
+      .hist .bar-t-sub { fill: var(--teal); }
+      .hist .hist-base { fill: var(--rule); }
+      .hist .hist-tick { fill: var(--ink-soft); }
+      .hist .hist-tickmark { fill: var(--ink-soft); }
+      .hist .hist-peak { fill: var(--ink); font-weight: 700; pointer-events: none; }
+      .hist .hist-peak.muted { fill: var(--ink-soft); font-weight: 400; }
+      .hist .hist-peak.is-hover, .hist .hist-peak-sub.is-hover { fill: var(--btn-on); font-weight: 700; }
+      .hist .hist-peak-sub { fill: var(--ink); font-weight: 700; pointer-events: none; }
+      .cls-filter {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .cls-label {
+        font-size: 12.5px;
+        color: var(--ink-soft);
+        font-style: italic;
+        margin-right: 2px;
+      }
+      .cls-btn {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 8px;
+        min-width: 28px;
+        border-radius: 5px;
+      }
+      .hist-sub {
+        margin: 2px 0 0;
+        font-size: 11.5px;
+        line-height: 1.4;
+        color: var(--ink-soft);
+        font-style: italic;
+      }
+      .dep-tools {
+        margin: 14px 0 10px;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+      }
+      #depFilter {
+        font-family: inherit;
+        font-size: 14px;
+        color: var(--ink);
+        background: var(--field);
+        border: 1px solid var(--panel-edge);
+        border-radius: 6px;
+        padding: 7px 11px;
+        width: min(340px, 100%);
+      }
+      #depFilter:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+      .dep-showing { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
+      /* Active destination filter chip, set by clicking a city on the map. */
+      .dep-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--btn-on); color: var(--btn-on-ink);
+        border-radius: 999px; padding: 3px 4px 3px 11px;
+        font-size: 13px;
+      }
+      .dep-chip[hidden] { display: none; }
+      .dep-chip button {
+        background: transparent; border: 0; color: inherit;
+        width: 22px; height: 22px; border-radius: 50%;
+        padding: 0; font-size: 15px; line-height: 1;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .dep-chip button:hover { border-color: transparent; background: rgba(0, 0, 0, 0.18); }
+      /* The departures table scrolls inside its own box, capped at half
+         the viewport height, so the section never takes more than 50%
+         of the page; the header row sticks to the top of the scroller. */
+      .dep-scroll { overflow-x: auto; overflow-y: auto; max-height: 50dvh; -webkit-overflow-scrolling: touch; }
+      #depTable {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 660px;
+        font-size: 14px;
+      }
+      #depTable th, #depTable td {
+        text-align: left;
+        padding: 7px 10px;
+        border-bottom: 0.5px solid var(--rule);
+        vertical-align: top;
+      }
+      #depTable thead th {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        background: var(--paper-deep);
+        border-bottom: 1.5px solid var(--ink);
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      #depTable th.sortable { cursor: pointer; user-select: none; }
+      #depTable th.sortable:hover { color: var(--ink); }
+      #depTable th .arrow { font-size: 10px; letter-spacing: 0; }
+      #depTable tbody tr:nth-child(even) { background: var(--row-alt); }
+      #depTable td.num, #depTable th.num { text-align: right; }
+      .c-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .c-train { white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .c-train .cls {
+        display: inline-block;
+        min-width: 19px;
+        text-align: center;
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--rust);
+        border: 1px solid var(--rust);
+        border-radius: 3px;
+        padding: 0 3px;
+        margin-right: 5px;
+        line-height: 1.5;
+      }
+      .c-train b { font-size: 14.5px; }
+      .to-city { font-weight: 700; }
+      .to-stn { display: block; font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+      .plus { font-size: 11px; color: var(--ink-soft); }
+      /* Calls mode: the table lists every train stopping at the selected
+         city; the status chip says whether it ends its journey there. */
+      #depTable.calls { min-width: 800px; }
+      .status-chip {
+        display: inline-block;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        border-radius: 999px;
+        padding: 1px 9px;
+        line-height: 1.6;
+        white-space: nowrap;
+      }
+      .status-term { background: var(--btn-on); color: var(--btn-on-ink); }
+      .status-mid { color: var(--ink-soft); border: 1px solid var(--panel-edge); }
+      .dep-empty { padding: 18px 10px; color: var(--ink-soft); font-style: italic; }
+      @media (max-width: 640px) {
+        /* Phones keep a tall stage of their own (~68dvh) and the page
+           scrolls past it to the departures table. */
+        #mapwrap { height: 68vh; height: 68dvh; min-height: 400px; }
+        header { padding: 10px 14px 8px; }
+        .subtitle {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .stats { gap: 3px 14px; font-size: 11.5px; }
+        .stats b { font-size: 13.5px; }
+        .toolbar { padding: 7px 14px; }
+        footer { padding: 6px 14px 8px; }
+        #departures { padding: 16px 14px 24px; }
+        .hist-strip { flex-direction: column; gap: 14px; margin-top: 12px; }
+        #legendNotes { padding: 2px 14px calc(24px + env(safe-area-inset-bottom, 0px)); }
+        #depTable th, #depTable td { padding: 6px 8px; }
+        .hint { display: none; }
+        #legendCol { left: 10px; bottom: 10px; width: min(216px, calc(100vw - 20px)); }
+        #scalebar { right: 10px; bottom: 10px; }
+        #legend { padding: 7px 10px 8px; }
+        #legendBody.collapsed { display: none; }
+        #legendToggle {
+          display: inline-block;
+          margin-top: 6px;
+          font-size: 11px;
+          padding: 3px 8px;
+        }
+        #legend h2 { margin-bottom: 0; }
+        /* Full-width city picker and thumb-sized controls. */
+        .city-picker { flex: 1 1 100%; }
+        .city-picker .combo { flex: 1; }
+        .city-picker label { flex: 0 0 auto; }
+        #originSearch {
+          width: 100%;
+          min-height: 44px;
+          font-size: 16px;   /* >=16px stops iOS focus zoom */
+          padding: 9px 10px;
+        }
+        #originList { left: 0; right: 0; width: auto; max-height: 46vh; }
+        #originList .opt { padding: 13px 12px; }
+        .toolbar button { min-height: 44px; padding: 8px 12px; }
+        #depFilter { min-height: 44px; font-size: 16px; }
+        footer { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+        /* The destination panel becomes a bottom sheet. */
+        #destPanel {
+          top: auto; left: 10px; right: 10px;
+          bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+          width: auto;
+          border-radius: 12px;
+          box-shadow: var(--shadow-pop);
+        }
+        #destClose { width: 44px; height: 44px; font-size: 19px; }
+        /* Departures table scroll hint: caption plus an edge fade. */
+        .dep-swipe {
+          display: block;
+          margin: 0 0 6px;
+          font-size: 12px;
+          color: var(--ink-soft);
+          font-style: italic;
+        }
+        .dep-fade {
+          display: block;
+          position: absolute; top: 0; right: 0; bottom: 0;
+          width: 34px;
+          pointer-events: none;
+          background: linear-gradient(to right, rgba(127, 108, 74, 0), var(--paper));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>/*__BUNDLE__*/</script>
+  </body>
+</html>

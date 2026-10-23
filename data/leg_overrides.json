@@ -1,0 +1,6494 @@
+[
+  {
+    "set": 0,
+    "train_no": "5u000D314707",
+    "code": "D3146",
+    "class": "D",
+    "from": "三明北",
+    "to": "福州",
+    "via": [
+      "尤溪"
+    ],
+    "minutes": 70,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 59.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "4e000D32650N",
+    "code": "D3265",
+    "class": "D",
+    "from": "三明北",
+    "to": "福州",
+    "via": [
+      "尤溪"
+    ],
+    "minutes": 71,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 59.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5500000D9900",
+    "code": "D99",
+    "class": "D",
+    "from": "上海南",
+    "to": "杭州东",
+    "via": [
+      "嘉兴",
+      "海宁"
+    ],
+    "minutes": 92,
+    "assigned_len_km": 174.3,
+    "drawn_len_km": 155.6,
+    "predicted_min": 94.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "470000D20200",
+    "code": "D203",
+    "class": "D",
+    "from": "上海松江",
+    "to": "杭州南",
+    "via": [
+      "嘉兴"
+    ],
+    "minutes": 90,
+    "assigned_len_km": 152.7,
+    "drawn_len_km": 144.0,
+    "predicted_min": 84.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5l0000D98600",
+    "code": "D986",
+    "class": "D",
+    "from": "上海虹桥",
+    "to": "南京南",
+    "via": [
+      "盛泽",
+      "湖州东",
+      "宜兴",
+      "溧阳",
+      "溧水"
+    ],
+    "minutes": 108,
+    "assigned_len_km": 349.1,
+    "drawn_len_km": 285.4,
+    "predicted_min": 111.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "57000G138402",
+    "code": "G1384",
+    "class": "G",
+    "from": "上饶",
+    "to": "金华",
+    "via": [
+      "玉山南"
+    ],
+    "minutes": 49,
+    "assigned_len_km": 185.8,
+    "drawn_len_km": 210.2,
+    "predicted_min": 49.0,
+    "drawn_predicted_min": 39.0,
+    "flags": "F4"
+  },
+  {
+    "set": 0,
+    "train_no": "5n000G164206",
+    "code": "G1642",
+    "class": "G",
+    "from": "上饶",
+    "to": "金华",
+    "via": [
+      "玉山南"
+    ],
+    "minutes": 48,
+    "assigned_len_km": 185.8,
+    "drawn_len_km": 210.2,
+    "predicted_min": 49.0,
+    "drawn_predicted_min": 39.0,
+    "flags": "F4"
+  },
+  {
+    "set": 0,
+    "train_no": "57000K152310",
+    "code": "K1523",
+    "class": "K",
+    "from": "九江",
+    "to": "共青城",
+    "via": [
+      "瑞昌西"
+    ],
+    "minutes": 46,
+    "assigned_len_km": 108.7,
+    "drawn_len_km": 63.4,
+    "predicted_min": 45.0,
+    "drawn_predicted_min": 28.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "58000K49680O",
+    "code": "K4969",
+    "class": "K",
+    "from": "亳州",
+    "to": "曹县",
+    "via": [
+      "商丘"
+    ],
+    "minutes": 99,
+    "assigned_len_km": 121.3,
+    "drawn_len_km": 112.0,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 73.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "56000K180633",
+    "code": "K1807",
+    "class": "K",
+    "from": "兖州",
+    "to": "德州",
+    "via": [
+      "泰山",
+      "济南"
+    ],
+    "minutes": 197,
+    "assigned_len_km": 274.1,
+    "drawn_len_km": 259.0,
+    "predicted_min": 174.0,
+    "drawn_predicted_min": 145.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "480000K16109",
+    "code": "K161",
+    "class": "K",
+    "from": "全州南",
+    "to": "桂林北",
+    "via": [
+      "桂林"
+    ],
+    "minutes": 67,
+    "assigned_len_km": 125.4,
+    "drawn_len_km": 110.0,
+    "predicted_min": 57.0,
+    "drawn_predicted_min": 44.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000T2102",
+    "code": "T21",
+    "class": "T",
+    "from": "全州南",
+    "to": "桂林北",
+    "via": [
+      "桂林"
+    ],
+    "minutes": 57,
+    "assigned_len_km": 125.4,
+    "drawn_len_km": 110.0,
+    "predicted_min": 57.0,
+    "drawn_predicted_min": 44.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000T2890Z",
+    "code": "T289",
+    "class": "T",
+    "from": "全州南",
+    "to": "桂林北",
+    "via": [
+      "桂林"
+    ],
+    "minutes": 58,
+    "assigned_len_km": 125.4,
+    "drawn_len_km": 110.0,
+    "predicted_min": 57.0,
+    "drawn_predicted_min": 44.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "12000K15200U",
+    "code": "K1520",
+    "class": "K",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 174,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000K39208",
+    "code": "K389",
+    "class": "K",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 172,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "800000K9860K",
+    "code": "K987",
+    "class": "K",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 161,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "410000T2690M",
+    "code": "T269",
+    "class": "T",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 151,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000Z16407",
+    "code": "Z165",
+    "class": "Z",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 152,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000Z210W",
+    "code": "Z21",
+    "class": "Z",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 151,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "770000Z2230C",
+    "code": "Z223",
+    "class": "Z",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 162,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000Z26403",
+    "code": "Z265",
+    "class": "Z",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 147,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000Z3220D",
+    "code": "Z323",
+    "class": "Z",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 162,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "770000Z37900",
+    "code": "Z379",
+    "class": "Z",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 142,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "4100000Z6502",
+    "code": "Z65",
+    "class": "Z",
+    "from": "兰州",
+    "to": "西宁",
+    "via": [
+      "兰州西",
+      "海石湾"
+    ],
+    "minutes": 138,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 154.0,
+    "drawn_predicted_min": 66.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000T17515",
+    "code": "T175",
+    "class": "T",
+    "from": "兰州西",
+    "to": "西宁",
+    "via": [
+      "海石湾"
+    ],
+    "minutes": 141,
+    "assigned_len_km": 199.9,
+    "drawn_len_km": 188.5,
+    "predicted_min": 144.0,
+    "drawn_predicted_min": 60.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000Z1793C",
+    "code": "Z179",
+    "class": "Z",
+    "from": "兰州西",
+    "to": "西宁",
+    "via": [
+      "海石湾"
+    ],
+    "minutes": 148,
+    "assigned_len_km": 199.9,
+    "drawn_len_km": 188.5,
+    "predicted_min": 144.0,
+    "drawn_predicted_min": 60.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "410000Z25903",
+    "code": "Z259",
+    "class": "Z",
+    "from": "兰州西",
+    "to": "西宁",
+    "via": [
+      "海石湾"
+    ],
+    "minutes": 139,
+    "assigned_len_km": 199.9,
+    "drawn_len_km": 188.5,
+    "predicted_min": 144.0,
+    "drawn_predicted_min": 60.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5f0000Z36402",
+    "code": "Z361",
+    "class": "Z",
+    "from": "兰州西",
+    "to": "西宁",
+    "via": [
+      "海石湾"
+    ],
+    "minutes": 163,
+    "assigned_len_km": 199.9,
+    "drawn_len_km": 188.5,
+    "predicted_min": 144.0,
+    "drawn_predicted_min": 60.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000K530K",
+    "code": "K53",
+    "class": "K",
+    "from": "北京",
+    "to": "沈阳北",
+    "via": [
+      "唐山北",
+      "昌黎",
+      "秦皇岛",
+      "山海关",
+      "绥中",
+      "兴城",
+      "葫芦岛",
+      "锦州",
+      "沟帮子",
+      "大虎山"
+    ],
+    "minutes": 505,
+    "assigned_len_km": 736.6,
+    "drawn_len_km": 698.5,
+    "predicted_min": 510.0,
+    "drawn_predicted_min": 175.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000K9760M",
+    "code": "K976",
+    "class": "K",
+    "from": "北戴河",
+    "to": "唐山",
+    "via": [
+      "昌黎"
+    ],
+    "minutes": 95,
+    "assigned_len_km": 138.0,
+    "drawn_len_km": 128.4,
+    "predicted_min": 85.0,
+    "drawn_predicted_min": 35.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "130000T13115",
+    "code": "T131",
+    "class": "T",
+    "from": "北戴河",
+    "to": "唐山",
+    "via": [
+      "昌黎"
+    ],
+    "minutes": 81,
+    "assigned_len_km": 138.0,
+    "drawn_len_km": 128.4,
+    "predicted_min": 85.0,
+    "drawn_predicted_min": 35.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K2840J",
+    "code": "K284",
+    "class": "K",
+    "from": "南京",
+    "to": "上海",
+    "via": [
+      "扬州",
+      "泰州",
+      "海安",
+      "南通西",
+      "张家港",
+      "常熟",
+      "太仓南",
+      "安亭西"
+    ],
+    "minutes": 187,
+    "assigned_len_km": 433.5,
+    "drawn_len_km": 300.0,
+    "predicted_min": 203.0,
+    "drawn_predicted_min": 87.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "71000K119220",
+    "code": "K1192",
+    "class": "K",
+    "from": "南宁",
+    "to": "柳州",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 179,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 187.0,
+    "drawn_predicted_min": 70.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "71000K15240Y",
+    "code": "K1524",
+    "class": "K",
+    "from": "南宁",
+    "to": "柳州",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 180,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 187.0,
+    "drawn_predicted_min": 70.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "71000K15580T",
+    "code": "K1555",
+    "class": "K",
+    "from": "南宁",
+    "to": "柳州",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 185,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 187.0,
+    "drawn_predicted_min": 70.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "800000T3820V",
+    "code": "T382",
+    "class": "T",
+    "from": "南宁",
+    "to": "柳州",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 184,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 187.0,
+    "drawn_predicted_min": 70.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "710000Z3360H",
+    "code": "Z337",
+    "class": "Z",
+    "from": "南宁",
+    "to": "柳州",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 182,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 187.0,
+    "drawn_predicted_min": 70.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "710000Z39606",
+    "code": "Z397",
+    "class": "Z",
+    "from": "南宁",
+    "to": "柳州",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 178,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 187.0,
+    "drawn_predicted_min": 70.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "73000G343810",
+    "code": "G3438",
+    "class": "G",
+    "from": "南宁东",
+    "to": "贵阳北",
+    "via": [
+      "河池西",
+      "荔波",
+      "贵安"
+    ],
+    "minutes": 150,
+    "assigned_len_km": 576.8,
+    "drawn_len_km": 524.5,
+    "predicted_min": 163.0,
+    "drawn_predicted_min": 129.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "470000D21101",
+    "code": "D211",
+    "class": "D",
+    "from": "南昌",
+    "to": "宜春",
+    "via": [
+      "丰城",
+      "樟树",
+      "新余"
+    ],
+    "minutes": 121,
+    "assigned_len_km": 213.0,
+    "drawn_len_km": 191.3,
+    "predicted_min": 134.0,
+    "drawn_predicted_min": 68.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "55000K15560A",
+    "code": "K1556",
+    "class": "K",
+    "from": "南昌",
+    "to": "衡阳",
+    "via": [
+      "吉安",
+      "井冈山"
+    ],
+    "minutes": 346,
+    "assigned_len_km": 536.8,
+    "drawn_len_km": 489.9,
+    "predicted_min": 320.0,
+    "drawn_predicted_min": 302.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "03000K101404",
+    "code": "K1014",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 94,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "49000K10520M",
+    "code": "K1049",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 87,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "24000K110910",
+    "code": "K1109",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 89,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "77000K11540K",
+    "code": "K1151",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 89,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "26000K12630Z",
+    "code": "K1263",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 89,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "39000K14400B",
+    "code": "K1437",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 94,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "850000K3063A",
+    "code": "K306",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 88,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "410000K46821",
+    "code": "K468",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 94,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "53000K583300",
+    "code": "K5833",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 93,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "430000K6080E",
+    "code": "K608",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 92,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "330000K65510",
+    "code": "K655",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 91,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "480000K6770C",
+    "code": "K677",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 102,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "390000K7520T",
+    "code": "K752",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 99,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "53000K851304",
+    "code": "K8513",
+    "class": "K",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 97,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "770000T2380L",
+    "code": "T235",
+    "class": "T",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 84,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000Z59606",
+    "code": "Z596",
+    "class": "Z",
+    "from": "合肥",
+    "to": "芜湖",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 89,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 91.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0300000T180C",
+    "code": "T18",
+    "class": "T",
+    "from": "哈尔滨",
+    "to": "沈阳北",
+    "via": [
+      "双城堡",
+      "扶余",
+      "德惠",
+      "长春",
+      "公主岭",
+      "四平"
+    ],
+    "minutes": 295,
+    "assigned_len_km": 542.6,
+    "drawn_len_km": 517.6,
+    "predicted_min": 306.0,
+    "drawn_predicted_min": 126.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "030000T2980M",
+    "code": "T298",
+    "class": "T",
+    "from": "哈尔滨",
+    "to": "沈阳北",
+    "via": [
+      "双城堡",
+      "扶余",
+      "德惠",
+      "长春",
+      "公主岭",
+      "四平"
+    ],
+    "minutes": 297,
+    "assigned_len_km": 542.6,
+    "drawn_len_km": 517.6,
+    "predicted_min": 306.0,
+    "drawn_predicted_min": 126.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0400000T480H",
+    "code": "T48",
+    "class": "T",
+    "from": "哈尔滨",
+    "to": "沈阳北",
+    "via": [
+      "双城堡",
+      "扶余",
+      "德惠",
+      "长春",
+      "公主岭",
+      "四平"
+    ],
+    "minutes": 296,
+    "assigned_len_km": 542.6,
+    "drawn_len_km": 517.6,
+    "predicted_min": 306.0,
+    "drawn_predicted_min": 126.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "47000K14500K",
+    "code": "K1451",
+    "class": "K",
+    "from": "哈尔滨",
+    "to": "牡丹江",
+    "via": [
+      "海林"
+    ],
+    "minutes": 290,
+    "assigned_len_km": 339.3,
+    "drawn_len_km": 299.2,
+    "predicted_min": 295.0,
+    "drawn_predicted_min": 94.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a0000K5520G",
+    "code": "K553",
+    "class": "K",
+    "from": "唐山",
+    "to": "北戴河",
+    "via": [
+      "滦县"
+    ],
+    "minutes": 99,
+    "assigned_len_km": 138.0,
+    "drawn_len_km": 128.4,
+    "predicted_min": 92.0,
+    "drawn_predicted_min": 35.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000K18809",
+    "code": "K189",
+    "class": "K",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 133,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000K2715",
+    "code": "K27",
+    "class": "K",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 124,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000K34110",
+    "code": "K341",
+    "class": "K",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 125,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5600000K480D",
+    "code": "K48",
+    "class": "K",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 131,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "490000K9700P",
+    "code": "K971",
+    "class": "K",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 129,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000T37001",
+    "code": "T367",
+    "class": "T",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 131,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "800000Z3260B",
+    "code": "Z327",
+    "class": "Z",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 111,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "710000Z39606",
+    "code": "Z397",
+    "class": "Z",
+    "from": "唐山",
+    "to": "山海关",
+    "via": [
+      "滦县",
+      "秦皇岛"
+    ],
+    "minutes": 111,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "47000G119606",
+    "code": "G1193",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "5l000G120463",
+    "code": "G1201",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "49000G12080N",
+    "code": "G1208",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 42,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "5j000G1228D2",
+    "code": "G1225",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "5l000G123208",
+    "code": "G1232",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "26000G12400V",
+    "code": "G1237",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "47000G124491",
+    "code": "G1241",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "49000G12480U",
+    "code": "G1245",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "5l000G1252B6",
+    "code": "G1253",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "49000G12680L",
+    "code": "G1268",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "4e000G12780L",
+    "code": "G1275",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "76000G12820K",
+    "code": "G1283",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "38000G128640",
+    "code": "G1287",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "6c000G12900C",
+    "code": "G1291",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 39,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "4f000G12940Q",
+    "code": "G1295",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "47000G133901",
+    "code": "G1338",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "25000G135902",
+    "code": "G1359",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "27000G260213",
+    "code": "G2603",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "5l000G264607",
+    "code": "G2643",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "47000G264906",
+    "code": "G2649",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "49000G26540E",
+    "code": "G2654",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "39000G348404",
+    "code": "G3485",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 39,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "4r000G349406",
+    "code": "G3491",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "77000G349604",
+    "code": "G3497",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "26000G62842L",
+    "code": "G6284",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "26000G782805",
+    "code": "G7828",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "24000G892909",
+    "code": "G8929",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "5l0000G10000",
+    "code": "G97",
+    "class": "G",
+    "from": "唐山",
+    "to": "秦皇岛",
+    "via": [
+      "滦河"
+    ],
+    "minutes": 37,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 41.0,
+    "drawn_predicted_min": 103.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "24000K254905",
+    "code": "K2549",
+    "class": "K",
+    "from": "唐山",
+    "to": "锦州",
+    "via": [
+      "滦县",
+      "秦皇岛",
+      "山海关",
+      "兴城",
+      "葫芦岛"
+    ],
+    "minutes": 258,
+    "assigned_len_km": 369.6,
+    "drawn_len_km": 347.4,
+    "predicted_min": 247.0,
+    "drawn_predicted_min": 164.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "250000K48914",
+    "code": "K489",
+    "class": "K",
+    "from": "唐山",
+    "to": "锦州",
+    "via": [
+      "滦县",
+      "秦皇岛",
+      "山海关",
+      "兴城",
+      "葫芦岛"
+    ],
+    "minutes": 260,
+    "assigned_len_km": 369.6,
+    "drawn_len_km": 347.4,
+    "predicted_min": 247.0,
+    "drawn_predicted_min": 164.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000D11200",
+    "code": "D113",
+    "class": "D",
+    "from": "商丘",
+    "to": "郑州",
+    "via": [
+      "开封"
+    ],
+    "minutes": 101,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 103.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000D28800",
+    "code": "D289",
+    "class": "D",
+    "from": "商丘",
+    "to": "郑州",
+    "via": [
+      "开封"
+    ],
+    "minutes": 101,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 103.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5f0000Z36402",
+    "code": "Z361",
+    "class": "Z",
+    "from": "商丘",
+    "to": "郑州",
+    "via": [
+      "开封"
+    ],
+    "minutes": 101,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 103.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000Z37604",
+    "code": "Z377",
+    "class": "Z",
+    "from": "商丘",
+    "to": "郑州",
+    "via": [
+      "开封"
+    ],
+    "minutes": 101,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 103.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000K34200",
+    "code": "K342",
+    "class": "K",
+    "from": "天津",
+    "to": "北京",
+    "via": [
+      "广阳"
+    ],
+    "minutes": 110,
+    "assigned_len_km": 134.5,
+    "drawn_len_km": 123.1,
+    "predicted_min": 100.0,
+    "drawn_predicted_min": 51.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000Z2360B",
+    "code": "Z237",
+    "class": "Z",
+    "from": "天津",
+    "to": "沈阳北",
+    "via": [
+      "唐山",
+      "秦皇岛",
+      "山海关",
+      "盘锦",
+      "海城",
+      "鞍山",
+      "辽阳"
+    ],
+    "minutes": 355,
+    "assigned_len_km": 756.5,
+    "drawn_len_km": 662.3,
+    "predicted_min": 362.0,
+    "drawn_predicted_min": 210.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "27000K13980W",
+    "code": "K1398",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "41000K15740E",
+    "code": "K1571",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "87000K180507",
+    "code": "K1808",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "410000K2141B",
+    "code": "K214",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "270000K5660A",
+    "code": "K566",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "410000K6100P",
+    "code": "K610",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 123,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "270000K8842F",
+    "code": "K884",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 123,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "280000K8911S",
+    "code": "K894",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000K9780C",
+    "code": "K979",
+    "class": "K",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "270000T19205",
+    "code": "T193",
+    "class": "T",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 120,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000Z35807",
+    "code": "Z358",
+    "class": "Z",
+    "from": "太原",
+    "to": "石家庄北",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 116,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 121.0,
+    "drawn_predicted_min": 95.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000K20203",
+    "code": "K202",
+    "class": "K",
+    "from": "娄底",
+    "to": "怀化",
+    "via": [
+      "涟源",
+      "新化",
+      "溆浦"
+    ],
+    "minutes": 254,
+    "assigned_len_km": 299.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 263.0,
+    "drawn_predicted_min": 195.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000K35605",
+    "code": "K356",
+    "class": "K",
+    "from": "娄底",
+    "to": "怀化",
+    "via": [
+      "涟源",
+      "新化",
+      "溆浦"
+    ],
+    "minutes": 254,
+    "assigned_len_km": 299.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 263.0,
+    "drawn_predicted_min": 195.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000K4860T",
+    "code": "K486",
+    "class": "K",
+    "from": "娄底",
+    "to": "怀化",
+    "via": [
+      "涟源",
+      "新化",
+      "溆浦"
+    ],
+    "minutes": 254,
+    "assigned_len_km": 299.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 263.0,
+    "drawn_predicted_min": 195.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "490000K8780S",
+    "code": "K875",
+    "class": "K",
+    "from": "娄底",
+    "to": "怀化",
+    "via": [
+      "新化"
+    ],
+    "minutes": 277,
+    "assigned_len_km": 315.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 283.0,
+    "drawn_predicted_min": 195.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000Z28700",
+    "code": "Z287",
+    "class": "Z",
+    "from": "娄底",
+    "to": "怀化",
+    "via": [
+      "涟源",
+      "新化",
+      "溆浦"
+    ],
+    "minutes": 260,
+    "assigned_len_km": 299.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 263.0,
+    "drawn_predicted_min": 195.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000Z5318",
+    "code": "Z53",
+    "class": "Z",
+    "from": "娄底",
+    "to": "怀化",
+    "via": [
+      "涟源",
+      "新化",
+      "溆浦"
+    ],
+    "minutes": 252,
+    "assigned_len_km": 299.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 263.0,
+    "drawn_predicted_min": 195.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000Z770T",
+    "code": "Z77",
+    "class": "Z",
+    "from": "娄底",
+    "to": "怀化",
+    "via": [
+      "涟源",
+      "新化",
+      "溆浦"
+    ],
+    "minutes": 257,
+    "assigned_len_km": 299.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 263.0,
+    "drawn_predicted_min": 195.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "390000K14602",
+    "code": "K146",
+    "class": "K",
+    "from": "安康",
+    "to": "西安东",
+    "via": [
+      "引镇"
+    ],
+    "minutes": 145,
+    "assigned_len_km": 212.3,
+    "drawn_len_km": 203.3,
+    "predicted_min": 137.0,
+    "drawn_predicted_min": 96.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K2460I",
+    "code": "K246",
+    "class": "K",
+    "from": "安康",
+    "to": "西安东",
+    "via": [
+      "引镇"
+    ],
+    "minutes": 153,
+    "assigned_len_km": 212.3,
+    "drawn_len_km": 203.3,
+    "predicted_min": 137.0,
+    "drawn_predicted_min": 96.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "770000K50804",
+    "code": "K508",
+    "class": "K",
+    "from": "安康",
+    "to": "西安东",
+    "via": [
+      "引镇"
+    ],
+    "minutes": 152,
+    "assigned_len_km": 212.3,
+    "drawn_len_km": 203.3,
+    "predicted_min": 137.0,
+    "drawn_predicted_min": 96.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K9980M",
+    "code": "K998",
+    "class": "K",
+    "from": "安康",
+    "to": "西安东",
+    "via": [
+      "引镇"
+    ],
+    "minutes": 152,
+    "assigned_len_km": 212.3,
+    "drawn_len_km": 203.3,
+    "predicted_min": 137.0,
+    "drawn_predicted_min": 96.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000D95406",
+    "code": "D951",
+    "class": "D",
+    "from": "宜昌东",
+    "to": "汉口",
+    "via": [
+      "荆州"
+    ],
+    "minutes": 103,
+    "assigned_len_km": 292.4,
+    "drawn_len_km": 318.8,
+    "predicted_min": 106.0,
+    "drawn_predicted_min": 89.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "770000D9580H",
+    "code": "D955",
+    "class": "D",
+    "from": "宜昌东",
+    "to": "汉口",
+    "via": [
+      "荆州"
+    ],
+    "minutes": 103,
+    "assigned_len_km": 292.4,
+    "drawn_len_km": 318.8,
+    "predicted_min": 106.0,
+    "drawn_predicted_min": 89.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000T15202",
+    "code": "T152",
+    "class": "T",
+    "from": "宜春",
+    "to": "南昌",
+    "via": [
+      "新余",
+      "樟树",
+      "丰城",
+      "向塘"
+    ],
+    "minutes": 141,
+    "assigned_len_km": 213.0,
+    "drawn_len_km": 191.3,
+    "predicted_min": 135.0,
+    "drawn_predicted_min": 69.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "380000D23201",
+    "code": "D232",
+    "class": "D",
+    "from": "宣城",
+    "to": "杭州",
+    "via": [
+      "长兴南",
+      "德清西"
+    ],
+    "minutes": 142,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 146.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "39000K14400B",
+    "code": "K1437",
+    "class": "K",
+    "from": "宣城",
+    "to": "杭州",
+    "via": [
+      "长兴南",
+      "德清西"
+    ],
+    "minutes": 164,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 146.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "41000K290813",
+    "code": "K2908",
+    "class": "K",
+    "from": "宣城",
+    "to": "杭州",
+    "via": [
+      "长兴南",
+      "德清西"
+    ],
+    "minutes": 146,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 146.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "850000K3063A",
+    "code": "K306",
+    "class": "K",
+    "from": "宣城",
+    "to": "杭州",
+    "via": [
+      "长兴南",
+      "德清西"
+    ],
+    "minutes": 160,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 146.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "110000K1280K",
+    "code": "K128",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 125,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "18000K19860J",
+    "code": "K1983",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 120,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "12000K255010",
+    "code": "K2550",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 120,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "1200000K280M",
+    "code": "K28",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 137,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000K34200",
+    "code": "K342",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 120,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "120000K34612",
+    "code": "K347",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 120,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "040000K49003",
+    "code": "K490",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "110000K9580E",
+    "code": "K955",
+    "class": "K",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 120,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "130000T36910",
+    "code": "T368",
+    "class": "T",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 120,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000Z36807",
+    "code": "Z365",
+    "class": "Z",
+    "from": "山海关",
+    "to": "唐山",
+    "via": [
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 110,
+    "assigned_len_km": 186.6,
+    "drawn_len_km": 174.2,
+    "predicted_min": 123.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000K2715",
+    "code": "K27",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 278,
+    "assigned_len_km": 419.5,
+    "drawn_len_km": 387.0,
+    "predicted_min": 270.0,
+    "drawn_predicted_min": 133.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000K33600",
+    "code": "K337",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳",
+    "via": [
+      "兴城",
+      "锦州",
+      "沟帮子",
+      "盘锦",
+      "海城",
+      "鞍山",
+      "辽阳"
+    ],
+    "minutes": 296,
+    "assigned_len_km": 480.9,
+    "drawn_len_km": 387.0,
+    "predicted_min": 321.0,
+    "drawn_predicted_min": 133.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "24000K102329",
+    "code": "K1023",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "绥中",
+      "兴城",
+      "葫芦岛",
+      "锦州",
+      "盘锦",
+      "海城",
+      "鞍山",
+      "辽阳"
+    ],
+    "minutes": 298,
+    "assigned_len_km": 482.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 319.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "77000K106434",
+    "code": "K1061",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 262,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "410000K12600",
+    "code": "K127",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 257,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "24000K13030Y",
+    "code": "K1303",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 279,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "26000K152601",
+    "code": "K1527",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 238,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000K3490V",
+    "code": "K349",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 282,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000K3830P",
+    "code": "K383",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 244,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K5460Y",
+    "code": "K546",
+    "class": "K",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 247,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000T12400",
+    "code": "T121",
+    "class": "T",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 274,
+    "assigned_len_km": 410.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000Z17609",
+    "code": "Z177",
+    "class": "Z",
+    "from": "山海关",
+    "to": "沈阳北",
+    "via": [
+      "葫芦岛北",
+      "锦州南",
+      "盘锦",
+      "鞍山西",
+      "辽阳"
+    ],
+    "minutes": 179,
+    "assigned_len_km": 457.7,
+    "drawn_len_km": 387.5,
+    "predicted_min": 159.0,
+    "drawn_predicted_min": 130.0,
+    "flags": "F1"
+  },
+  {
+    "set": 1,
+    "train_no": "760000C79404",
+    "code": "C794",
+    "class": "C",
+    "from": "峨眉",
+    "to": "成都东",
+    "via": [
+      "成都南"
+    ],
+    "minutes": 70,
+    "assigned_len_km": 142.1,
+    "drawn_len_km": 157.4,
+    "predicted_min": 74.0,
+    "drawn_predicted_min": 57.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000D16604",
+    "code": "D166",
+    "class": "D",
+    "from": "峨眉",
+    "to": "成都东",
+    "via": [
+      "成都南"
+    ],
+    "minutes": 70,
+    "assigned_len_km": 142.1,
+    "drawn_len_km": 157.4,
+    "predicted_min": 74.0,
+    "drawn_predicted_min": 57.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "640000Z29705",
+    "code": "Z296",
+    "class": "Z",
+    "from": "常德",
+    "to": "长沙",
+    "via": [
+      "益阳"
+    ],
+    "minutes": 123,
+    "assigned_len_km": 197.2,
+    "drawn_len_km": 179.0,
+    "predicted_min": 112.0,
+    "drawn_predicted_min": 56.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K1180L",
+    "code": "K118",
+    "class": "K",
+    "from": "广元",
+    "to": "汉中",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 162,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 165.0,
+    "drawn_predicted_min": 46.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K2460I",
+    "code": "K246",
+    "class": "K",
+    "from": "广元",
+    "to": "汉中",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 167,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 165.0,
+    "drawn_predicted_min": 46.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K2920O",
+    "code": "K292",
+    "class": "K",
+    "from": "广元",
+    "to": "汉中",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 170,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 165.0,
+    "drawn_predicted_min": 46.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K3520X",
+    "code": "K352",
+    "class": "K",
+    "from": "广元",
+    "to": "汉中",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 166,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 165.0,
+    "drawn_predicted_min": 46.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000Z31602",
+    "code": "Z316",
+    "class": "Z",
+    "from": "广元",
+    "to": "汉中",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 165,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 165.0,
+    "drawn_predicted_min": 46.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000Z39008",
+    "code": "Z391",
+    "class": "Z",
+    "from": "广元",
+    "to": "汉中",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 172,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 165.0,
+    "drawn_predicted_min": 46.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "250000K2131U",
+    "code": "K213",
+    "class": "K",
+    "from": "延安",
+    "to": "西安",
+    "via": [
+      "富县东",
+      "洛川北"
+    ],
+    "minutes": 197,
+    "assigned_len_km": 331.4,
+    "drawn_len_km": 313.7,
+    "predicted_min": 191.0,
+    "drawn_predicted_min": 107.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "330000K77105",
+    "code": "K771",
+    "class": "K",
+    "from": "延安",
+    "to": "西安",
+    "via": [
+      "富县东",
+      "洛川北"
+    ],
+    "minutes": 206,
+    "assigned_len_km": 331.4,
+    "drawn_len_km": 313.7,
+    "predicted_min": 191.0,
+    "drawn_predicted_min": 107.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000D1530",
+    "code": "D15",
+    "class": "D",
+    "from": "延安",
+    "to": "西安东",
+    "via": [
+      "西安"
+    ],
+    "minutes": 143,
+    "assigned_len_km": 312.5,
+    "drawn_len_km": 298.8,
+    "predicted_min": 156.0,
+    "drawn_predicted_min": 76.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a000K127607",
+    "code": "K1277",
+    "class": "K",
+    "from": "张家口",
+    "to": "天镇",
+    "via": [
+      "柴沟堡"
+    ],
+    "minutes": 85,
+    "assigned_len_km": 90.1,
+    "drawn_len_km": 84.6,
+    "predicted_min": 86.0,
+    "drawn_predicted_min": 38.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "16000K75280R",
+    "code": "K7528",
+    "class": "K",
+    "from": "彰武",
+    "to": "沈阳",
+    "via": [
+      "泡子"
+    ],
+    "minutes": 133,
+    "assigned_len_km": 161.8,
+    "drawn_len_km": 113.5,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "110000K9580E",
+    "code": "K955",
+    "class": "K",
+    "from": "彰武",
+    "to": "沈阳",
+    "via": [
+      "泡子"
+    ],
+    "minutes": 133,
+    "assigned_len_km": 161.8,
+    "drawn_len_km": 113.5,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000T3040D",
+    "code": "T304",
+    "class": "T",
+    "from": "彰武",
+    "to": "沈阳",
+    "via": [
+      "泡子"
+    ],
+    "minutes": 125,
+    "assigned_len_km": 161.8,
+    "drawn_len_km": 113.5,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "24000K103502",
+    "code": "K1035",
+    "class": "K",
+    "from": "徐州",
+    "to": "宿州",
+    "via": [
+      "淮北"
+    ],
+    "minutes": 92,
+    "assigned_len_km": 113.1,
+    "drawn_len_km": 74.9,
+    "predicted_min": 97.0,
+    "drawn_predicted_min": 37.0,
+    "flags": "F4"
+  },
+  {
+    "set": 0,
+    "train_no": "130000T13115",
+    "code": "T131",
+    "class": "T",
+    "from": "徐州",
+    "to": "蚌埠",
+    "via": [
+      "萧县",
+      "淮北",
+      "宿州"
+    ],
+    "minutes": 131,
+    "assigned_len_km": 203.4,
+    "drawn_len_km": 165.2,
+    "predicted_min": 146.0,
+    "drawn_predicted_min": 83.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "80000K123610",
+    "code": "K1236",
+    "class": "K",
+    "from": "怀化",
+    "to": "娄底",
+    "via": [
+      "新化"
+    ],
+    "minutes": 252,
+    "assigned_len_km": 315.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 183.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "7m0000K48802",
+    "code": "K485",
+    "class": "K",
+    "from": "怀化",
+    "to": "娄底",
+    "via": [
+      "新化"
+    ],
+    "minutes": 251,
+    "assigned_len_km": 315.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 183.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "770000K8030A",
+    "code": "K803",
+    "class": "K",
+    "from": "怀化",
+    "to": "娄底",
+    "via": [
+      "新化"
+    ],
+    "minutes": 251,
+    "assigned_len_km": 315.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 183.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "800000Z3260B",
+    "code": "Z327",
+    "class": "Z",
+    "from": "怀化",
+    "to": "娄底",
+    "via": [
+      "冷水江东"
+    ],
+    "minutes": 254,
+    "assigned_len_km": 299.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 254.0,
+    "drawn_predicted_min": 183.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "7800000Z7806",
+    "code": "Z78",
+    "class": "Z",
+    "from": "怀化",
+    "to": "娄底",
+    "via": [
+      "新化"
+    ],
+    "minutes": 251,
+    "assigned_len_km": 315.0,
+    "drawn_len_km": 282.9,
+    "predicted_min": 253.0,
+    "drawn_predicted_min": 183.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "770000K51701",
+    "code": "K516",
+    "class": "K",
+    "from": "怀化",
+    "to": "株洲",
+    "via": [
+      "新化",
+      "娄底"
+    ],
+    "minutes": 372,
+    "assigned_len_km": 432.5,
+    "drawn_len_km": 409.2,
+    "predicted_min": 361.0,
+    "drawn_predicted_min": 293.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "780000K8760B",
+    "code": "K876",
+    "class": "K",
+    "from": "怀化",
+    "to": "株洲",
+    "via": [
+      "新化",
+      "娄底"
+    ],
+    "minutes": 378,
+    "assigned_len_km": 432.5,
+    "drawn_len_km": 409.2,
+    "predicted_min": 361.0,
+    "drawn_predicted_min": 293.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000D25504",
+    "code": "D255",
+    "class": "D",
+    "from": "成都东",
+    "to": "峨眉",
+    "via": [
+      "夹江"
+    ],
+    "minutes": 72,
+    "assigned_len_km": 140.5,
+    "drawn_len_km": 157.4,
+    "predicted_min": 75.0,
+    "drawn_predicted_min": 60.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "76000G244501",
+    "code": "G2445",
+    "class": "G",
+    "from": "成都东",
+    "to": "重庆东",
+    "via": [
+      "重庆西"
+    ],
+    "minutes": 101,
+    "assigned_len_km": 374.4,
+    "drawn_len_km": 352.3,
+    "predicted_min": 103.0,
+    "drawn_predicted_min": 175.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "76000G244702",
+    "code": "G2447",
+    "class": "G",
+    "from": "成都东",
+    "to": "重庆东",
+    "via": [
+      "重庆西"
+    ],
+    "minutes": 111,
+    "assigned_len_km": 374.4,
+    "drawn_len_km": 352.3,
+    "predicted_min": 103.0,
+    "drawn_predicted_min": 175.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "76000D22080L",
+    "code": "D2208",
+    "class": "D",
+    "from": "成都东",
+    "to": "重庆北",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 114,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 116.0,
+    "drawn_predicted_min": 84.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "76000D512850",
+    "code": "D5128",
+    "class": "D",
+    "from": "成都东",
+    "to": "重庆北",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 114,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 116.0,
+    "drawn_predicted_min": 84.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000D95406",
+    "code": "D951",
+    "class": "D",
+    "from": "成都东",
+    "to": "重庆北",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 113,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 116.0,
+    "drawn_predicted_min": 84.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000D84601",
+    "code": "D846",
+    "class": "D",
+    "from": "成都东",
+    "to": "重庆西",
+    "via": [
+      "自贡",
+      "泸州",
+      "江津北"
+    ],
+    "minutes": 118,
+    "assigned_len_km": 388.7,
+    "drawn_len_km": 302.1,
+    "predicted_min": 115.0,
+    "drawn_predicted_min": 73.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000D86201",
+    "code": "D862",
+    "class": "D",
+    "from": "成都东",
+    "to": "重庆西",
+    "via": [
+      "自贡",
+      "泸州",
+      "江津北"
+    ],
+    "minutes": 123,
+    "assigned_len_km": 388.7,
+    "drawn_len_km": 302.1,
+    "predicted_min": 115.0,
+    "drawn_predicted_min": 73.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "76000G335501",
+    "code": "G3355",
+    "class": "G",
+    "from": "成都东",
+    "to": "重庆西",
+    "via": [
+      "自贡",
+      "泸州",
+      "江津北"
+    ],
+    "minutes": 109,
+    "assigned_len_km": 388.7,
+    "drawn_len_km": 302.1,
+    "predicted_min": 115.0,
+    "drawn_predicted_min": 73.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K5300Z",
+    "code": "K531",
+    "class": "K",
+    "from": "成都西",
+    "to": "达州",
+    "via": [
+      "遂宁",
+      "南充北",
+      "蓬安西",
+      "仪陇",
+      "巴中东",
+      "平昌"
+    ],
+    "minutes": 318,
+    "assigned_len_km": 512.8,
+    "drawn_len_km": 387.9,
+    "predicted_min": 297.0,
+    "drawn_predicted_min": 200.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5f000K198453",
+    "code": "K1985",
+    "class": "K",
+    "from": "扬州",
+    "to": "明光",
+    "via": [
+      "南京"
+    ],
+    "minutes": 131,
+    "assigned_len_km": 220.5,
+    "drawn_len_km": 187.4,
+    "predicted_min": 131.0,
+    "drawn_predicted_min": 114.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000T1260F",
+    "code": "T127",
+    "class": "T",
+    "from": "旬阳",
+    "to": "十堰",
+    "via": [
+      "白河县"
+    ],
+    "minutes": 138,
+    "assigned_len_km": 156.6,
+    "drawn_len_km": 148.9,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 147.0,
+    "flags": "F4"
+  },
+  {
+    "set": 0,
+    "train_no": "24000K107146",
+    "code": "K1071",
+    "class": "K",
+    "from": "曹县",
+    "to": "亳州",
+    "via": [
+      "商丘"
+    ],
+    "minutes": 105,
+    "assigned_len_km": 121.3,
+    "drawn_len_km": 112.0,
+    "predicted_min": 100.0,
+    "drawn_predicted_min": 63.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a0000K30807",
+    "code": "K305",
+    "class": "K",
+    "from": "杭州",
+    "to": "宣城",
+    "via": [
+      "长兴南"
+    ],
+    "minutes": 145,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 143.0,
+    "drawn_predicted_min": 69.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a0000K34808",
+    "code": "K348",
+    "class": "K",
+    "from": "杭州",
+    "to": "宣城",
+    "via": [
+      "长兴南"
+    ],
+    "minutes": 143,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 143.0,
+    "drawn_predicted_min": 69.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5q0000K75102",
+    "code": "K751",
+    "class": "K",
+    "from": "杭州",
+    "to": "宣城",
+    "via": [
+      "长兴南"
+    ],
+    "minutes": 153,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 143.0,
+    "drawn_predicted_min": 69.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000Z59404",
+    "code": "Z595",
+    "class": "Z",
+    "from": "杭州",
+    "to": "宣城",
+    "via": [
+      "长兴南"
+    ],
+    "minutes": 155,
+    "assigned_len_km": 218.9,
+    "drawn_len_km": 203.8,
+    "predicted_min": 143.0,
+    "drawn_predicted_min": 69.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000D10000",
+    "code": "D100",
+    "class": "D",
+    "from": "杭州东",
+    "to": "上海南",
+    "via": [
+      "海宁",
+      "嘉兴",
+      "上海松江"
+    ],
+    "minutes": 90,
+    "assigned_len_km": 172.5,
+    "drawn_len_km": 155.6,
+    "predicted_min": 90.0,
+    "drawn_predicted_min": 50.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "570000D17203",
+    "code": "D172",
+    "class": "D",
+    "from": "杭州东",
+    "to": "上海南",
+    "via": [
+      "海宁",
+      "嘉兴",
+      "上海松江"
+    ],
+    "minutes": 95,
+    "assigned_len_km": 172.5,
+    "drawn_len_km": 155.6,
+    "predicted_min": 90.0,
+    "drawn_predicted_min": 50.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5l0000G26900",
+    "code": "G269",
+    "class": "G",
+    "from": "杭州东",
+    "to": "南昌东",
+    "via": [
+      "义乌"
+    ],
+    "minutes": 125,
+    "assigned_len_km": 616.7,
+    "drawn_len_km": 567.2,
+    "predicted_min": 129.0,
+    "drawn_predicted_min": 206.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "560000D20403",
+    "code": "D204",
+    "class": "D",
+    "from": "杭州南",
+    "to": "上海松江",
+    "via": [
+      "杭州东",
+      "海宁",
+      "嘉兴"
+    ],
+    "minutes": 88,
+    "assigned_len_km": 160.9,
+    "drawn_len_km": 144.0,
+    "predicted_min": 86.0,
+    "drawn_predicted_min": 52.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "55000K15560A",
+    "code": "K1556",
+    "class": "K",
+    "from": "柳州",
+    "to": "南宁",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 188,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 194.0,
+    "drawn_predicted_min": 72.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5q0000T38102",
+    "code": "T381",
+    "class": "T",
+    "from": "柳州",
+    "to": "南宁",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 212,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 194.0,
+    "drawn_predicted_min": 72.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "330000Z3380Z",
+    "code": "Z335",
+    "class": "Z",
+    "from": "柳州",
+    "to": "南宁",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 184,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 194.0,
+    "drawn_predicted_min": 72.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "110000Z39808",
+    "code": "Z398",
+    "class": "Z",
+    "from": "柳州",
+    "to": "南宁",
+    "via": [
+      "来宾"
+    ],
+    "minutes": 186,
+    "assigned_len_km": 254.0,
+    "drawn_len_km": 223.5,
+    "predicted_min": 194.0,
+    "drawn_predicted_min": 72.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5q0000K57501",
+    "code": "K575",
+    "class": "K",
+    "from": "株洲",
+    "to": "邵阳",
+    "via": [
+      "衡山",
+      "衡阳"
+    ],
+    "minutes": 209,
+    "assigned_len_km": 288.9,
+    "drawn_len_km": 226.5,
+    "predicted_min": 185.0,
+    "drawn_predicted_min": 166.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "71000G234030",
+    "code": "G2340",
+    "class": "G",
+    "from": "桂林北",
+    "to": "东安东",
+    "via": [
+      "全州南"
+    ],
+    "minutes": 59,
+    "assigned_len_km": 170.3,
+    "drawn_len_km": 192.4,
+    "predicted_min": 63.0,
+    "drawn_predicted_min": 87.0,
+    "flags": "F4"
+  },
+  {
+    "set": 0,
+    "train_no": "6c000D18680B",
+    "code": "D1868",
+    "class": "D",
+    "from": "桂林西",
+    "to": "贵阳北",
+    "via": [
+      "三江南",
+      "都匀东",
+      "龙洞堡"
+    ],
+    "minutes": 134,
+    "assigned_len_km": 429.1,
+    "drawn_len_km": 410.2,
+    "predicted_min": 125.0,
+    "drawn_predicted_min": 117.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a000K13960J",
+    "code": "K1397",
+    "class": "K",
+    "from": "永康南",
+    "to": "金华南",
+    "via": [
+      "武义"
+    ],
+    "minutes": 52,
+    "assigned_len_km": 49.3,
+    "drawn_len_km": 45.8,
+    "predicted_min": 46.0,
+    "drawn_predicted_min": 21.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a0000K34808",
+    "code": "K348",
+    "class": "K",
+    "from": "永康南",
+    "to": "金华南",
+    "via": [
+      "武义"
+    ],
+    "minutes": 39,
+    "assigned_len_km": 49.3,
+    "drawn_len_km": 45.8,
+    "predicted_min": 46.0,
+    "drawn_predicted_min": 21.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5q0000K35103",
+    "code": "K351",
+    "class": "K",
+    "from": "汉中",
+    "to": "广元",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 169,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 168.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "580000Z3920L",
+    "code": "Z392",
+    "class": "Z",
+    "from": "汉中",
+    "to": "广元",
+    "via": [
+      "阳平关"
+    ],
+    "minutes": 163,
+    "assigned_len_km": 181.6,
+    "drawn_len_km": 138.2,
+    "predicted_min": 168.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000D95204",
+    "code": "D952",
+    "class": "D",
+    "from": "汉口",
+    "to": "宜昌东",
+    "via": [
+      "潜江"
+    ],
+    "minutes": 104,
+    "assigned_len_km": 292.4,
+    "drawn_len_km": 318.8,
+    "predicted_min": 107.0,
+    "drawn_predicted_min": 89.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000D956A0",
+    "code": "D956",
+    "class": "D",
+    "from": "汉口",
+    "to": "宜昌东",
+    "via": [
+      "潜江"
+    ],
+    "minutes": 103,
+    "assigned_len_km": 292.4,
+    "drawn_len_km": 318.8,
+    "predicted_min": 107.0,
+    "drawn_predicted_min": 89.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "1200000K280M",
+    "code": "K28",
+    "class": "K",
+    "from": "沈阳",
+    "to": "山海关",
+    "via": [
+      "锦州"
+    ],
+    "minutes": 274,
+    "assigned_len_km": 419.5,
+    "drawn_len_km": 387.0,
+    "predicted_min": 271.0,
+    "drawn_predicted_min": 137.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "120000T3020B",
+    "code": "T302",
+    "class": "T",
+    "from": "沈阳",
+    "to": "彰武",
+    "via": [
+      "泡子"
+    ],
+    "minutes": 113,
+    "assigned_len_km": 161.8,
+    "drawn_len_km": 113.5,
+    "predicted_min": 126.0,
+    "drawn_predicted_min": 47.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000T1701",
+    "code": "T17",
+    "class": "T",
+    "from": "沈阳北",
+    "to": "哈尔滨",
+    "via": [
+      "四平",
+      "长春",
+      "双城堡"
+    ],
+    "minutes": 302,
+    "assigned_len_km": 542.4,
+    "drawn_len_km": 517.6,
+    "predicted_min": 286.0,
+    "drawn_predicted_min": 128.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000T4731",
+    "code": "T47",
+    "class": "T",
+    "from": "沈阳北",
+    "to": "哈尔滨",
+    "via": [
+      "四平",
+      "长春",
+      "双城堡"
+    ],
+    "minutes": 301,
+    "assigned_len_km": 542.4,
+    "drawn_len_km": 517.6,
+    "predicted_min": 286.0,
+    "drawn_predicted_min": 128.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000Z23820",
+    "code": "Z238",
+    "class": "Z",
+    "from": "沈阳北",
+    "to": "唐山",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "锦州南",
+      "葫芦岛北",
+      "绥中北",
+      "山海关",
+      "秦皇岛"
+    ],
+    "minutes": 273,
+    "assigned_len_km": 637.3,
+    "drawn_len_km": 551.9,
+    "predicted_min": 269.0,
+    "drawn_predicted_min": 180.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "11000K10240A",
+    "code": "K1024",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "沟帮子",
+      "锦州"
+    ],
+    "minutes": 279,
+    "assigned_len_km": 419.5,
+    "drawn_len_km": 387.5,
+    "predicted_min": 277.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "05000K13040L",
+    "code": "K1304",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "西柳",
+      "盘锦",
+      "锦州"
+    ],
+    "minutes": 297,
+    "assigned_len_km": 485.6,
+    "drawn_len_km": 387.5,
+    "predicted_min": 313.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "040000K9800H",
+    "code": "K980",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "沟帮子",
+      "锦州"
+    ],
+    "minutes": 277,
+    "assigned_len_km": 419.5,
+    "drawn_len_km": 387.5,
+    "predicted_min": 277.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "110000T1220Q",
+    "code": "T122",
+    "class": "T",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "葫芦岛北"
+    ],
+    "minutes": 204,
+    "assigned_len_km": 463.1,
+    "drawn_len_km": 387.5,
+    "predicted_min": 215.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "030000T22805",
+    "code": "T228",
+    "class": "T",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "葫芦岛北"
+    ],
+    "minutes": 238,
+    "assigned_len_km": 463.1,
+    "drawn_len_km": 387.5,
+    "predicted_min": 215.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "030000T2980M",
+    "code": "T298",
+    "class": "T",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "葫芦岛北"
+    ],
+    "minutes": 223,
+    "assigned_len_km": 463.1,
+    "drawn_len_km": 387.5,
+    "predicted_min": 215.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000Z1780I",
+    "code": "Z175",
+    "class": "Z",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "葫芦岛北"
+    ],
+    "minutes": 209,
+    "assigned_len_km": 463.1,
+    "drawn_len_km": 387.5,
+    "predicted_min": 215.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "110000Z32809",
+    "code": "Z328",
+    "class": "Z",
+    "from": "沈阳北",
+    "to": "山海关",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "葫芦岛北"
+    ],
+    "minutes": 223,
+    "assigned_len_km": 463.1,
+    "drawn_len_km": 387.5,
+    "predicted_min": 215.0,
+    "drawn_predicted_min": 131.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "010000K34001",
+    "code": "K340",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "秦皇岛",
+    "via": [
+      "大虎山",
+      "沟帮子",
+      "锦州",
+      "葫芦岛",
+      "绥中",
+      "山海关"
+    ],
+    "minutes": 314,
+    "assigned_len_km": 439.5,
+    "drawn_len_km": 407.3,
+    "predicted_min": 291.0,
+    "drawn_predicted_min": 145.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "040000K3810B",
+    "code": "K384",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "绥中北",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "锦州南",
+      "葫芦岛北"
+    ],
+    "minutes": 206,
+    "assigned_len_km": 400.4,
+    "drawn_len_km": 324.8,
+    "predicted_min": 194.0,
+    "drawn_predicted_min": 112.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "020000K5480G",
+    "code": "K545",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "绥中北",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "锦州南",
+      "葫芦岛北"
+    ],
+    "minutes": 198,
+    "assigned_len_km": 400.4,
+    "drawn_len_km": 324.8,
+    "predicted_min": 194.0,
+    "drawn_predicted_min": 112.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000K9760M",
+    "code": "K976",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "葫芦岛北",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦",
+      "锦州南"
+    ],
+    "minutes": 178,
+    "assigned_len_km": 341.0,
+    "drawn_len_km": 265.5,
+    "predicted_min": 172.0,
+    "drawn_predicted_min": 93.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "120000Z1880I",
+    "code": "Z188",
+    "class": "Z",
+    "from": "沈阳北",
+    "to": "辽阳",
+    "via": [
+      "沈阳",
+      "沈阳南"
+    ],
+    "minutes": 46,
+    "assigned_len_km": 70.1,
+    "drawn_len_km": 67.7,
+    "predicted_min": 34.0,
+    "drawn_predicted_min": 26.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "03000K101404",
+    "code": "K1014",
+    "class": "K",
+    "from": "沈阳北",
+    "to": "锦州南",
+    "via": [
+      "辽阳",
+      "鞍山",
+      "海城",
+      "盘锦"
+    ],
+    "minutes": 165,
+    "assigned_len_km": 298.2,
+    "drawn_len_km": 222.6,
+    "predicted_min": 155.0,
+    "drawn_predicted_min": 79.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K2460I",
+    "code": "K246",
+    "class": "K",
+    "from": "泰州",
+    "to": "扬州",
+    "via": [
+      "高邮"
+    ],
+    "minutes": 61,
+    "assigned_len_km": 132.1,
+    "drawn_len_km": 66.0,
+    "predicted_min": 61.0,
+    "drawn_predicted_min": 35.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "850000K42084",
+    "code": "K420",
+    "class": "K",
+    "from": "泰州",
+    "to": "扬州",
+    "via": [
+      "高邮"
+    ],
+    "minutes": 63,
+    "assigned_len_km": 132.1,
+    "drawn_len_km": 66.0,
+    "predicted_min": 61.0,
+    "drawn_predicted_min": 35.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "39000K16240C",
+    "code": "K1624",
+    "class": "K",
+    "from": "涡阳",
+    "to": "徐州",
+    "via": [
+      "宿州"
+    ],
+    "minutes": 134,
+    "assigned_len_km": 186.0,
+    "drawn_len_km": 142.2,
+    "predicted_min": 126.0,
+    "drawn_predicted_min": 102.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000G8870G",
+    "code": "G887",
+    "class": "G",
+    "from": "淮安东",
+    "to": "海安",
+    "via": [
+      "阜宁南",
+      "盐城"
+    ],
+    "minutes": 55,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 231.5,
+    "predicted_min": 62.0,
+    "drawn_predicted_min": 84.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "490000K2860T",
+    "code": "K286",
+    "class": "K",
+    "from": "烟台",
+    "to": "莱阳",
+    "via": [
+      "徐家店"
+    ],
+    "minutes": 80,
+    "assigned_len_km": 106.4,
+    "drawn_len_km": 99.8,
+    "predicted_min": 83.0,
+    "drawn_predicted_min": 40.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000T12400",
+    "code": "T121",
+    "class": "T",
+    "from": "白洋淀",
+    "to": "天津",
+    "via": [
+      "霸州"
+    ],
+    "minutes": 111,
+    "assigned_len_km": 131.3,
+    "drawn_len_km": 120.6,
+    "predicted_min": 112.0,
+    "drawn_predicted_min": 50.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000T37001",
+    "code": "T367",
+    "class": "T",
+    "from": "白洋淀",
+    "to": "天津",
+    "via": [
+      "霸州"
+    ],
+    "minutes": 116,
+    "assigned_len_km": 131.3,
+    "drawn_len_km": 120.6,
+    "predicted_min": 112.0,
+    "drawn_predicted_min": 50.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000Z1860I",
+    "code": "Z187",
+    "class": "Z",
+    "from": "盘锦",
+    "to": "海城",
+    "via": [
+      "大石桥"
+    ],
+    "minutes": 114,
+    "assigned_len_km": 117.4,
+    "drawn_len_km": 72.5,
+    "predicted_min": 101.0,
+    "drawn_predicted_min": 59.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2500000D5200",
+    "code": "D53",
+    "class": "D",
+    "from": "石家庄",
+    "to": "武昌",
+    "via": [
+      "郑州"
+    ],
+    "minutes": 493,
+    "assigned_len_km": 915.4,
+    "drawn_len_km": 878.0,
+    "predicted_min": 481.0,
+    "drawn_predicted_min": 218.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000D4301",
+    "code": "D43",
+    "class": "D",
+    "from": "石家庄",
+    "to": "西安",
+    "via": [
+      "洛阳"
+    ],
+    "minutes": 549,
+    "assigned_len_km": 899.6,
+    "drawn_len_km": 857.7,
+    "predicted_min": 548.0,
+    "drawn_predicted_min": 223.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a000K13960J",
+    "code": "K1397",
+    "class": "K",
+    "from": "石家庄北",
+    "to": "太原",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 134,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 94.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "56000K180633",
+    "code": "K1807",
+    "class": "K",
+    "from": "石家庄北",
+    "to": "太原",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 143,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 94.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "490000K8820L",
+    "code": "K883",
+    "class": "K",
+    "from": "石家庄北",
+    "to": "太原",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 124,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 94.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "040000K9800H",
+    "code": "K980",
+    "class": "K",
+    "from": "石家庄北",
+    "to": "太原",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 155,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 94.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "240000T17515",
+    "code": "T175",
+    "class": "T",
+    "from": "石家庄北",
+    "to": "太原",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 130,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 94.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "490000Z35602",
+    "code": "Z357",
+    "class": "Z",
+    "from": "石家庄北",
+    "to": "太原",
+    "via": [
+      "太原南"
+    ],
+    "minutes": 155,
+    "assigned_len_km": 206.5,
+    "drawn_len_km": 189.9,
+    "predicted_min": 138.0,
+    "drawn_predicted_min": 94.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "58000D224210",
+    "code": "D2242",
+    "class": "D",
+    "from": "福州",
+    "to": "三明北",
+    "via": [
+      "永泰"
+    ],
+    "minutes": 69,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 56.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "58000D32660W",
+    "code": "D3266",
+    "class": "D",
+    "from": "福州",
+    "to": "三明北",
+    "via": [
+      "永泰"
+    ],
+    "minutes": 70,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 56.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "58000D65020S",
+    "code": "D6502",
+    "class": "D",
+    "from": "福州",
+    "to": "三明北",
+    "via": [
+      "永泰"
+    ],
+    "minutes": 70,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 56.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "58000D651021",
+    "code": "D6510",
+    "class": "D",
+    "from": "福州",
+    "to": "三明北",
+    "via": [
+      "永泰"
+    ],
+    "minutes": 69,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 56.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "58000G333601",
+    "code": "G3333",
+    "class": "G",
+    "from": "福州",
+    "to": "三明北",
+    "via": [
+      "永泰"
+    ],
+    "minutes": 70,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 56.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "580000Z21804",
+    "code": "Z218",
+    "class": "Z",
+    "from": "福州",
+    "to": "三明北",
+    "via": [
+      "永泰"
+    ],
+    "minutes": 85,
+    "assigned_len_km": 194.4,
+    "drawn_len_km": 180.6,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 56.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000Z830E",
+    "code": "Z83",
+    "class": "Z",
+    "from": "秦皇岛",
+    "to": "哈尔滨",
+    "via": [
+      "山海关",
+      "绥中",
+      "兴城",
+      "葫芦岛",
+      "锦州",
+      "沟帮子",
+      "大虎山",
+      "沈阳北",
+      "四平",
+      "长春"
+    ],
+    "minutes": 522,
+    "assigned_len_km": 969.6,
+    "drawn_len_km": 924.9,
+    "predicted_min": 544.0,
+    "drawn_predicted_min": 277.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "04000G119404",
+    "code": "G1195",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "0h000G12020L",
+    "code": "G1203",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 39,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "0h000G12060U",
+    "code": "G1206",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "12000G12220H",
+    "code": "G1223",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "12000G12260P",
+    "code": "G1226",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 40,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "12000G12300L",
+    "code": "G1230",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "02000G12390D",
+    "code": "G1239",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "1g000G12510C",
+    "code": "G1251",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "04000G12620I",
+    "code": "G1263",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "12000G12720N",
+    "code": "G1273",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "0h000G12760H",
+    "code": "G1276",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "12000G12880K",
+    "code": "G1285",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "1g000G12920D",
+    "code": "G1289",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 39,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "1g000G133701",
+    "code": "G1340",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 39,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "1c000G260401",
+    "code": "G2601",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "1g000G262207",
+    "code": "G2622",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "12000G26300C",
+    "code": "G2631",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 39,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "12000G265004",
+    "code": "G2647",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "25000G627808",
+    "code": "G6278",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "25000G62900P",
+    "code": "G6291",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "25000G89280D",
+    "code": "G8928",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 40,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "25000G893206",
+    "code": "G8932",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "1g00000G9800",
+    "code": "G99",
+    "class": "G",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "北戴河"
+    ],
+    "minutes": 38,
+    "assigned_len_km": 148.5,
+    "drawn_len_km": 154.4,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F5"
+  },
+  {
+    "set": 0,
+    "train_no": "110000Z3840I",
+    "code": "Z384",
+    "class": "Z",
+    "from": "秦皇岛",
+    "to": "唐山",
+    "via": [
+      "滦县"
+    ],
+    "minutes": 114,
+    "assigned_len_km": 166.8,
+    "drawn_len_km": 154.4,
+    "predicted_min": 109.0,
+    "drawn_predicted_min": 98.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "110000Z1020G",
+    "code": "Z102",
+    "class": "Z",
+    "from": "秦皇岛",
+    "to": "天津",
+    "via": [
+      "北戴河",
+      "滦县",
+      "唐山"
+    ],
+    "minutes": 157,
+    "assigned_len_km": 281.0,
+    "drawn_len_km": 264.8,
+    "predicted_min": 139.0,
+    "drawn_predicted_min": 70.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5n0000K2300Z",
+    "code": "K230",
+    "class": "K",
+    "from": "肇庆",
+    "to": "茂名",
+    "via": [
+      "茂名西"
+    ],
+    "minutes": 240,
+    "assigned_len_km": 269.4,
+    "drawn_len_km": 249.2,
+    "predicted_min": 222.0,
+    "drawn_predicted_min": 201.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5q0000K51103",
+    "code": "K511",
+    "class": "K",
+    "from": "肇庆",
+    "to": "茂名",
+    "via": [
+      "茂名西"
+    ],
+    "minutes": 229,
+    "assigned_len_km": 269.4,
+    "drawn_len_km": 249.2,
+    "predicted_min": 222.0,
+    "drawn_predicted_min": 201.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "56000K12640D",
+    "code": "K1264",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 96,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a000K13960J",
+    "code": "K1397",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 88,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5a0000K30807",
+    "code": "K305",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 88,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000K39208",
+    "code": "K389",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 94,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000K65607",
+    "code": "K656",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 90,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000K6750J",
+    "code": "K678",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 88,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5q0000K75102",
+    "code": "K751",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 96,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "54000K8412E1",
+    "code": "K8412",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 88,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5e000K851205",
+    "code": "K8512",
+    "class": "K",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 88,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000T23601",
+    "code": "T237",
+    "class": "T",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 92,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "560000Z59404",
+    "code": "Z595",
+    "class": "Z",
+    "from": "芜湖",
+    "to": "合肥",
+    "via": [
+      "巢湖"
+    ],
+    "minutes": 98,
+    "assigned_len_km": 139.7,
+    "drawn_len_km": 128.1,
+    "predicted_min": 89.0,
+    "drawn_predicted_min": 48.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000Z17202",
+    "code": "Z172",
+    "class": "Z",
+    "from": "葫芦岛北",
+    "to": "沈阳北",
+    "via": [
+      "锦州南",
+      "盘锦",
+      "鞍山西",
+      "辽阳"
+    ],
+    "minutes": 132,
+    "assigned_len_km": 335.6,
+    "drawn_len_km": 265.5,
+    "predicted_min": 117.0,
+    "drawn_predicted_min": 92.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000K37208",
+    "code": "K373",
+    "class": "K",
+    "from": "蚌埠",
+    "to": "徐州",
+    "via": [
+      "淮北"
+    ],
+    "minutes": 124,
+    "assigned_len_km": 203.4,
+    "drawn_len_km": 165.2,
+    "predicted_min": 137.0,
+    "drawn_predicted_min": 97.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "530000K71601",
+    "code": "K717",
+    "class": "K",
+    "from": "衡水",
+    "to": "天津",
+    "via": [
+      "德州",
+      "沧州"
+    ],
+    "minutes": 184,
+    "assigned_len_km": 294.9,
+    "drawn_len_km": 262.8,
+    "predicted_min": 185.0,
+    "drawn_predicted_min": 162.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "390000K92601",
+    "code": "K926",
+    "class": "K",
+    "from": "衡水",
+    "to": "天津",
+    "via": [
+      "德州",
+      "沧州"
+    ],
+    "minutes": 186,
+    "assigned_len_km": 294.9,
+    "drawn_len_km": 262.8,
+    "predicted_min": 185.0,
+    "drawn_predicted_min": 162.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5q000K112701",
+    "code": "K1127",
+    "class": "K",
+    "from": "衢州",
+    "to": "九江",
+    "via": [
+      "上饶",
+      "鹰潭",
+      "向塘",
+      "南昌"
+    ],
+    "minutes": 221,
+    "assigned_len_km": 499.7,
+    "drawn_len_km": 332.9,
+    "predicted_min": 230.0,
+    "drawn_predicted_min": 164.0,
+    "flags": "F1"
+  },
+  {
+    "set": 1,
+    "train_no": "560000C48220",
+    "code": "C482",
+    "class": "C",
+    "from": "衢州",
+    "to": "金华",
+    "via": [
+      "金华南"
+    ],
+    "minutes": 43,
+    "assigned_len_km": 121.4,
+    "drawn_len_km": 78.2,
+    "predicted_min": 40.0,
+    "drawn_predicted_min": 26.0,
+    "flags": "F1"
+  },
+  {
+    "set": 1,
+    "train_no": "560000C49212",
+    "code": "C492",
+    "class": "C",
+    "from": "衢州",
+    "to": "金华",
+    "via": [
+      "金华南"
+    ],
+    "minutes": 45,
+    "assigned_len_km": 121.4,
+    "drawn_len_km": 78.2,
+    "predicted_min": 40.0,
+    "drawn_predicted_min": 26.0,
+    "flags": "F1"
+  },
+  {
+    "set": 1,
+    "train_no": "560000C63400",
+    "code": "C634",
+    "class": "C",
+    "from": "衢州",
+    "to": "金华",
+    "via": [
+      "金华南"
+    ],
+    "minutes": 48,
+    "assigned_len_km": 121.4,
+    "drawn_len_km": 78.2,
+    "predicted_min": 40.0,
+    "drawn_predicted_min": 26.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "570000D17203",
+    "code": "D172",
+    "class": "D",
+    "from": "衢州",
+    "to": "金华",
+    "via": [
+      "金华南"
+    ],
+    "minutes": 44,
+    "assigned_len_km": 121.4,
+    "drawn_len_km": 78.2,
+    "predicted_min": 40.0,
+    "drawn_predicted_min": 26.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000T1020O",
+    "code": "T102",
+    "class": "T",
+    "from": "衢州",
+    "to": "金华",
+    "via": [
+      "金华南"
+    ],
+    "minutes": 49,
+    "assigned_len_km": 121.4,
+    "drawn_len_km": 78.2,
+    "predicted_min": 40.0,
+    "drawn_predicted_min": 26.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "800000Z2880P",
+    "code": "Z288",
+    "class": "Z",
+    "from": "衢州",
+    "to": "金华",
+    "via": [
+      "金华南"
+    ],
+    "minutes": 43,
+    "assigned_len_km": 121.4,
+    "drawn_len_km": 78.2,
+    "predicted_min": 40.0,
+    "drawn_predicted_min": 26.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "88000K13100N",
+    "code": "K1310",
+    "class": "K",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 172,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "88000K21880T",
+    "code": "K2188",
+    "class": "K",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 169,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000K31201",
+    "code": "K312",
+    "class": "K",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 165,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000K3900D",
+    "code": "K390",
+    "class": "K",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 168,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000K9880B",
+    "code": "K988",
+    "class": "K",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 172,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "940000T2700B",
+    "code": "T270",
+    "class": "T",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 168,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000Z1660D",
+    "code": "Z166",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 159,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "8800000Z220A",
+    "code": "Z22",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 158,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000Z22409",
+    "code": "Z224",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 166,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "8b0000Z26100",
+    "code": "Z260",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 159,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000Z2660P",
+    "code": "Z263",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 166,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000Z2740G",
+    "code": "Z274",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 152,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000Z3240B",
+    "code": "Z324",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 166,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000Z36206",
+    "code": "Z362",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 172,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "880000Z3780B",
+    "code": "Z378",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州",
+    "via": [
+      "海石湾",
+      "兰州西"
+    ],
+    "minutes": 156,
+    "assigned_len_km": 209.9,
+    "drawn_len_km": 198.6,
+    "predicted_min": 160.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000Z1800K",
+    "code": "Z180",
+    "class": "Z",
+    "from": "西宁",
+    "to": "兰州西",
+    "via": [
+      "海石湾"
+    ],
+    "minutes": 147,
+    "assigned_len_km": 199.9,
+    "drawn_len_km": 188.5,
+    "predicted_min": 150.0,
+    "drawn_predicted_min": 60.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "41000K15740E",
+    "code": "K1571",
+    "class": "K",
+    "from": "西安",
+    "to": "延安",
+    "via": [
+      "洛川北"
+    ],
+    "minutes": 200,
+    "assigned_len_km": 333.8,
+    "drawn_len_km": 313.7,
+    "predicted_min": 201.0,
+    "drawn_predicted_min": 136.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "760000K5460Y",
+    "code": "K546",
+    "class": "K",
+    "from": "西安",
+    "to": "延安",
+    "via": [
+      "洛川北"
+    ],
+    "minutes": 184,
+    "assigned_len_km": 333.8,
+    "drawn_len_km": 313.7,
+    "predicted_min": 201.0,
+    "drawn_predicted_min": 136.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "4100000D4405",
+    "code": "D44",
+    "class": "D",
+    "from": "西安",
+    "to": "石家庄",
+    "via": [
+      "洛阳",
+      "新乡",
+      "安阳",
+      "邯郸"
+    ],
+    "minutes": 546,
+    "assigned_len_km": 899.6,
+    "drawn_len_km": 857.7,
+    "predicted_min": 556.0,
+    "drawn_predicted_min": 218.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "7600000D1600",
+    "code": "D16",
+    "class": "D",
+    "from": "西安东",
+    "to": "延安",
+    "via": [
+      "蒲城东",
+      "富县东"
+    ],
+    "minutes": 147,
+    "assigned_len_km": 312.5,
+    "drawn_len_km": 298.8,
+    "predicted_min": 157.0,
+    "drawn_predicted_min": 79.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "800000K69214",
+    "code": "K692",
+    "class": "K",
+    "from": "西安东",
+    "to": "延安",
+    "via": [
+      "黄陵南",
+      "富县东"
+    ],
+    "minutes": 202,
+    "assigned_len_km": 349.7,
+    "drawn_len_km": 298.8,
+    "predicted_min": 190.0,
+    "drawn_predicted_min": 79.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5n0000K2300Z",
+    "code": "K230",
+    "class": "K",
+    "from": "贵港",
+    "to": "南宁",
+    "via": [
+      "黎塘"
+    ],
+    "minutes": 162,
+    "assigned_len_km": 173.0,
+    "drawn_len_km": 151.1,
+    "predicted_min": 174.0,
+    "drawn_predicted_min": 53.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "78000G376100",
+    "code": "G3761",
+    "class": "G",
+    "from": "贵阳北",
+    "to": "桂林西",
+    "via": [
+      "龙洞堡",
+      "都匀东",
+      "从江"
+    ],
+    "minutes": 122,
+    "assigned_len_km": 429.1,
+    "drawn_len_km": 410.2,
+    "predicted_min": 120.0,
+    "drawn_predicted_min": 111.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "410000D12401",
+    "code": "D124",
+    "class": "D",
+    "from": "郑州",
+    "to": "商丘",
+    "via": [
+      "开封"
+    ],
+    "minutes": 95,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 98.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000D13001",
+    "code": "D130",
+    "class": "D",
+    "from": "郑州",
+    "to": "商丘",
+    "via": [
+      "开封"
+    ],
+    "minutes": 98,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 98.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "850000D29000",
+    "code": "D290",
+    "class": "D",
+    "from": "郑州",
+    "to": "商丘",
+    "via": [
+      "开封"
+    ],
+    "minutes": 95,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 98.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000Z1060C",
+    "code": "Z106",
+    "class": "Z",
+    "from": "郑州",
+    "to": "商丘",
+    "via": [
+      "开封"
+    ],
+    "minutes": 95,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 98.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000Z3060B",
+    "code": "Z306",
+    "class": "Z",
+    "from": "郑州",
+    "to": "商丘",
+    "via": [
+      "开封"
+    ],
+    "minutes": 95,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 98.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "930000Z36206",
+    "code": "Z362",
+    "class": "Z",
+    "from": "郑州",
+    "to": "商丘",
+    "via": [
+      "开封"
+    ],
+    "minutes": 97,
+    "assigned_len_km": 216.7,
+    "drawn_len_km": 199.0,
+    "predicted_min": 98.0,
+    "drawn_predicted_min": 64.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "24000000D300",
+    "code": "D3",
+    "class": "D",
+    "from": "郑州",
+    "to": "汉口",
+    "via": [
+      "信阳"
+    ],
+    "minutes": 264,
+    "assigned_len_km": 513.0,
+    "drawn_len_km": 485.1,
+    "predicted_min": 271.0,
+    "drawn_predicted_min": 135.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "2400000D9502",
+    "code": "D95",
+    "class": "D",
+    "from": "郑州",
+    "to": "汉口",
+    "via": [
+      "信阳"
+    ],
+    "minutes": 264,
+    "assigned_len_km": 513.0,
+    "drawn_len_km": 485.1,
+    "predicted_min": 271.0,
+    "drawn_predicted_min": 135.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "71000G161604",
+    "code": "G1616",
+    "class": "G",
+    "from": "都匀东",
+    "to": "贵阳北",
+    "via": [
+      "贵安"
+    ],
+    "minutes": 60,
+    "assigned_len_km": 166.9,
+    "drawn_len_km": 114.5,
+    "predicted_min": 65.0,
+    "drawn_predicted_min": 47.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "62000G244602",
+    "code": "G2446",
+    "class": "G",
+    "from": "重庆东",
+    "to": "成都东",
+    "via": [
+      "重庆西"
+    ],
+    "minutes": 99,
+    "assigned_len_km": 370.0,
+    "drawn_len_km": 352.3,
+    "predicted_min": 100.0,
+    "drawn_predicted_min": 111.0,
+    "flags": "F4"
+  },
+  {
+    "set": 0,
+    "train_no": "5u000D223610",
+    "code": "D2236",
+    "class": "D",
+    "from": "重庆北",
+    "to": "成都东",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 115,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 119.0,
+    "drawn_predicted_min": 80.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "58000D224210",
+    "code": "D2242",
+    "class": "D",
+    "from": "重庆北",
+    "to": "成都东",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 115,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 119.0,
+    "drawn_predicted_min": 80.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5l000D237304",
+    "code": "D2373",
+    "class": "D",
+    "from": "重庆北",
+    "to": "成都东",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 115,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 119.0,
+    "drawn_predicted_min": 80.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "390000D3610C",
+    "code": "D361",
+    "class": "D",
+    "from": "重庆北",
+    "to": "成都东",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 115,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 119.0,
+    "drawn_predicted_min": 80.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000D95204",
+    "code": "D952",
+    "class": "D",
+    "from": "重庆北",
+    "to": "成都东",
+    "via": [
+      "潼南"
+    ],
+    "minutes": 115,
+    "assigned_len_km": 298.0,
+    "drawn_len_km": 320.2,
+    "predicted_min": 119.0,
+    "drawn_predicted_min": 80.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "7700000T100A",
+    "code": "T10",
+    "class": "T",
+    "from": "重庆西",
+    "to": "广安",
+    "via": [
+      "重庆北"
+    ],
+    "minutes": 104,
+    "assigned_len_km": 141.0,
+    "drawn_len_km": 124.5,
+    "predicted_min": 102.0,
+    "drawn_predicted_min": 85.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "6e0000D84800",
+    "code": "D848",
+    "class": "D",
+    "from": "重庆西",
+    "to": "成都东",
+    "via": [
+      "泸州",
+      "自贡"
+    ],
+    "minutes": 118,
+    "assigned_len_km": 388.2,
+    "drawn_len_km": 302.1,
+    "predicted_min": 112.0,
+    "drawn_predicted_min": 69.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "6i0000D86400",
+    "code": "D864",
+    "class": "D",
+    "from": "重庆西",
+    "to": "成都东",
+    "via": [
+      "泸州",
+      "自贡"
+    ],
+    "minutes": 118,
+    "assigned_len_km": 388.2,
+    "drawn_len_km": 302.1,
+    "predicted_min": 112.0,
+    "drawn_predicted_min": 69.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "64000K13740S",
+    "code": "K1374",
+    "class": "K",
+    "from": "金华",
+    "to": "杭州南",
+    "via": [
+      "义乌",
+      "诸暨",
+      "杭州"
+    ],
+    "minutes": 107,
+    "assigned_len_km": 182.8,
+    "drawn_len_km": 150.1,
+    "predicted_min": 117.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "6b0000K51243",
+    "code": "K512",
+    "class": "K",
+    "from": "金华",
+    "to": "杭州南",
+    "via": [
+      "义乌",
+      "诸暨",
+      "杭州"
+    ],
+    "minutes": 117,
+    "assigned_len_km": 182.8,
+    "drawn_len_km": 150.1,
+    "predicted_min": 117.0,
+    "drawn_predicted_min": 45.0,
+    "flags": "F1"
+  },
+  {
+    "set": 1,
+    "train_no": "560000C48220",
+    "code": "C482",
+    "class": "C",
+    "from": "金华",
+    "to": "诸暨",
+    "via": [
+      "金华南"
+    ],
+    "minutes": 42,
+    "assigned_len_km": 99.0,
+    "drawn_len_km": 95.0,
+    "predicted_min": 42.0,
+    "drawn_predicted_min": 32.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h000K10620L",
+    "code": "K1062",
+    "class": "K",
+    "from": "锦州",
+    "to": "唐山",
+    "via": [
+      "葫芦岛",
+      "兴城",
+      "绥中",
+      "山海关",
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 288,
+    "assigned_len_km": 369.8,
+    "drawn_len_km": 347.4,
+    "predicted_min": 255.0,
+    "drawn_predicted_min": 169.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "020000K55406",
+    "code": "K551",
+    "class": "K",
+    "from": "锦州",
+    "to": "唐山",
+    "via": [
+      "葫芦岛",
+      "兴城",
+      "绥中",
+      "山海关",
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 253,
+    "assigned_len_km": 369.8,
+    "drawn_len_km": 347.4,
+    "predicted_min": 255.0,
+    "drawn_predicted_min": 169.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "0h0000K7040L",
+    "code": "K701",
+    "class": "K",
+    "from": "锦州",
+    "to": "唐山",
+    "via": [
+      "葫芦岛",
+      "兴城",
+      "绥中",
+      "山海关",
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 250,
+    "assigned_len_km": 369.8,
+    "drawn_len_km": 347.4,
+    "predicted_min": 255.0,
+    "drawn_predicted_min": 169.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "030000K9400Q",
+    "code": "K940",
+    "class": "K",
+    "from": "锦州",
+    "to": "唐山",
+    "via": [
+      "葫芦岛",
+      "兴城",
+      "绥中",
+      "山海关",
+      "秦皇岛",
+      "滦县"
+    ],
+    "minutes": 268,
+    "assigned_len_km": 369.8,
+    "drawn_len_km": 347.4,
+    "predicted_min": 255.0,
+    "drawn_predicted_min": 169.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5n0000K9740E",
+    "code": "K975",
+    "class": "K",
+    "from": "锦州",
+    "to": "沈阳",
+    "via": [
+      "沟帮子",
+      "盘锦",
+      "海城",
+      "鞍山",
+      "辽阳"
+    ],
+    "minutes": 204,
+    "assigned_len_km": 297.9,
+    "drawn_len_km": 236.5,
+    "predicted_min": 193.0,
+    "drawn_predicted_min": 144.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "5f000K198453",
+    "code": "K1985",
+    "class": "K",
+    "from": "长春",
+    "to": "吉林",
+    "via": [
+      "九台"
+    ],
+    "minutes": 100,
+    "assigned_len_km": 130.7,
+    "drawn_len_km": 110.6,
+    "predicted_min": 100.0,
+    "drawn_predicted_min": 44.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "550000Z51602",
+    "code": "Z517",
+    "class": "Z",
+    "from": "长春",
+    "to": "吉林",
+    "via": [
+      "九台"
+    ],
+    "minutes": 99,
+    "assigned_len_km": 130.7,
+    "drawn_len_km": 110.6,
+    "predicted_min": 100.0,
+    "drawn_predicted_min": 44.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000K9320K",
+    "code": "K932",
+    "class": "K",
+    "from": "长沙",
+    "to": "宜昌东",
+    "via": [
+      "当阳"
+    ],
+    "minutes": 393,
+    "assigned_len_km": 501.3,
+    "drawn_len_km": 435.9,
+    "predicted_min": 394.0,
+    "drawn_predicted_min": 321.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "65000K926804",
+    "code": "K9268",
+    "class": "K",
+    "from": "长沙",
+    "to": "常德",
+    "via": [
+      "开福寺",
+      "观沙岭",
+      "谷山",
+      "益阳"
+    ],
+    "minutes": 121,
+    "assigned_len_km": 197.6,
+    "drawn_len_km": 179.0,
+    "predicted_min": 115.0,
+    "drawn_predicted_min": 57.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "650000Z33208",
+    "code": "Z332",
+    "class": "Z",
+    "from": "长沙",
+    "to": "常德",
+    "via": [
+      "开福寺",
+      "观沙岭",
+      "谷山",
+      "益阳"
+    ],
+    "minutes": 114,
+    "assigned_len_km": 197.6,
+    "drawn_len_km": 179.0,
+    "predicted_min": 115.0,
+    "drawn_predicted_min": 57.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "42000K112850",
+    "code": "K1128",
+    "class": "K",
+    "from": "阳新",
+    "to": "九江",
+    "via": [
+      "瑞昌"
+    ],
+    "minutes": 75,
+    "assigned_len_km": 97.4,
+    "drawn_len_km": 91.3,
+    "predicted_min": 73.0,
+    "drawn_predicted_min": 35.0,
+    "flags": "F4"
+  },
+  {
+    "set": 0,
+    "train_no": "560000D18202",
+    "code": "D182",
+    "class": "D",
+    "from": "青岛西",
+    "to": "青岛北",
+    "via": [
+      "城阳"
+    ],
+    "minutes": 46,
+    "assigned_len_km": 83.7,
+    "drawn_len_km": 74.0,
+    "predicted_min": 47.0,
+    "drawn_predicted_min": 37.0,
+    "flags": "F1"
+  },
+  {
+    "set": 0,
+    "train_no": "87000K108730",
+    "code": "K1086",
+    "class": "K",
+    "from": "黄石",
+    "to": "南昌",
+    "via": [
+      "阳新"
+    ],
+    "minutes": 167,
+    "assigned_len_km": 232.6,
+    "drawn_len_km": 245.6,
+    "predicted_min": 153.0,
+    "drawn_predicted_min": 134.0,
+    "flags": "F1 F4"
+  },
+  {
+    "set": 0,
+    "train_no": "62000G245000",
+    "code": "G2450",
+    "class": "G",
+    "from": "重庆东",
+    "to": "成都东",
+    "via": [
+      "重庆西"
+    ],
+    "minutes": 111,
+    "assigned_len_km": 374.4,
+    "drawn_len_km": 352.3,
+    "predicted_min": 100.0,
+    "drawn_predicted_min": 99.0,
+    "flags": "F4-hand-adjudicated"
+  }
+]

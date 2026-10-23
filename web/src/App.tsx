@@ -1,0 +1,868 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { decompress as brotliDecompress } from "brotli/decompress.js";
+import type {
+  AtlasData,
+  CityPointVM,
+  DecodedAtlas,
+  DestVM,
+  Direction,
+  DistUnit,
+  InMapData,
+  InTablesData,
+  OriginVM,
+  OutMapData,
+  OutTablesData,
+  SharedData,
+  SrcVM,
+} from "./types";
+import {
+  buildOrigin,
+  classIndex,
+  filterOriginByClasses,
+  FLOW_CLASSES,
+  prepAtlas,
+} from "./lib";
+import CityPicker from "./components/CityPicker";
+import MapCanvas, { type MapApi } from "./components/MapCanvas";
+import Legend, { type LegendHandle } from "./components/Legend";
+import DestinationPanel from "./components/DestinationPanel";
+import DeparturesTable from "./components/DeparturesTable";
+import Footnote from "./components/Footnote";
+
+// The v2 atlas dataset ships in five split files (same origin order
+// throughout): the shared tables and geometry, and per direction a map
+// file (identity, aggregates, flows) and a tables file (the per-train
+// rows). Loading is staged so the map paints before the table data
+// arrives:
+//   phase 1 — shared + out-map in parallel (plus in-map when the
+//     persisted direction is inbound): the map renders and is fully
+//     interactive on this data alone;
+//   phase 2 — the active direction's tables file, fetched immediately
+//     behind phase 1; the departures table and histograms fill in
+//     when it lands;
+//   phase 3 — the other direction loads the same way on the first
+//     flip: its map file (paint), then its tables behind it.
+// Every file is fetched at most once and cached for the session; each
+// merge goes into the origins in place, by index.
+const SHARED_URL = "assets/atlas-v2-shared.json";
+const OUT_MAP_URL = "assets/atlas-v2-out-map.json";
+const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
+const IN_MAP_URL = "assets/atlas-v2-in-map.json";
+const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
+
+// The v2 files carry no `about` blurb (v1 embedded one in the data);
+// the text is unchanged apart from the geometry-precision sentence,
+// which now states the v2 encoding.
+const ABOUT =
+  "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. " +
+  "Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); " +
+  "every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. " +
+  "Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) " +
+  "and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. " +
+  "Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e4 precision, [lat, lon] order.";
+
+/* Fetch one dataset file, preferring its Brotli twin (the .br asset):
+   1. if the server negotiates the encoding itself (the .br response
+      arrives with a Content-Encoding), the browser decompresses
+      transparently and the bytes parse as JSON directly;
+   2. else decompress the .br bytes through DecompressionStream
+      ("brotli") where the browser offers it (Chrome's headless shell,
+      for one, does not);
+   3. else decompress with the bundled pure-JS Brotli decoder
+      (the `brotli` package's decode half, ~91 KB minified) — the path
+      this runtime takes: phase 1 transfers shared .br (520,344 B) +
+      out-map .br (571,195 B) ≈ 1.09 MB, decoded byte-identical to the
+      plain splits;
+   4. else fall back to the plain .json split. */
+async function fetchData<T>(jsonUrl: string): Promise<T> {
+  try {
+    const res = await fetch(jsonUrl + ".br");
+    if (res.ok) {
+      const buf = await res.arrayBuffer();
+      const u8 = new Uint8Array(buf);
+      if (u8.length > 0 && u8[0] !== 0x3c) {
+        if (u8[0] === 0x7b) {
+          return JSON.parse(new TextDecoder().decode(u8)) as T;
+        }
+        const DS = (
+          window as unknown as {
+            DecompressionStream?: typeof DecompressionStream;
+          }
+        ).DecompressionStream;
+        if (DS) {
+          try {
+            const body = new Response(buf).body;
+            if (body) {
+              const stream = body.pipeThrough(
+                new DS("brotli" as CompressionFormat),
+              );
+              const text = await new Response(stream).text();
+              return JSON.parse(text) as T;
+            }
+          } catch {
+            /* no native Brotli stream: use the bundled decoder */
+          }
+        }
+        const out = brotliDecompress(u8);
+        return JSON.parse(new TextDecoder().decode(out)) as T;
+      }
+    }
+  } catch {
+    /* fall through to the plain split */
+  }
+  const r = await fetch(jsonUrl);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return (await r.json()) as T;
+}
+function initialDistUnit(): DistUnit {
+  try {
+    if (window.localStorage && localStorage.getItem("crfa-dist-unit") === "mi")
+      return "mi";
+  } catch {
+    /* storage unavailable: stay on km */
+  }
+  return "km";
+}
+
+function initialInfra(): boolean {
+  try {
+    if (window.localStorage && localStorage.getItem("crfa-infra") === "1")
+      return true;
+  } catch {
+    /* storage unavailable: stay in flow-width mode */
+  }
+  return false;
+}
+
+function initialDirection(): Direction {
+  try {
+    if (window.localStorage && localStorage.getItem("crfa-direction") === "in")
+      return "in";
+  } catch {
+    /* storage unavailable: stay outbound */
+  }
+  return "out";
+}
+
+function initialDark(): boolean {
+  return !!(
+    window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+}
+
+export default function App() {
+  const [atlas, setAtlas] = useState<DecodedAtlas | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [originIdx, setOriginIdx] = useState(-1);
+  // Staged-file readiness. Each file is merged into the origins in
+  // place (object identity is preserved, so a merge never looks like
+  // an origin switch to the map), then its flag rebuilds the
+  // view-model. Out-map needs no flag: the atlas itself is built from
+  // it in phase 1.
+  const [outTablesReady, setOutTablesReady] = useState(false);
+  const [inMapReady, setInMapReady] = useState(false);
+  const [inTablesReady, setInTablesReady] = useState(false);
+  const [inMapLoading, setInMapLoading] = useState(false);
+  const atlasRef = useRef<DecodedAtlas | null>(null);
+  const outTablesRef = useRef<OutTablesData | null>(null);
+  const inMapDataRef = useRef<InMapData | null>(null);
+  const inTablesRef = useRef<InTablesData | null>(null);
+  const flightsRef = useRef({
+    outTables: false,
+    inMap: false,
+    inTables: false,
+  });
+  const [showNetwork, setShowNetwork] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
+  const [showInfra, setShowInfraState] = useState<boolean>(initialInfra);
+  const [distUnit, setDistUnitState] = useState<DistUnit>(initialDistUnit);
+  const [direction, setDirectionState] = useState<Direction>(initialDirection);
+  // Pinning a city also filters the table below the map to that city
+  // (destinations outbound, sources inbound); the filter lives exactly
+  // as long as the panel does.
+  const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [dark, setDark] = useState<boolean>(initialDark);
+
+  const mapRef = useRef<MapApi | null>(null);
+  const legendRef = useRef<LegendHandle | null>(null);
+
+  /* ---------- staged loads (phases 2 and 3) ---------- */
+  // Each staged file merges into the origins in place once fetched,
+  // then its ready flag rebuilds the view-model. A fetch that beats
+  // the atlas (a flip during phase 1) is applied by the init effect
+  // instead. Failures clear the in-flight mark and leave the ready
+  // flag false; the next direction switch retries.
+  const applyOutTables = () => {
+    const d = outTablesRef.current;
+    const at = atlasRef.current;
+    if (!d || !at) return;
+    for (let i = 0; i < d.origins.length; i++)
+      Object.assign(at.data.origins[i], d.origins[i]);
+    setOutTablesReady(true);
+  };
+  const applyInMap = () => {
+    const d = inMapDataRef.current;
+    const at = atlasRef.current;
+    if (!d || !at) return;
+    setInMapLoading(false);
+    for (let i = 0; i < d.origins.length; i++)
+      Object.assign(at.data.origins[i], d.origins[i]);
+    setInMapReady(true);
+    // The tables follow the map file, as in every stage.
+    ensureInTables();
+  };
+  const applyInTables = () => {
+    const d = inTablesRef.current;
+    const at = atlasRef.current;
+    if (!d || !at) return;
+    for (let i = 0; i < d.origins.length; i++)
+      Object.assign(at.data.origins[i], d.origins[i]);
+    setInTablesReady(true);
+  };
+
+  const ensureOutTables = () => {
+    if (outTablesRef.current) {
+      applyOutTables();
+      return;
+    }
+    if (flightsRef.current.outTables) return;
+    flightsRef.current.outTables = true;
+    fetchData<OutTablesData>(OUT_TABLES_URL)
+      .then((d) => {
+        outTablesRef.current = d;
+        flightsRef.current.outTables = false;
+        applyOutTables();
+      })
+      .catch(() => {
+        flightsRef.current.outTables = false;
+      });
+  };
+  const ensureInTables = () => {
+    if (inTablesRef.current) {
+      applyInTables();
+      return;
+    }
+    if (flightsRef.current.inTables) return;
+    flightsRef.current.inTables = true;
+    fetchData<InTablesData>(IN_TABLES_URL)
+      .then((d) => {
+        inTablesRef.current = d;
+        flightsRef.current.inTables = false;
+        applyInTables();
+      })
+      .catch(() => {
+        flightsRef.current.inTables = false;
+      });
+  };
+  // Phase 3 for inbound: the map file first (paint), and only once it
+  // has landed do its tables follow behind it, as in phases 1–2.
+  const ensureInMap = () => {
+    if (inMapDataRef.current) {
+      applyInMap();
+      ensureInTables();
+      return;
+    }
+    if (flightsRef.current.inMap) return;
+    flightsRef.current.inMap = true;
+    setInMapLoading(true);
+    fetchData<InMapData>(IN_MAP_URL)
+      .then((d) => {
+        inMapDataRef.current = d;
+        flightsRef.current.inMap = false;
+        applyInMap(); // chains the tables fetch once the atlas exists
+      })
+      .catch(() => {
+        flightsRef.current.inMap = false;
+        setInMapLoading(false);
+      });
+  };
+
+  /* ---------- load (phase 1) ---------- */
+  useEffect(() => {
+    let cancelled = false;
+    // A persisted inbound direction paints its map in phase 1 too, so
+    // in-map joins the parallel fetch; identity fields still come from
+    // out-map, which always loads.
+    const persistedIn = initialDirection() === "in";
+    const phase1: [
+      Promise<SharedData>,
+      Promise<OutMapData>,
+      Promise<InMapData | null> | null,
+    ] = [
+      fetchData<SharedData>(SHARED_URL),
+      fetchData<OutMapData>(OUT_MAP_URL),
+      // A failed in-map fetch must not sink phase 1: it resolves to
+      // null here and the staged loader retries it below.
+      persistedIn
+        ? fetchData<InMapData>(IN_MAP_URL).catch(() => null)
+        : null,
+    ];
+    Promise.all(phase1)
+      .then(([shared, outMap, inMap]) => {
+        if (cancelled) return;
+        const data: AtlasData = {
+          ...shared,
+          about: ABOUT,
+          origins: outMap.origins,
+        };
+        const decoded = prepAtlas(data);
+        let def = 0;
+        for (let j = 0; j < data.origins.length; j++) {
+          if (data.origins[j].zh === "成都") {
+            def = j;
+            break;
+          }
+        }
+        atlasRef.current = decoded;
+        // Any staged file that beat the atlas here merges in now.
+        if (inMap) {
+          inMapDataRef.current = inMap;
+          applyInMap();
+        } else if (inMapDataRef.current) applyInMap();
+        if (outTablesRef.current) applyOutTables();
+        if (inTablesRef.current) applyInTables();
+        setAtlas(decoded);
+        setOriginIdx(def);
+        // Phase 2: the active direction's tables go out immediately
+        // behind phase 1, no user action needed. (A persisted-inbound
+        // session's tables were already chained by applyInMap above;
+        // only a failed phase-1 in-map fetch retries, the staged way.)
+        if (persistedIn) {
+          if (!inMap && !inMapDataRef.current) ensureInMap();
+        } else ensureOutTables();
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setLoadError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cur: OriginVM | null = useMemo(
+    () => (atlas && originIdx >= 0 ? buildOrigin(atlas, originIdx) : null),
+    // The ready flags flip as each staged file merges in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [atlas, originIdx, outTablesReady, inMapReady, inTablesReady],
+  );
+
+  const viewCur: OriginVM | null = useMemo(
+    () => (cur ? filterOriginByClasses(cur, selectedClasses) : null),
+    [cur, selectedClasses],
+  );
+
+  const availableClasses: Set<string> = useMemo(() => {
+    if (!cur) return new Set(FLOW_CLASSES);
+
+    const originClasses = new Set<string>();
+    const flows = direction === "out" ? cur.flows : cur.inFlows;
+    for (const f of flows) {
+      for (let i = 0; i < FLOW_CLASSES.length; i++) {
+        if (f.byClass[i] > 0) originClasses.add(FLOW_CLASSES[i]);
+      }
+    }
+    if (direction === "out" && outTablesReady && cur.deps) {
+      for (const d of cur.deps) {
+        originClasses.add(FLOW_CLASSES[classIndex(d.cls)]);
+      }
+    } else if (direction === "in" && inTablesReady && cur.arrs) {
+      for (const a of cur.arrs) {
+        originClasses.add(FLOW_CLASSES[classIndex(a.cls)]);
+      }
+    }
+
+    if (panelCity) {
+      const baseList: CityPointVM[] =
+        direction === "out" ? cur.dests : cur.srcs;
+      const baseCity = baseList.find((c) => c.idx === panelCity.idx);
+      if (direction === "out" && outTablesReady && baseCity) {
+        const set = new Set<string>();
+        for (const c of (baseCity as DestVM).calls) {
+          if (c.dep) set.add(FLOW_CLASSES[classIndex(c.dep.cls)]);
+        }
+        return set;
+      } else if (direction === "in" && inTablesReady && baseCity) {
+        const set = new Set<string>();
+        for (const c of (baseCity as SrcVM).inCalls) {
+          if (c.arr) set.add(FLOW_CLASSES[classIndex(c.arr.cls)]);
+        }
+        return set;
+      }
+      return originClasses;
+    }
+
+    return originClasses;
+  }, [cur, direction, panelCity, outTablesReady, inTablesReady]);
+
+  useEffect(() => {
+    setSelectedClasses((prev) => {
+      const next = prev.filter((c) => availableClasses.has(c));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [availableClasses]);
+
+  const toggleClass = (cls: string) => {
+    setSelectedClasses((prev) =>
+      prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls],
+    );
+  };
+
+  /* ---------- pinned city follows view-model rebuilds ---------- */
+  // Pinning a city keeps that city's view-model object; when a staged
+  // merge or class filter rebuilds the current origin, re-point the pin
+  // at the fresh object for the same city.
+  useEffect(() => {
+    if (!viewCur || !panelCity) return;
+    const list: CityPointVM[] =
+      direction === "out" ? viewCur.dests : viewCur.srcs;
+    const fresh = list.find((c) => c.idx === panelCity.idx);
+    if (fresh) {
+      if (fresh !== panelCity) setPanelCity(fresh);
+    } else if (cur && panelCity.trains !== 0) {
+      const baseList: CityPointVM[] =
+        direction === "out" ? cur.dests : cur.srcs;
+      const base = baseList.find((c) => c.idx === panelCity.idx);
+      if (base) {
+        setPanelCity(
+          direction === "out"
+            ? ({
+                ...(base as import("./types").DestVM),
+                trains: 0,
+                fast: 0,
+                endpoint: 0,
+                terminating: 0,
+                calls: [],
+              } as CityPointVM)
+            : ({
+                ...(base as import("./types").SrcVM),
+                trains: 0,
+                fast: 0,
+                endpoint: 0,
+                originating: 0,
+                inCalls: [],
+              } as CityPointVM),
+        );
+      }
+    }
+  }, [viewCur, cur, panelCity, direction]);
+
+  /* ---------- theme ---------- */
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setDark(mq.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+    };
+  }, []);
+
+  /* ---------- actions ---------- */
+  const selectOrigin = (idx: number) => {
+    setPanelCity(null);
+    setOriginIdx(idx);
+  };
+
+  const handleSelectDest = (d: CityPointVM | null) => {
+    if (d === null) {
+      setPanelCity(null);
+      return;
+    }
+    if (panelCity && panelCity.idx === d.idx) {
+      const origins = atlas?.data.origins || [];
+      const nextIdx = origins.findIndex((o) => o.zh === d.zh);
+      if (nextIdx >= 0) {
+        selectOrigin(nextIdx);
+        setSelectedClasses([]);
+        mapRef.current?.fitCountry();
+      } else {
+        setPanelCity(null);
+      }
+    } else {
+      setPanelCity(d);
+    }
+  };
+
+  const closePanel = () => {
+    setPanelCity(null);
+    if (mapRef.current) mapRef.current.clearStationHover();
+  };
+
+  // Switching direction keeps the selected city and re-renders from
+  // the other direction's fields; the pinned city and the table's
+  // filter/sort state reset (the table remounts on the direction key).
+  // The first flip to a direction stages its files: map first (paint),
+  // then its tables behind it; flipping back just ensures that
+  // direction's tables are on their way.
+  const setDirection = (d: Direction) => {
+    if (d === direction) return;
+    if (d === "in") ensureInMap();
+    else ensureOutTables();
+    setPanelCity(null);
+    setDirectionState(d);
+    try {
+      if (window.localStorage) localStorage.setItem("crfa-direction", d);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+
+  // Esc dismisses the city panel (and its table filter).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && panelCity) closePanel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelCity]);
+
+  // Infrastructure overlay: the proportional flows stay untouched and
+  // every flow section's track geometry is superimposed on top of them
+  // as one uniform thin line, so the true shape of the rail network
+  // reads through the traffic volume; persisted like the direction and
+  // distance-unit choices.
+  const toggleInfra = () => {
+    const v = !showInfra;
+    setShowInfraState(v);
+    try {
+      if (window.localStorage)
+        localStorage.setItem("crfa-infra", v ? "1" : "0");
+    } catch {
+      /* storage unavailable */
+    }
+  };
+
+  const setDistUnit = (u: DistUnit) => {
+    if (u === distUnit) return;
+    setDistUnitState(u);
+    try {
+      if (window.localStorage) localStorage.setItem("crfa-dist-unit", u);
+    } catch {
+      /* storage unavailable */
+    }
+    // The open panel re-renders from state; refresh a visible tooltip too.
+    if (mapRef.current) mapRef.current.refreshTooltip();
+  };
+
+  const origins = atlas ? atlas.data.origins : [];
+
+  return (
+    <>
+      <div className="stage">
+        <header>
+          <h1>
+            <svg
+              className="cr-logo"
+              viewBox="-100 -110 200 230"
+              aria-hidden="true"
+            >
+              <path
+                d="M34.899004 68.637159a77 77 0 1 0-69.798007 0l-14.151965 18.506415A100 100 0 0 1-18.99159-98.180036 10 10 0 0 1-10-109.544511a110 110 0 0 1 20 0 10 10 0 0 1 8.99159 11.364475 100 100 0 0 1 30.059378 185.32361zm26.885461 38.719734A4 4 0 0 1 65 111.279216V120H-65v-8.720784a4 4 0 0 1 3.215535-3.922323l42.530091-8.506018A14 14 0 0 0-8 85.122745V28.2573a10 10 0 0 0-7.252789-9.615239L-35 13V-5.169757A14 14 0 0 1-22.105263-19.12606a280 280 0 0 1 44.210526 0A14 14 0 0 1 35-5.169757V13l-19.747211 5.64206A10 10 0 0 0 8 28.2573v56.865445a14 14 0 0 0 11.254373 13.728129z"
+                fill="currentColor"
+              />
+            </svg>
+            <span>
+              China Rail Flow Map <span className="zh">· 中国铁路流量图</span>
+            </span>
+          </h1>
+          <p className="subtitle">
+            Flow diagram of trains departing and arriving across China&rsquo;s
+            top 100 rail cities. The width of each line refers to the number of
+            daily trains along that particular piece of track &mdash; spanning{" "}
+            <b>7,253</b> scheduled daily passenger services (of over{" "}
+            <b>12,000</b> nationwide) across China&rsquo;s{" "}
+            <b>{distUnit === "mi" ? "30,000 mi" : "48,000 km"}</b> high-speed
+            rail network ({distUnit === "mi" ? "100,000 mi" : "162,000 km"} of
+            total track).
+          </p>
+          <div className="stats" id="stats">
+            {cur &&
+              viewCur &&
+              (direction === "out" ? (
+                <>
+                  <div>
+                    <b>
+                      {(selectedClasses.length > 0 && outTablesReady
+                        ? viewCur.deps.length
+                        : cur.o.outbound
+                      ).toLocaleString("en-US")}
+                    </b>{" "}
+                    <span>
+                      {selectedClasses.length > 0
+                        ? selectedClasses
+                            .map((c) => (c === "plain" ? "普" : c))
+                            .join("/") +
+                          " trains leave " +
+                          cur.en +
+                          " daily"
+                        : "trains leave " + cur.en + " daily"}
+                    </span>
+                  </div>
+                  <div>
+                    <b>{viewCur.dests.length}</b>{" "}
+                    <span>cities reached without a change</span>
+                  </div>
+                  <div>
+                    <b>
+                      {Math.round((100 * cur.o.fully_tracked) / cur.o.outbound)}%
+                    </b>{" "}
+                    <span>
+                      of trains fully on track ({cur.o.fully_tracked} of{" "}
+                      {cur.o.outbound})
+                    </span>
+                  </div>
+                  <div>
+                    <b>{viewCur.maxFlow}</b>{" "}
+                    <span>trains/day on the widest section</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <b>
+                      {(selectedClasses.length > 0 && inTablesReady
+                        ? viewCur.arrs.length
+                        : cur.o.inbound
+                      ).toLocaleString("en-US")}
+                    </b>{" "}
+                    <span>
+                      {selectedClasses.length > 0
+                        ? selectedClasses
+                            .map((c) => (c === "plain" ? "普" : c))
+                            .join("/") +
+                          " trains arrive in " +
+                          cur.en +
+                          " daily"
+                        : "trains arrive in " + cur.en + " daily"}
+                    </span>
+                  </div>
+                  <div>
+                    <b>{viewCur.srcs.length}</b>{" "}
+                    <span>cities send direct trains</span>
+                  </div>
+                  <div>
+                    <b>{viewCur.maxInFlow}</b>{" "}
+                    <span>trains/day on the widest section</span>
+                  </div>
+                </>
+              ))}
+          </div>
+        </header>
+
+        <div className="toolbar">
+          <div className="group city-picker">
+            <label htmlFor="originSearch">Origin city</label>
+            <CityPicker
+              origins={origins}
+              curIdx={originIdx}
+              onSelect={selectOrigin}
+            />
+          </div>
+          <div className="group units" role="group" aria-label="Direction">
+            <button
+              id="dirOut"
+              type="button"
+              aria-pressed={direction === "out" ? "true" : "false"}
+              onClick={() => setDirection("out")}
+            >
+              Outbound
+            </button>
+            <button
+              id="dirIn"
+              type="button"
+              aria-pressed={direction === "in" ? "true" : "false"}
+              onClick={() => setDirection("in")}
+            >
+              Inbound
+            </button>
+          </div>
+          <div
+            className="group cls-filter"
+            role="group"
+            aria-label="Filter map and table by train class"
+          >
+            <span className="cls-label">Class:</span>
+            <button
+              type="button"
+              className="cls-btn"
+              aria-pressed={selectedClasses.length === 0 ? "true" : "false"}
+              onClick={() => setSelectedClasses([])}
+            >
+              All
+            </button>
+            {FLOW_CLASSES.map((cls) => {
+              const active = selectedClasses.includes(cls);
+              const label = cls === "plain" ? "普" : cls;
+              const enabled = availableClasses.has(cls);
+              return (
+                <button
+                  key={cls}
+                  type="button"
+                  className="cls-btn"
+                  aria-pressed={active ? "true" : "false"}
+                  disabled={!enabled}
+                  title={
+                    !enabled
+                      ? panelCity
+                        ? `No ${label} trains between ${cur?.en || "origin"} and ${panelCity.en}`
+                        : `No ${label} trains for ${cur?.en || "origin"}`
+                      : undefined
+                  }
+                  onClick={() => toggleClass(cls)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="group">
+            <button
+              id="btnCountry"
+              type="button"
+              onClick={() => mapRef.current?.fitCountry()}
+            >
+              National view
+            </button>
+            <button
+              id="btnHome"
+              type="button"
+              onClick={() => mapRef.current?.fitHome()}
+            >
+              Origin close-up
+            </button>
+          </div>
+          <div className="spacer"></div>
+          <div className="group">
+            <button
+              id="tglNetwork"
+              type="button"
+              aria-pressed={showNetwork ? "true" : "false"}
+              onClick={() => setShowNetwork((v) => !v)}
+            >
+              Rail network
+            </button>
+            <button
+              id="tglLabels"
+              type="button"
+              aria-pressed={showLabels ? "true" : "false"}
+              onClick={() => setShowLabels((v) => !v)}
+            >
+              City labels
+            </button>
+            <button
+              id="tglInfra"
+              type="button"
+              aria-pressed={showInfra ? "true" : "false"}
+              onClick={toggleInfra}
+            >
+              Infrastructure
+            </button>
+            <button
+              id="btnOut"
+              type="button"
+              aria-label="Zoom out"
+              onClick={() => mapRef.current?.zoomCenter(1 / 1.45)}
+            >
+              &minus;
+            </button>
+            <button
+              id="btnIn"
+              type="button"
+              aria-label="Zoom in"
+              onClick={() => mapRef.current?.zoomCenter(1.45)}
+            >
+              +
+            </button>
+          </div>
+          <div className="group units" role="group" aria-label="Distance units">
+            <button
+              id="unitKm"
+              type="button"
+              aria-pressed={distUnit === "km" ? "true" : "false"}
+              onClick={() => setDistUnit("km")}
+            >
+              km
+            </button>
+            <button
+              id="unitMi"
+              type="button"
+              aria-pressed={distUnit === "mi" ? "true" : "false"}
+              onClick={() => setDistUnit("mi")}
+            >
+              mi
+            </button>
+          </div>
+          <span className="hint">
+            Drag to pan &middot; scroll or pinch to zoom &middot; click a city
+            for its distances
+          </span>
+        </div>
+
+        <MapCanvas
+          ref={mapRef}
+          atlas={atlas}
+          cur={viewCur}
+          direction={direction}
+          dark={dark}
+          showNetwork={showNetwork}
+          showLabels={showLabels}
+          showInfra={showInfra}
+          distUnit={distUnit}
+          panelDest={panelCity}
+          loadError={loadError}
+          inLoading={direction === "in" && inMapLoading}
+          onSelectDest={handleSelectDest}
+          legendRef={legendRef}
+        >
+          <DestinationPanel
+            point={panelCity}
+            direction={direction}
+            cityEn={cur ? cur.en : ""}
+            cityZh={cur ? cur.o.zh : ""}
+            unit={distUnit}
+            onClose={closePanel}
+          />
+          <div id="legendCol">
+            <Legend
+              ref={legendRef}
+              title={
+                direction === "out"
+                  ? "Fastest time from origin"
+                  : "Fastest time to " + (cur ? cur.en : "destination")
+              }
+            />
+          </div>
+        </MapCanvas>
+
+        <footer id="pageFooter">
+          {atlas
+            ? atlas.data.about +
+              " In the outbound view, trains are counted from the origin city outward " +
+              "to their termini; in the inbound view, from the cities they start in, " +
+              "through every city they call at, into the selected city. The counts are " +
+              "the union of the two timetable sample dates. "
+            : ""}
+          Track geometry &copy; OpenStreetMap contributors (ODbL).
+        </footer>
+      </div>
+
+      <DeparturesTable
+        key={direction}
+        cur={cur}
+        unit={distUnit}
+        direction={direction}
+        panelCity={panelCity}
+        selectedClasses={selectedClasses}
+        onSelectClasses={setSelectedClasses}
+        outTablesReady={outTablesReady}
+        inTablesReady={inTablesReady}
+        onClearFilter={closePanel}
+      />
+
+      <Footnote cur={cur} direction={direction} />
+    </>
+  );
+}

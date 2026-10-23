@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = [
+    "analyze",
+    "router",
+    "filter",
+    "tiler",
+    "outline",
+]
+
+[profile.release]
+opt-level = 3

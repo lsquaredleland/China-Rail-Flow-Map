@@ -1,0 +1,313 @@
+{
+  "东乡": {
+    "clusters_chosen": [
+      {
+        "point": [
+          28.23,
+          116.621
+        ],
+        "trains": 6
+      }
+    ]
+  },
+  "兴山": {
+    "clusters_chosen": [
+      {
+        "point": [
+          31.328,
+          110.746
+        ],
+        "trains": 31
+      }
+    ]
+  },
+  "南溪": {
+    "clusters_chosen": [
+      {
+        "point": [
+          28.882,
+          104.953
+        ],
+        "trains": 4
+      }
+    ]
+  },
+  "南阳": {
+    "clusters_chosen": [
+      {
+        "point": [
+          33.001,
+          112.506
+        ],
+        "trains": 38
+      }
+    ]
+  },
+  "嘉兴": {
+    "clusters_chosen": [
+      {
+        "point": [
+          30.767,
+          120.76
+        ],
+        "trains": 84
+      }
+    ]
+  },
+  "大兴": {
+    "clusters_chosen": [
+      {
+        "point": [
+          46.875,
+          123.744
+        ],
+        "trains": 1
+      }
+    ]
+  },
+  "定州东": {
+    "clusters_chosen": [
+      {
+        "point": [
+          38.508,
+          115.069
+        ],
+        "trains": 47
+      }
+    ]
+  },
+  "屏山": {
+    "clusters_chosen": [
+      {
+        "point": [
+          28.852,
+          104.358
+        ],
+        "trains": 3
+      }
+    ]
+  },
+  "巴彦高勒": {
+    "clusters_chosen": [
+      {
+        "point": [
+          40.332,
+          107.016
+        ],
+        "trains": 5
+      }
+    ]
+  },
+  "平山": {
+    "clusters_chosen": [
+      {
+        "point": [
+          45.319,
+          127.399
+        ],
+        "trains": 1
+      }
+    ]
+  },
+  "广阳": {
+    "clusters_chosen": [
+      {
+        "point": [
+          39.512,
+          116.7
+        ],
+        "trains": 14
+      }
+    ]
+  },
+  "建桥": {
+    "clusters_chosen": [
+      {
+        "point": [
+          23.931,
+          116.108
+        ],
+        "trains": 2
+      }
+    ]
+  },
+  "李家": {
+    "clusters_chosen": [
+      {
+        "point": [
+          47.938,
+          126.749
+        ],
+        "trains": 1
+      }
+    ]
+  },
+  "梁山": {
+    "clusters_chosen": [
+      {
+        "point": [
+          35.819,
+          115.932
+        ],
+        "trains": 7
+      }
+    ]
+  },
+  "武夷山": {
+    "clusters_chosen": [
+      {
+        "point": [
+          27.629,
+          117.984
+        ],
+        "trains": 2
+      }
+    ]
+  },
+  "永庆": {
+    "clusters_chosen": [
+      {
+        "point": [
+          42.708,
+          128.237
+        ],
+        "trains": 2
+      }
+    ]
+  },
+  "泉州东": {
+    "clusters_chosen": [
+      {
+        "point": [
+          24.925,
+          118.766
+        ],
+        "trains": 30
+      }
+    ]
+  },
+  "海阳": {
+    "clusters_chosen": [
+      {
+        "point": [
+          36.717,
+          121.175
+        ],
+        "trains": 12
+      }
+    ]
+  },
+  "清河": {
+    "clusters_chosen": [
+      {
+        "point": [
+          40.04,
+          116.309
+        ],
+        "trains": 75
+      }
+    ]
+  },
+  "滦河": {
+    "clusters_chosen": [
+      {
+        "point": [
+          39.853,
+          118.666
+        ],
+        "trains": 32
+      }
+    ]
+  },
+  "福山": {
+    "clusters_chosen": [
+      {
+        "point": [
+          37.484,
+          121.211
+        ],
+        "trains": 3
+      }
+    ]
+  },
+  "禹州": {
+    "clusters_chosen": [
+      {
+        "point": [
+          34.141,
+          113.445
+        ],
+        "trains": 24
+      },
+      {
+        "point": [
+          34.126,
+          113.565
+        ],
+        "trains": 5
+      }
+    ]
+  },
+  "西峡": {
+    "clusters_chosen": [
+      {
+        "point": [
+          33.273,
+          111.506
+        ],
+        "trains": 15
+      }
+    ]
+  },
+  "遂溪": {
+    "clusters_chosen": [
+      {
+        "point": [
+          21.401,
+          110.262
+        ],
+        "trains": 4
+      }
+    ]
+  },
+  "郏县": {
+    "clusters_chosen": [
+      {
+        "point": [
+          33.947,
+          113.264
+        ],
+        "trains": 13
+      },
+      {
+        "point": [
+          34.093,
+          113.241
+        ],
+        "trains": 2
+      }
+    ]
+  },
+  "阳江": {
+    "clusters_chosen": [
+      {
+        "point": [
+          21.864,
+          111.877
+        ],
+        "trains": 5
+      }
+    ]
+  },
+  "龙镇": {
+    "clusters_chosen": [
+      {
+        "point": [
+          48.685,
+          126.709
+        ],
+        "trains": 3
+      }
+    ]
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "decisions": {
+    "ambiguous-keep": 6742,
+    "bridge-fix": 4680,
+    "chord": 277,
+    "filled": 627,
+    "infeasible-keep": 287,
+    "no-candidates": 1,
+    "not-routed": 237,
+    "production": 55747,
+    "switched": 5813
+  },
+  "trains_with_changed_legs": 4712,
+  "leg_paths": 11120,
+  "calibration": [
+    {
+      "class": "G",
+      "n": 22012,
+      "median_ratio": 1.137,
+      "p5": 0.984,
+      "p95": 1.349,
+      "feasibility_floor": 0.751
+    },
+    {
+      "class": "D",
+      "n": 8605,
+      "median_ratio": 1.112,
+      "p5": 0.949,
+      "p95": 1.382,
+      "feasibility_floor": 0.759
+    },
+    {
+      "class": "C",
+      "n": 8791,
+      "median_ratio": 1.118,
+      "p5": 0.851,
+      "p95": 1.573,
+      "feasibility_floor": 0.663
+    },
+    {
+      "class": "S",
+      "n": 2991,
+      "median_ratio": 1.12,
+      "p5": 0.82,
+      "p95": 1.555,
+      "feasibility_floor": 0.735
+    },
+    {
+      "class": "Z",
+      "n": 1198,
+      "median_ratio": 1.241,
+      "p5": 1.011,
+      "p95": 1.757,
+      "feasibility_floor": 0.496
+    },
+    {
+      "class": "T",
+      "n": 857,
+      "median_ratio": 1.238,
+      "p5": 1.041,
+      "p95": 1.828,
+      "feasibility_floor": 0.746
+    },
+    {
+      "class": "K",
+      "n": 6264,
+      "median_ratio": 1.266,
+      "p5": 1.03,
+      "p95": 1.888,
+      "feasibility_floor": 0.604
+    }
+  ],
+  "validation": {
+    "tests": 6922,
+    "model_argmax_pct": 97.2,
+    "shortest_pct": 80.6,
+    "with_production_geometry": 6811,
+    "production_pct": 84.3,
+    "production_plus_switches_pct": 94.0,
+    "switches": 1257,
+    "switches_correct": 1170,
+    "per_class": [
+      {
+        "class": "G",
+        "n": 3622,
+        "model_pct": 98.4,
+        "production_pct": 89.5
+      },
+      {
+        "class": "D",
+        "n": 1195,
+        "model_pct": 97.3,
+        "production_pct": 75.1
+      },
+      {
+        "class": "C",
+        "n": 594,
+        "model_pct": 97.5,
+        "production_pct": 81.6
+      },
+      {
+        "class": "S",
+        "n": 49,
+        "model_pct": 98.0,
+        "production_pct": 28.6
+      },
+      {
+        "class": "Z",
+        "n": 368,
+        "model_pct": 89.9,
+        "production_pct": 74.2
+      },
+      {
+        "class": "T",
+        "n": 174,
+        "model_pct": 93.1,
+        "production_pct": 74.7
+      },
+      {
+        "class": "K",
+        "n": 920,
+        "model_pct": 95.7,
+        "production_pct": 76.5
+      }
+    ]
+  },
+  "timings_s": [
+    [
+      "inputs: 7253 trains, 7698 production pairs, 7671 base paths, 16113 station names",
+      0.25
+    ],
+    [
+      "graph",
+      4.8
+    ],
+    [
+      "legs: 74411 legs, 7681 pairs to route (6 duplicate-name pairs left on production)",
+      0.51
+    ],
+    [
+      "candidates: 12272 over 7681 pairs",
+      7.55
+    ],
+    [
+      "calibration: 50718 undisputed legs",
+      0.01
+    ],
+    [
+      "bridging: 749 pairs searched, 650 bridged",
+      0.98
+    ],
+    [
+      "service evidence: 71305 stopping-service spans",
+      0.07
+    ],
+    [
+      "inference: 74411 legs",
+      0.01
+    ],
+    [
+      "canonical production geometry: 7554 pairs",
+      5.27
+    ],
+    [
+      "map redraw: 1318 chosen corridors",
+      0.43
+    ],
+    [
+      "outputs",
+      0.49
+    ],
+    [
+      "validation",
+      0.03
+    ]
+  ],
+  "total_s": 20.41
+}
