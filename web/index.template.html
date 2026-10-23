@@ -816,6 +816,17 @@
       #depTable th.sortable { cursor: pointer; user-select: none; }
       #depTable th.sortable:hover { color: var(--rust); }
       #depTable th .arrow { font-size: 10px; letter-spacing: 0; }
+      #depTable tbody tr {
+        cursor: pointer;
+        transition: background 0.08s ease;
+      }
+      #depTable tbody tr:hover {
+        background: var(--paper-warm) !important;
+      }
+      #depTable tbody tr.dep-row-selected {
+        background: var(--paper-deep) !important;
+        box-shadow: inset 4px 0 0 var(--crimson);
+      }
       #depTable tbody tr:nth-child(even) { background: var(--row-alt); }
       #depTable td.num, #depTable th.num { text-align: right; }
       .c-time { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 500; }

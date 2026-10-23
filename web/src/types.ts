@@ -352,8 +352,12 @@ export interface DurBinFilter {
 export interface OriginFilterCriteria {
   classes?: string[];
   hour?: number | null;
+  hours?: number[] | null;
   distBin?: DistBinFilter | null;
+  distBins?: DistBinFilter[] | null;
   durBin?: DurBinFilter | null;
+  durBins?: DurBinFilter[] | null;
+  trainCodes?: string[] | null;
   unit?: DistUnit;
 }
 

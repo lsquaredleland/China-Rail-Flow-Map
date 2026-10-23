@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type {
   CityPointVM,
   DestVM,
@@ -19,11 +19,17 @@ interface Props {
   panelCity?: CityPointVM | null;
   selectedClasses?: string[];
   selectedHour?: number | null;
+  selectedHours?: number[];
   onSelectHour?: (hour: number | null) => void;
+  onSelectHours?: (hours: number[]) => void;
   selectedDistBin?: DistBinFilter | null;
+  selectedDistBins?: DistBinFilter[];
   onSelectDistBin?: (bin: DistBinFilter | null) => void;
+  onSelectDistBins?: (bins: DistBinFilter[]) => void;
   selectedDurBin?: DurBinFilter | null;
+  selectedDurBins?: DurBinFilter[];
   onSelectDurBin?: (bin: DurBinFilter | null) => void;
+  onSelectDurBins?: (bins: DurBinFilter[]) => void;
 }
 
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif';
@@ -50,6 +56,7 @@ function Chart({
   barClass,
   subBarClass,
   selectedBin,
+  selectedBins,
   onSelectBin,
   ariaLabel,
 }: {
@@ -60,7 +67,8 @@ function Chart({
   barClass: string | ((i: number) => string);
   subBarClass?: string | ((i: number) => string);
   selectedBin?: number | null;
-  onSelectBin?: (bin: number) => void;
+  selectedBins?: number[] | null;
+  onSelectBin?: (bin: number, e: React.MouseEvent) => void;
   ariaLabel: string;
 }) {
   const [hoveredBin, setHoveredBin] = useState<number | null>(null);
@@ -73,7 +81,9 @@ function Chart({
   const bw = PLOT_W / n;
   const gap = n > 30 ? 1 : Math.min(2, bw * 0.18);
   const barW = Math.max(0.5, bw - gap);
-  const hasSelection = selectedBin !== null && selectedBin !== undefined;
+  const hasSelection =
+    (selectedBins && selectedBins.length > 0) ||
+    (selectedBin !== null && selectedBin !== undefined);
 
   return (
     <svg
@@ -86,7 +96,9 @@ function Chart({
         const sc = hasSub ? subCounts![i] : 0;
         const sh = (sc / max) * PLOT_H;
         const x = PAD_L + i * bw;
-        const isSelected = selectedBin === i;
+        const isSelected = selectedBins
+          ? selectedBins.includes(i)
+          : selectedBin === i;
         const isHovered = hoveredBin === i;
         const canClick = !!onSelectBin && (c > 0 || isSelected);
         const colClass =
@@ -119,7 +131,7 @@ function Chart({
             onMouseLeave={() =>
               setHoveredBin((prev) => (prev === i ? null : prev))
             }
-            onClick={canClick ? () => onSelectBin!(i) : undefined}
+            onClick={canClick ? (e) => onSelectBin!(i, e) : undefined}
           >
             <rect
               className="hist-col-bg"
@@ -253,17 +265,46 @@ export default function Histograms({
   panelCity,
   selectedClasses,
   selectedHour,
+  selectedHours,
   onSelectHour,
+  onSelectHours,
   selectedDistBin,
+  selectedDistBins,
   onSelectDistBin,
+  onSelectDistBins,
   selectedDurBin,
+  selectedDurBins,
   onSelectDurBin,
+  onSelectDurBins,
 }: Props) {
   const inbound = direction === "in";
   const hasClassFilter = !!selectedClasses && selectedClasses.length > 0;
   const clsText = hasClassFilter
     ? selectedClasses!.map((c) => (c === "plain" ? "普" : c)).join("/")
     : "";
+
+  const activeHours =
+    selectedHours !== undefined
+      ? selectedHours
+      : selectedHour !== null && selectedHour !== undefined
+        ? [selectedHour]
+        : [];
+  const activeDistBins =
+    selectedDistBins !== undefined
+      ? selectedDistBins
+      : selectedDistBin
+        ? [selectedDistBin]
+        : [];
+  const activeDurBins =
+    selectedDurBins !== undefined
+      ? selectedDurBins
+      : selectedDurBin
+        ? [selectedDurBin]
+        : [];
+
+  const lastHourRef = useRef<number | null>(null);
+  const lastDistRef = useRef<number | null>(null);
+  const lastDurRef = useRef<number | null>(null);
 
   const {
     hourCounts,
@@ -324,32 +365,39 @@ export default function Histograms({
       !hasClassFilter || selectedClasses!.includes(r.cls);
 
     const matchesHour = (r: { time: string }) => {
-      if (selectedHour === null || selectedHour === undefined) return true;
+      if (activeHours.length === 0) return true;
       const h = parseInt(r.time.slice(0, 2), 10);
-      return h === selectedHour;
+      return activeHours.includes(h);
     };
 
     const matchesDist = (r: { distKm: number }) => {
-      if (!selectedDistBin) return true;
+      if (activeDistBins.length === 0) return true;
       const v = unit === "km" ? r.distKm : r.distKm * 0.621371;
-      const b = Math.min(
-        selectedDistBin.nb - 1,
-        Math.max(0, Math.floor(v / selectedDistBin.size)),
-      );
-      return b === selectedDistBin.bin;
+      return activeDistBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(v / bin.size)),
+        );
+        return b === bin.bin;
+      });
     };
 
     const matchesDur = (r: { dur: number }) => {
-      if (!selectedDurBin) return true;
-      const b = Math.min(
-        selectedDurBin.nb - 1,
-        Math.max(0, Math.floor(r.dur / selectedDurBin.size)),
-      );
-      return b === selectedDurBin.bin;
+      if (activeDurBins.length === 0) return true;
+      return activeDurBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(r.dur / bin.size)),
+        );
+        return b === bin.bin;
+      });
     };
 
     const hasOtherForHour =
-      fullCity || hasClassFilter || selectedDistBin || selectedDurBin;
+      fullCity ||
+      hasClassFilter ||
+      activeDistBins.length > 0 ||
+      activeDurBins.length > 0;
     const subRowsHour = hasOtherForHour
       ? baseSubRows.filter(
           (r) => matchesClass(r) && matchesDist(r) && matchesDur(r),
@@ -357,7 +405,10 @@ export default function Histograms({
       : null;
 
     const hasOtherForDist =
-      fullCity || hasClassFilter || (selectedHour !== null && selectedHour !== undefined) || selectedDurBin;
+      fullCity ||
+      hasClassFilter ||
+      activeHours.length > 0 ||
+      activeDurBins.length > 0;
     const subRowsDist = hasOtherForDist
       ? baseSubRows.filter(
           (r) => matchesClass(r) && matchesHour(r) && matchesDur(r),
@@ -365,7 +416,10 @@ export default function Histograms({
       : null;
 
     const hasOtherForDur =
-      fullCity || hasClassFilter || (selectedHour !== null && selectedHour !== undefined) || selectedDistBin;
+      fullCity ||
+      hasClassFilter ||
+      activeHours.length > 0 ||
+      activeDistBins.length > 0;
     const subRowsDur = hasOtherForDur
       ? baseSubRows.filter(
           (r) => matchesClass(r) && matchesHour(r) && matchesDist(r),
@@ -563,9 +617,9 @@ export default function Histograms({
     hasClassFilter,
     selectedClasses,
     clsText,
-    selectedHour,
-    selectedDistBin,
-    selectedDurBin,
+    activeHours,
+    activeDistBins,
+    activeDurBins,
   ]);
 
   if ((inbound ? cur.arrs.length : cur.deps.length) === 0) return null;
@@ -585,36 +639,125 @@ export default function Histograms({
       ? clsText + " trains"
       : null;
 
-  const handleHourClick = (h: number) => {
-    if (!onSelectHour) return;
-    onSelectHour(selectedHour === h ? null : h);
-  };
-
-  const handleDistClick = (b: number) => {
-    if (!onSelectDistBin) return;
-    if (selectedDistBin && selectedDistBin.bin === b) {
-      onSelectDistBin(null);
-    } else {
-      onSelectDistBin({
-        bin: b,
-        nb: distNb,
-        size: distBinSize,
-        label: distRanges[b],
-      });
+  const handleHourClick = (h: number, e: React.MouseEvent) => {
+    if (onSelectHours) {
+      if (e.shiftKey && lastHourRef.current !== null) {
+        const start = Math.min(lastHourRef.current, h);
+        const end = Math.max(lastHourRef.current, h);
+        const range: number[] = [];
+        for (let i = start; i <= end; i++) range.push(i);
+        onSelectHours(range);
+      } else if (e.metaKey || e.ctrlKey) {
+        const next = activeHours.includes(h)
+          ? activeHours.filter((item) => item !== h)
+          : [...activeHours, h].sort((a, b) => a - b);
+        onSelectHours(next);
+        lastHourRef.current = h;
+      } else {
+        if (activeHours.length === 1 && activeHours[0] === h) {
+          onSelectHours([]);
+          lastHourRef.current = null;
+        } else {
+          onSelectHours([h]);
+          lastHourRef.current = h;
+        }
+      }
+    } else if (onSelectHour) {
+      onSelectHour(selectedHour === h ? null : h);
     }
   };
 
-  const handleDurClick = (b: number) => {
-    if (!onSelectDurBin) return;
-    if (selectedDurBin && selectedDurBin.bin === b) {
-      onSelectDurBin(null);
-    } else {
-      onSelectDurBin({
-        bin: b,
+  const handleDistClick = (b: number, e: React.MouseEvent) => {
+    if (onSelectDistBins) {
+      const makeBin = (binIdx: number): DistBinFilter => ({
+        bin: binIdx,
+        nb: distNb,
+        size: distBinSize,
+        label:
+          distRanges[binIdx] ||
+          `${binIdx * distBinSize}–${(binIdx + 1) * distBinSize} ${unit}`,
+      });
+      if (e.shiftKey && lastDistRef.current !== null) {
+        const start = Math.min(lastDistRef.current, b);
+        const end = Math.max(lastDistRef.current, b);
+        const range: DistBinFilter[] = [];
+        for (let i = start; i <= end; i++) range.push(makeBin(i));
+        onSelectDistBins(range);
+      } else if (e.metaKey || e.ctrlKey) {
+        const exists = activeDistBins.some((item) => item.bin === b);
+        const next = exists
+          ? activeDistBins.filter((item) => item.bin !== b)
+          : [...activeDistBins, makeBin(b)].sort((x, y) => x.bin - y.bin);
+        onSelectDistBins(next);
+        lastDistRef.current = b;
+      } else {
+        const isSingle =
+          activeDistBins.length === 1 && activeDistBins[0].bin === b;
+        if (isSingle) {
+          onSelectDistBins([]);
+          lastDistRef.current = null;
+        } else {
+          onSelectDistBins([makeBin(b)]);
+          lastDistRef.current = b;
+        }
+      }
+    } else if (onSelectDistBin) {
+      if (selectedDistBin && selectedDistBin.bin === b) {
+        onSelectDistBin(null);
+      } else {
+        onSelectDistBin({
+          bin: b,
+          nb: distNb,
+          size: distBinSize,
+          label: distRanges[b],
+        });
+      }
+    }
+  };
+
+  const handleDurClick = (b: number, e: React.MouseEvent) => {
+    if (onSelectDurBins) {
+      const makeBin = (binIdx: number): DurBinFilter => ({
+        bin: binIdx,
         nb: durNb,
         size: durBinSize,
-        label: durRanges[b],
+        label: durRanges[binIdx] || `${binIdx}h–${binIdx + 1}h`,
       });
+      if (e.shiftKey && lastDurRef.current !== null) {
+        const start = Math.min(lastDurRef.current, b);
+        const end = Math.max(lastDurRef.current, b);
+        const range: DurBinFilter[] = [];
+        for (let i = start; i <= end; i++) range.push(makeBin(i));
+        onSelectDurBins(range);
+      } else if (e.metaKey || e.ctrlKey) {
+        const exists = activeDurBins.some((item) => item.bin === b);
+        const next = exists
+          ? activeDurBins.filter((item) => item.bin !== b)
+          : [...activeDurBins, makeBin(b)].sort((x, y) => x.bin - y.bin);
+        onSelectDurBins(next);
+        lastDurRef.current = b;
+      } else {
+        const isSingle =
+          activeDurBins.length === 1 && activeDurBins[0].bin === b;
+        if (isSingle) {
+          onSelectDurBins([]);
+          lastDurRef.current = null;
+        } else {
+          onSelectDurBins([makeBin(b)]);
+          lastDurRef.current = b;
+        }
+      }
+    } else if (onSelectDurBin) {
+      if (selectedDurBin && selectedDurBin.bin === b) {
+        onSelectDurBin(null);
+      } else {
+        onSelectDurBin({
+          bin: b,
+          nb: durNb,
+          size: durBinSize,
+          label: durRanges[b],
+        });
+      }
     }
   };
 
@@ -642,6 +785,7 @@ export default function Histograms({
           barClass="bar-h"
           subBarClass="bar-h-sub"
           selectedBin={selectedHour}
+          selectedBins={activeHours}
           onSelectBin={handleHourClick}
           ariaLabel={
             "Histogram of " +
@@ -685,6 +829,7 @@ export default function Histograms({
           barClass="bar-d"
           subBarClass="bar-d-sub"
           selectedBin={selectedDistBin ? selectedDistBin.bin : null}
+          selectedBins={activeDistBins.map((b) => b.bin)}
           onSelectBin={handleDistClick}
           ariaLabel={
             "Histogram of trains " +
@@ -740,6 +885,7 @@ export default function Histograms({
                 : "bar-t-sub bar-t-ultra";
           }}
           selectedBin={selectedDurBin ? selectedDurBin.bin : null}
+          selectedBins={activeDurBins.map((b) => b.bin)}
           onSelectBin={handleDurClick}
           ariaLabel={
             "Histogram of trains " +

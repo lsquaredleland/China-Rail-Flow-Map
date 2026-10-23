@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   ArrVM,
   CityPointVM,
@@ -31,11 +31,19 @@ interface Props {
   inTablesReady: boolean;
   onClearFilter: () => void;
   selectedHour?: number | null;
+  selectedHours?: number[];
   onSelectHour?: (h: number | null) => void;
+  onSelectHours?: (hours: number[]) => void;
   selectedDistBin?: DistBinFilter | null;
+  selectedDistBins?: DistBinFilter[];
   onSelectDistBin?: (b: DistBinFilter | null) => void;
+  onSelectDistBins?: (bins: DistBinFilter[]) => void;
   selectedDurBin?: DurBinFilter | null;
+  selectedDurBins?: DurBinFilter[];
   onSelectDurBin?: (b: DurBinFilter | null) => void;
+  onSelectDurBins?: (bins: DurBinFilter[]) => void;
+  selectedTrainCodes?: string[];
+  onSelectTrainCodes?: (codes: string[]) => void;
 }
 
 type SortKey = "dep" | "dur" | "km";
@@ -58,6 +66,22 @@ const CLASS_NAMES: Record<string, string> = {
 
 function pad2(n: number): string {
   return n < 10 ? "0" + n : String(n);
+}
+
+function formatHoursLabel(hours: number[]): string {
+  if (hours.length === 0) return "";
+  if (hours.length === 1) {
+    const h = hours[0];
+    return `${pad2(h)}:00–${pad2(h + 1)}:00`;
+  }
+  const sorted = [...hours].sort((a, b) => a - b);
+  const isConsecutive = sorted.every(
+    (h, i) => i === 0 || h === sorted[i - 1] + 1,
+  );
+  if (isConsecutive) {
+    return `${pad2(sorted[0])}:00–${pad2(sorted[sorted.length - 1] + 1)}:00`;
+  }
+  return sorted.map((h) => `${pad2(h)}:00`).join(", ");
 }
 
 function depDayOffset(d: DepVM): number {
@@ -144,11 +168,19 @@ export default function DeparturesTable({
   inTablesReady,
   onClearFilter,
   selectedHour: controlledHour,
+  selectedHours: controlledHours,
   onSelectHour,
+  onSelectHours,
   selectedDistBin: controlledDistBin,
+  selectedDistBins: controlledDistBins,
   onSelectDistBin,
+  onSelectDistBins,
   selectedDurBin: controlledDurBin,
+  selectedDurBins: controlledDurBins,
   onSelectDurBin,
+  onSelectDurBins,
+  selectedTrainCodes = [],
+  onSelectTrainCodes,
 }: Props) {
   const [query, setQuery] = useState("");
   const [internalHour, setInternalHour] = useState<number | null>(null);
@@ -167,6 +199,61 @@ export default function DeparturesTable({
   const selectedDurBin =
     controlledDurBin !== undefined ? controlledDurBin : internalDurBin;
   const setSelectedDurBin = onSelectDurBin || setInternalDurBin;
+
+  const activeHours: number[] =
+    controlledHours !== undefined
+      ? controlledHours
+      : selectedHour !== null && selectedHour !== undefined
+        ? [selectedHour]
+        : [];
+  const activeDistBins: DistBinFilter[] =
+    controlledDistBins !== undefined
+      ? controlledDistBins
+      : selectedDistBin
+        ? [selectedDistBin]
+        : [];
+  const activeDurBins: DurBinFilter[] =
+    controlledDurBins !== undefined
+      ? controlledDurBins
+      : selectedDurBin
+        ? [selectedDurBin]
+        : [];
+
+  const lastClickedRowIdxRef = useRef<number | null>(null);
+
+  const handleRowClick = (
+    code: string,
+    idx: number,
+    e: React.MouseEvent,
+    currentList: { code: string }[],
+  ) => {
+    if (!onSelectTrainCodes) return;
+    if (e.shiftKey && lastClickedRowIdxRef.current !== null) {
+      const start = Math.min(lastClickedRowIdxRef.current, idx);
+      const end = Math.max(lastClickedRowIdxRef.current, idx);
+      const rangeCodes = currentList
+        .slice(start, end + 1)
+        .map((item) => item.code);
+      const merged = Array.from(
+        new Set([...selectedTrainCodes, ...rangeCodes]),
+      );
+      onSelectTrainCodes(merged);
+    } else if (e.metaKey || e.ctrlKey) {
+      const next = selectedTrainCodes.includes(code)
+        ? selectedTrainCodes.filter((c) => c !== code)
+        : [...selectedTrainCodes, code];
+      onSelectTrainCodes(next);
+      lastClickedRowIdxRef.current = idx;
+    } else {
+      if (selectedTrainCodes.length === 1 && selectedTrainCodes[0] === code) {
+        onSelectTrainCodes([]);
+        lastClickedRowIdxRef.current = null;
+      } else {
+        onSelectTrainCodes([code]);
+        lastClickedRowIdxRef.current = idx;
+      }
+    }
+  };
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({
     key: "dep",
     dir: 1,
@@ -265,25 +352,31 @@ export default function DeparturesTable({
     if (selectedClasses.length > 0 && !selectedClasses.includes(cls)) {
       return false;
     }
-    if (selectedHour !== null) {
+    if (activeHours.length > 0) {
       const h = parseInt(timeStr.slice(0, 2), 10);
-      if (h !== selectedHour) return false;
+      if (!activeHours.includes(h)) return false;
     }
-    if (selectedDistBin !== null) {
+    if (activeDistBins.length > 0) {
       const v = unit === "km" ? distKm : distKm * 0.621371;
-      const b = Math.min(
-        selectedDistBin.nb - 1,
-        Math.max(0, Math.floor(v / selectedDistBin.size)),
-      );
-      if (b !== selectedDistBin.bin) return false;
+      const matched = activeDistBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(v / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
-    if (selectedDurBin !== null) {
+    if (activeDurBins.length > 0) {
       if (durMins < 0) return false;
-      const b = Math.min(
-        selectedDurBin.nb - 1,
-        Math.max(0, Math.floor(durMins / selectedDurBin.size)),
-      );
-      if (b !== selectedDurBin.bin) return false;
+      const matched = activeDurBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(durMins / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     return true;
   };
@@ -291,9 +384,10 @@ export default function DeparturesTable({
   const hasExtraFilters =
     !!q ||
     selectedClasses.length > 0 ||
-    selectedHour !== null ||
-    selectedDistBin !== null ||
-    selectedDurBin !== null;
+    activeHours.length > 0 ||
+    activeDistBins.length > 0 ||
+    activeDurBins.length > 0 ||
+    selectedTrainCodes.length > 0;
 
   // A fresh selection starts from its pre-sorted arrival order.
   useEffect(() => {
@@ -576,8 +670,20 @@ export default function DeparturesTable({
           ) : (
             list.map((c, i) => {
               const d = c.dep;
+              const isSelected = selectedTrainCodes.includes(d.code);
               return (
-                <tr key={i}>
+                <tr
+                  key={i}
+                  className={isSelected ? "dep-row-selected" : undefined}
+                  onClick={(e) =>
+                    handleRowClick(
+                      d.code,
+                      i,
+                      e,
+                      list.map((item) => ({ code: item.dep.code })),
+                    )
+                  }
+                >
                   <td className="c-train">
                     <TrainCell d={d} />
                   </td>
@@ -777,8 +883,20 @@ export default function DeparturesTable({
           ) : (
             list.map((c, i) => {
               const a = c.arr;
+              const isSelected = selectedTrainCodes.includes(a.code);
               return (
-                <tr key={i}>
+                <tr
+                  key={i}
+                  className={isSelected ? "dep-row-selected" : undefined}
+                  onClick={(e) =>
+                    handleRowClick(
+                      a.code,
+                      i,
+                      e,
+                      list.map((item) => ({ code: item.arr.code })),
+                    )
+                  }
+                >
                   <td className="c-train">
                     <TrainCell d={a} />
                   </td>
@@ -962,7 +1080,15 @@ export default function DeparturesTable({
             </tr>
           ) : (
             list.map((a, i) => (
-              <tr key={i}>
+              <tr
+                key={i}
+                className={
+                  selectedTrainCodes.includes(a.code)
+                    ? "dep-row-selected"
+                    : undefined
+                }
+                onClick={(e) => handleRowClick(a.code, i, e, list)}
+              >
                 <td className="c-train">
                   <TrainCell d={a} />
                 </td>
@@ -1117,7 +1243,15 @@ export default function DeparturesTable({
             </tr>
           ) : (
             list.map((d, i) => (
-              <tr key={i}>
+              <tr
+                key={i}
+                className={
+                  selectedTrainCodes.includes(d.code)
+                    ? "dep-row-selected"
+                    : undefined
+                }
+                onClick={(e) => handleRowClick(d.code, i, e, list)}
+              >
                 <td className="c-train">
                   <TrainCell d={d} />
                 </td>
@@ -1164,11 +1298,17 @@ export default function DeparturesTable({
           panelCity={activeCity}
           selectedClasses={selectedClasses}
           selectedHour={selectedHour}
+          selectedHours={activeHours}
           onSelectHour={setSelectedHour}
+          onSelectHours={onSelectHours}
           selectedDistBin={selectedDistBin}
+          selectedDistBins={activeDistBins}
           onSelectDistBin={setSelectedDistBin}
+          onSelectDistBins={onSelectDistBins}
           selectedDurBin={selectedDurBin}
+          selectedDurBins={activeDurBins}
           onSelectDurBin={setSelectedDurBin}
+          onSelectDurBins={onSelectDurBins}
         />
       ) : null}
       <div className="dep-tools">
@@ -1222,40 +1362,67 @@ export default function DeparturesTable({
           })}
         </div>
         {chipNode}
-        {selectedHour !== null ? (
+        {selectedTrainCodes.length > 0 ? (
           <span className="dep-chip">
-            Hour:{" "}
-            <b>
-              {pad2(selectedHour)}:00–{pad2(selectedHour + 1)}:00
-            </b>
+            {selectedTrainCodes.length === 1 ? (
+              <>
+                Train: <b>{selectedTrainCodes[0]}</b>
+              </>
+            ) : (
+              <>
+                Trains: <b>{selectedTrainCodes.length} selected</b>
+              </>
+            )}
+            <button
+              type="button"
+              aria-label="Clear selected trains"
+              onClick={() => onSelectTrainCodes && onSelectTrainCodes([])}
+            >
+              &times;
+            </button>
+          </span>
+        ) : null}
+        {activeHours.length > 0 ? (
+          <span className="dep-chip">
+            {activeHours.length === 1 ? "Hour" : "Hours"}:{" "}
+            <b>{formatHoursLabel(activeHours)}</b>
             <button
               type="button"
               aria-label="Clear hour filter"
-              onClick={() => setSelectedHour(null)}
+              onClick={() => {
+                if (onSelectHours) onSelectHours([]);
+                setSelectedHour(null);
+              }}
             >
               &times;
             </button>
           </span>
         ) : null}
-        {selectedDistBin !== null ? (
+        {activeDistBins.length > 0 ? (
           <span className="dep-chip">
-            Distance: <b>{selectedDistBin.label}</b>
+            Distance: <b>{activeDistBins.map((b) => b.label).join(", ")}</b>
             <button
               type="button"
               aria-label="Clear distance filter"
-              onClick={() => setSelectedDistBin(null)}
+              onClick={() => {
+                if (onSelectDistBins) onSelectDistBins([]);
+                setSelectedDistBin(null);
+              }}
             >
               &times;
             </button>
           </span>
         ) : null}
-        {selectedDurBin !== null ? (
+        {activeDurBins.length > 0 ? (
           <span className="dep-chip">
-            Time: <b>{selectedDurBin.label}</b>
+            Time: <b>{activeDurBins.map((b) => b.label).join(", ")}</b>
             <button
               type="button"
               aria-label="Clear duration filter"
-              onClick={() => setSelectedDurBin(null)}
+              onClick={() => {
+                if (onSelectDurBins) onSelectDurBins([]);
+                setSelectedDurBin(null);
+              }}
             >
               &times;
             </button>

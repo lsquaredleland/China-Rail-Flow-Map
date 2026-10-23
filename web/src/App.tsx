@@ -242,11 +242,15 @@ export default function App() {
   const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [selectedHours, setSelectedHours] = useState<number[]>([]);
   const [selectedDistBin, setSelectedDistBin] =
     useState<DistBinFilter | null>(null);
+  const [selectedDistBins, setSelectedDistBins] = useState<DistBinFilter[]>([]);
   const [selectedDurBin, setSelectedDurBin] = useState<DurBinFilter | null>(
     null,
   );
+  const [selectedDurBins, setSelectedDurBins] = useState<DurBinFilter[]>([]);
+  const [selectedTrainCodes, setSelectedTrainCodes] = useState<string[]>([]);
   const [dark, setDarkState] = useState<boolean>(initialDark);
   const [showTimeline, setShowTimeline] = useState<boolean>(true);
 
@@ -475,9 +479,25 @@ export default function App() {
       cur
         ? filterOrigin(cur, {
             classes: selectedClasses,
-            hour: selectedHour,
-            distBin: selectedDistBin,
-            durBin: selectedDurBin,
+            hours:
+              selectedHours.length > 0
+                ? selectedHours
+                : selectedHour !== null
+                  ? [selectedHour]
+                  : [],
+            distBins:
+              selectedDistBins.length > 0
+                ? selectedDistBins
+                : selectedDistBin
+                  ? [selectedDistBin]
+                  : [],
+            durBins:
+              selectedDurBins.length > 0
+                ? selectedDurBins
+                : selectedDurBin
+                  ? [selectedDurBin]
+                  : [],
+            trainCodes: selectedTrainCodes,
             unit: distUnit,
           })
         : null,
@@ -485,8 +505,12 @@ export default function App() {
       cur,
       selectedClasses,
       selectedHour,
+      selectedHours,
       selectedDistBin,
+      selectedDistBins,
       selectedDurBin,
+      selectedDurBins,
+      selectedTrainCodes,
       distUnit,
     ],
   );
@@ -626,11 +650,20 @@ export default function App() {
     w.__setDark = setDark;
   });
 
+  const clearFilters = () => {
+    setSelectedClasses([]);
+    setSelectedHour(null);
+    setSelectedHours([]);
+    setSelectedDistBin(null);
+    setSelectedDistBins([]);
+    setSelectedDurBin(null);
+    setSelectedDurBins([]);
+    setSelectedTrainCodes([]);
+  };
+
   const selectOrigin = (idx: number) => {
     setPanelCity(null);
-    setSelectedHour(null);
-    setSelectedDistBin(null);
-    setSelectedDurBin(null);
+    clearFilters();
     setOriginIdx(idx);
     syncUrl(idx);
   };
@@ -693,9 +726,7 @@ export default function App() {
     if (d === "in") ensureInMap();
     else ensureOutTables();
     setPanelCity(null);
-    setSelectedHour(null);
-    setSelectedDistBin(null);
-    setSelectedDurBin(null);
+    clearFilters();
     setDirectionState(d);
     try {
       if (window.localStorage) localStorage.setItem("crfa-direction", d);
@@ -793,10 +824,20 @@ export default function App() {
               (() => {
                 const hasHistFilter =
                   selectedHour !== null ||
+                  selectedHours.length > 0 ||
                   selectedDistBin !== null ||
-                  selectedDurBin !== null;
+                  selectedDistBins.length > 0 ||
+                  selectedDurBin !== null ||
+                  selectedDurBins.length > 0 ||
+                  selectedTrainCodes.length > 0;
                 const hasAnyFilter =
                   selectedClasses.length > 0 || hasHistFilter;
+                const filterLabel =
+                  selectedTrainCodes.length > 0
+                    ? selectedTrainCodes.length === 1
+                      ? "train selected"
+                      : "trains selected"
+                    : "trains matching filter";
 
                 return direction === "out" ? (
                   <>
@@ -809,7 +850,7 @@ export default function App() {
                       </b>{" "}
                       <span>
                         {hasHistFilter
-                          ? "trains matching filter"
+                          ? filterLabel
                           : selectedClasses.length > 0
                             ? selectedClasses
                                 .map((c) => (c === "plain" ? "普" : c))
@@ -840,7 +881,7 @@ export default function App() {
                       </b>{" "}
                       <span>
                         {hasHistFilter
-                          ? "trains matching filter"
+                          ? filterLabel
                           : selectedClasses.length > 0
                             ? selectedClasses
                                 .map((c) => (c === "plain" ? "普" : c))
@@ -1064,6 +1105,7 @@ export default function App() {
           atlas={atlas}
           outline={outline}
           showOutline={showOutline}
+          baseCur={cur}
           cur={viewCur}
           direction={direction}
           dark={dark}
@@ -1081,21 +1123,45 @@ export default function App() {
         >
           <ActiveFilterBar
             classes={selectedClasses}
-            hour={selectedHour}
-            distBin={selectedDistBin}
-            durBin={selectedDurBin}
+            hours={
+              selectedHours.length > 0
+                ? selectedHours
+                : selectedHour !== null
+                  ? [selectedHour]
+                  : []
+            }
+            distBins={
+              selectedDistBins.length > 0
+                ? selectedDistBins
+                : selectedDistBin
+                  ? [selectedDistBin]
+                  : []
+            }
+            durBins={
+              selectedDurBins.length > 0
+                ? selectedDurBins
+                : selectedDurBin
+                  ? [selectedDurBin]
+                  : []
+            }
+            trainCodes={selectedTrainCodes}
             onClearClass={(cls) =>
               setSelectedClasses((prev) => prev.filter((c) => c !== cls))
             }
-            onClearHour={() => setSelectedHour(null)}
-            onClearDist={() => setSelectedDistBin(null)}
-            onClearDur={() => setSelectedDurBin(null)}
-            onClearAll={() => {
-              setSelectedClasses([]);
+            onClearHours={() => {
+              setSelectedHours([]);
               setSelectedHour(null);
+            }}
+            onClearDist={() => {
+              setSelectedDistBins([]);
               setSelectedDistBin(null);
+            }}
+            onClearDur={() => {
+              setSelectedDurBins([]);
               setSelectedDurBin(null);
             }}
+            onClearTrains={() => setSelectedTrainCodes([])}
+            onClearAll={clearFilters}
           />
           <DestinationPanel
             point={panelCity}
@@ -1137,13 +1203,24 @@ export default function App() {
         onSelectClasses={setSelectedClasses}
         outTablesReady={outTablesReady}
         inTablesReady={inTablesReady}
-        onClearFilter={closePanel}
+        onClearFilter={() => {
+          closePanel();
+          setSelectedTrainCodes([]);
+        }}
         selectedHour={selectedHour}
+        selectedHours={selectedHours}
         onSelectHour={setSelectedHour}
+        onSelectHours={setSelectedHours}
         selectedDistBin={selectedDistBin}
+        selectedDistBins={selectedDistBins}
         onSelectDistBin={setSelectedDistBin}
+        onSelectDistBins={setSelectedDistBins}
         selectedDurBin={selectedDurBin}
+        selectedDurBins={selectedDurBins}
         onSelectDurBin={setSelectedDurBin}
+        onSelectDurBins={setSelectedDurBins}
+        selectedTrainCodes={selectedTrainCodes}
+        onSelectTrainCodes={setSelectedTrainCodes}
       />
 
       <footer id="pageFooter">
@@ -1155,35 +1232,58 @@ export default function App() {
   );
 }
 
+function pad2(n: number): string {
+  return n < 10 ? "0" + n : String(n);
+}
+
+function formatHoursLabel(hours: number[]): string {
+  if (hours.length === 0) return "";
+  if (hours.length === 1) {
+    const h = hours[0];
+    return `${pad2(h)}:00–${pad2(h + 1)}:00`;
+  }
+  const sorted = [...hours].sort((a, b) => a - b);
+  const isConsecutive = sorted.every(
+    (h, i) => i === 0 || h === sorted[i - 1] + 1,
+  );
+  if (isConsecutive) {
+    return `${pad2(sorted[0])}:00–${pad2(sorted[sorted.length - 1] + 1)}:00`;
+  }
+  return sorted.map((h) => `${pad2(h)}:00`).join(", ");
+}
+
 function ActiveFilterBar({
   classes,
-  hour,
-  distBin,
-  durBin,
+  hours,
+  distBins,
+  durBins,
+  trainCodes,
   onClearClass,
-  onClearHour,
+  onClearHours,
   onClearDist,
   onClearDur,
+  onClearTrains,
   onClearAll,
 }: {
   classes: string[];
-  hour: number | null;
-  distBin: DistBinFilter | null;
-  durBin: DurBinFilter | null;
+  hours: number[];
+  distBins: DistBinFilter[];
+  durBins: DurBinFilter[];
+  trainCodes: string[];
   onClearClass: (cls: string) => void;
-  onClearHour: () => void;
+  onClearHours: () => void;
   onClearDist: () => void;
   onClearDur: () => void;
+  onClearTrains: () => void;
   onClearAll: () => void;
 }) {
   const hasAny =
     classes.length > 0 ||
-    hour !== null ||
-    distBin !== null ||
-    durBin !== null;
+    hours.length > 0 ||
+    distBins.length > 0 ||
+    durBins.length > 0 ||
+    trainCodes.length > 0;
   if (!hasAny) return null;
-
-  const pad2 = (n: number) => String(n).padStart(2, "0");
 
   return (
     <div
@@ -1204,21 +1304,35 @@ function ActiveFilterBar({
           </button>
         </span>
       ))}
-      {hour !== null && (
+      {trainCodes.length > 0 && (
         <span className="filter-pill">
-          Hour: {pad2(hour)}:00–{pad2(hour + 1)}:00
+          {trainCodes.length === 1
+            ? `Train: ${trainCodes[0]}`
+            : `Trains: ${trainCodes.length} selected`}
           <button
             type="button"
-            aria-label="Remove hour filter"
-            onClick={onClearHour}
+            aria-label="Remove train selection"
+            onClick={onClearTrains}
           >
             &times;
           </button>
         </span>
       )}
-      {distBin !== null && (
+      {hours.length > 0 && (
         <span className="filter-pill">
-          Dist: {distBin.label}
+          {hours.length === 1 ? "Hour" : "Hours"}: {formatHoursLabel(hours)}
+          <button
+            type="button"
+            aria-label="Remove hour filter"
+            onClick={onClearHours}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      {distBins.length > 0 && (
+        <span className="filter-pill">
+          Dist: {distBins.map((b) => b.label).join(", ")}
           <button
             type="button"
             aria-label="Remove distance filter"
@@ -1228,9 +1342,9 @@ function ActiveFilterBar({
           </button>
         </span>
       )}
-      {durBin !== null && (
+      {durBins.length > 0 && (
         <span className="filter-pill">
-          Time: {durBin.label}
+          Time: {durBins.map((b) => b.label).join(", ")}
           <button
             type="button"
             aria-label="Remove duration filter"

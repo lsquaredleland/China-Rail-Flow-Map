@@ -74,6 +74,7 @@ interface Props {
   atlas: DecodedAtlas | null;
   outline?: DecodedOutline | null;
   showOutline?: boolean;
+  baseCur?: OriginVM | null;
   cur: OriginVM | null;
   direction: Direction;
   dark: boolean;
@@ -562,7 +563,21 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!atlas || !cur || !set) return;
     const { pts, off, len, bb } = set;
     const flows = flowsList();
-    const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
+    const baseCur = P.current.baseCur || cur;
+    const baseFlows =
+      P.current.direction === "out" ? baseCur.flows : baseCur.inFlows;
+    const baseMaxN =
+      P.current.direction === "out" ? baseCur.maxFlow : baseCur.maxInFlow;
+    const effectiveMaxN = Math.max(1, baseMaxN);
+
+    const isFiltered =
+      !!destSecCounts ||
+      (baseCur &&
+        cur &&
+        (cur.deps.length !== baseCur.deps.length ||
+          cur.arrs.length !== baseCur.arrs.length ||
+          cur.flows.length !== baseCur.flows.length ||
+          cur.maxFlow !== baseCur.maxFlow));
 
     const timeline =
       P.current.direction === "out" ? cur.timeline : cur.inTimeline;
@@ -570,9 +585,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const step = isAnimated
       ? Math.min(287, Math.max(0, Math.floor(S.current.animTime / 5)))
       : 0;
-    const curMaxN =
-      isAnimated && timeline ? timeline.maxFlowSteps[step] || maxN : maxN;
-    const effectiveMaxN = Math.max(1, curMaxN);
 
     const isFerry = (s: number) =>
       bb[s * 4 + 1] < 20.15 &&
@@ -656,11 +668,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
 
     let activeFlows: { s: number; n: number }[];
-    if (isAnimated && timeline) {
+    const isActivelyScrubbing =
+      S.current.animPlaying || S.current.animTime < 1440;
+    if (isAnimated && timeline && isActivelyScrubbing) {
       activeFlows = [];
       for (let i = 0; i < flows.length; i++) {
         const f = flows[i];
-        const n = timeline.secFlowSteps.get(f.s)?.[step] ?? 0;
+        const stepN = timeline.secFlowSteps.get(f.s)?.[step] ?? 0;
+        const origTotal = timeline.secFlowSteps.get(f.s)?.[287] ?? stepN;
+        const frac = origTotal > 0 ? stepN / origTotal : 1;
+        const n = Math.max(0, Math.round(f.n * frac));
         if (n > 0) {
           activeFlows.push({ s: f.s, n });
         }
@@ -671,42 +688,30 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
 
     if (destSecCounts) {
-      // Pass 1: faded background of ALL flows at current trunk width
-      strokeFlowList(activeFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
+      // Pass 1: faded background of ALL base flows at full trunk width
+      strokeFlowList(baseFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
       // Pass 2: exact city-pair flow on top at widthOf(subN) and flowColor(subN, effectiveMaxN, pal)
       if (destSecCounts.size > 0) {
         const subFlows: { s: number; n: number }[] = [];
-        if (isAnimated && timeline) {
-          const staticFlowMap = new Map<number, number>();
-          for (let i = 0; i < flows.length; i++) {
-            staticFlowMap.set(flows[i].s, flows[i].n);
-          }
-          for (let i = 0; i < activeFlows.length; i++) {
-            const af = activeFlows[i];
-            const destN = destSecCounts.get(af.s) || 0;
-            if (destN > 0) {
-              const totalN = staticFlowMap.get(af.s) || af.n;
-              const subN = Math.min(
-                destN,
-                Math.max(1, Math.round(af.n * (destN / totalN))),
-              );
-              if (subN > 0) {
-                subFlows.push({ s: af.s, n: subN });
-              }
-            }
-          }
-        } else {
-          for (let i = 0; i < flows.length; i++) {
-            const f = flows[i];
-            const subN = destSecCounts.get(f.s) || 0;
+        for (let i = 0; i < activeFlows.length; i++) {
+          const af = activeFlows[i];
+          const destN = destSecCounts.get(af.s) || 0;
+          if (destN > 0) {
+            const subN = Math.min(af.n, destN);
             if (subN > 0) {
-              subFlows.push({ s: f.s, n: subN });
+              subFlows.push({ s: af.s, n: subN });
             }
           }
         }
         subFlows.sort((a, b) => b.n - a.n);
         strokeFlowList(subFlows, 1.0, effectiveMaxN);
       }
+      ctx.globalAlpha = 1.0;
+    } else if (isFiltered) {
+      // Pass 1: faded background of ALL base flows at full trunk width
+      strokeFlowList(baseFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
+      // Pass 2: exact filtered flows on top at widthOf(f.n) and flowColor(f.n, effectiveMaxN, pal)
+      strokeFlowList(activeFlows, 1.0, effectiveMaxN);
       ctx.globalAlpha = 1.0;
     } else {
       strokeFlowList(activeFlows, 1.0, effectiveMaxN);
@@ -820,10 +825,19 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     hasSelectedDest: boolean,
   ) {
     const cur = P.current.cur;
-    if (!cur) return;
-    if (hasSelectedDest) ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
-    for (let i = 0; i < cur.chords.length; i++) {
-      const ch = cur.chords[i];
+    const baseCur = P.current.baseCur || cur;
+    if (!cur || !baseCur) return;
+    const isFiltered =
+      hasSelectedDest ||
+      (baseCur &&
+        cur &&
+        (cur.deps.length !== baseCur.deps.length ||
+          cur.arrs.length !== baseCur.arrs.length ||
+          cur.flows.length !== baseCur.flows.length ||
+          cur.maxFlow !== baseCur.maxFlow));
+    if (isFiltered) ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
+    for (let i = 0; i < baseCur.chords.length; i++) {
+      const ch = baseCur.chords[i];
       if (highlight === ch) continue;
       if (!inViewBB(ch.bb.x0, ch.bb.y0, ch.bb.x1, ch.bb.y1, 0.35)) continue;
       const w = widthOf(ch.n);

@@ -14,7 +14,9 @@ import type {
   DepVM,
   DestVM,
   Direction,
+  DistBinFilter,
   DistUnit,
+  DurBinFilter,
   FlowVM,
   OriginFilterCriteria,
   OriginVM,
@@ -1122,18 +1124,48 @@ export function filterOrigin(
   const {
     classes = [],
     hour = null,
+    hours = null,
     distBin = null,
+    distBins = null,
     durBin = null,
+    durBins = null,
+    trainCodes = null,
     unit = "km",
   } = criteria;
 
+  const activeHours: number[] =
+    hours && hours.length > 0
+      ? hours
+      : hour !== null && hour !== undefined
+        ? [hour]
+        : [];
+  const activeDistBins: DistBinFilter[] =
+    distBins && distBins.length > 0
+      ? distBins
+      : distBin
+        ? [distBin]
+        : [];
+  const activeDurBins: DurBinFilter[] =
+    durBins && durBins.length > 0
+      ? durBins
+      : durBin
+        ? [durBin]
+        : [];
+  const activeTrainCodes: string[] =
+    trainCodes && trainCodes.length > 0 ? trainCodes : [];
+
   const hasClassFilter = classes.length > 0;
-  const hasHourFilter = hour !== null && hour !== undefined;
-  const hasDistFilter = distBin !== null && distBin !== undefined;
-  const hasDurFilter = durBin !== null && durBin !== undefined;
+  const hasHourFilter = activeHours.length > 0;
+  const hasDistFilter = activeDistBins.length > 0;
+  const hasDurFilter = activeDurBins.length > 0;
+  const hasTrainFilter = activeTrainCodes.length > 0;
 
   const hasAnyFilter =
-    hasClassFilter || hasHourFilter || hasDistFilter || hasDurFilter;
+    hasClassFilter ||
+    hasHourFilter ||
+    hasDistFilter ||
+    hasDurFilter ||
+    hasTrainFilter;
   if (!hasAnyFilter) return cur;
 
   const clsIndices = Array.from(new Set(classes.map(classIndex)));
@@ -1142,50 +1174,67 @@ export function filterOrigin(
     classes.includes(cls) ||
     (classes.includes("plain") && classIndex(cls) === 7);
 
+  const trainCodeSet = hasTrainFilter ? new Set(activeTrainCodes) : null;
+  const hourSet = hasHourFilter ? new Set(activeHours) : null;
+
   const matchesDep = (d: DepVM) => {
+    if (trainCodeSet && !trainCodeSet.has(d.code)) return false;
     if (!hasClass(d.cls)) return false;
-    if (hasHourFilter) {
+    if (hourSet) {
       const h = parseInt(d.dep.slice(0, 2), 10);
-      if (h !== hour) return false;
+      if (!hourSet.has(h)) return false;
     }
     if (hasDistFilter) {
       const v = unit === "km" ? d.distKm : d.distKm * 0.621371;
-      const b = Math.min(
-        distBin.nb - 1,
-        Math.max(0, Math.floor(v / distBin.size)),
-      );
-      if (b !== distBin.bin) return false;
+      const matched = activeDistBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(v / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     if (hasDurFilter) {
-      const b = Math.min(
-        durBin.nb - 1,
-        Math.max(0, Math.floor(d.dur / durBin.size)),
-      );
-      if (b !== durBin.bin) return false;
+      const matched = activeDurBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(d.dur / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     return true;
   };
 
   const matchesArr = (a: ArrVM) => {
+    if (trainCodeSet && !trainCodeSet.has(a.code)) return false;
     if (!hasClass(a.cls)) return false;
-    if (hasHourFilter) {
+    if (hourSet) {
       const h = parseInt(a.arr.slice(0, 2), 10);
-      if (h !== hour) return false;
+      if (!hourSet.has(h)) return false;
     }
     if (hasDistFilter) {
       const v = unit === "km" ? a.distKm : a.distKm * 0.621371;
-      const b = Math.min(
-        distBin.nb - 1,
-        Math.max(0, Math.floor(v / distBin.size)),
-      );
-      if (b !== distBin.bin) return false;
+      const matched = activeDistBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(v / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     if (hasDurFilter) {
-      const b = Math.min(
-        durBin.nb - 1,
-        Math.max(0, Math.floor(a.dur / durBin.size)),
-      );
-      if (b !== durBin.bin) return false;
+      const matched = activeDurBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(a.dur / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     return true;
   };
@@ -1194,7 +1243,10 @@ export function filterOrigin(
   const arrs = cur.arrs.filter(matchesArr);
 
   let flows: FlowVM[];
-  if (cur.deps.length > 0 && (hasHourFilter || hasDistFilter || hasDurFilter)) {
+  if (
+    cur.deps.length > 0 &&
+    (hasHourFilter || hasDistFilter || hasDurFilter || hasTrainFilter)
+  ) {
     const secMap = new Map<number, { n: number; byClass: number[] }>();
     for (const d of deps) {
       const ci = classIndex(d.cls);
@@ -1226,7 +1278,10 @@ export function filterOrigin(
   }
 
   let inFlows: FlowVM[];
-  if (cur.arrs.length > 0 && (hasHourFilter || hasDistFilter || hasDurFilter)) {
+  if (
+    cur.arrs.length > 0 &&
+    (hasHourFilter || hasDistFilter || hasDurFilter || hasTrainFilter)
+  ) {
     const secMap = new Map<number, { n: number; byClass: number[] }>();
     for (const a of arrs) {
       const ci = classIndex(a.cls);
