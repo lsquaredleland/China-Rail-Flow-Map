@@ -254,18 +254,64 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   }
   // Append one polyline (flat coords, offset in floats) to the current path,
   // skipping points that land on (nearly) the same pixel as the previous one.
+  // Optional waterMode isolates open-water ferry crossings from overland track.
   function traceInto(
     ctx: CanvasRenderingContext2D,
     arr: ArrayLike<number>,
     off: number,
     count: number,
+    waterMode?: "landOnly" | "waterOnly",
   ) {
+    if (!waterMode) {
+      let lx = -1e9,
+        ly = -1e9,
+        started = false;
+      for (let i = 0; i < count; i++) {
+        const x = X(arr[off + i * 2]),
+          y = Y(arr[off + i * 2 + 1]);
+        const dx = x - lx,
+          dy = y - ly;
+        if (started && dx * dx + dy * dy < 0.42 && i !== count - 1) continue;
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else ctx.lineTo(x, y);
+        lx = x;
+        ly = y;
+      }
+      return;
+    }
+
     let lx = -1e9,
       ly = -1e9,
       started = false;
     for (let i = 0; i < count; i++) {
-      const x = X(arr[off + i * 2]),
-        y = Y(arr[off + i * 2 + 1]);
+      const lon = arr[off + i * 2];
+      const lat = arr[off + i * 2 + 1];
+
+      if (i > 0) {
+        const prevLon = arr[off + (i - 1) * 2];
+        const prevLat = arr[off + (i - 1) * 2 + 1];
+        const isWaterCross =
+          ((prevLat < 20.10 && lat > 20.18) || (prevLat > 20.18 && lat < 20.10)) &&
+          prevLon > 109.9 && prevLon < 110.4 &&
+          lon > 109.9 && lon < 110.4;
+
+        if (waterMode === "landOnly" && isWaterCross) {
+          started = false;
+        } else if (waterMode === "waterOnly") {
+          if (isWaterCross) {
+            ctx.moveTo(X(prevLon), Y(prevLat));
+            ctx.lineTo(X(lon), Y(lat));
+          }
+          continue;
+        }
+      }
+
+      if (waterMode === "waterOnly") continue;
+
+      const x = X(lon),
+        y = Y(lat);
       const dx = x - lx,
         dy = y - ly;
       if (started && dx * dx + dy * dy < 0.42 && i !== count - 1) continue;
@@ -459,7 +505,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!atlas) return;
     const { pts, off, len, bb } = atlas.net;
     ctx.strokeStyle = pal.network;
-    ctx.lineWidth = Math.max(0.45, S.current.view.scale * 0.016);
+    const netScaleW = Math.min(2.5, Math.max(0.45, S.current.view.scale * 0.008));
+    ctx.lineWidth = netScaleW;
 
     const isFerry = (i: number) =>
       bb[i * 4 + 1] < 20.15 &&
@@ -467,28 +514,30 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       bb[i * 4] > 110.0 &&
       bb[i * 4 + 2] < 110.3;
 
-    // Solid track network
+    // Solid track network (including overland tracks of ferry corridor)
     ctx.setLineDash([]);
     ctx.beginPath();
     for (let i = 0; i < len.length; i++) {
-      if (isFerry(i)) continue;
-      if (inViewBB(bb[i * 4], bb[i * 4 + 1], bb[i * 4 + 2], bb[i * 4 + 3], 0.3)) {
+      if (!inViewBB(bb[i * 4], bb[i * 4 + 1], bb[i * 4 + 2], bb[i * 4 + 3], 0.3)) continue;
+      if (isFerry(i)) {
+        traceInto(ctx, pts, off[i], len[i], "landOnly");
+      } else {
         traceInto(ctx, pts, off[i], len[i]);
       }
     }
     ctx.stroke();
 
-    // Dashed ferry crossing line across Qiongzhou strait (maritime water blue)
-    const netW = Math.max(0.65, S.current.view.scale * 0.02);
+    // Dashed ferry crossing line across Qiongzhou strait (maritime water blue, open-water only)
+    const ferryW = Math.min(3.5, Math.max(0.75, S.current.view.scale * 0.01));
     ctx.strokeStyle = P.current.dark ? "#38BDF8" : "#0284C7";
-    ctx.lineWidth = netW;
+    ctx.lineWidth = ferryW;
     ctx.lineCap = "butt";
-    ctx.setLineDash([Math.max(8, netW * 2.5), Math.max(6, netW * 2.0)]);
+    ctx.setLineDash([Math.max(12, ferryW * 3.0), Math.max(8, ferryW * 2.0)]);
     ctx.beginPath();
     for (let i = 0; i < len.length; i++) {
       if (!isFerry(i)) continue;
       if (inViewBB(bb[i * 4], bb[i * 4 + 1], bb[i * 4 + 2], bb[i * 4 + 3], 0.3)) {
-        traceInto(ctx, pts, off[i], len[i]);
+        traceInto(ctx, pts, off[i], len[i], "waterOnly");
       }
     }
     ctx.stroke();
@@ -576,8 +625,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.globalAlpha = alpha;
       let curW = -1,
         curCol = "",
-        curDash = false,
         open = false;
+      ctx.lineCap = "round";
+      ctx.setLineDash([]);
+
       for (let i = 0; i < items.length; i++) {
         const f = items[i];
         if (
@@ -591,36 +642,50 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         )
           continue;
         const bw0 = Math.round(widthOf(f.n) * 4) / 4;
-        const ferry = isFerry(f.s);
-        // Water crossing blue: luminous azure in dark mode, vibrant ocean blue in light mode
-        const col = ferry
-          ? P.current.dark
-            ? "#38BDF8"
-            : "#0284C7"
-          : flowColor(f.n, maxN, pal);
-        if (bw0 !== curW || col !== curCol || ferry !== curDash) {
+        const col = flowColor(f.n, maxN, pal);
+        if (bw0 !== curW || col !== curCol) {
           if (open) ctx.stroke();
           ctx.beginPath();
           ctx.lineWidth = bw0;
           ctx.strokeStyle = col;
-          if (ferry) {
-            // Use butt cap and scale dash/gap with stroke width so dashes never merge at high zoom
-            ctx.lineCap = "butt";
-            const dashLen = Math.max(12, bw0 * 2.5);
-            const gapLen = Math.max(9, bw0 * 1.8);
-            ctx.setLineDash([dashLen, gapLen]);
-          } else {
-            ctx.lineCap = "round";
-            ctx.setLineDash([]);
-          }
           curW = bw0;
           curCol = col;
-          curDash = ferry;
           open = true;
         }
-        traceInto(ctx, pts, off[f.s], len[f.s]);
+        if (isFerry(f.s)) {
+          traceInto(ctx, pts, off[f.s], len[f.s], "landOnly");
+        } else {
+          traceInto(ctx, pts, off[f.s], len[f.s]);
+        }
       }
       if (open) ctx.stroke();
+
+      // Open-water ferry crossing dashed lines (Qiongzhou Strait water connector)
+      const ferryBlue = P.current.dark ? "#38BDF8" : "#0284C7";
+      for (let i = 0; i < items.length; i++) {
+        const f = items[i];
+        if (!isFerry(f.s)) continue;
+        if (
+          !inViewBB(
+            bb[f.s * 4],
+            bb[f.s * 4 + 1],
+            bb[f.s * 4 + 2],
+            bb[f.s * 4 + 3],
+            0.35,
+          )
+        )
+          continue;
+        const bw0 = Math.round(widthOf(f.n) * 4) / 4;
+        ctx.beginPath();
+        ctx.lineWidth = bw0;
+        ctx.strokeStyle = ferryBlue;
+        ctx.lineCap = "butt";
+        const dashLen = Math.max(12, bw0 * 2.5);
+        const gapLen = Math.max(9, bw0 * 1.8);
+        ctx.setLineDash([dashLen, gapLen]);
+        traceInto(ctx, pts, off[f.s], len[f.s], "waterOnly");
+        ctx.stroke();
+      }
       ctx.lineCap = "round";
       ctx.setLineDash([]);
     }
@@ -712,7 +777,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           )
             continue;
           if ((hsr[f.s] ? 1 : 0) !== wantHsr) continue;
-          if (pass === 0 && isFerry(f.s)) continue;
           if (
             !inViewBB(
               bb[f.s * 4],
@@ -723,12 +787,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
             )
           )
             continue;
-          traceInto(ctx, pts, off[f.s], len[f.s]);
+          if (pass === 0 && isFerry(f.s)) {
+            traceInto(ctx, pts, off[f.s], len[f.s], "landOnly");
+          } else {
+            traceInto(ctx, pts, off[f.s], len[f.s]);
+          }
           any = true;
         }
         if (any) ctx.stroke();
 
-        // Depict train ferry crossing with a maritime dashed line in water blue
+        // Depict train ferry crossing with a maritime dashed line in water blue (open water only)
         if (pass === 0) {
           ctx.beginPath();
           ctx.lineCap = "butt";
@@ -753,7 +821,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
               )
             )
               continue;
-            traceInto(ctx, pts, off[f.s], len[f.s]);
+            traceInto(ctx, pts, off[f.s], len[f.s], "waterOnly");
             anyFerry = true;
           }
           if (anyFerry) ctx.stroke();
@@ -820,21 +888,30 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       set.bb[sIdx * 4 + 2] < 110.3;
     const hw = widthOf(n) + 1.6;
     ctx.lineWidth = hw;
-    ctx.strokeStyle = isFerry
-      ? P.current.dark
-        ? "#7DD3FC"
-        : "#0284C7"
-      : pal.flowHi;
     if (isFerry) {
-      ctx.lineCap = "butt";
-      ctx.setLineDash([Math.max(12, hw * 2.5), Math.max(9, hw * 1.8)]);
-    } else {
+      // Overland portions of the ferry route highlighted in standard flowHi
+      ctx.strokeStyle = pal.flowHi;
       ctx.lineCap = "round";
       ctx.setLineDash([]);
+      ctx.beginPath();
+      traceInto(ctx, set.pts, set.off[sIdx], set.len[sIdx], "landOnly");
+      ctx.stroke();
+
+      // Open-water crossing highlighted in luminous water blue
+      ctx.strokeStyle = P.current.dark ? "#7DD3FC" : "#0284C7";
+      ctx.lineCap = "butt";
+      ctx.setLineDash([Math.max(12, hw * 2.5), Math.max(9, hw * 1.8)]);
+      ctx.beginPath();
+      traceInto(ctx, set.pts, set.off[sIdx], set.len[sIdx], "waterOnly");
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = pal.flowHi;
+      ctx.lineCap = "round";
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      traceInto(ctx, set.pts, set.off[sIdx], set.len[sIdx]);
+      ctx.stroke();
     }
-    ctx.beginPath();
-    traceInto(ctx, set.pts, set.off[sIdx], set.len[sIdx]);
-    ctx.stroke();
     ctx.lineCap = "round";
     ctx.setLineDash([]);
   }

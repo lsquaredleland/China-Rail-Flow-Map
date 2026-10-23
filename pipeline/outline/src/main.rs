@@ -255,15 +255,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(2)
         .unwrap_or_else(|| format!("{out_dir}/china-outline.json"));
 
-    // Pass 1: extract boundary ways for PRC (270056), Taiwan (449220), Hainan (2128285)
-    let (outer_ways_prc, inner_ways_prc, ways_tw, ways_hn) = {
+    // Pass 1: extract boundary ways for PRC (270056) and Taiwan (449220)
+    // Note: Hainan's physical shoreline is fully captured by natural=coastline,
+    // so relation 2128285 (which includes maritime administrative jurisdiction) is excluded.
+    let (outer_ways_prc, inner_ways_prc, ways_tw) = {
         let reader = ElementReader::from_path(&input)?;
         reader.par_map_reduce(
             |el| {
                 let mut out_prc = HashSet::new();
                 let mut inn_prc = HashSet::new();
                 let mut out_tw = HashSet::new();
-                let mut out_hn = HashSet::new();
                 if let Element::Relation(r) = el {
                     let id = r.id();
                     if id == 270056 {
@@ -282,30 +283,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 out_tw.insert(m.member_id);
                             }
                         }
-                    } else if id == 2128285 {
-                        for m in r.members() {
-                            if m.member_type == RelMemberType::Way && m.role().unwrap_or("") != "inner" {
-                                out_hn.insert(m.member_id);
-                            }
-                        }
                     }
                 }
-                (out_prc, inn_prc, out_tw, out_hn)
+                (out_prc, inn_prc, out_tw)
             },
-            || (HashSet::new(), HashSet::new(), HashSet::new(), HashSet::new()),
+            || (HashSet::new(), HashSet::new(), HashSet::new()),
             |mut a, b| {
                 a.0.extend(b.0);
                 a.1.extend(b.1);
                 a.2.extend(b.2);
-                a.3.extend(b.3);
                 a
             },
         )?
     };
 
     println!(
-        "ways in relations: PRC outer {} inner {}, Taiwan {}, Hainan {}",
-        outer_ways_prc.len(), inner_ways_prc.len(), ways_tw.len(), ways_hn.len()
+        "ways in relations: PRC outer {} inner {}, Taiwan {}",
+        outer_ways_prc.len(), inner_ways_prc.len(), ways_tw.len()
     );
 
     // Pass 2: node refs for member ways (filtering out maritime straight baselines) + natural=coastline
@@ -322,7 +316,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let is_prc_out = outer_ways_prc.contains(&wid);
                     let is_prc_in = inner_ways_prc.contains(&wid);
                     let is_tw = ways_tw.contains(&wid);
-                    let is_hn = ways_hn.contains(&wid);
 
                     let mut is_maritime = false;
                     let mut is_coastline = false;
@@ -343,7 +336,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         coast.insert(wid);
                     }
 
-                    if (is_prc_out && !is_maritime) || is_prc_in || is_tw || is_hn || is_coastline {
+                    if (is_prc_out && !is_maritime) || is_prc_in || (is_tw && !is_maritime) || is_coastline {
                         let refs: Vec<i64> = w.refs().collect();
                         for n in refs.iter() {
                             nodes.insert(*n);
@@ -407,19 +400,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut rings_mainland, mut lines_mainland) = snap_chains(chain(&mainland_ways, &way_refs, &coords), tol_km);
     let (in_rings, in_lines) = snap_chains(chain(&inner_ways_prc, &way_refs, &coords), tol_km);
     let (rings_tw, lines_tw) = snap_chains(chain(&ways_tw, &way_refs, &coords), tol_km);
-    let (rings_hn, lines_hn) = snap_chains(chain(&ways_hn, &way_refs, &coords), tol_km);
 
     let mut all_rings: Vec<Vec<[f64; 2]>> = Vec::new();
     all_rings.append(&mut rings_mainland);
     all_rings.extend(in_rings);
     all_rings.extend(rings_tw);
-    all_rings.extend(rings_hn);
 
     let mut all_lines: Vec<Vec<[f64; 2]>> = Vec::new();
     all_lines.append(&mut lines_mainland);
     all_lines.extend(in_lines);
     all_lines.extend(lines_tw);
-    all_lines.extend(lines_hn);
 
     // Canonical Nine-Dash Line dashes in the South China Sea
     let nine_dashes: Vec<Vec<[f64; 2]>> = vec![

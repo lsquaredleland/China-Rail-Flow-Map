@@ -75,7 +75,7 @@ export function palette(dark: boolean): Palette {
         [0.67, [200, 48, 42]],   // traffic red #C8302A
         [1, [229, 64, 53]],      // luminous traffic red #E54035
       ],
-      chord: "rgba(190,160,120,0.75)",
+      chord: "#c9b8a6",
       infraLine: "#EDEDEA",
       infraHsr: "#FF6A00",
       infraConv: "#EDEDEA",
@@ -86,7 +86,7 @@ export function palette(dark: boolean): Palette {
       origin: "#EDEDEA",
       legendInk: "#A3A3A0",
       legendLine: "#C8302A",
-      ramp: TIME_BANDS_NIGHT,
+      ramp: TIME_BANDS,
       outline: "rgba(255,255,255,0.13)",
       dashLine: "rgba(56,189,248,0.40)",
       landFill: "rgba(255,255,255,0.015)",

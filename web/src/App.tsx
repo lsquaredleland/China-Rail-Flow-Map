@@ -783,15 +783,6 @@ export default function App() {
           <div className="spacer"></div>
           <div className="group">
             <button
-              id="tglOutline"
-              type="button"
-              aria-pressed={showOutline ? "true" : "false"}
-              onClick={() => setShowOutline((v) => !v)}
-              title="Show boundary outline of China, Taiwan, Hainan, and South China Sea"
-            >
-              Boundary
-            </button>
-            <button
               id="btnConnector"
               type="button"
               onClick={() =>
@@ -936,9 +927,6 @@ export default function App() {
           </div>
         </MapCanvas>
 
-        <footer id="pageFooter">
-          {atlas ? atlas.data.about : ""}
-        </footer>
       </div>
 
       <DeparturesTable
@@ -953,6 +941,10 @@ export default function App() {
         inTablesReady={inTablesReady}
         onClearFilter={closePanel}
       />
+
+      <footer id="pageFooter">
+        {atlas ? atlas.data.about : ""}
+      </footer>
 
       <Footnote cur={cur} direction={direction} />
     </>
