@@ -54,12 +54,11 @@ const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
 // the text is unchanged apart from the geometry-precision sentence,
 // which now states the v2 encoding.
 const ABOUT =
-  "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. " +
-  "Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); " +
-  "every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. " +
-  "Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) " +
-  "and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. " +
-  "Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e4 precision, [lat, lon] order.";
+  "Minard-style passenger rail flow maps for China's top 100 rail cities. " +
+  "Flow line width reflects daily train frequency along each railway corridor. " +
+  "In the outbound view, trains are traced from the origin city outward to their destinations; " +
+  "in the inbound view, trains are traced from their starting stations through all intermediate calls into the selected city. " +
+  "Timetable data is sourced from China Railway (12306), covering 5,043 trunk services and 2,210 intercity C/S services across sample dates in October 2026.";
 
 /* Fetch one dataset file, preferring its Brotli twin (the .br asset):
    1. if the server negotiates the encoding itself (the .br response
@@ -885,14 +884,7 @@ export default function App() {
         </MapCanvas>
 
         <footer id="pageFooter">
-          {atlas
-            ? atlas.data.about +
-              " In the outbound view, trains are counted from the origin city outward " +
-              "to their termini; in the inbound view, from the cities they start in, " +
-              "through every city they call at, into the selected city. The counts are " +
-              "the union of the two timetable sample dates. "
-            : ""}
-          Track geometry &copy; OpenStreetMap contributors (ODbL).
+          {atlas ? atlas.data.about : ""}
         </footer>
       </div>
 

@@ -574,7 +574,7 @@ export default function Histograms({
               <span className="swatch swatch-h-sub" />
               {subLabel}
               <span className="swatch swatch-h-muted" />
-              All {cur.en}
+              All
             </span>
           ) : (
             <span className="hist-hint">Click a bar to filter</span>
@@ -617,7 +617,7 @@ export default function Histograms({
               <span className="swatch swatch-d-sub" />
               {subLabel}
               <span className="swatch swatch-d-muted" />
-              All {cur.en}
+              All
             </span>
           ) : (
             <span className="hist-hint">Click a bar to filter</span>
@@ -658,7 +658,7 @@ export default function Histograms({
               <span className="swatch swatch-t-sub" />
               {subLabel}
               <span className="swatch swatch-t-muted" />
-              All {cur.en}
+              All
             </span>
           ) : (
             <span className="hist-hint">Click a bar to filter</span>

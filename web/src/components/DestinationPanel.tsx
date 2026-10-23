@@ -56,12 +56,15 @@ export default function DestinationPanel({
         </div>
         <table>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r[0]}>
-                <td>{r[0]}</td>
-                <td>{r[1]}</td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const isAccent = r[0].startsWith("Fastest") || r[0] === "By rail";
+              return (
+                <tr key={r[0]}>
+                  <td>{r[0]}</td>
+                  <td className={isAccent ? "accent-val" : undefined}>{r[1]}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {point.trains > 0 && (

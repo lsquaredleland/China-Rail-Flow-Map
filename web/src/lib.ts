@@ -264,10 +264,18 @@ function rowsHtml(rows: [string, string][]): string {
   return (
     "<table>" +
     rows
-      .map(
-        (r) =>
-          "<tr><td>" + esc(r[0]) + "</td><td>" + esc(r[1]) + "</td></tr>",
-      )
+      .map((r) => {
+        const isAccent = r[0].startsWith("Fastest") || r[0] === "By rail";
+        return (
+          "<tr><td>" +
+          esc(r[0]) +
+          "</td><td" +
+          (isAccent ? ' class="accent-val"' : "") +
+          ">" +
+          esc(r[1]) +
+          "</td></tr>"
+        );
+      })
       .join("") +
     "</table>"
   );
