@@ -119,16 +119,33 @@ export default function TrainScheduleModal({
       if (liveTime >= curr.depMins && liveTime < next.arrMins) {
         const eta = Math.max(0, Math.round(next.arrMins - liveTime));
         return {
-          state: "transit",
+          state: "transit" as const,
           text: `En route: ${curr.stZh} ➔ ${next.stZh} · ETA in ${eta}m (${next.arr})`,
           fromIdx: i,
           toIdx: i + 1,
+          eta,
         };
       }
     }
 
     return null;
   }, [stops, liveTime]);
+
+  const overallProgress = useMemo(() => {
+    if (!stops || stops.length === 0) return 0;
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    const totalTrip = Math.max(1, last.arrMins - first.depMins);
+    return Math.max(0, Math.min(1, (liveTime - first.depMins) / totalTrip));
+  }, [stops, liveTime]);
+
+  const legProgress = useMemo(() => {
+    if (!currentStatus || currentStatus.state !== "transit" || !stops) return 0;
+    const curr = stops[currentStatus.fromIdx];
+    const next = stops[currentStatus.toIdx];
+    const legDur = Math.max(1, next.arrMins - curr.depMins);
+    return Math.max(0, Math.min(1, (liveTime - curr.depMins) / legDur));
+  }, [currentStatus, stops, liveTime]);
 
   if (!code) return null;
 
@@ -429,6 +446,84 @@ export default function TrainScheduleModal({
           )}
         </div>
 
+        {/* Live Journey Progress Track */}
+        {stops && stops.length > 0 && (
+          <div
+            style={{
+              padding: "10px 20px 12px 20px",
+              background: dark ? "rgba(0,0,0,0.24)" : "rgba(0,0,0,0.02)",
+              borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "12px",
+                fontWeight: 700,
+                marginBottom: "6px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "15px" }}>
+                  {currentStatus?.state === "stopped"
+                    ? "🚆"
+                    : currentStatus?.state === "transit"
+                      ? "🚅"
+                      : currentStatus?.state === "post"
+                        ? "🏁"
+                        : "⏳"}
+                </span>
+                <span>{currentStatus?.text || "Trip Progress"}</span>
+              </div>
+              <span
+                style={{
+                  fontFamily: "monospace",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  color: "#F59E0B",
+                }}
+              >
+                {Math.round(overallProgress * 100)}%
+              </span>
+            </div>
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "6px",
+                background: dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+                borderRadius: "3px",
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.round(overallProgress * 100)}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg, #3B82F6 0%, #F59E0B 100%)",
+                  borderRadius: "3px",
+                  transition: "width 0.25s ease",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${Math.round(overallProgress * 100)}%`,
+                  top: "-8px",
+                  transform: "translateX(-50%)",
+                  fontSize: "14px",
+                  transition: "left 0.25s ease",
+                  pointerEvents: "none",
+                  filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
+                }}
+              >
+                🚅
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Timetable Table */}
         <div style={{ overflowY: "auto", flex: 1, padding: "4px 0" }}>
           {!stops ? (
@@ -461,7 +556,7 @@ export default function TrainScheduleModal({
                 </tr>
               </thead>
               <tbody>
-                {stops.map((s, idx) => {
+                {stops.flatMap((s, idx) => {
                   const isOriginCity = originStop && s.stIdx === originStop.stIdx;
                   const isCurrent =
                     typeof liveTime === "number" &&
@@ -473,12 +568,15 @@ export default function TrainScheduleModal({
                     typeof liveTime === "number" &&
                     s.depMins >= 0 &&
                     liveTime > s.depMins;
+                  const isNextStop =
+                    currentStatus?.state === "transit" &&
+                    currentStatus.toIdx === idx;
 
                   const jumpTime = s.arrMins >= 0 ? s.arrMins : s.depMins;
 
-                  return (
+                  const rows = [
                     <tr
-                      key={idx}
+                      key={`stop-${idx}`}
                       onClick={() => {
                         if (jumpTime >= 0 && onJumpToTime) {
                           onJumpToTime(jumpTime);
@@ -487,7 +585,11 @@ export default function TrainScheduleModal({
                       title={onJumpToTime ? `Click to jump simulation to ${s.stZh} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
                       style={{
                         borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)"}`,
-                        borderLeft: isOriginCity ? "4px solid #3B82F6" : "4px solid transparent",
+                        borderLeft: isOriginCity
+                          ? "4px solid #3B82F6"
+                          : isCurrent
+                            ? "4px solid #F59E0B"
+                            : "4px solid transparent",
                         background: isCurrent
                           ? dark
                             ? "rgba(245, 158, 11, 0.26)"
@@ -519,10 +621,18 @@ export default function TrainScheduleModal({
                           textAlign: "center",
                           color: dark ? "#6B7280" : "#94A3B8",
                           fontFamily: "monospace",
-                          fontSize: "11px",
+                          fontSize: "12px",
                         }}
                       >
-                        {isCurrent ? "●" : idx + 1}
+                        {isCurrent ? (
+                          <span style={{ fontSize: "16px" }}>🚆</span>
+                        ) : isPast ? (
+                          <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+                        ) : isNextStop ? (
+                          <span style={{ color: "#F59E0B", fontWeight: 800 }}>▶</span>
+                        ) : (
+                          <span style={{ opacity: 0.6 }}>{idx + 1}</span>
+                        )}
                       </td>
                       <td style={{ padding: "9px 16px" }}>
                         <div style={{ fontWeight: 600, color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit" }}>
@@ -552,11 +662,29 @@ export default function TrainScheduleModal({
                                 background: "#F59E0B",
                                 color: "#000",
                                 fontWeight: 800,
-                                padding: "1px 5px",
-                                borderRadius: "3px",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                display: "inline-block",
                               }}
                             >
-                              NOW
+                              🚆 AT STATION (NOW)
+                            </span>
+                          )}
+                          {isNextStop && (
+                            <span
+                              style={{
+                                marginLeft: "8px",
+                                fontSize: "10px",
+                                background: "rgba(245, 158, 11, 0.2)",
+                                color: "#F59E0B",
+                                fontWeight: 700,
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                display: "inline-block",
+                                border: "1px solid rgba(245, 158, 11, 0.4)",
+                              }}
+                            >
+                              NEXT STOP (ETA {currentStatus?.eta}m)
                             </span>
                           )}
                         </div>
@@ -630,7 +758,78 @@ export default function TrainScheduleModal({
                         {s.dwellMins > 0 ? `${s.dwellMins}m` : "—"}
                       </td>
                     </tr>
-                  );
+                  ];
+
+                  // In transit between idx and idx + 1: insert transit tracker row
+                  if (
+                    currentStatus?.state === "transit" &&
+                    currentStatus.fromIdx === idx &&
+                    idx < stops.length - 1
+                  ) {
+                    rows.push(
+                      <tr
+                        key={`transit-leg-${idx}`}
+                        style={{
+                          background: dark
+                            ? "rgba(245, 158, 11, 0.12)"
+                            : "rgba(245, 158, 11, 0.08)",
+                          borderLeft: "4px solid #F59E0B",
+                        }}
+                      >
+                        <td colSpan={5} style={{ padding: "8px 16px 8px 18px" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "10px",
+                            }}
+                          >
+                            <span style={{ fontSize: "16px" }}>🚅</span>
+                            <div style={{ flex: 1 }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  color: "#F59E0B",
+                                }}
+                              >
+                                <span>
+                                  EN ROUTE: {s.stZh} ➔ {stops[idx + 1].stZh}
+                                </span>
+                                <span>
+                                  {Math.round(legProgress * 100)}% · {currentStatus.eta}m to arrival
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: "5px",
+                                  background: "rgba(245, 158, 11, 0.25)",
+                                  borderRadius: "3px",
+                                  marginTop: "4px",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: `${Math.round(legProgress * 100)}%`,
+                                    height: "100%",
+                                    background: "#F59E0B",
+                                    borderRadius: "3px",
+                                    transition: "width 0.2s ease",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return rows;
                 })}
               </tbody>
             </table>

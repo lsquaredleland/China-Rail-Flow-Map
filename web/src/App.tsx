@@ -242,18 +242,10 @@ export default function App() {
   const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [dark, setDarkState] = useState<boolean>(initialDark);
-  const [showTimeline, setShowTimeline] = useState<boolean>(true);
+  const [showTimeline] = useState<boolean>(true);
   const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
   const [selectedTrainCode, setSelectedTrainCode] = useState<string | null>(null);
   const [isolatedTrainCode, setIsolatedTrainCode] = useState<string | null>(null);
-
-  const toggleTimeline = () => {
-    setShowTimeline((prev) => {
-      const next = !prev;
-      mapRef.current?.setAnimEnabled?.(next);
-      return next;
-    });
-  };
 
   const mapRef = useRef<MapApi | null>(null);
   const legendRef = useRef<LegendHandle | null>(null);
@@ -945,51 +937,6 @@ export default function App() {
               onClick={toggleInfra}
             >
               Infrastructure
-            </button>
-            <button
-              id="tglTimeline"
-              type="button"
-              aria-pressed={showTimeline ? "true" : "false"}
-              onClick={toggleTimeline}
-              title="Toggle 24-hour train flow animation and timeline scrubber"
-              style={{
-                background: showTimeline
-                  ? "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)"
-                  : dark
-                    ? "rgba(255, 255, 255, 0.12)"
-                    : "rgba(0, 0, 0, 0.08)",
-                color: showTimeline ? "#000000" : "inherit",
-                border: showTimeline
-                  ? "1px solid #D97706"
-                  : dark
-                    ? "1px solid rgba(255, 255, 255, 0.22)"
-                    : "1px solid rgba(0, 0, 0, 0.16)",
-                fontWeight: 800,
-                padding: "5px 12px",
-                borderRadius: "8px",
-                boxShadow: showTimeline
-                  ? "0 0 12px rgba(245, 158, 11, 0.45)"
-                  : "none",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                cursor: "pointer",
-                transition: "all 0.18s ease",
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: showTimeline ? "#000000" : "#F59E0B",
-                  boxShadow: showTimeline ? "none" : "0 0 6px #F59E0B",
-                }}
-              />
-              <span>
-                {showTimeline ? "24h Flow Active" : "▶ 24h Flow Animation"}
-              </span>
             </button>
             <button
               id="btnOut"
