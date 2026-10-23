@@ -768,18 +768,38 @@ fn dp_keep(pts: &[[f64; 2]], tol: f64) -> Vec<[f64; 2]> {
 /// English for a station name: curated specials, else base place EN from the
 /// city gazetteer plus a suffix word (East/South/West/North/Airport).
 fn station_en(name: &str, city_en: &HashMap<String, String>) -> String {
+    static STATION_EN: std::sync::LazyLock<HashMap<String, String>> = std::sync::LazyLock::new(|| {
+        serde_json::from_str(include_str!("../../../../data/station_en.json")).unwrap_or_default()
+    });
+    if let Some(v) = STATION_EN.get(name) {
+        return v.clone();
+    }
     let specials: &[(&str, &str)] = &[
-        ("北京南", "Beijing South"),
-        ("北京西", "Beijing West"),
-        ("北京丰台", "Beijing Fengtai"),
-        ("北京", "Beijing"),
-        ("上海虹桥", "Shanghai Hongqiao"),
-        ("上海南", "Shanghai South"),
-        ("上海", "Shanghai"),
+        ("广州白云", "Guangzhou Baiyun"),
         ("广州南", "Guangzhou South"),
         ("广州东", "Guangzhou East"),
+        ("广州北", "Guangzhou North"),
+        ("广州西", "Guangzhou West"),
+        ("广州新塘", "Guangzhou Xintang"),
         ("广州", "Guangzhou"),
+        ("北京南", "Beijing South"),
+        ("北京西", "Beijing West"),
+        ("北京北", "Beijing North"),
+        ("北京东", "Beijing East"),
+        ("北京大兴", "Beijing Daxing"),
+        ("北京朝阳", "Beijing Chaoyang"),
+        ("北京丰台", "Beijing Fengtai"),
+        ("北京通州", "Beijing Tongzhou"),
+        ("北京", "Beijing"),
+        ("上海虹桥", "Shanghai Hongqiao"),
+        ("上海松江", "Shanghai Songjiang"),
+        ("上海南", "Shanghai South"),
+        ("上海西", "Shanghai West"),
+        ("上海", "Shanghai"),
         ("深圳北", "Shenzhen North"),
+        ("深圳坪山", "Shenzhen Pingshan"),
+        ("深圳机场北", "Shenzhen Airport North"),
+        ("深圳机场", "Shenzhen Airport"),
         ("深圳", "Shenzhen"),
         ("香港西九龙", "Hong Kong West Kowloon"),
         ("成都东", "Chengdu East"),
@@ -818,11 +838,23 @@ fn station_en(name: &str, city_en: &HashMap<String, String>) -> String {
         }
     }
     let base_en = |b: &str| -> Option<String> {
-        city_en
-            .get(b)
-            .cloned()
-            .or_else(|| city_en.get(&city_of(b)).cloned())
+        STATION_EN.get(b).cloned().or_else(|| city_en.get(b).cloned())
     };
+    if let Some(b) = name.strip_suffix("国际机场") {
+        if let Some(e) = base_en(b) {
+            return format!("{} International Airport", e);
+        }
+    }
+    if let Some(b) = name.strip_suffix("机场北") {
+        if let Some(e) = base_en(b) {
+            return format!("{} Airport North", e);
+        }
+    }
+    if let Some(b) = name.strip_suffix("机场南") {
+        if let Some(e) = base_en(b) {
+            return format!("{} Airport South", e);
+        }
+    }
     if let Some(b) = name.strip_suffix("机场") {
         if let Some(e) = base_en(b) {
             return format!("{} Airport", e);
@@ -845,7 +877,7 @@ fn station_en(name: &str, city_en: &HashMap<String, String>) -> String {
             return e;
         }
     }
-    base_en(name).unwrap_or_default()
+    base_en(name).unwrap_or_else(|| name.to_string())
 }
 
 /// Dijkstra over the corridor graph; returns the chain of pair keys and
