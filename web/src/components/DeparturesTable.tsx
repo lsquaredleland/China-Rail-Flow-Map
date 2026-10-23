@@ -470,10 +470,9 @@ export default function DeparturesTable({
     heading = (
       <>
         <span id="depCityName">
-          {calls.length} trains call at {destFilter.en} &middot;{" "}
+          <b className="dep-num-lead">{calls.length}</b> trains call at {destFilter.en} &middot;{" "}
           {destFilter.zh}
         </span>{" "}
-        &mdash;{" "}
         <span id="depCount">
           {termCount > 0
             ? termCount + " terminate here"
@@ -1036,10 +1035,7 @@ export default function DeparturesTable({
         <span id="depCityName">
           {cur ? cur.en + " · " + cur.o.zh : "…"}
         </span>{" "}
-        &mdash;{" "}
-        <span id="depCount">
-          {cur ? cur.deps.length + " departures" : "…"}
-        </span>
+        <b className="dep-num-lead">{cur ? cur.deps.length : "…"}</b>
       </>
     );
     depNote = (

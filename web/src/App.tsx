@@ -596,7 +596,7 @@ export default function App() {
               </svg>
             </span>
             <span>
-              China Rail Flow Map <span className="zh">· {direction === "out" ? "出发" : "到达"}</span>
+              China Rail Flow Map <span className="zh">· 铁路客流图</span>
             </span>
           </h1>
           <p className="subtitle">
@@ -626,28 +626,19 @@ export default function App() {
                         ? selectedClasses
                             .map((c) => (c === "plain" ? "普" : c))
                             .join("/") +
-                          " trains leave " +
+                          " trains Depart " +
                           cur.en +
                           " daily"
-                        : "trains leave " + cur.en + " daily"}
+                        : "trains Depart " + cur.en + " daily"}
                     </span>
                   </div>
                   <div>
                     <b>{viewCur.dests.length}</b>{" "}
-                    <span>cities reached without a change</span>
-                  </div>
-                  <div>
-                    <b>
-                      {Math.round((100 * cur.o.fully_tracked) / cur.o.outbound)}%
-                    </b>{" "}
-                    <span>
-                      of trains fully on track ({cur.o.fully_tracked} of{" "}
-                      {cur.o.outbound})
-                    </span>
+                    <span>cities with a direct connection</span>
                   </div>
                   <div>
                     <b>{viewCur.maxFlow}</b>{" "}
-                    <span>trains/day on the widest section</span>
+                    <span>trains/day on the busiest sections</span>
                   </div>
                 </>
               ) : (
@@ -664,19 +655,19 @@ export default function App() {
                         ? selectedClasses
                             .map((c) => (c === "plain" ? "普" : c))
                             .join("/") +
-                          " trains arrive in " +
+                          " trains Arrive in " +
                           cur.en +
                           " daily"
-                        : "trains arrive in " + cur.en + " daily"}
+                        : "trains Arrive in " + cur.en + " daily"}
                     </span>
                   </div>
                   <div>
                     <b>{viewCur.srcs.length}</b>{" "}
-                    <span>cities send direct trains</span>
+                    <span>cities with a direct connection</span>
                   </div>
                   <div>
                     <b>{viewCur.maxInFlow}</b>{" "}
-                    <span>trains/day on the widest section</span>
+                    <span>trains/day on the busiest sections</span>
                   </div>
                 </>
               ))}

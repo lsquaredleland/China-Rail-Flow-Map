@@ -559,7 +559,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.fillStyle =
         typeof c.fastest === "number" ? rampColor(c.fastest, pal) : pal.dot;
       ctx.fill();
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = P.current.dark ? 3.0 : 1.5;
       ctx.strokeStyle = pal.dotEdge;
       ctx.stroke();
     }
@@ -597,8 +597,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
     ctx.globalAlpha = 1.0;
 
-    // The origin: solid black disc with centered white diamond in light mode,
-    // or ringed diamond in dark mode.
+    // The origin: solid black disc with white diamond in day mode,
+    // or solid paper-white disc with night diamond in night mode.
     const cx = X(cur.o.pt[0]),
       cy = Y(cur.o.pt[1]);
     if (!P.current.dark) {
@@ -620,44 +620,44 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.fill();
       ctx.restore();
     } else {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, 6.2832);
+      ctx.fillStyle = "#EDEDEA";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#1A1B1E";
+      ctx.stroke();
+
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = pal.origin;
-      ctx.strokeStyle = pal.paper;
-      ctx.lineWidth = 1.2;
-      const s = 6.2;
+      ctx.fillStyle = "#1A1B1E";
+      const s = 4.4;
       ctx.beginPath();
-      ctx.rect(-s / 1.6, -s / 1.6, s * 1.25, s * 1.25);
+      ctx.rect(-s / 2, -s / 2, s, s);
       ctx.fill();
-      ctx.stroke();
       ctx.restore();
-      ctx.beginPath();
-      ctx.arc(cx, cy, 11, 0, 6.2832);
-      ctx.strokeStyle = pal.origin;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
     }
 
     if (P.current.panelDest) {
       const pd = P.current.panelDest;
       ctx.beginPath();
       ctx.arc(X(pd.pt[0]), Y(pd.pt[1]), stationR(pd.trains) + 3.8, 0, 6.2832);
-      ctx.strokeStyle = P.current.dark ? pal.flowHi : "#111111";
-      ctx.lineWidth = P.current.dark ? 2.0 : 3.0;
+      ctx.strokeStyle = P.current.dark ? "#EDEDEA" : "#111111";
+      ctx.lineWidth = 3.0;
       ctx.stroke();
     }
     if (hover && hover.kind === "station") {
       const hc = hover.station;
       ctx.beginPath();
       ctx.arc(X(hc.pt[0]), Y(hc.pt[1]), stationR(hc.trains) + 3.5, 0, 6.2832);
-      ctx.strokeStyle = P.current.dark ? pal.flowHi : "#111111";
+      ctx.strokeStyle = P.current.dark ? "#EDEDEA" : "#111111";
       ctx.lineWidth = 2.0;
       ctx.stroke();
     } else if (hover && hover.kind === "origin") {
       ctx.beginPath();
       ctx.arc(cx, cy, 14.5, 0, 6.2832);
-      ctx.strokeStyle = P.current.dark ? pal.flowHi : "#111111";
+      ctx.strokeStyle = P.current.dark ? "#EDEDEA" : "#111111";
       ctx.lineWidth = 2.0;
       ctx.stroke();
     }
@@ -776,6 +776,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           ctx.lineWidth = 1;
           ctx.strokeRect(box.x, box.y, box.w, box.h);
           ctx.fillStyle = "#111111";
+        } else if (style.isBoxed && P.current.dark) {
+          ctx.fillStyle = "#1A1B1E";
+          ctx.fillRect(box.x, box.y, box.w, box.h);
+          ctx.strokeStyle = "#EDEDEA";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(box.x, box.y, box.w, box.h);
+          ctx.fillStyle = "#EDEDEA";
         } else {
           ctx.fillStyle = pal.labelHalo;
           ctx.fillRect(box.x, box.y, box.w, box.h);

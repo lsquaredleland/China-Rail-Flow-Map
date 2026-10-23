@@ -37,11 +37,8 @@ export function esc(s: string): string {
 
 /* ---------- palettes ---------- */
 
-// Travel-time bands: three flat colours on a fixed 0–24 hour scale —
-// petrol #14746F under 4h, saffron #E3A63F from 4h to 12h, ultramarine
-// #34488C beyond 12h. Each band's interior is flat; the doubled stops
-// at 210/270 and 690/750 minutes soften each join over ±30 minutes
-// around the 4h and 12h boundaries.
+// Travel-time bands: three flat colours on a fixed 0–24 hour scale.
+// Day: petrol #14746F under 4h, saffron #E3A63F from 4h to 12h, ultramarine #34488C beyond 12h.
 const TIME_BANDS: RampStop[] = [
   [0, [20, 116, 111]],
   [210, [20, 116, 111]],
@@ -51,27 +48,43 @@ const TIME_BANDS: RampStop[] = [
   [1440, [52, 72, 140]],
 ];
 
+// Night: petrol lifted to #2BB5AC, saffron #F1B94E, and ultramarine lifted to
+// pale periwinkle #A4B8F5 to maintain lightness separation on graphite.
+const TIME_BANDS_NIGHT: RampStop[] = [
+  [0, [43, 181, 172]],
+  [210, [43, 181, 172]],
+  [270, [241, 185, 78]],
+  [690, [241, 185, 78]],
+  [750, [164, 184, 245]],
+  [1440, [164, 184, 245]],
+];
+
 export function palette(dark: boolean): Palette {
   if (dark)
     return {
-      paper: "#221b11",
-      network: "rgba(206,182,140,0.13)",
-      graticule: "rgba(206,182,140,0.07)",
-      flow: "rgb(255,140,66)",
-      flowHi: "#ffc79a",
-      flowStops: [],
+      paper: "#1A1B1E",
+      network: "#2E3035",
+      graticule: "rgba(46,48,53,0.5)",
+      flow: "rgb(200,48,42)",
+      flowHi: "#C8302A",
+      flowStops: [
+        [0, [142, 27, 23]],      // deep red #8E1B17
+        [0.33, [180, 36, 31]],
+        [0.67, [200, 48, 42]],   // traffic red #C8302A
+        [1, [229, 64, 53]],      // luminous traffic red #E54035
+      ],
       chord: "rgba(190,160,120,0.75)",
-      infraLine: "#ecdfc2",
-      infraHsr: "#4da3ff",
-      infraConv: "#ecdfc2",
-      dot: "#ecdfc2",
-      dotEdge: "#221b11",
-      label: "#ecdfc2",
-      labelHalo: "rgba(34,27,17,0.88)",
-      origin: "#e8b34b",
-      legendInk: "#b8a67f",
-      legendLine: "#ff8c42",
-      ramp: TIME_BANDS,
+      infraLine: "#EDEDEA",
+      infraHsr: "#FF6A00",
+      infraConv: "#EDEDEA",
+      dot: "#EDEDEA",
+      dotEdge: "#1A1B1E",
+      label: "#EDEDEA",
+      labelHalo: "rgba(26,27,30,0.92)",
+      origin: "#EDEDEA",
+      legendInk: "#A3A3A0",
+      legendLine: "#C8302A",
+      ramp: TIME_BANDS_NIGHT,
     };
   return {
     paper: "#ffffff",
@@ -87,7 +100,7 @@ export function palette(dark: boolean): Palette {
     ],
     chord: "#c9b8a6",
     infraLine: "#111111",
-    infraHsr: "#C8302A",
+    infraHsr: "#FF6A00",
     infraConv: "#111111",
     dot: "#111111",
     dotEdge: "#ffffff",

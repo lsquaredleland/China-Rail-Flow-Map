@@ -226,6 +226,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
             {BAND_LABELS.map((b) => (
               <text
                 key={b.label}
+                className="lg-band-label"
                 x={4 + (b.mid / 1440) * (W - 8)}
                 y={8 + BAR_H / 2}
                 fontSize={10}
@@ -344,7 +345,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               y1={14}
               x2={24}
               y2={14}
-              stroke="#0066cc"
+              stroke="#FF6A00"
               strokeWidth={2.2}
               strokeLinecap="round"
             />
@@ -364,7 +365,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               y1={28}
               x2={24}
               y2={28}
-              stroke="#40231a"
+              stroke="#111111"
               strokeWidth={2.2}
               strokeLinecap="round"
             />
