@@ -2,7 +2,7 @@
   "name": "china-rail-flow-map-web",
   "private": true,
   "scripts": {
-    "build": "bun bundle.mjs",
+    "build": "node bundle.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   }
 }
