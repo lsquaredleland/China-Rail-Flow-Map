@@ -1121,16 +1121,16 @@ export default function App() {
               }
             />
           </div>
-          {showTimeline && (
-            <TimelineScrubber
-              mapRef={mapRef}
-              dark={dark}
-              direction={direction}
-              originZh={cur?.o.zh}
-            />
-          )}
         </MapCanvas>
 
+        {showTimeline && (
+          <TimelineScrubber
+            mapRef={mapRef}
+            dark={dark}
+            direction={direction}
+            originZh={cur?.o.zh}
+          />
+        )}
       </div>
 
       <DeparturesTable

@@ -315,44 +315,48 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
     mapRef.current?.setPlaying?.(true);
   };
 
-  // If user collapsed the timeline in-place: show only the clean expand button
+  // If user collapsed the timeline in-place: show only the clean expand button right below map
   if (isCollapsed) {
     return (
       <div
+        className="timeline-collapsed-bar"
         style={{
-          position: "absolute",
-          bottom: "16px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 40,
+          width: "100%",
+          padding: "6px 16px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: dark ? "#18181B" : "#F4F4F0",
+          borderTop: dark ? "1px solid rgba(255,255,255,0.12)" : "1.5px solid #111111",
+          borderBottom: dark ? "1px solid rgba(255,255,255,0.12)" : "1.5px solid #111111",
+          userSelect: "none",
+          boxSizing: "border-box",
         }}
       >
         <button
           type="button"
           onClick={handleExpand}
           style={{
-            background: dark ? "rgba(24, 24, 27, 0.96)" : "rgba(255, 255, 255, 0.98)",
+            background: dark ? "#27272A" : "#FFFFFF",
             color: dark ? "#EDEDEA" : "#111111",
-            border: dark ? "1.5px solid rgba(255, 255, 255, 0.2)" : "1.5px solid #111111",
-            borderRadius: "24px",
-            padding: "8px 22px",
+            border: dark ? "1.5px solid rgba(255, 255, 255, 0.25)" : "1.5px solid #111111",
+            borderRadius: "20px",
+            padding: "5px 18px",
             fontSize: "12px",
             fontWeight: 700,
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.25)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
             transition: "transform 0.12s ease, background 0.15s ease",
           }}
           title="Expand 24h train flow animation controls"
         >
           <span
             style={{
-              width: "8px",
-              height: "8px",
+              width: "7px",
+              height: "7px",
               borderRadius: "50%",
               background: "#C8302A",
               boxShadow: "0 0 6px #C8302A",
@@ -370,20 +374,18 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
     <div
       className="timeline-bar-dock"
       style={{
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
+        position: "relative",
         width: "100%",
         background: dark ? "#18181B" : "#FFFFFF",
         color: dark ? "#EDEDEA" : "#111111",
         borderTop: dark ? "1px solid rgba(255,255,255,0.18)" : "1.5px solid #111111",
-        boxShadow: "0 -4px 16px rgba(0, 0, 0, 0.10)",
+        borderBottom: dark ? "1px solid rgba(255,255,255,0.18)" : "1.5px solid #111111",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.06)",
         padding: "8px 24px 6px 24px",
         display: "flex",
         flexDirection: "column",
         gap: "6px",
-        zIndex: 40,
+        zIndex: 10,
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         userSelect: "none",
         boxSizing: "border-box",
@@ -468,6 +470,8 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         }
         .tb-btn-action {
           height: 28px;
+          padding: 0;
+          box-sizing: border-box;
           border: 1.5px solid ${dark ? "rgba(255,255,255,0.25)" : "#111111"};
           background: transparent;
           color: ${dark ? "#EDEDEA" : "#111111"};
@@ -478,6 +482,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           align-items: center;
           justify-content: center;
           transition: background 0.12s ease;
+          flex-shrink: 0;
         }
         .tb-btn-action:hover {
           background: ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)"};
@@ -607,8 +612,10 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         </div>
 
         {/* Right: A DAY IN / 15s 30s 60s / Finish / Collapse */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span className="tb-speed-caption">A DAY IN</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+          <span className="tb-speed-caption" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+            A DAY IN
+          </span>
 
           <div
             style={{
@@ -618,6 +625,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
                 : "1.5px solid #111111",
               borderRadius: "0",
               overflow: "hidden",
+              flexShrink: 0,
             }}
           >
             <button
@@ -660,18 +668,34 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             type="button"
             className="tb-btn-action"
             onClick={handleCollapse}
-            style={{ width: "28px" }}
+            style={{
+              width: "28px",
+              height: "28px",
+              padding: 0,
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
             title="Collapse animation bar"
           >
             <svg
               viewBox="0 0 24 24"
-              width="14"
-              height="14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
+              width="16"
+              height="16"
+              style={{
+                display: "block",
+                pointerEvents: "none",
+              }}
             >
-              <polyline points="6 9 12 15 18 9"></polyline>
+              <polyline
+                points="6 9 12 15 18 9"
+                fill="none"
+                stroke={dark ? "#EDEDEA" : "#111111"}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
