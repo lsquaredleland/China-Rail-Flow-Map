@@ -955,6 +955,40 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     ctx.lineCap = "round";
     ctx.setLineDash([]);
   }
+  function getAllowedTrainCodes(): Set<string> | null {
+    const pd = P.current.panelDest;
+    const cur = P.current.cur;
+    if (!pd || !cur) return null;
+
+    const allowed = new Set<string>();
+    if (P.current.direction === "out") {
+      const dest = (pd as DestVM).calls
+        ? (pd as DestVM)
+        : cur.dests.find((d) => d.idx === pd.idx);
+      if (dest && dest.calls) {
+        for (let i = 0; i < dest.calls.length; i++) {
+          const c = dest.calls[i];
+          if (c.dep && c.dep.code) {
+            allowed.add(c.dep.code);
+          }
+        }
+      }
+    } else {
+      const src = (pd as SrcVM).inCalls
+        ? (pd as SrcVM)
+        : cur.srcs.find((s) => s.idx === pd.idx);
+      if (src && src.inCalls) {
+        for (let i = 0; i < src.inCalls.length; i++) {
+          const c = src.inCalls[i];
+          if (c.arr && c.arr.code) {
+            allowed.add(c.arr.code);
+          }
+        }
+      }
+    }
+    return allowed;
+  }
+
   function drawTrains(ctx: CanvasRenderingContext2D, _pal: Palette) {
     const cur = P.current.cur;
     if (!cur) return;
@@ -966,11 +1000,15 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const isolatedCode = P.current.isolatedTrainCode;
     if (!activeTrains || activeTrains.length === 0) return;
 
+    const allowedCodes = getAllowedTrainCodes();
     const { W, H } = S.current;
     const tailLen = 12;
 
     for (let i = 0; i < activeTrains.length; i++) {
       const tr = activeTrains[i];
+      if (allowedCodes && !allowedCodes.has(tr.code)) {
+        continue;
+      }
       const isIsolated = isolatedCode === tr.code;
       if (isolatedCode && !isIsolated) {
         ctx.globalAlpha = 0.08;
@@ -1606,11 +1644,29 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const cur = P.current.cur;
     const tl =
       P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
-    const total = tl ? tl.totalTrains : 0;
-    const departed = tl ? tl.getDepartedCount(st.animTime) : 0;
-    const arrived = tl ? tl.getArrivedCount(st.animTime) : 0;
+    let total = tl ? tl.totalTrains : 0;
+    let departed = tl ? tl.getDepartedCount(st.animTime) : 0;
+    let arrived = tl ? tl.getArrivedCount(st.animTime) : 0;
     const totalMins = tl ? tl.totalMins : 1440;
     const totalDays = tl ? tl.totalDays : 1;
+
+    const allowedCodes = getAllowedTrainCodes();
+    if (allowedCodes && cur) {
+      total = allowedCodes.size;
+      let depCount = 0;
+      let arrCount = 0;
+      const trains = P.current.direction === "out" ? cur.deps : cur.arrs;
+      for (let i = 0; i < trains.length; i++) {
+        const t = trains[i];
+        if (allowedCodes.has(t.code)) {
+          if (t.depMins <= st.animTime) depCount++;
+          if (t.arrMins <= st.animTime) arrCount++;
+        }
+      }
+      departed = depCount;
+      arrived = arrCount;
+    }
+
     return {
       time: st.animTime,
       totalMins,
@@ -1879,10 +1935,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const activeTrains = timeline.getActiveTrains(st.animTime);
     if (!activeTrains || activeTrains.length === 0) return null;
 
+    const allowedCodes = getAllowedTrainCodes();
     let bestDist = 14;
     let bestTrain: ActiveTrainVM | null = null;
     for (let i = 0; i < activeTrains.length; i++) {
       const tr = activeTrains[i];
+      if (allowedCodes && !allowedCodes.has(tr.code)) {
+        continue;
+      }
       const tx = X(tr.lon);
       const ty = Y(tr.lat);
       const d = Math.hypot(px - tx, py - ty);
