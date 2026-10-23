@@ -317,24 +317,6 @@ export interface InCallVM {
   secCnt: number; // number of section indices from arrival back to boarding stop
 }
 
-export interface ActiveTrainVM {
-  lon: number;
-  lat: number;
-  heading: number; // in radians
-  cls: string;     // train class e.g. "G", "D", "K", etc.
-  code: string;
-}
-
-export interface DayTimelineVM {
-  stepMins: number; // 5
-  numSteps: number; // 288
-  secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(288) of cumulative train count
-  maxFlowSteps: Uint16Array; // length 288: max flow count across all sections at each step
-  getActiveTrains: (tMins: number) => ActiveTrainVM[];
-  totalTrains: number;
-  getDepartedCount: (tMins: number) => number;
-}
-
 export interface DistBinFilter {
   bin: number;
   nb: number;
@@ -373,8 +355,6 @@ export interface OriginVM {
   srcs: SrcVM[]; // sorted by trains/day desc
   arrs: ArrVM[];
   maxInFlow: number;
-  timeline?: DayTimelineVM;
-  inTimeline?: DayTimelineVM;
 }
 
 export type DistUnit = "km" | "mi";
