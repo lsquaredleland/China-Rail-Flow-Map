@@ -75,6 +75,13 @@ interface Props {
   inLoading: boolean;
   onSelectDest: (d: CityPointVM | null) => void;
   legendRef: RefObject<LegendHandle | null>;
+  initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
+  onViewChange?: (view: {
+    lon: number;
+    lat: number;
+    zoom: number;
+    scale: number;
+  }) => void;
   children?: ReactNode;
 }
 
@@ -101,6 +108,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const scaleLabelRef = useRef<HTMLDivElement | null>(null);
   const scaleBarRef = useRef<HTMLDivElement | null>(null);
   const [switching, setSwitching] = useState(false);
+  const viewReportTimerRef = useRef<number | null>(null);
 
   // Latest props, readable from the imperative engine below.
   const P = useRef(props);
@@ -1213,6 +1221,30 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         P.current.showInfra,
       );
     updateScaleBar();
+    scheduleViewReport();
+  }
+
+  function reportViewChange() {
+    if (!P.current.onViewChange) return;
+    const st = S.current;
+    if (st.W <= 0 || st.H <= 0 || st.view.scale <= 0) return;
+    const centerLon = toLon(st.W / 2);
+    const centerLat = toLat(st.H / 2);
+    const zoom = Math.log2((st.view.scale * 360) / 256);
+    P.current.onViewChange({
+      lon: centerLon,
+      lat: centerLat,
+      zoom,
+      scale: st.view.scale,
+    });
+  }
+
+  function scheduleViewReport() {
+    if (!P.current.onViewChange) return;
+    if (viewReportTimerRef.current) clearTimeout(viewReportTimerRef.current);
+    viewReportTimerRef.current = window.setTimeout(() => {
+      reportViewChange();
+    }, 200);
   }
 
   function resize() {
@@ -1240,7 +1272,17 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     canvas.height = Math.round(st.H * st.DPR);
     if (P.current.atlas && P.current.cur) {
       if (!st.interacted) {
-        if (!st.initialViewApplied && P.current.cur.o.zh === "广州") {
+        if (!st.initialViewApplied && P.current.initialCamera) {
+          fitCountryCalc();
+          const ic = P.current.initialCamera;
+          const targetScale =
+            ic.scale || (256 * Math.pow(2, ic.zoom || 5)) / 360;
+          st.view.scale = targetScale;
+          st.view.tx = st.W / 2 - ic.lon * targetScale;
+          st.view.ty = st.H / 2 + ic.lat * targetScale;
+          st.interacted = true;
+          st.initialViewApplied = true;
+        } else if (!st.initialViewApplied && P.current.cur.o.zh === "广州") {
           fitGuangzhouInitialCalc();
         } else {
           fitCountryCalc();
@@ -1606,7 +1648,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       );
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", onWheel);
+    return () => {
+      canvas.removeEventListener("wheel", onWheel);
+      if (viewReportTimerRef.current) clearTimeout(viewReportTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

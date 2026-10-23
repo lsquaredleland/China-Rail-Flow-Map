@@ -166,6 +166,28 @@ function initialDark(): boolean {
   );
 }
 
+function parseInitialCamera(): {
+  lon: number;
+  lat: number;
+  zoom: number;
+  scale: number;
+} | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const lat = parseFloat(params.get("lat") || "");
+    const lon = parseFloat(params.get("lon") || params.get("lng") || "");
+    const z = parseFloat(params.get("z") || params.get("zoom") || "");
+    if (!isNaN(lat) && !isNaN(lon) && !isNaN(z)) {
+      const scale = z <= 25 ? (256 * Math.pow(2, z)) / 360 : z;
+      const zoom = z <= 25 ? z : Math.log2((z * 360) / 256);
+      return { lon, lat, zoom, scale };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export default function App() {
   const [atlas, setAtlas] = useState<DecodedAtlas | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -204,6 +226,42 @@ export default function App() {
 
   const mapRef = useRef<MapApi | null>(null);
   const legendRef = useRef<LegendHandle | null>(null);
+  const [initialCamera] = useState(parseInitialCamera);
+  const lastCameraRef = useRef<{
+    lon: number;
+    lat: number;
+    zoom: number;
+  } | null>(initialCamera);
+
+  const syncUrl = (
+    idx: number,
+    cam?: { lon: number; lat: number; zoom: number } | null,
+  ) => {
+    if (!atlasRef.current || idx < 0 || idx >= atlasRef.current.data.origins.length) return;
+    const o = atlasRef.current.data.origins[idx];
+    const params = new URLSearchParams(window.location.search);
+    params.set("city", o.en);
+    const camera = cam || lastCameraRef.current;
+    if (camera) {
+      params.set("lat", camera.lat.toFixed(4));
+      params.set("lon", camera.lon.toFixed(4));
+      params.set("z", camera.zoom.toFixed(2));
+    }
+    const newSearch = params.toString();
+    const newUrl = `${window.location.pathname}${newSearch ? "?" + newSearch : ""}`;
+    if (window.location.search !== `?${newSearch}`) {
+      window.history.replaceState(null, "", newUrl);
+    }
+  };
+
+  const handleViewChange = (v: {
+    lon: number;
+    lat: number;
+    zoom: number;
+  }) => {
+    lastCameraRef.current = v;
+    syncUrl(originIdx, v);
+  };
 
   /* ---------- staged loads (phases 2 and 3) ---------- */
   // Each staged file merges into the origins in place once fetched,
@@ -330,14 +388,26 @@ export default function App() {
           origins: outMap.origins,
         };
         const decoded = prepAtlas(data);
+        atlasRef.current = decoded;
         let def = 0;
-        for (let j = 0; j < data.origins.length; j++) {
-          if (data.origins[j].zh === "广州") {
-            def = j;
-            break;
+        const cityParam = new URLSearchParams(window.location.search).get("city");
+        if (cityParam) {
+          const q = cityParam.trim().toLowerCase();
+          const match = data.origins.findIndex(
+            (o) =>
+              o.zh === cityParam ||
+              o.en.toLowerCase() === q ||
+              o.en.toLowerCase().replace(/\s+/g, "") === q.replace(/\s+/g, ""),
+          );
+          if (match >= 0) def = match;
+        } else {
+          for (let j = 0; j < data.origins.length; j++) {
+            if (data.origins[j].zh === "广州") {
+              def = j;
+              break;
+            }
           }
         }
-        atlasRef.current = decoded;
         // Any staged file that beat the atlas here merges in now.
         if (inMap) {
           inMapDataRef.current = inMap;
@@ -347,6 +417,7 @@ export default function App() {
         if (inTablesRef.current) applyInTables();
         setAtlas(decoded);
         setOriginIdx(def);
+        syncUrl(def, initialCamera);
         // Phase 2: the active direction's tables go out immediately
         // behind phase 1, no user action needed. (A persisted-inbound
         // session's tables were already chained by applyInMap above;
@@ -514,7 +585,34 @@ export default function App() {
   const selectOrigin = (idx: number) => {
     setPanelCity(null);
     setOriginIdx(idx);
+    syncUrl(idx);
   };
+
+  useEffect(() => {
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const cp = params.get("city");
+      if (cp && atlasRef.current) {
+        const q = cp.trim().toLowerCase();
+        const idx = atlasRef.current.data.origins.findIndex(
+          (o) =>
+            o.zh === cp ||
+            o.en.toLowerCase() === q ||
+            o.en.toLowerCase().replace(/\s+/g, "") === q.replace(/\s+/g, ""),
+        );
+        if (idx >= 0 && idx !== originIdx) {
+          setPanelCity(null);
+          setOriginIdx(idx);
+        }
+      }
+      const cam = parseInitialCamera();
+      if (cam && mapRef.current) {
+        mapRef.current.panZoomTo(cam.lon, cam.lat, cam.scale);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [originIdx]);
 
   const handleSelectDest = (d: CityPointVM | null) => {
     if (d === null) {
@@ -899,6 +997,8 @@ export default function App() {
           inLoading={direction === "in" && inMapLoading}
           onSelectDest={handleSelectDest}
           legendRef={legendRef}
+          initialCamera={initialCamera}
+          onViewChange={handleViewChange}
         >
           <DestinationPanel
             point={panelCity}
