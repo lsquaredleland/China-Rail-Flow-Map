@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from "react";
 import type {
+  ActiveTrainVM,
   ChordVM,
   CityPointVM,
   DecodedAtlas,
@@ -91,6 +92,10 @@ interface Props {
       canvas. */
   inLoading: boolean;
   onSelectDest: (d: CityPointVM | null) => void;
+  selectedTrainCode?: string | null;
+  onSelectTrain?: (code: string | null) => void;
+  isolatedTrainCode?: string | null;
+  onSelectIsolatedTrain?: (code: string | null) => void;
   legendRef: RefObject<LegendHandle | null>;
   initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
   onViewChange?: (view: {
@@ -670,7 +675,32 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       activeFlows = flows;
     }
 
-    if (destSecCounts) {
+    const isolatedCode = P.current.isolatedTrainCode;
+    const isoTrain = isolatedCode
+      ? (P.current.direction === "out" ? cur.deps : cur.arrs).find(
+          (t) => t.code === isolatedCode,
+        )
+      : null;
+    const isoSecs = isoTrain ? isoTrain.secs : null;
+
+    if (isoSecs && isoSecs.length > 0) {
+      // Pass 1: faded ambient flows across the network
+      strokeFlowList(activeFlows, P.current.dark ? 0.12 : 0.15, effectiveMaxN);
+
+      // Pass 2: illuminate the exact physical corridor of the isolated train
+      const isHs = isoTrain.cls === "G" || isoTrain.cls === "D" || isoTrain.cls === "C";
+      const isoColor = isHs ? "#F59E0B" : "#06B6D4";
+      ctx.globalAlpha = 1.0;
+      ctx.lineWidth = Math.max(3.5, 4.0 * (S.current.view.scale / 10));
+      ctx.strokeStyle = isoColor;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      for (let i = 0; i < isoSecs.length; i++) {
+        const s = isoSecs[i];
+        traceInto(ctx, pts, off[s], len[s]);
+      }
+      ctx.stroke();
+    } else if (destSecCounts) {
       // Pass 1: faded background of ALL flows at current trunk width
       strokeFlowList(activeFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
       // Pass 2: exact city-pair flow on top at widthOf(subN) and flowColor(subN, effectiveMaxN, pal)
@@ -900,6 +930,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!timeline) return;
 
     const activeTrains = timeline.getActiveTrains(S.current.animTime);
+    const isolatedCode = P.current.isolatedTrainCode;
     if (!activeTrains || activeTrains.length === 0) return;
 
     const { W, H } = S.current;
@@ -907,6 +938,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
     for (let i = 0; i < activeTrains.length; i++) {
       const tr = activeTrains[i];
+      const isIsolated = isolatedCode === tr.code;
+      if (isolatedCode && !isIsolated) {
+        ctx.globalAlpha = 0.08;
+      } else {
+        ctx.globalAlpha = 1.0;
+      }
+
       const px = X(tr.lon);
       const py = Y(tr.lat);
       if (px < -20 || px > W + 20 || py < -20 || py > H + 20) continue;
@@ -925,8 +963,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       // screen vx = cos(heading), vy = -sin(heading) due to equirectangular latitude inversion
       const vx = Math.cos(tr.heading);
       const vy = -Math.sin(tr.heading);
-      const tailX = px - vx * tailLen;
-      const tailY = py - vy * tailLen;
+      const actualTailLen = isIsolated ? 22 : tailLen;
+      const tailX = px - vx * actualTailLen;
+      const tailY = py - vy * actualTailLen;
 
       // Draw tapered motion tail
       const grad = ctx.createLinearGradient(tailX, tailY, px, py);
@@ -937,22 +976,59 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.moveTo(tailX, tailY);
       ctx.lineTo(px, py);
       ctx.strokeStyle = grad;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = isIsolated ? 3.5 : 2.5;
       ctx.lineCap = "round";
       ctx.stroke();
 
       // Outer glow
       ctx.beginPath();
-      ctx.arc(px, py, 4, 0, 6.2832);
+      ctx.arc(px, py, isIsolated ? 5.5 : 4, 0, 6.2832);
       ctx.fillStyle = glowColor;
       ctx.fill();
 
       // Inner white core
       ctx.beginPath();
-      ctx.arc(px, py, 2, 0, 6.2832);
+      ctx.arc(px, py, isIsolated ? 2.8 : 2, 0, 6.2832);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
+
+      // If hovered (while paused), selected, or isolated, draw prominent indicator ring and code tag
+      const isHovered =
+        S.current.hover &&
+        S.current.hover.kind === "train" &&
+        S.current.hover.train.code === tr.code;
+      const isSelected = P.current.selectedTrainCode === tr.code;
+
+      if (isHovered || isSelected || isIsolated) {
+        ctx.beginPath();
+        ctx.arc(px, py, isIsolated ? 9 : 7, 0, 6.2832);
+        ctx.strokeStyle = isIsolated ? glowColor : "#FFFFFF";
+        ctx.lineWidth = isIsolated ? 2.5 : 2.0;
+        ctx.stroke();
+
+        ctx.font = "bold 10px monospace";
+        const tagText = isIsolated ? `${tr.code} · ${tr.progressPct}%` : tr.code;
+        const tagMetrics = ctx.measureText(tagText);
+        const tagW = tagMetrics.width + 8;
+        const tagH = 16;
+        const tagX = px - tagW / 2;
+        const tagY = py - 18;
+
+        ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+        ctx.beginPath();
+        ctx.roundRect(tagX, tagY, tagW, tagH, 3);
+        ctx.fill();
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(tagText, px, tagY + tagH / 2);
+      }
     }
+    ctx.globalAlpha = 1.0;
   }
   function drawStations(ctx: CanvasRenderingContext2D, pal: Palette) {
     const cur = P.current.cur;
@@ -1683,7 +1759,35 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     return chordBest ? { kind: "chord", chord: chordBest } : null;
   }
+  function pickTrain(px: number, py: number): Hit | null {
+    const st = S.current;
+    // Paused only: moving train tooltips are strictly active when visualization is paused
+    if (!st.animEnabled || st.animPlaying) return null;
+    const cur = P.current.cur;
+    if (!cur) return null;
+    const timeline =
+      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    if (!timeline) return null;
+    const activeTrains = timeline.getActiveTrains(st.animTime);
+    if (!activeTrains || activeTrains.length === 0) return null;
+
+    let bestDist = 14;
+    let bestTrain: ActiveTrainVM | null = null;
+    for (let i = 0; i < activeTrains.length; i++) {
+      const tr = activeTrains[i];
+      const tx = X(tr.lon);
+      const ty = Y(tr.lat);
+      const d = Math.hypot(px - tx, py - ty);
+      if (d < bestDist) {
+        bestDist = d;
+        bestTrain = tr;
+      }
+    }
+    return bestTrain ? { kind: "train", train: bestTrain } : null;
+  }
   function pick(px: number, py: number): Hit | null {
+    const tr = pickTrain(px, py);
+    if (tr) return tr;
     const c = pickStation(px, py);
     if (c) return c;
     return pickSegment(px, py);
@@ -1790,6 +1894,22 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           `<div class='t-sub' style='color:${blueCol};font-weight:600'>` +
           "粤海铁路轮渡 (Guangdong–Hainan Train Ferry) &middot; Qiongzhou Strait crossing</div>";
       }
+    } else if (hit.kind === "train") {
+      const tr = hit.train;
+      const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
+      const badgeColor = isHighSpeed ? "#F59E0B" : "#0284C7";
+      html =
+        "<div class='t-title' style='display:flex;align-items:center;gap:6px;margin-bottom:6px;'>" +
+        `<span style='background:${badgeColor};color:#fff;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;font-family:monospace;'>${esc(tr.code)}</span>` +
+        `<span style='font-size:13px;font-weight:600;'>${esc(tr.fromStation || "")} &rarr; ${esc(tr.toStation || "")}</span>` +
+        "</div>" +
+        "<table style='width:100%;margin-bottom:4px;'>" +
+        `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +
+        `<tr><td>Arrival</td><td style='text-align:right'><b>${esc(tr.arrTime)}</b></td></tr>` +
+        `<tr><td>Duration</td><td style='text-align:right'>${Math.floor(tr.durMins / 60)}h ${tr.durMins % 60}m</td></tr>` +
+        `<tr><td>Journey Progress</td><td style='text-align:right'><b>${tr.progressPct}%</b></td></tr>` +
+        "</table>" +
+        `<div class='t-sub' style='margin-top:6px;color:${badgeColor};font-weight:600;'>Click train to inspect full station schedule</div>`;
     }
     tooltip.innerHTML = html;
     tooltip.classList.add("show");
@@ -1812,6 +1932,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (a.kind !== b.kind) return false;
     if (a.kind === "seg" && b.kind === "seg") return a.s === b.s;
     if (a.kind === "chord" && b.kind === "chord") return a.chord === b.chord;
+    if (a.kind === "train" && b.kind === "train") return a.train.code === b.train.code;
     if (a.kind === "station" && b.kind === "station")
       return a.station === b.station;
     return true; // origin
@@ -2085,6 +2206,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           // A tap/click on a destination pins the detail panel instead of
           // the floating tooltip; another destination updates it.
           P.current.onSelectDest(hit.station);
+          hideTooltip();
+        } else if (hit && hit.kind === "train") {
+          P.current.onSelectTrain?.(hit.train.code);
           hideTooltip();
         } else if (hit) {
           st.pinned = true;

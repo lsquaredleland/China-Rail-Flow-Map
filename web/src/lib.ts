@@ -21,6 +21,8 @@ import type {
   OutlineData,
   Palette,
   RampStop,
+  ScheduleStop,
+  SchedulesData,
   SrcVM,
 } from "./types";
 
@@ -882,6 +884,10 @@ export function buildDayTimeline(
   interface PrepTrain {
     code: string;
     cls: string;
+    fromStation: string;
+    toStation: string;
+    depTime: string;
+    arrTime: string;
     depMins: number;
     arrMins: number;
     dur: number;
@@ -896,9 +902,103 @@ export function buildDayTimeline(
   for (let ti = 0; ti < rawTrains.length; ti++) {
     const train = rawTrains[ti];
     const rawSecs = train.secs || [];
-    // Outbound secs are in travel order.
-    // Inbound secs are stored arrival to origin, so reverse them for travel order.
-    const routeSecs = isOut ? rawSecs : rawSecs.slice().reverse();
+    let routeSecs: number[] = [];
+    const secRevsArr: number[] = [];
+
+    // Greedily chain track sections end-to-end to ensure the train moves
+    // 100% monotonically forward along continuous physical rail geometry,
+    // eliminating pipeline A* leg concatenation reversals.
+    if (rawSecs.length > 0) {
+      if (isOut) {
+        const remaining = rawSecs.slice();
+        let curLon = cur.o.pt[0];
+        let curLat = cur.o.pt[1];
+        while (remaining.length > 0) {
+          let bestIdx = 0;
+          let bestDist = 1e9;
+          let bestRev = 0;
+          let nextExitLon = curLon;
+          let nextExitLat = curLat;
+          for (let i = 0; i < remaining.length; i++) {
+            const s = remaining[i];
+            const off = secSet.off[s];
+            const cnt = secSet.len[s];
+            if (cnt <= 0) continue;
+            const p0Lon = secSet.pts[off];
+            const p0Lat = secSet.pts[off + 1];
+            const p1Lon = secSet.pts[off + (cnt - 1) * 2];
+            const p1Lat = secSet.pts[off + (cnt - 1) * 2 + 1];
+            const d0 = (p0Lon - curLon) ** 2 + (p0Lat - curLat) ** 2;
+            const d1 = (p1Lon - curLon) ** 2 + (p1Lat - curLat) ** 2;
+            if (d0 < bestDist) {
+              bestDist = d0;
+              bestIdx = i;
+              bestRev = 0;
+              nextExitLon = p1Lon;
+              nextExitLat = p1Lat;
+            }
+            if (d1 < bestDist) {
+              bestDist = d1;
+              bestIdx = i;
+              bestRev = 1;
+              nextExitLon = p0Lon;
+              nextExitLat = p0Lat;
+            }
+          }
+          const sChosen = remaining.splice(bestIdx, 1)[0];
+          routeSecs.push(sChosen);
+          secRevsArr.push(bestRev);
+          curLon = nextExitLon;
+          curLat = nextExitLat;
+        }
+      } else {
+        const remaining = rawSecs.slice();
+        let curLon = cur.o.pt[0];
+        let curLat = cur.o.pt[1];
+        const revRouteSecs: number[] = [];
+        const revSecRevs: number[] = [];
+        while (remaining.length > 0) {
+          let bestIdx = 0;
+          let bestDist = 1e9;
+          let bestRev = 0;
+          let nextEntryLon = curLon;
+          let nextEntryLat = curLat;
+          for (let i = 0; i < remaining.length; i++) {
+            const s = remaining[i];
+            const off = secSet.off[s];
+            const cnt = secSet.len[s];
+            if (cnt <= 0) continue;
+            const p0Lon = secSet.pts[off];
+            const p0Lat = secSet.pts[off + 1];
+            const p1Lon = secSet.pts[off + (cnt - 1) * 2];
+            const p1Lat = secSet.pts[off + (cnt - 1) * 2 + 1];
+            const d0 = (p0Lon - curLon) ** 2 + (p0Lat - curLat) ** 2;
+            const d1 = (p1Lon - curLon) ** 2 + (p1Lat - curLat) ** 2;
+            if (d0 < bestDist) {
+              bestDist = d0;
+              bestIdx = i;
+              bestRev = 1;
+              nextEntryLon = p1Lon;
+              nextEntryLat = p1Lat;
+            }
+            if (d1 < bestDist) {
+              bestDist = d1;
+              bestIdx = i;
+              bestRev = 0;
+              nextEntryLon = p0Lon;
+              nextEntryLat = p0Lat;
+            }
+          }
+          const sChosen = remaining.splice(bestIdx, 1)[0];
+          revRouteSecs.push(sChosen);
+          revSecRevs.push(bestRev);
+          curLon = nextEntryLon;
+          curLat = nextEntryLat;
+        }
+        routeSecs = revRouteSecs.reverse();
+        secRevsArr.push(...revSecRevs.reverse());
+      }
+    }
 
     let totalDist = 0;
     const secStarts = new Float64Array(routeSecs.length);
@@ -906,54 +1006,7 @@ export function buildDayTimeline(
       secStarts[i] = totalDist;
       totalDist += secLengths[routeSecs[i]] || 0;
     }
-
-    // Determine traversal direction (forward vs reversed) for each track section in the route.
-    // Railway track sections in OSM have fixed digitization orientations; many are stored
-    // in reverse relative to an individual train's outbound or inbound travel path.
-    const secRevs = new Uint8Array(routeSecs.length);
-    if (isOut) {
-      let pExitLon = cur.o.pt[0];
-      let pExitLat = cur.o.pt[1];
-      for (let i = 0; i < routeSecs.length; i++) {
-        const s = routeSecs[i];
-        const off = secSet.off[s];
-        const cnt = secSet.len[s];
-        if (cnt <= 0) continue;
-        const p0Lon = secSet.pts[off];
-        const p0Lat = secSet.pts[off + 1];
-        const p1Lon = secSet.pts[off + (cnt - 1) * 2];
-        const p1Lat = secSet.pts[off + (cnt - 1) * 2 + 1];
-        const d0 = (p0Lon - pExitLon) ** 2 + (p0Lat - pExitLat) ** 2;
-        const d1 = (p1Lon - pExitLon) ** 2 + (p1Lat - pExitLat) ** 2;
-        // If end vertex p1 is closer to entry, train enters at p1 and exits at p0 (reversed)
-        const rev = d1 < d0;
-        secRevs[i] = rev ? 1 : 0;
-        pExitLon = rev ? p0Lon : p1Lon;
-        pExitLat = rev ? p0Lat : p1Lat;
-      }
-    } else {
-      // Inbound: routeSecs finishes at cur.o.pt (arrival in origin city). Trace backward from arrival.
-      let pExitLon = cur.o.pt[0];
-      let pExitLat = cur.o.pt[1];
-      for (let i = routeSecs.length - 1; i >= 0; i--) {
-        const s = routeSecs[i];
-        const off = secSet.off[s];
-        const cnt = secSet.len[s];
-        if (cnt <= 0) continue;
-        const p0Lon = secSet.pts[off];
-        const p0Lat = secSet.pts[off + 1];
-        const p1Lon = secSet.pts[off + (cnt - 1) * 2];
-        const p1Lat = secSet.pts[off + (cnt - 1) * 2 + 1];
-        const d0 = (p0Lon - pExitLon) ** 2 + (p0Lat - pExitLat) ** 2;
-        const d1 = (p1Lon - pExitLon) ** 2 + (p1Lat - pExitLat) ** 2;
-        // Section s exits at the point closer to pExit
-        // If p0 is closer to exit, train exits at p0 -> traversed p1 -> p0 (reversed)
-        const rev = d0 < d1;
-        secRevs[i] = rev ? 1 : 0;
-        pExitLon = rev ? p1Lon : p0Lon;
-        pExitLat = rev ? p1Lat : p0Lat;
-      }
-    }
+    const secRevs = new Uint8Array(secRevsArr);
 
     const dur = train.dur > 0 ? train.dur : 1;
     const depMins =
@@ -962,9 +1015,18 @@ export function buildDayTimeline(
         : 0;
     const arrMins = depMins + dur;
 
+    const fromStation = (train as any).fsZh || "";
+    const toStation = (train as any).tsZh || "";
+    const depTime = train.dep || "";
+    const arrTime = train.arr || "";
+
     prepTrains.push({
       code: train.code,
       cls: train.cls,
+      fromStation,
+      toStation,
+      depTime,
+      arrTime,
       depMins,
       arrMins,
       dur,
@@ -1052,6 +1114,12 @@ export function buildDayTimeline(
             heading: 0,
             cls: pt.cls,
             code: pt.code,
+            fromStation: pt.fromStation,
+            toStation: pt.toStation,
+            depTime: pt.depTime,
+            arrTime: pt.arrTime,
+            durMins: pt.dur,
+            progressPct: Math.round(alpha * 100),
           });
         }
         continue;
@@ -1085,6 +1153,12 @@ export function buildDayTimeline(
         heading,
         cls: pt.cls,
         code: pt.code,
+        fromStation: pt.fromStation,
+        toStation: pt.toStation,
+        depTime: pt.depTime,
+        arrTime: pt.arrTime,
+        durMins: pt.dur,
+        progressPct: Math.round(alpha * 100),
       });
     }
     return active;
@@ -1337,4 +1411,45 @@ export function filterOriginByClasses(
   selectedClasses: string[],
 ): OriginVM {
   return filterOrigin(cur, { classes: selectedClasses });
+}
+
+/** Formats raw schedule integers into human-readable ScheduleStop records */
+export function formatScheduleStops(
+  schedulesData: SchedulesData | null,
+  stationTable: { zh: string; en: string }[],
+  code: string,
+): ScheduleStop[] | null {
+  if (!schedulesData || !schedulesData.schedules) return null;
+  const rawStops = schedulesData.schedules[code];
+  if (!rawStops || rawStops.length === 0) return null;
+
+  return rawStops.map(([stIdx, arrMins, depMins, dayOff]) => {
+    let stZh = "";
+    let stEn = "";
+    if (stIdx < stationTable.length) {
+      stZh = stationTable[stIdx].zh;
+      stEn = stationTable[stIdx].en;
+    } else {
+      const extraIdx = stIdx - stationTable.length;
+      stZh =
+        schedulesData.extra_stations[extraIdx] ||
+        (extraIdx >= 0 ? `Station ${stIdx}` : "");
+      stEn = stZh;
+    }
+    const arr = arrMins >= 0 ? fmtClock(arrMins) : "—";
+    const dep = depMins >= 0 ? fmtClock(depMins) : "—";
+    const dwellMins =
+      arrMins >= 0 && depMins >= 0 ? Math.max(0, depMins - arrMins) : 0;
+    return {
+      stIdx,
+      stZh,
+      stEn,
+      arr,
+      dep,
+      arrMins,
+      depMins,
+      dayOff,
+      dwellMins,
+    };
+  });
 }

@@ -1,12 +1,17 @@
 # Build and dependency artifacts
 **/target/
-**/node_modules/
+**/node_modules
+**/node_modules/**
+node_modules/
+web/node_modules/
 web/dist/
 .DS_Store
 *.log
 
 # Local-only raw timetable dumps, OSM extracts, and derived routing caches
+output
 output/
+data/
 data/raw/
 data/osm/
 data/derived/

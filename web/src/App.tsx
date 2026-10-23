@@ -14,6 +14,7 @@ import type {
   OutMapData,
   OutTablesData,
   OutlineData,
+  SchedulesData,
   SharedData,
   SrcVM,
 } from "./types";
@@ -33,6 +34,7 @@ import DestinationPanel from "./components/DestinationPanel";
 import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
 import TimelineScrubber from "./components/TimelineScrubber";
+import TrainScheduleModal from "./components/TrainScheduleModal";
 
 // The v2 atlas dataset ships in five split files (same origin order
 // throughout): the shared tables and geometry, and per direction a map
@@ -55,6 +57,7 @@ const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
 const OUTLINE_URL = "assets/china-outline.json";
+const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
 
 // The v2 files carry no `about` blurb (v1 embedded one in the data);
 // the text is unchanged apart from the geometry-precision sentence,
@@ -240,6 +243,9 @@ export default function App() {
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [dark, setDarkState] = useState<boolean>(initialDark);
   const [showTimeline, setShowTimeline] = useState<boolean>(true);
+  const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
+  const [selectedTrainCode, setSelectedTrainCode] = useState<string | null>(null);
+  const [isolatedTrainCode, setIsolatedTrainCode] = useState<string | null>(null);
 
   const toggleTimeline = () => {
     setShowTimeline((prev) => {
@@ -387,6 +393,11 @@ export default function App() {
         if (!cancelled) setOutline(prepOutline(d));
       })
       .catch(() => {});
+    fetchData<SchedulesData>(SCHEDULES_URL)
+      .then((d) => {
+        if (!cancelled) setSchedulesData(d);
+      })
+      .catch((err) => console.warn("Failed to load national schedules asset:", err));
     // A persisted inbound direction paints its map in phase 1 too, so
     // in-map joins the parallel fetch; identity fields still come from
     // out-map, which always loads.
@@ -465,6 +476,12 @@ export default function App() {
     () => (cur ? filterOriginByClasses(cur, selectedClasses) : null),
     [cur, selectedClasses],
   );
+
+  const selectedTrainVM = useMemo(() => {
+    if (!selectedTrainCode || !cur) return null;
+    const list = direction === "out" ? cur.deps : cur.arrs;
+    return list.find((t) => t.code === selectedTrainCode) || null;
+  }, [selectedTrainCode, cur, direction]);
 
   const availableClasses: Set<string> = useMemo(() => {
     if (!cur) return new Set(FLOW_CLASSES);
@@ -1031,10 +1048,89 @@ export default function App() {
           loadError={loadError}
           inLoading={direction === "in" && inMapLoading}
           onSelectDest={handleSelectDest}
+          selectedTrainCode={selectedTrainCode}
+          onSelectTrain={setSelectedTrainCode}
+          isolatedTrainCode={isolatedTrainCode}
+          onSelectIsolatedTrain={setIsolatedTrainCode}
           legendRef={legendRef}
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
+          {isolatedTrainCode && (
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 100,
+                background: dark
+                  ? "rgba(17, 24, 39, 0.94)"
+                  : "rgba(255, 255, 255, 0.95)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid #F59E0B",
+                borderRadius: "30px",
+                padding: "6px 16px",
+                boxShadow: "0 10px 25px -5px rgba(0,0,0,0.35)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                fontSize: "13px",
+                color: dark ? "#F3F4F6" : "#111827",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: "#F59E0B",
+                  boxShadow: "0 0 8px #F59E0B",
+                }}
+              />
+              <span>
+                Isolated:{" "}
+                <strong style={{ fontFamily: "monospace", fontWeight: 800 }}>
+                  {isolatedTrainCode}
+                </strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedTrainCode(isolatedTrainCode)}
+                style={{
+                  border: "none",
+                  background: dark
+                    ? "rgba(255,255,255,0.12)"
+                    : "rgba(0,0,0,0.08)",
+                  color: "inherit",
+                  cursor: "pointer",
+                  padding: "3px 8px",
+                  borderRadius: "12px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                }}
+              >
+                Timetable
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsolatedTrainCode(null)}
+                style={{
+                  border: "none",
+                  background: "none",
+                  cursor: "pointer",
+                  color: dark ? "#9CA3AF" : "#64748B",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  padding: "0 4px",
+                }}
+                title="Exit single train isolation"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <DestinationPanel
             point={panelCity}
             direction={direction}
@@ -1076,6 +1172,7 @@ export default function App() {
         outTablesReady={outTablesReady}
         inTablesReady={inTablesReady}
         onClearFilter={closePanel}
+        onSelectTrain={setSelectedTrainCode}
       />
 
       <footer id="pageFooter">
@@ -1083,6 +1180,23 @@ export default function App() {
       </footer>
 
       <Footnote cur={cur} direction={direction} />
+
+      <TrainScheduleModal
+        code={selectedTrainCode}
+        onClose={() => setSelectedTrainCode(null)}
+        schedulesData={schedulesData}
+        stationTable={atlas ? atlas.data.station_table : []}
+        dark={dark}
+        trainVM={selectedTrainVM}
+        isIsolated={isolatedTrainCode === selectedTrainCode}
+        onToggleIsolate={(c) => {
+          setIsolatedTrainCode((prev) => (prev === c ? null : c));
+        }}
+        onJumpToTime={(mins) => {
+          mapRef.current?.setTime(mins);
+        }}
+        mapRef={mapRef}
+      />
     </>
   );
 }

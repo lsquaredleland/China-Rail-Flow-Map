@@ -30,6 +30,7 @@ interface Props {
   outTablesReady: boolean;
   inTablesReady: boolean;
   onClearFilter: () => void;
+  onSelectTrain?: (code: string) => void;
 }
 
 type SortKey = "dep" | "dur" | "km";
@@ -106,15 +107,49 @@ function matchCityFromQuery(
 }
 
 /** The train cell shared by every table mode: class chip and number. */
-function TrainCell({ d }: { d: { code: string; cls: string } }) {
+function TrainCell({
+  d,
+  onClick,
+}: {
+  d: { code: string; cls: string };
+  onClick?: () => void;
+}) {
   const chip = d.cls === "plain" ? "普" : d.cls;
   const num = d.cls === "plain" ? d.code : d.code.replace(/^[A-Z]+/, "");
   const isHs = d.cls === "G" || d.cls === "D" || d.cls === "C";
   return (
-    <>
+    <button
+      type="button"
+      onClick={onClick}
+      title={onClick ? `View full schedule for train ${d.code}` : undefined}
+      style={{
+        background: "none",
+        border: "none",
+        padding: 0,
+        margin: 0,
+        font: "inherit",
+        color: "inherit",
+        cursor: onClick ? "pointer" : "default",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+      }}
+    >
       <span className={"cls " + (isHs ? "cls-hs" : "cls-conv")}>{chip}</span>
-      <b>{num || d.code}</b>
-    </>
+      <b
+        style={
+          onClick
+            ? {
+                textDecoration: "underline",
+                textDecorationStyle: "dotted",
+                textUnderlineOffset: "3px",
+              }
+            : undefined
+        }
+      >
+        {num || d.code}
+      </b>
+    </button>
   );
 }
 
@@ -137,6 +172,7 @@ export default function DeparturesTable({
   outTablesReady,
   inTablesReady,
   onClearFilter,
+  onSelectTrain,
 }: Props) {
   const [query, setQuery] = useState("");
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
@@ -558,7 +594,12 @@ export default function DeparturesTable({
               return (
                 <tr key={i}>
                   <td className="c-train">
-                    <TrainCell d={d} />
+                    <TrainCell
+                      d={d}
+                      onClick={
+                        onSelectTrain ? () => onSelectTrain(d.code) : undefined
+                      }
+                    />
                   </td>
                   <td className="c-time">{d.dep}</td>
                   <td>
@@ -759,7 +800,12 @@ export default function DeparturesTable({
               return (
                 <tr key={i}>
                   <td className="c-train">
-                    <TrainCell d={a} />
+                    <TrainCell
+                      d={a}
+                      onClick={
+                        onSelectTrain ? () => onSelectTrain(a.code) : undefined
+                      }
+                    />
                   </td>
                   <td className="c-time">
                     {c.board}
@@ -943,7 +989,12 @@ export default function DeparturesTable({
             list.map((a, i) => (
               <tr key={i}>
                 <td className="c-train">
-                  <TrainCell d={a} />
+                  <TrainCell
+                    d={a}
+                    onClick={
+                      onSelectTrain ? () => onSelectTrain(a.code) : undefined
+                    }
+                  />
                 </td>
                 <td>
                   <span className="to-city">
@@ -1098,7 +1149,12 @@ export default function DeparturesTable({
             list.map((d, i) => (
               <tr key={i}>
                 <td className="c-train">
-                  <TrainCell d={d} />
+                  <TrainCell
+                    d={d}
+                    onClick={
+                      onSelectTrain ? () => onSelectTrain(d.code) : undefined
+                    }
+                  />
                 </td>
                 <td className="c-time">{d.dep}</td>
                 <td>

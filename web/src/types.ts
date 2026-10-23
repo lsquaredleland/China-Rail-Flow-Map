@@ -323,6 +323,29 @@ export interface ActiveTrainVM {
   heading: number; // in radians
   cls: string;     // train class e.g. "G", "D", "K", etc.
   code: string;
+  fromStation: string;
+  toStation: string;
+  depTime: string;
+  arrTime: string;
+  durMins: number;
+  progressPct: number;
+}
+
+export interface ScheduleStop {
+  stIdx: number;
+  stZh: string;
+  stEn: string;
+  arr: string;
+  dep: string;
+  arrMins: number;
+  depMins: number;
+  dayOff: number;
+  dwellMins: number;
+}
+
+export interface SchedulesData {
+  extra_stations: string[];
+  schedules: Record<string, [number, number, number, number][]>;
 }
 
 export interface DayTimelineVM {
@@ -381,7 +404,8 @@ export type Hit =
   | { kind: "origin" }
   | { kind: "station"; station: CityPointVM }
   | { kind: "seg"; s: number; n: number; subN?: number }
-  | { kind: "chord"; chord: ChordVM };
+  | { kind: "chord"; chord: ChordVM }
+  | { kind: "train"; train: ActiveTrainVM };
 
 export type RampStop = [number, [number, number, number]];
 
