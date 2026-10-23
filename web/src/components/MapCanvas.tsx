@@ -166,7 +166,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     animTime: 1440,
     animPlaying: false,
     animSpeed: 30,
-    animEnabled: true,
+    animEnabled: false,
     animListeners: new Set<AnimListener>(),
     lastRafTimestamp: null as number | null,
     animRafId: null as number | null,
@@ -668,15 +668,20 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
     let activeFlows: { s: number; n: number }[];
     if (isAnimated && timeline) {
-      activeFlows = [];
-      for (let i = 0; i < flows.length; i++) {
-        const f = flows[i];
-        const n = timeline.secFlowSteps.get(f.s)?.[step] ?? 0;
-        if (n > 0) {
-          activeFlows.push({ s: f.s, n });
+      if (S.current.animTime >= timeline.totalMins) {
+        // At or beyond totalMins, all journeys have completed: show 100% completed network
+        activeFlows = flows;
+      } else {
+        activeFlows = [];
+        for (let i = 0; i < flows.length; i++) {
+          const f = flows[i];
+          const n = timeline.secFlowSteps.get(f.s)?.[step] ?? 0;
+          if (n > 0) {
+            activeFlows.push({ s: f.s, n });
+          }
         }
+        activeFlows.sort((a, b) => b.n - a.n);
       }
-      activeFlows.sort((a, b) => b.n - a.n);
     } else {
       activeFlows = flows;
     }
@@ -1077,22 +1082,32 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       )
         return;
 
-      // Dynamic city circle sizing: circle grows as trains arrive at this city
+      // Dynamic city circle sizing: circle grows only when a train arrives at this city
       let effectiveTrains = c.trains;
       let recentArrival = false;
-      if (isAnimated && timeline && c.arrTimes && c.arrTimes.length > 0) {
+      let pulseDt = 0;
+      if (isAnimated && timeline) {
         const t = S.current.animTime;
-        let count = 0;
-        for (let k = 0; k < c.arrTimes.length; k++) {
-          if (c.arrTimes[k] <= t) count++;
-          else break;
-        }
-        effectiveTrains = count;
-        if (count > 0) {
-          const lastArr = c.arrTimes[count - 1];
-          if (t - lastArr >= 0 && t - lastArr <= 20) {
-            recentArrival = true;
+        if (t >= timeline.totalMins) {
+          // Finished: all trips completed
+          effectiveTrains = c.trains;
+        } else if (c.arrTimes && c.arrTimes.length > 0) {
+          let count = 0;
+          for (let k = 0; k < c.arrTimes.length; k++) {
+            if (c.arrTimes[k] <= t) count++;
+            else break;
           }
+          effectiveTrains = count;
+          if (count > 0) {
+            const lastArr = c.arrTimes[count - 1];
+            const dt = t - lastArr;
+            if (dt >= 0 && dt <= 20) {
+              recentArrival = true;
+              pulseDt = dt;
+            }
+          }
+        } else {
+          effectiveTrains = 0;
         }
       }
 
@@ -1109,13 +1124,17 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.strokeStyle = pal.dotEdge;
       ctx.stroke();
 
-      // Golden arrival pulse ring when a train has recently arrived at this city
+      // Golden arrival pulse ripple when a train has arrived at this city (never before)
       if (recentArrival && isAnimated) {
+        const frac = pulseDt / 20;
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(x, y, r + 4, 0, 6.2832);
+        ctx.arc(x, y, r + frac * 7, 0, 6.2832);
         ctx.strokeStyle = P.current.dark ? "#F59E0B" : "#D97706";
+        ctx.globalAlpha = Math.max(0, 1 - frac);
         ctx.lineWidth = 1.5;
         ctx.stroke();
+        ctx.restore();
       }
     }
 
@@ -1656,6 +1675,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const totalMins = tl ? tl.totalMins : 1440;
 
     if (playing) {
+      if (!st.animEnabled) {
+        st.animEnabled = true;
+      }
       if (st.animTime >= totalMins) {
         st.animTime = 0;
       }

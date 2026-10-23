@@ -69,10 +69,11 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   const fillTrackRef = useRef<HTMLDivElement | null>(null);
   const counterRef = useRef<HTMLSpanElement | null>(null);
   const rushBadgeRef = useRef<HTMLSpanElement | null>(null);
+  const finishTickRef = useRef<HTMLSpanElement | null>(null);
 
   // Un-rendered transient state kept in refs for 60fps direct-DOM execution
   const currentPlayingRef = useRef(false);
-  const currentTimeRef = useRef(360); // default 06:00 AM
+  const currentTimeRef = useRef(0);
   const currentSpeedRef = useRef(30);
   const totalMinsRef = useRef(1440);
   const totalDaysRef = useRef(1);
@@ -80,7 +81,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   // Minimal React state — only toggled on user interactions or discrete state flips
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(30);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   // Subscribe to MapCanvas animation ticks with direct DOM updates (0% React re-render overhead)
   useEffect(() => {
@@ -95,6 +96,9 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       // 1. Time display clock
       if (timeDisplayRef.current) {
         timeDisplayRef.current.textContent = fmtTimelineClock(t, totM);
+      }
+      if (finishTickRef.current) {
+        finishTickRef.current.textContent = fmtTimelineClock(totM, totM);
       }
 
       // 2. Non-linear slider input value & fill progress bar
@@ -276,6 +280,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   const handleJumpToFinish = () => {
     const totM = totalMinsRef.current || 1440;
     currentTimeRef.current = totM;
+    mapRef.current?.setPlaying?.(false);
     mapRef.current?.setTime?.(totM);
     if (timeDisplayRef.current) {
       timeDisplayRef.current.textContent = fmtTimelineClock(totM, totM);
@@ -292,12 +297,15 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
     setIsCollapsed(true);
     // When collapsed, pause playback and show the full extent of the network
     mapRef.current?.setPlaying?.(false);
-    const totM = totalMinsRef.current || 1440;
-    mapRef.current?.setTime?.(totM);
+    mapRef.current?.setAnimEnabled?.(false);
   };
 
   const handleExpand = () => {
     setIsCollapsed(false);
+    currentTimeRef.current = 0;
+    mapRef.current?.setAnimEnabled?.(true);
+    mapRef.current?.setTime?.(0);
+    mapRef.current?.setPlaying?.(true);
   };
 
   // If user collapsed the timeline in-place: show only the clean expand button
@@ -881,12 +889,13 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             24:00 (D1 End)
           </span>
           <span
+            ref={finishTickRef}
             className="ts-tick-pos"
             style={{ left: "100%", transform: "translateX(-100%)" }}
             onClick={handleJumpToFinish}
-            title="All long-haul trans-continental trains arrived"
+            title="Jump to finish when all trains have arrived"
           >
-            All Arrived
+            {fmtTimelineClock(totalMinsRef.current || 1440, totalMinsRef.current || 1440)}
           </span>
         </div>
       </div>

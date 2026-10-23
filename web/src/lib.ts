@@ -864,8 +864,8 @@ export function buildDayTimeline(
   const rawTrains = isOut ? cur.deps || [] : cur.arrs || [];
   const totalTrains = rawTrains.length;
 
-  // Track max arrival time across all services (which may arrive on Day 2 or Day 3)
-  let maxArrMins = 1440;
+  // Track max arrival time across all services (ending time of the bar varies depending on the last train)
+  let maxArrMins = 0;
   for (let ti = 0; ti < rawTrains.length; ti++) {
     const t = rawTrains[ti];
     const dm = t.depMins >= 0 ? t.depMins : 0;
@@ -873,8 +873,8 @@ export function buildDayTimeline(
     const am = dm + dur;
     if (am > maxArrMins) maxArrMins = am;
   }
-  const totalDays = Math.max(1, Math.ceil(maxArrMins / 1440));
-  const totalMins = totalDays * 1440;
+  const totalMins = Math.max(60, Math.ceil(maxArrMins / 5) * 5);
+  const totalDays = Math.max(1, Math.ceil(totalMins / 1440));
   const numSteps = Math.ceil(totalMins / stepMins);
   const secFlowSteps = new Map<number, Uint16Array>();
   const maxFlowSteps = new Uint16Array(numSteps);
@@ -1093,6 +1093,58 @@ export function buildDayTimeline(
       if (arr[step] > m) m = arr[step];
     }
     maxFlowSteps[step] = m;
+  }
+
+  // Calibrate city arrival times to the exact simulation minute the train visually reaches the city
+  if (isOut && cur.dests) {
+    const prepMap = new Map<string, PrepTrain>();
+    for (let i = 0; i < prepTrains.length; i++) {
+      prepMap.set(prepTrains[i].code, prepTrains[i]);
+    }
+    for (let di = 0; di < cur.dests.length; di++) {
+      const dest = cur.dests[di];
+      const visualArrTimes: number[] = [];
+      const calls = dest.calls || [];
+      for (let ci = 0; ci < calls.length; ci++) {
+        const call = calls[ci];
+        const pt = call.dep ? prepMap.get(call.dep.code) : null;
+        if (pt) {
+          if (call.term) {
+            visualArrTimes.push(pt.arrMins);
+          } else {
+            const secCnt = call.secCnt;
+            let distToC = 0;
+            if (secCnt >= pt.secStarts.length) {
+              distToC = pt.totalDist;
+            } else if (secCnt > 0) {
+              distToC = pt.secStarts[secCnt];
+            }
+            const frac = pt.totalDist > 0 ? distToC / pt.totalDist : 0;
+            const tArr = pt.depMins + frac * pt.dur;
+            visualArrTimes.push(Math.round(tArr));
+          }
+        } else if (call.dep) {
+          const arrM = call.dur > 0 ? call.dep.depMins + call.dur : call.dep.arrMins;
+          visualArrTimes.push(arrM);
+        }
+      }
+      visualArrTimes.sort((a, b) => a - b);
+      dest.arrTimes = visualArrTimes;
+    }
+  } else if (!isOut && cur.srcs) {
+    for (let si = 0; si < cur.srcs.length; si++) {
+      const src = cur.srcs[si];
+      const visualArrTimes: number[] = [];
+      const inCalls = src.inCalls || [];
+      for (let ci = 0; ci < inCalls.length; ci++) {
+        const ic = inCalls[ci];
+        if (ic.arrMins >= 0) {
+          visualArrTimes.push(ic.arrMins);
+        }
+      }
+      visualArrTimes.sort((a, b) => a - b);
+      src.arrTimes = visualArrTimes;
+    }
   }
 
   function getActiveTrains(tMins: number): ActiveTrainVM[] {
