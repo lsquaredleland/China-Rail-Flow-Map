@@ -184,7 +184,6 @@ export default function App() {
   });
   const [outline, setOutline] = useState<DecodedOutline | null>(null);
   const [showOutline, setShowOutline] = useState(true);
-  const [connectorMode, setConnectorMode] = useState<"solid" | "dashed" | "none">("solid");
   const [showNetwork, setShowNetwork] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [showInfra, setShowInfraState] = useState<boolean>(initialInfra);
@@ -497,7 +496,6 @@ export default function App() {
       const idx = origins.findIndex((o) => o.zh === zh);
       if (idx >= 0) selectOrigin(idx);
     };
-    w.__setConnectorMode = setConnectorMode;
     w.__setShowOutline = setShowOutline;
     w.__setDark = setDark;
   });
@@ -783,22 +781,6 @@ export default function App() {
           <div className="spacer"></div>
           <div className="group">
             <button
-              id="btnConnector"
-              type="button"
-              onClick={() =>
-                setConnectorMode((m) =>
-                  m === "solid" ? "dashed" : m === "dashed" ? "none" : "solid",
-                )
-              }
-              title="Toggle intra-city track connector between arrival station and city marker"
-            >
-              {connectorMode === "solid"
-                ? "Connector: Solid"
-                : connectorMode === "dashed"
-                  ? "Connector: Dashed"
-                  : "Connector: Off"}
-            </button>
-            <button
               id="tglNetwork"
               type="button"
               aria-pressed={showNetwork ? "true" : "false"}
@@ -893,7 +875,6 @@ export default function App() {
           atlas={atlas}
           outline={outline}
           showOutline={showOutline}
-          connectorMode={connectorMode}
           cur={viewCur}
           direction={direction}
           dark={dark}

@@ -57,7 +57,6 @@ interface Props {
   atlas: DecodedAtlas | null;
   outline?: DecodedOutline | null;
   showOutline?: boolean;
-  connectorMode?: "solid" | "dashed" | "none";
   cur: OriginVM | null;
   direction: Direction;
   dark: boolean;
@@ -323,95 +322,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ly = y;
     }
   }
-  function distKm(lon1: number, lat1: number, lon2: number, lat2: number): number {
-    const dx = (lon1 - lon2) * 111.0 * Math.cos(((lat1 + lat2) / 2) * 0.017453292519943295);
-    const dy = (lat1 - lat2) * 111.0;
-    return Math.hypot(dx, dy);
-  }
-
-  function getIntraCityConnector(): {
-    netIdx: number;
-    subN: number;
-    bw0: number;
-    col: string;
-  } | null {
-    const dest = P.current.panelDest;
-    const atlas = P.current.atlas;
-    const cur = P.current.cur;
-    const destSecCounts = getDestSectionCounts();
-    if (!dest || !atlas || !cur || !destSecCounts || destSecCounts.size === 0) return null;
-    const mode = P.current.connectorMode ?? "solid";
-    if (mode === "none") return null;
-
-    const set = flowsSet();
-    if (!set) return null;
-
-    const [destLon, destLat] = dest.pt;
-
-    let bestArrLon = 0,
-      bestArrLat = 0,
-      minTermDist = 1e9;
-
-    for (const [s, count] of destSecCounts.entries()) {
-      if (count <= 0) continue;
-      const o = set.off[s];
-      const l = set.len[s];
-      if (l <= 0) continue;
-      const x0 = set.pts[o];
-      const y0 = set.pts[o + 1];
-      const x1 = set.pts[o + (l - 1) * 2];
-      const y1 = set.pts[o + (l - 1) * 2 + 1];
-
-      const d0 = distKm(x0, y0, destLon, destLat);
-      const d1 = distKm(x1, y1, destLon, destLat);
-      if (d0 < minTermDist) {
-        minTermDist = d0;
-        bestArrLon = x0;
-        bestArrLat = y0;
-      }
-      if (d1 < minTermDist) {
-        minTermDist = d1;
-        bestArrLon = x1;
-        bestArrLat = y1;
-      }
-    }
-
-    if (minTermDist < 2.5 || minTermDist > 70.0) return null;
-
-    const { pts, off, len } = atlas.net;
-    let bestNetIdx = -1;
-    let minNetErr = 1e9;
-
-    for (let i = 0; i < len.length; i++) {
-      const o = off[i];
-      const l = len[i];
-      if (l <= 0) continue;
-      const nx0 = pts[o];
-      const ny0 = pts[o + 1];
-      const nx1 = pts[o + (l - 1) * 2];
-      const ny1 = pts[o + (l - 1) * 2 + 1];
-
-      const err1 = distKm(nx0, ny0, bestArrLon, bestArrLat) + distKm(nx1, ny1, destLon, destLat);
-      const err2 = distKm(nx1, ny1, bestArrLon, bestArrLat) + distKm(nx0, ny0, destLon, destLat);
-      const err = Math.min(err1, err2);
-      if (err < minNetErr) {
-        minNetErr = err;
-        bestNetIdx = i;
-      }
-    }
-
-    if (bestNetIdx >= 0 && minNetErr < 5.0) {
-      const subN = (dest as DestVM).trains || (dest as SrcVM).trains || 5;
-      const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
-      const pal = makePalette(P.current.dark);
-      const bw0 = Math.round(widthOf(subN) * 4) / 4;
-      const col = flowColor(subN, maxN, pal);
-      return { netIdx: bestNetIdx, subN, bw0, col };
-    }
-
-    return null;
-  }
-
   function drawOutline(ctx: CanvasRenderingContext2D, pal: Palette) {
     const outline = P.current.outline;
     if (!outline) return;
@@ -705,33 +615,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         }
         subFlows.sort((a, b) => b.n - a.n);
         strokeFlowList(subFlows, 1.0);
-
-        // Intra-city track connector (bridges gap to metropolitan city marker)
-        const conn = getIntraCityConnector();
-        if (conn) {
-          const mode = P.current.connectorMode ?? "solid";
-          ctx.beginPath();
-          if (mode === "dashed") {
-            ctx.lineWidth = Math.max(1.8, conn.bw0 * 0.75);
-            ctx.strokeStyle = conn.col;
-            ctx.lineCap = "butt";
-            ctx.setLineDash([8, 6]);
-          } else {
-            ctx.lineWidth = conn.bw0;
-            ctx.strokeStyle = conn.col;
-            ctx.lineCap = "round";
-            ctx.setLineDash([]);
-          }
-          traceInto(
-            ctx,
-            atlas.net.pts,
-            atlas.net.off[conn.netIdx],
-            atlas.net.len[conn.netIdx],
-          );
-          ctx.stroke();
-          ctx.lineCap = "round";
-          ctx.setLineDash([]);
-        }
       }
       ctx.globalAlpha = 1.0;
     } else {
@@ -886,7 +769,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       set.bb[sIdx * 4 + 3] > 20.20 &&
       set.bb[sIdx * 4] > 110.0 &&
       set.bb[sIdx * 4 + 2] < 110.3;
-    const hw = widthOf(n) + 1.6;
+    const destSecCounts = getDestSectionCounts();
+    const subN = destSecCounts ? destSecCounts.get(sIdx) : undefined;
+    const effectiveN = subN !== undefined && subN > 0 ? subN : n;
+    const hw = widthOf(effectiveN) + 1.6;
     ctx.lineWidth = hw;
     if (isFerry) {
       // Overland portions of the ferry route highlighted in standard flowHi
@@ -1425,9 +1311,17 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let segBest: FlowVM | null = null;
     let bestDist = 10;
     let i: number, k: number;
+    const destSecCounts = getDestSectionCounts();
     for (i = 0; i < flows.length; i++) {
       const f = flows[i];
       const s = f.s;
+      // When a city pair is selected, restrict segment picking ONLY to sections that belong to the city pair
+      if (
+        destSecCounts &&
+        (!destSecCounts.has(s) || (destSecCounts.get(s) ?? 0) <= 0)
+      ) {
+        continue;
+      }
       if (
         lon < sec.bb[s * 4] - thrDeg ||
         lon > sec.bb[s * 4 + 2] + thrDeg ||
@@ -1465,7 +1359,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           : undefined;
       return { kind: "seg", s: segBest.s, n: segBest.n, subN };
     }
-    if (P.current.direction !== "out") return null;
+    if (P.current.direction !== "out" || destSecCounts) return null;
     let chordBest: ChordVM | null = null;
     for (i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
@@ -1773,7 +1667,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     props.showInfra,
     props.showOutline,
     props.outline,
-    props.connectorMode,
     props.dark,
     props.direction,
     props.panelDest,
