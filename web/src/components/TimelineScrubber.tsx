@@ -16,7 +16,7 @@ export interface TimelineScrubberProps {
 }
 
 // 75% of slider track visual width is dedicated to Day 1 (0–24h)
-// 25% is dedicated to the Day 2–3 transcontinental tail (24h–55h+)
+// 25% is dedicated to the trans-continental tail (24h–55h+)
 const SPLIT_SLIDER = 750; // out of 1000
 
 function timeToSlider(tMins: number, totalMins: number): number {
@@ -64,23 +64,30 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   dark,
   direction,
 }) => {
+  const timeDayRef = useRef<HTMLSpanElement | null>(null);
   const timeDisplayRef = useRef<HTMLSpanElement | null>(null);
   const sliderRef = useRef<HTMLInputElement | null>(null);
   const fillTrackRef = useRef<HTMLDivElement | null>(null);
-  const counterRef = useRef<HTMLSpanElement | null>(null);
-  const rushBadgeRef = useRef<HTMLSpanElement | null>(null);
+  const needleRef = useRef<HTMLDivElement | null>(null);
+
+  const departedValRef = useRef<HTMLSpanElement | null>(null);
+  const arrivedValRef = useRef<HTMLSpanElement | null>(null);
+  const totalValRef = useRef<HTMLSpanElement | null>(null);
+
+  const rushBadgeRef = useRef<HTMLDivElement | null>(null);
+  const rushBadgeTextRef = useRef<HTMLSpanElement | null>(null);
   const finishTickRef = useRef<HTMLSpanElement | null>(null);
 
   // Un-rendered transient state kept in refs for 60fps direct-DOM execution
   const currentPlayingRef = useRef(false);
   const currentTimeRef = useRef(0);
-  const currentSpeedRef = useRef(30);
+  const currentSpeedRef = useRef(15);
   const totalMinsRef = useRef(1440);
   const totalDaysRef = useRef(1);
 
   // Minimal React state — only toggled on user interactions or discrete state flips
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(30);
+  const [speed, setSpeed] = useState(15);
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   // Subscribe to MapCanvas animation ticks with direct DOM updates (0% React re-render overhead)
@@ -93,68 +100,77 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       const t = Math.max(0, Math.min(totM, state.time));
       currentTimeRef.current = t;
 
-      // 1. Time display clock
+      const day = Math.floor(t / 1440) + 1;
+      const minsInDay = t % 1440;
+      const hh = Math.floor(minsInDay / 60);
+      const mm = minsInDay % 60;
+      const clockStr = `${hh < 10 ? "0" : ""}${hh}:${mm < 10 ? "0" : ""}${mm}`;
+
+      // 1. Time display clock & day caption
+      if (timeDayRef.current) {
+        timeDayRef.current.textContent = `DAY ${day}`;
+      }
       if (timeDisplayRef.current) {
-        timeDisplayRef.current.textContent = fmtTimelineClock(t, totM);
+        timeDisplayRef.current.textContent = clockStr;
       }
       if (finishTickRef.current) {
         finishTickRef.current.textContent = fmtTimelineClock(totM, totM);
       }
 
-      // 2. Non-linear slider input value & fill progress bar
+      // 2. Non-linear slider input value, fill progress bar, and custom needle handle
       const sliderVal = timeToSlider(t, totM);
+      const pct = (sliderVal / 10).toFixed(2);
       if (sliderRef.current) {
         sliderRef.current.value = String(Math.round(sliderVal));
       }
       if (fillTrackRef.current) {
-        fillTrackRef.current.style.width = `${(sliderVal / 10).toFixed(2)}%`;
+        fillTrackRef.current.style.width = `${pct}%`;
+      }
+      if (needleRef.current) {
+        needleRef.current.style.left = `${pct}%`;
       }
 
-      // 3. Trains counter HUD
-      if (counterRef.current) {
-        const dep = state.departed ?? 0;
-        const arr = state.arrived ?? 0;
-        const tot = state.total ?? 0;
-        if (t <= 1440) {
-          const verb = direction === "out" ? "Departed" : "Boarded";
-          counterRef.current.textContent = `${dep.toLocaleString("en-US")} ${verb} · ${arr.toLocaleString("en-US")} Arrived / ${tot.toLocaleString("en-US")} Total`;
-        } else if (t >= totM) {
-          counterRef.current.textContent = `All ${tot.toLocaleString("en-US")} Trains Arrived · 100% Complete`;
-        } else {
-          const pct = Math.round((arr / Math.max(1, tot)) * 100);
-          counterRef.current.textContent = `${arr.toLocaleString("en-US")} / ${tot.toLocaleString("en-US")} Arrived (${pct}%) · In Transit`;
-        }
+      // 3. Train statistics (Departed, Arrived, Total)
+      const dep = state.departed ?? 0;
+      const arr = state.arrived ?? 0;
+      const tot = state.total ?? 0;
+      if (departedValRef.current) {
+        departedValRef.current.textContent = dep.toLocaleString("en-US");
+      }
+      if (arrivedValRef.current) {
+        arrivedValRef.current.textContent = arr.toLocaleString("en-US");
+      }
+      if (totalValRef.current) {
+        totalValRef.current.textContent = tot.toLocaleString("en-US");
       }
 
       // 4. Time period / Rush hour badge
-      if (rushBadgeRef.current) {
+      if (rushBadgeRef.current && rushBadgeTextRef.current) {
+        const rushColor = dark ? "#E54035" : "#C8302A";
         if (t >= totM) {
-          rushBadgeRef.current.textContent = "All Trips Completed";
-          rushBadgeRef.current.className = "ts-badge";
+          rushBadgeTextRef.current.textContent = "ALL ARRIVED";
+          rushBadgeRef.current.style.borderColor = "#10B981";
+          rushBadgeRef.current.style.color = "#10B981";
+        } else if (day === 1 && minsInDay >= 420 && minsInDay <= 570) {
+          rushBadgeTextRef.current.textContent = "MORNING RUSH";
+          rushBadgeRef.current.style.borderColor = rushColor;
+          rushBadgeRef.current.style.color = rushColor;
+        } else if (day === 1 && minsInDay >= 1050 && minsInDay <= 1230) {
+          rushBadgeTextRef.current.textContent = "EVENING RUSH";
+          rushBadgeRef.current.style.borderColor = rushColor;
+          rushBadgeRef.current.style.color = rushColor;
+        } else if (day === 1 && minsInDay < 360) {
+          rushBadgeTextRef.current.textContent = "NIGHT SERVICES";
+          rushBadgeRef.current.style.borderColor = dark ? "#6B7280" : "#9CA3AF";
+          rushBadgeRef.current.style.color = dark ? "#6B7280" : "#9CA3AF";
+        } else if (day > 1) {
+          rushBadgeTextRef.current.textContent = `DAY ${day} TAIL`;
+          rushBadgeRef.current.style.borderColor = dark ? "#F59E0B" : "#D97706";
+          rushBadgeRef.current.style.color = dark ? "#F59E0B" : "#D97706";
         } else {
-          const day = Math.floor(t / 1440) + 1;
-          const minsInDay = t % 1440;
-          if (day === 1) {
-            if (minsInDay >= 420 && minsInDay <= 570) {
-              rushBadgeRef.current.textContent = "Morning Rush";
-              rushBadgeRef.current.className = "ts-badge ts-badge-rush";
-            } else if (minsInDay >= 1050 && minsInDay <= 1230) {
-              rushBadgeRef.current.textContent = "Evening Rush";
-              rushBadgeRef.current.className = "ts-badge ts-badge-rush";
-            } else if (minsInDay < 360) {
-              rushBadgeRef.current.textContent = "Night Services";
-              rushBadgeRef.current.className = "ts-badge";
-            } else {
-              rushBadgeRef.current.textContent = "Day 1 Regular";
-              rushBadgeRef.current.className = "ts-badge";
-            }
-          } else if (day === 2) {
-            rushBadgeRef.current.textContent = "Day 2 Cross-Country";
-            rushBadgeRef.current.className = "ts-badge ts-badge-rush";
-          } else {
-            rushBadgeRef.current.textContent = `Day ${day} Distal Terminus`;
-            rushBadgeRef.current.className = "ts-badge";
-          }
+          rushBadgeTextRef.current.textContent = "DAY 1 REGULAR";
+          rushBadgeRef.current.style.borderColor = dark ? "#4B5563" : "#6B7280";
+          rushBadgeRef.current.style.color = dark ? "#4B5563" : "#6B7280";
         }
       }
 
@@ -197,7 +213,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       if (pollInterval) clearInterval(pollInterval);
       if (unsub) unsub();
     };
-  }, [mapRef, direction]);
+  }, [mapRef, direction, dark]);
 
   // Global Keyboard Shortcuts (Space, ArrowLeft, ArrowRight, Home)
   useEffect(() => {
@@ -227,9 +243,6 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         const prevT = sliderToTime(prevS, totM);
         currentTimeRef.current = prevT;
         mapRef.current?.setTime?.(prevT);
-        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtTimelineClock(prevT, totM);
-        if (sliderRef.current) sliderRef.current.value = String(Math.round(prevS));
-        if (fillTrackRef.current) fillTrackRef.current.style.width = `${(prevS / 10).toFixed(2)}%`;
       } else if (e.code === "ArrowRight") {
         e.preventDefault();
         const curS = timeToSlider(currentTimeRef.current, totM);
@@ -237,16 +250,10 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         const nextT = sliderToTime(nextS, totM);
         currentTimeRef.current = nextT;
         mapRef.current?.setTime?.(nextT);
-        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtTimelineClock(nextT, totM);
-        if (sliderRef.current) sliderRef.current.value = String(Math.round(nextS));
-        if (fillTrackRef.current) fillTrackRef.current.style.width = `${(nextS / 10).toFixed(2)}%`;
       } else if (e.code === "Home") {
         e.preventDefault();
         currentTimeRef.current = 0;
         mapRef.current?.setTime?.(0);
-        if (timeDisplayRef.current) timeDisplayRef.current.textContent = fmtTimelineClock(0, totM);
-        if (sliderRef.current) sliderRef.current.value = "0";
-        if (fillTrackRef.current) fillTrackRef.current.style.width = "0%";
       }
     };
 
@@ -259,11 +266,12 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
     const tMins = sliderToTime(val, totM);
     currentTimeRef.current = tMins;
     mapRef.current?.setTime?.(tMins);
-    if (timeDisplayRef.current) {
-      timeDisplayRef.current.textContent = fmtTimelineClock(tMins, totM);
-    }
+    const pct = (val / 10).toFixed(2);
     if (fillTrackRef.current) {
-      fillTrackRef.current.style.width = `${(val / 10).toFixed(2)}%`;
+      fillTrackRef.current.style.width = `${pct}%`;
+    }
+    if (needleRef.current) {
+      needleRef.current.style.left = `${pct}%`;
     }
   };
 
@@ -282,20 +290,19 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
     currentTimeRef.current = totM;
     mapRef.current?.setPlaying?.(false);
     mapRef.current?.setTime?.(totM);
-    if (timeDisplayRef.current) {
-      timeDisplayRef.current.textContent = fmtTimelineClock(totM, totM);
-    }
     if (sliderRef.current) {
       sliderRef.current.value = "1000";
     }
     if (fillTrackRef.current) {
       fillTrackRef.current.style.width = "100%";
     }
+    if (needleRef.current) {
+      needleRef.current.style.left = "100%";
+    }
   };
 
   const handleCollapse = () => {
     setIsCollapsed(true);
-    // When collapsed, pause playback and show the full extent of the network
     mapRef.current?.setPlaying?.(false);
     mapRef.current?.setAnimEnabled?.(false);
   };
@@ -309,7 +316,6 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   };
 
   // If user collapsed the timeline in-place: show only the clean expand button
-  // (no time on page; network map remains in full extent)
   if (isCollapsed) {
     return (
       <div
@@ -325,22 +331,18 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           type="button"
           onClick={handleExpand}
           style={{
-            background: dark
-              ? "rgba(26, 27, 30, 0.94)"
-              : "rgba(255, 255, 255, 0.95)",
+            background: dark ? "rgba(24, 24, 27, 0.96)" : "rgba(255, 255, 255, 0.98)",
             color: dark ? "#EDEDEA" : "#111111",
-            border: dark
-              ? "1px solid rgba(255, 255, 255, 0.18)"
-              : "1px solid rgba(0, 0, 0, 0.15)",
+            border: dark ? "1.5px solid rgba(255, 255, 255, 0.2)" : "1.5px solid #111111",
             borderRadius: "24px",
-            padding: "8px 20px",
+            padding: "8px 22px",
             fontSize: "12px",
             fontWeight: 700,
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.32)",
+            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.25)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
             transition: "transform 0.12s ease, background 0.15s ease",
@@ -352,550 +354,580 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               width: "8px",
               height: "8px",
               borderRadius: "50%",
-              background: "#F59E0B",
-              boxShadow: "0 0 6px #F59E0B",
+              background: "#C8302A",
+              boxShadow: "0 0 6px #C8302A",
             }}
           />
-          <span>24h Flow Animation</span>
-          <span style={{ opacity: 0.6, fontWeight: 500 }}>·</span>
-          <span style={{ color: "var(--rust, #C8302A)", fontWeight: 800 }}>
-            Expand ▴
-          </span>
+          <span>24h Flow Animation · Expand ▴</span>
         </button>
       </div>
     );
   }
 
+  const redAccent = dark ? "#E54035" : "#C8302A";
+
   return (
     <div
-      className={`timeline-scrubber-dock ${dark ? "ts-dark" : "ts-light"}`}
-      role="region"
-      aria-label="24-hour train flow simulation controls"
+      className="timeline-bar-dock"
+      style={{
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: "100%",
+        background: dark ? "#18181B" : "#FFFFFF",
+        color: dark ? "#EDEDEA" : "#111111",
+        borderTop: dark ? "1px solid rgba(255,255,255,0.18)" : "1.5px solid #111111",
+        boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.12)",
+        padding: "16px 32px 14px 32px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        zIndex: 40,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        userSelect: "none",
+        boxSizing: "border-box",
+      }}
     >
       <style>{`
-        .timeline-scrubber-dock {
-          position: absolute;
-          bottom: 20px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: calc(100% - 32px);
-          max-width: 920px;
-          border-radius: 14px;
-          backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-          padding: 10px 16px 8px 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          z-index: 40;
-          user-select: none;
-          box-sizing: border-box;
-          transition: background 0.2s ease, border-color 0.2s ease;
+        .tb-day-label {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.8px;
+          color: ${dark ? "#A1A1AA" : "#71717A"};
+          text-transform: uppercase;
         }
-
-        .timeline-scrubber-dock.ts-dark {
-          background: rgba(26, 27, 30, 0.88);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          color: #EDEDEA;
-        }
-
-        .timeline-scrubber-dock.ts-light {
-          background: rgba(255, 255, 255, 0.90);
-          border: 1px solid rgba(0, 0, 0, 0.10);
-          color: #111111;
-        }
-
-        .ts-top-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          flex-wrap: nowrap;
-        }
-
-        .ts-left-group {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .ts-play-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: none;
-          background: var(--rust, #C8302A);
-          color: #FFFFFF;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: transform 0.1s ease, background 0.15s ease;
-          box-shadow: 0 2px 8px rgba(200, 48, 42, 0.4);
-          flex-shrink: 0;
-        }
-
-        .ts-play-btn:hover {
-          transform: scale(1.06);
-          background: #E54035;
-        }
-
-        .ts-clock {
-          font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-          font-variant-numeric: tabular-nums;
+        .tb-clock {
+          font-size: 40px;
           font-weight: 800;
-          font-size: 19px;
-          letter-spacing: -0.3px;
-          min-width: 110px;
+          line-height: 1;
+          color: ${dark ? "#EDEDEA" : "#111111"};
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -1px;
         }
-
-        .ts-badge {
+        .tb-badge {
           display: inline-flex;
           align-items: center;
-          padding: 2px 7px;
-          border-radius: 4px;
+          gap: 6px;
+          border: 1.5px solid ${redAccent};
+          color: ${redAccent};
+          padding: 6px 12px;
           font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.2px;
-          background: rgba(128, 128, 128, 0.15);
-          color: inherit;
-          white-space: nowrap;
+          font-weight: 800;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
         }
-
-        .ts-badge-rush {
-          background: rgba(227, 166, 63, 0.22);
-          color: #E3A63F;
-          border: 1px solid rgba(227, 166, 63, 0.35);
+        .tb-badge-icon {
+          font-size: 8px;
+          line-height: 1;
         }
-
-        .ts-right-group {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .ts-counter-wrap {
-          font-variant-numeric: tabular-nums;
-          font-size: 12px;
-          font-weight: 600;
-          opacity: 0.85;
-          white-space: nowrap;
-        }
-
-        .ts-speed-control {
-          display: flex;
-          align-items: center;
-          border-radius: 6px;
-          background: rgba(128, 128, 128, 0.12);
-          padding: 2px 4px;
-          gap: 2px;
-        }
-
-        .ts-speed-label {
-          font-size: 10px;
-          font-weight: 700;
-          opacity: 0.65;
-          margin-right: 2px;
-        }
-
-        .ts-speed-btn {
-          border: none;
-          background: transparent;
-          font-size: 11px;
-          font-weight: 700;
-          padding: 3px 6px;
-          border-radius: 4px;
-          cursor: pointer;
-          color: inherit;
-          opacity: 0.7;
-          transition: background 0.12s ease, opacity 0.12s ease;
-        }
-
-        .ts-speed-btn.active {
-          background: var(--rust, #C8302A);
-          color: #FFFFFF;
-          opacity: 1;
-        }
-
-        .ts-jump-group {
-          display: flex;
-          align-items: center;
-          gap: 3px;
-        }
-
-        .ts-jump-btn {
-          border: 1px solid rgba(128, 128, 128, 0.26);
-          background: transparent;
-          border-radius: 5px;
-          font-size: 11px;
-          font-weight: 700;
-          font-variant-numeric: tabular-nums;
-          padding: 4px 8px;
-          cursor: pointer;
-          color: inherit;
-          transition: background 0.15s ease;
-        }
-
-        .ts-jump-btn:hover {
-          background: rgba(128, 128, 128, 0.16);
-          color: var(--rust, #C8302A);
-        }
-
-        .ts-collapse-btn {
-          border: 1px solid rgba(128, 128, 128, 0.26);
-          background: transparent;
-          border-radius: 5px;
-          font-size: 11px;
-          font-weight: 700;
-          padding: 4px 8px;
-          cursor: pointer;
-          color: inherit;
-          display: flex;
-          align-items: center;
-          gap: 3px;
-          opacity: 0.8;
-          transition: opacity 0.15s ease, background 0.15s ease;
-        }
-
-        .ts-collapse-btn:hover {
-          opacity: 1;
-          background: rgba(128, 128, 128, 0.16);
-        }
-
-        .ts-slider-container {
-          position: relative;
-          width: 100%;
+        .tb-metric-col {
           display: flex;
           flex-direction: column;
-          gap: 2px;
-        }
-
-        .ts-slider-track-wrap {
-          position: relative;
-          height: 18px;
-          display: flex;
           align-items: center;
-          width: 100%;
         }
-
-        .ts-track-bg {
-          position: absolute;
-          left: 0;
-          right: 0;
-          height: 6px;
-          border-radius: 3px;
-          background: rgba(128, 128, 128, 0.22);
-          overflow: hidden;
-          pointer-events: none;
-        }
-
-        .ts-zone-am {
-          position: absolute;
-          left: 21.87%;
-          width: 7.81%;
-          height: 100%;
-          background: rgba(227, 166, 63, 0.42);
-        }
-
-        .ts-zone-pm {
-          position: absolute;
-          left: 54.68%;
-          width: 9.38%;
-          height: 100%;
-          background: rgba(227, 166, 63, 0.42);
-        }
-
-        .ts-zone-tail {
-          position: absolute;
-          left: 75%;
-          width: 25%;
-          height: 100%;
-          background: rgba(100, 116, 139, 0.25);
-        }
-
-        .ts-split-divider {
-          position: absolute;
-          left: 75%;
-          top: 0;
-          bottom: 0;
-          width: 1px;
-          background: rgba(255, 255, 255, 0.45);
-          pointer-events: none;
-        }
-
-        .ts-track-fill {
-          position: absolute;
-          left: 0;
-          top: 0;
-          height: 100%;
-          width: 25%;
-          border-radius: 3px;
-          background: linear-gradient(90deg, var(--rust, #C8302A) 0%, var(--saffron, #E3A63F) 75%, #06B6D4 100%);
-          pointer-events: none;
-        }
-
-        .ts-range-input {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 100%;
-          height: 18px;
-          margin: 0;
-          background: transparent;
-          outline: none;
-          cursor: pointer;
-          position: relative;
-          z-index: 2;
-        }
-
-        .ts-range-input::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: var(--rust, #C8302A);
-          border: 2px solid #FFFFFF;
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-          cursor: grab;
-          transition: transform 0.1s ease;
-        }
-
-        .ts-range-input:active::-webkit-slider-thumb {
-          cursor: grabbing;
-          transform: scale(1.22);
-        }
-
-        .ts-range-input::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: var(--rust, #C8302A);
-          border: 2px solid #FFFFFF;
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-          cursor: grab;
-        }
-
-        .ts-ticks-row {
-          position: relative;
-          width: 100%;
-          height: 14px;
-          font-size: 10px;
-          font-weight: 500;
+        .tb-metric-val {
+          font-size: 32px;
+          font-weight: 800;
+          line-height: 1;
           font-variant-numeric: tabular-nums;
-          opacity: 0.75;
-          margin-top: -1px;
+          letter-spacing: -0.5px;
         }
-
-        .ts-tick-pos {
+        .tb-metric-lbl {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.8px;
+          color: ${dark ? "#A1A1AA" : "#71717A"};
+          text-transform: uppercase;
+          margin-top: 4px;
+        }
+        .tb-speed-caption {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.8px;
+          color: ${dark ? "#A1A1AA" : "#71717A"};
+          text-transform: uppercase;
+        }
+        .tb-speed-btn {
+          height: 38px;
+          padding: 0 16px;
+          border: none;
+          background: transparent;
+          color: ${dark ? "#EDEDEA" : "#111111"};
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.12s ease, color 0.12s ease;
+        }
+        .tb-speed-btn:not(:last-child) {
+          border-right: 1.5px solid ${dark ? "rgba(255,255,255,0.25)" : "#111111"};
+        }
+        .tb-speed-btn.active {
+          background: ${dark ? "#EDEDEA" : "#111111"};
+          color: ${dark ? "#111111" : "#FFFFFF"};
+        }
+        .tb-btn-action {
+          height: 38px;
+          border: 1.5px solid ${dark ? "rgba(255,255,255,0.25)" : "#111111"};
+          background: transparent;
+          color: ${dark ? "#EDEDEA" : "#111111"};
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.12s ease;
+        }
+        .tb-btn-action:hover {
+          background: ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)"};
+        }
+        .tb-tick-item {
           position: absolute;
-          transform: translateX(-50%);
           cursor: pointer;
           white-space: nowrap;
-          transition: color 0.15s ease, opacity 0.15s ease;
-        }
-
-        .ts-tick-pos:hover {
-          color: var(--rust, #C8302A);
-          opacity: 1;
-        }
-
-        .ts-tick-highlight {
+          font-size: 11px;
           font-weight: 700;
-          color: var(--rust, #C8302A);
-          opacity: 0.95;
+          color: ${dark ? "#EDEDEA" : "#111111"};
+          transition: color 0.15s ease;
         }
-
-        @media (max-width: 680px) {
-          .timeline-scrubber-dock {
-            bottom: 12px;
-            width: calc(100% - 20px);
-            padding: 8px 12px;
-            gap: 5px;
+        .tb-tick-item:hover {
+          color: ${redAccent};
+        }
+        @media (max-width: 900px) {
+          .tb-metrics-group {
+            display: none !important;
           }
-          .ts-clock {
-            font-size: 16px;
-            min-width: 80px;
-          }
-          .ts-badge {
-            display: none;
-          }
-          .ts-counter-wrap {
-            font-size: 11px;
-          }
-          .ts-speed-label {
-            display: none;
+          .tb-speed-caption {
+            display: none !important;
           }
         }
       `}</style>
 
-      {/* Top HUD & Controls row */}
-      <div className="ts-top-row">
-        <div className="ts-left-group">
+      {/* Top Row: Play / Clock / Rush Badge / Stats / Speed / Finish / Collapse */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "20px",
+        }}
+      >
+        {/* Left: Play button + Clock + Rush Badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <button
             type="button"
-            className="ts-play-btn"
             onClick={handleTogglePlay}
-            aria-label={isPlaying ? "Pause timeline (Space)" : "Play timeline (Space)"}
+            aria-label={isPlaying ? "Pause timeline" : "Play timeline"}
             title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+            style={{
+              width: "52px",
+              height: "52px",
+              background: dark ? "#EDEDEA" : "#111111",
+              color: dark ? "#111111" : "#FFFFFF",
+              border: "none",
+              borderRadius: "0",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
           >
             {isPlaying ? (
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <rect x="5" y="4" width="4" height="16" rx="1" />
-                <rect x="15" y="4" width="4" height="16" rx="1" />
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
               </svg>
             ) : (
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <polygon points="6,4 20,12 6,20" />
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <polygon points="7,4 20,12 7,20" />
               </svg>
             )}
           </button>
 
-          <span ref={timeDisplayRef} className="ts-clock">
-            Day 1 · 06:00
-          </span>
-
-          <span ref={rushBadgeRef} className="ts-badge">
-            Morning Rush
-          </span>
-        </div>
-
-        <div className="ts-right-group">
-          <div className="ts-counter-wrap">
-            <span ref={counterRef}>
-              0 Departed · 0 / 0 Arrived
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <span ref={timeDayRef} className="tb-day-label">
+              DAY 1
+            </span>
+            <span ref={timeDisplayRef} className="tb-clock">
+              19:31
             </span>
           </div>
 
+          <div ref={rushBadgeRef} className="tb-badge">
+            <span className="tb-badge-icon">■</span>
+            <span ref={rushBadgeTextRef}>EVENING RUSH</span>
+          </div>
+        </div>
+
+        {/* Center: Departed / Arrived / Total columnar stats */}
+        <div
+          className="tb-metrics-group"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "36px",
+          }}
+        >
+          <div className="tb-metric-col">
+            <span
+              ref={departedValRef}
+              className="tb-metric-val"
+              style={{ color: redAccent }}
+            >
+              638
+            </span>
+            <span className="tb-metric-lbl">
+              {direction === "out" ? "DEPARTED" : "BOARDED"}
+            </span>
+          </div>
+
+          <div className="tb-metric-col">
+            <span
+              ref={arrivedValRef}
+              className="tb-metric-val"
+              style={{ color: dark ? "#EDEDEA" : "#111111" }}
+            >
+              421
+            </span>
+            <span className="tb-metric-lbl">ARRIVED</span>
+          </div>
+
+          <div className="tb-metric-col">
+            <span
+              ref={totalValRef}
+              className="tb-metric-val"
+              style={{ color: dark ? "#9CA3AF" : "#4B5563" }}
+            >
+              758
+            </span>
+            <span className="tb-metric-lbl">TOTAL</span>
+          </div>
+        </div>
+
+        {/* Right: A DAY IN / 15s 30s 60s / Finish / Collapse */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span className="tb-speed-caption">A DAY IN</span>
+
           <div
-            className="ts-speed-control"
-            role="group"
-            aria-label="Playback cycle speed (seconds per 24 hours)"
-            title="Real-world seconds to simulate a 24-hour cycle"
+            style={{
+              display: "flex",
+              border: dark
+                ? "1.5px solid rgba(255,255,255,0.25)"
+                : "1.5px solid #111111",
+              borderRadius: "0",
+              overflow: "hidden",
+            }}
           >
-            <span className="ts-speed-label">Speed:</span>
             <button
               type="button"
-              className={`ts-speed-btn ${speed === 15 ? "active" : ""}`}
+              className={`tb-speed-btn ${speed === 15 ? "active" : ""}`}
               onClick={() => handleSetSpeed(15)}
-              title="15 seconds per day (Fast)"
+              title="Simulate 24 hours in 15 seconds"
             >
               15s
             </button>
             <button
               type="button"
-              className={`ts-speed-btn ${speed === 30 ? "active" : ""}`}
+              className={`tb-speed-btn ${speed === 30 ? "active" : ""}`}
               onClick={() => handleSetSpeed(30)}
-              title="30 seconds per day (Standard)"
+              title="Simulate 24 hours in 30 seconds"
             >
               30s
             </button>
             <button
               type="button"
-              className={`ts-speed-btn ${speed === 60 ? "active" : ""}`}
+              className={`tb-speed-btn ${speed === 60 ? "active" : ""}`}
               onClick={() => handleSetSpeed(60)}
-              title="60 seconds per day (Relaxed)"
+              title="Simulate 24 hours in 60 seconds"
             >
               60s
             </button>
           </div>
 
-          <div className="ts-jump-group">
-            <button
-              type="button"
-              className="ts-jump-btn"
-              onClick={handleJumpToFinish}
-              title="Jump to finish when all trains have arrived"
-            >
-              Finish
-            </button>
-          </div>
+          <button
+            type="button"
+            className="tb-btn-action"
+            onClick={handleJumpToFinish}
+            style={{ padding: "0 18px" }}
+            title="Jump simulation to finish when all trains have arrived"
+          >
+            Finish
+          </button>
 
           <button
             type="button"
-            className="ts-collapse-btn"
+            className="tb-btn-action"
             onClick={handleCollapse}
-            title="Collapse animation bar and display full-extent static network"
+            style={{ width: "38px" }}
+            title="Collapse animation bar"
           >
-            ▾ Collapse
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
           </button>
         </div>
       </div>
 
-      {/* Bottom Slider & Ticks row: 75% for 0–24h, 25% for 24h–55h+ tail */}
-      <div className="ts-slider-container">
-        <div className="ts-slider-track-wrap">
-          <div className="ts-track-bg">
-            <div className="ts-zone-am" title="Morning Rush Hour (07:00 – 09:30)" />
-            <div className="ts-zone-pm" title="Evening Rush Hour (17:30 – 20:30)" />
-            <div className="ts-zone-tail" title="Day 2–3 Trans-continental Terminal Arrivals" />
-            <div className="ts-split-divider" />
-            <div ref={fillTrackRef} className="ts-track-fill" />
+      {/* Bottom Scrubber: Zones Header + Track with Hatched Tail + Tick Labels */}
+      <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
+        {/* Zones row (Morning Rush, Evening Rush, Arrivals Only) */}
+        <div style={{ position: "relative", width: "100%", height: "18px", marginBottom: "4px" }}>
+          {/* Morning Rush (07:00–09:30): 07:00 / 24 * 75% = 21.875%, width 7.8125% */}
+          <div
+            style={{
+              position: "absolute",
+              left: "21.875%",
+              width: "7.8125%",
+              height: "100%",
+              background: dark ? "rgba(229, 64, 53, 0.16)" : "rgba(200, 48, 42, 0.12)",
+              display: "flex",
+              alignItems: "center",
+              padding: "0 6px",
+              boxSizing: "border-box",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 800,
+                color: redAccent,
+                letterSpacing: "0.5px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              MORNING RUSH
+            </span>
           </div>
 
+          {/* Evening Rush (17:30–20:30): 17.5 / 24 * 75% = 54.6875%, width 9.375% */}
+          <div
+            style={{
+              position: "absolute",
+              left: "54.6875%",
+              width: "9.375%",
+              height: "100%",
+              background: dark ? "rgba(229, 64, 53, 0.16)" : "rgba(200, 48, 42, 0.12)",
+              display: "flex",
+              alignItems: "center",
+              padding: "0 6px",
+              boxSizing: "border-box",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 800,
+                color: redAccent,
+                letterSpacing: "0.5px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              EVENING RUSH
+            </span>
+          </div>
+
+          {/* Arrivals Only (24:00+ extended tail) */}
+          <div
+            style={{
+              position: "absolute",
+              left: "76%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 800,
+                color: dark ? "#A1A1AA" : "#71717A",
+                letterSpacing: "0.6px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ARRIVALS ONLY
+            </span>
+          </div>
+        </div>
+
+        {/* Track Bar */}
+        <div style={{ position: "relative", width: "100%", height: "12px" }}>
+          {/* Track Background: Day 1 (0-75%) + Diagonally Hatched Tail (75-100%) */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: dark ? "#2E3035" : "#E5E3DC",
+              borderRadius: "0",
+              overflow: "hidden",
+            }}
+          >
+            {/* Extended Hatched Tail from 75% to 100% */}
+            <div
+              style={{
+                position: "absolute",
+                left: "75%",
+                right: 0,
+                top: 0,
+                bottom: 0,
+                background: dark
+                  ? "repeating-linear-gradient(45deg, #3A3D44, #3A3D44 2px, #26282D 2px, #26282D 6px)"
+                  : "repeating-linear-gradient(45deg, #D4D2CA, #D4D2CA 2px, #E5E3DC 2px, #E5E3DC 6px)",
+              }}
+            />
+
+            {/* Red Filled Progress */}
+            <div
+              ref={fillTrackRef}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: "0%",
+                background: redAccent,
+                transition: "width 0.05s linear",
+              }}
+            />
+          </div>
+
+          {/* Vertical Divider Line at 75% (24:00 Day 1 ends) */}
+          <div
+            style={{
+              position: "absolute",
+              left: "75%",
+              top: "-2px",
+              width: "2px",
+              height: "16px",
+              background: dark ? "#EDEDEA" : "#111111",
+              zIndex: 3,
+            }}
+          />
+
+          {/* Needle & Square Thumb Handle */}
+          <div
+            ref={needleRef}
+            style={{
+              position: "absolute",
+              left: "0%",
+              top: "-8px",
+              transform: "translateX(-50%)",
+              pointerEvents: "none",
+              zIndex: 5,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              transition: "left 0.05s linear",
+            }}
+          >
+            <div
+              style={{
+                width: "12px",
+                height: "12px",
+                background: dark ? "#EDEDEA" : "#111111",
+                borderRadius: "1px",
+              }}
+            />
+            <div
+              style={{
+                width: "2px",
+                height: "16px",
+                background: dark ? "#EDEDEA" : "#111111",
+              }}
+            />
+          </div>
+
+          {/* Interactive Range Input on top */}
           <input
             ref={sliderRef}
             type="range"
             min="0"
             max="1000"
             step="1"
-            defaultValue="188"
-            className="ts-range-input"
-            aria-label="Timeline time scrubber"
+            defaultValue="0"
+            style={{
+              position: "absolute",
+              left: 0,
+              top: "-6px",
+              width: "100%",
+              height: "24px",
+              opacity: 0,
+              cursor: "pointer",
+              zIndex: 10,
+              margin: 0,
+            }}
+            aria-label="Timeline scrubber"
             onInput={(e) => handleSliderInput(Number(e.currentTarget.value))}
             onChange={(e) => handleSliderInput(Number(e.currentTarget.value))}
           />
         </div>
 
-        <div className="ts-ticks-row">
+        {/* Ticks & Labels Row */}
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "18px",
+            marginTop: "6px",
+          }}
+        >
           <span
-            className="ts-tick-pos"
+            className="tb-tick-item"
             style={{ left: "0%" }}
             onClick={() => handleSliderInput(0)}
-            title="Day 1 00:00 midnight"
+            title="Day 1 00:00"
           >
             00:00
           </span>
           <span
-            className="ts-tick-pos ts-tick-highlight"
-            style={{ left: "18.75%" }}
+            className="tb-tick-item"
+            style={{ left: "18.75%", transform: "translateX(-50%)" }}
             onClick={() => handleSliderInput(188)}
-            title="Day 1 06:00 AM"
+            title="Day 1 06:00"
           >
-            06:00 Peak
+            06:00
           </span>
           <span
-            className="ts-tick-pos"
-            style={{ left: "37.5%" }}
+            className="tb-tick-item"
+            style={{ left: "37.5%", transform: "translateX(-50%)" }}
             onClick={() => handleSliderInput(375)}
-            title="Day 1 12:00 Midday"
+            title="Day 1 12:00"
           >
             12:00
           </span>
           <span
-            className="ts-tick-pos ts-tick-highlight"
-            style={{ left: "56.25%" }}
+            className="tb-tick-item"
+            style={{ left: "56.25%", transform: "translateX(-50%)" }}
             onClick={() => handleSliderInput(562)}
-            title="Day 1 18:00 PM"
+            title="Day 1 18:00"
           >
-            18:00 Peak
+            18:00
           </span>
           <span
-            className="ts-tick-pos ts-tick-highlight"
-            style={{ left: "75%" }}
+            className="tb-tick-item"
+            style={{ left: "75%", transform: "translateX(-50%)", fontWeight: 800 }}
             onClick={() => handleSliderInput(750)}
-            title="Day 1 24:00 (Departures complete)"
+            title="Day 1 24:00 (Day 1 departures complete)"
           >
-            24:00 (D1 End)
+            24:00 · Day 1 ends
           </span>
           <span
             ref={finishTickRef}
-            className="ts-tick-pos"
-            style={{ left: "100%", transform: "translateX(-100%)" }}
+            className="tb-tick-item"
+            style={{ right: 0 }}
             onClick={handleJumpToFinish}
-            title="Jump to finish when all trains have arrived"
+            title="All trains arrived"
           >
-            {fmtTimelineClock(totalMinsRef.current || 1440, totalMinsRef.current || 1440)}
+            All arrived
           </span>
         </div>
       </div>
