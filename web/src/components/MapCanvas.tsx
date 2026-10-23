@@ -1609,7 +1609,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (st.lastRafTimestamp !== null) {
       const dt = (timestamp - st.lastRafTimestamp) / 1000;
       if (dt > 0 && dt < 2) {
-        const deltaMins = (dt / Math.max(1, st.animSpeed)) * 1440;
+        // Accelerate tail playback (Day 2-3) by 2.5x so watching terminal arrivals stays dynamic
+        const tailMult = st.animTime > 1440 ? 2.5 : 1.0;
+        const deltaMins = (dt / Math.max(1, st.animSpeed)) * 1440 * tailMult;
         st.animTime = st.animTime + deltaMins;
         if (st.animTime >= totalMins) {
           st.animTime = 0;
