@@ -114,8 +114,16 @@ fn snap_chains(chains: Chains, tol_km: f64) -> (Chains, Chains) {
                         if i == j && ei >= ej {
                             continue;
                         }
-                        let a = if ei == 0 { pool[i][0] } else { *pool[i].last().unwrap() };
-                        let b = if ej == 0 { pool[j][0] } else { *pool[j].last().unwrap() };
+                        let a = if ei == 0 {
+                            pool[i][0]
+                        } else {
+                            *pool[i].last().unwrap()
+                        };
+                        let b = if ej == 0 {
+                            pool[j][0]
+                        } else {
+                            *pool[j].last().unwrap()
+                        };
                         let d = hav_km(a, b);
                         if best.is_none_or(|(bd, _, _, _, _)| d < bd) {
                             best = Some((d, i, ei, j, ej));
@@ -273,13 +281,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 continue;
                             }
                             match m.role().unwrap_or("") {
-                                "inner" => { inn_prc.insert(m.member_id); }
-                                _ => { out_prc.insert(m.member_id); }
+                                "inner" => {
+                                    inn_prc.insert(m.member_id);
+                                }
+                                _ => {
+                                    out_prc.insert(m.member_id);
+                                }
                             }
                         }
                     } else if id == 449220 {
                         for m in r.members() {
-                            if m.member_type == RelMemberType::Way && m.role().unwrap_or("") != "inner" {
+                            if m.member_type == RelMemberType::Way
+                                && m.role().unwrap_or("") != "inner"
+                            {
                                 out_tw.insert(m.member_id);
                             }
                         }
@@ -299,7 +313,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "ways in relations: PRC outer {} inner {}, Taiwan {}",
-        outer_ways_prc.len(), inner_ways_prc.len(), ways_tw.len()
+        outer_ways_prc.len(),
+        inner_ways_prc.len(),
+        ways_tw.len()
     );
 
     // Pass 2: node refs for member ways (filtering out maritime straight baselines) + natural=coastline
@@ -336,7 +352,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         coast.insert(wid);
                     }
 
-                    if (is_prc_out && !is_maritime) || is_prc_in || (is_tw && !is_maritime) || is_coastline {
+                    if (is_prc_out && !is_maritime)
+                        || is_prc_in
+                        || (is_tw && !is_maritime)
+                        || is_coastline
+                    {
                         let refs: Vec<i64> = w.refs().collect();
                         for n in refs.iter() {
                             nodes.insert(*n);
@@ -346,7 +366,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 (refs_map, nodes, land_prc, coast)
             },
-            || (HashMap::new(), HashSet::new(), HashSet::new(), HashSet::new()),
+            || {
+                (
+                    HashMap::new(),
+                    HashSet::new(),
+                    HashSet::new(),
+                    HashSet::new(),
+                )
+            },
             |mut a, b| {
                 a.0.extend(b.0);
                 a.1.extend(b.1);
@@ -359,7 +386,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "extracted: PRC land border ways {}, natural coastline ways {}, total nodes {}",
-        land_ways_prc.len(), coast_ways.len(), need_nodes.len()
+        land_ways_prc.len(),
+        coast_ways.len(),
+        need_nodes.len()
     );
 
     // Pass 3: node coordinates
@@ -369,15 +398,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             |el| {
                 let mut map = HashMap::new();
                 match el {
-                    Element::Node(n) => {
-                        if need_nodes.contains(&n.id()) {
-                            map.insert(n.id(), [n.lon(), n.lat()]);
-                        }
+                    Element::Node(n) if need_nodes.contains(&n.id()) => {
+                        map.insert(n.id(), [n.lon(), n.lat()]);
                     }
-                    Element::DenseNode(n) => {
-                        if need_nodes.contains(&n.id()) {
-                            map.insert(n.id(), [n.lon(), n.lat()]);
-                        }
+                    Element::DenseNode(n) if need_nodes.contains(&n.id()) => {
+                        map.insert(n.id(), [n.lon(), n.lat()]);
                     }
                     _ => {}
                 }
@@ -397,7 +422,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     mainland_ways.extend(coast_ways);
 
     let tol_km = 5.0f64;
-    let (mut rings_mainland, mut lines_mainland) = snap_chains(chain(&mainland_ways, &way_refs, &coords), tol_km);
+    let (mut rings_mainland, mut lines_mainland) =
+        snap_chains(chain(&mainland_ways, &way_refs, &coords), tol_km);
     let (in_rings, in_lines) = snap_chains(chain(&inner_ways_prc, &way_refs, &coords), tol_km);
     let (rings_tw, lines_tw) = snap_chains(chain(&ways_tw, &way_refs, &coords), tol_km);
 
@@ -413,16 +439,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Canonical Nine-Dash Line dashes in the South China Sea
     let nine_dashes: Vec<Vec<[f64; 2]>> = vec![
-        vec![[122.8, 23.8], [123.1, 24.8]],      // 1. East of Taiwan
-        vec![[122.8, 20.8], [122.2, 19.8]],      // 2. Bashi Channel
-        vec![[120.0, 19.2], [119.5, 18.2]],      // 3. North SCS
-        vec![[119.2, 16.2], [118.8, 15.1]],      // 4. Scarborough Shoal / West Luzon
-        vec![[118.2, 13.0], [117.6, 12.0]],      // 5. Central East SCS
-        vec![[116.8, 9.8], [116.1, 8.8]],        // 6. Palawan / East Spratly
-        vec![[113.2, 4.2], [112.5, 3.8]],        // 7. James Shoal (Zengmu Ansha)
-        vec![[109.5, 4.2], [108.8, 5.2]],        // 8. Southwest SCS / Natuna
-        vec![[109.2, 7.8], [109.2, 9.2]],        // 9. West SCS (South Vietnam)
-        vec![[110.2, 12.5], [110.0, 14.2]],      // 10. West SCS (Central Vietnam)
+        vec![[122.8, 23.8], [123.1, 24.8]], // 1. East of Taiwan
+        vec![[122.8, 20.8], [122.2, 19.8]], // 2. Bashi Channel
+        vec![[120.0, 19.2], [119.5, 18.2]], // 3. North SCS
+        vec![[119.2, 16.2], [118.8, 15.1]], // 4. Scarborough Shoal / West Luzon
+        vec![[118.2, 13.0], [117.6, 12.0]], // 5. Central East SCS
+        vec![[116.8, 9.8], [116.1, 8.8]],   // 6. Palawan / East Spratly
+        vec![[113.2, 4.2], [112.5, 3.8]],   // 7. James Shoal (Zengmu Ansha)
+        vec![[109.5, 4.2], [108.8, 5.2]],   // 8. Southwest SCS / Natuna
+        vec![[109.2, 7.8], [109.2, 9.2]],   // 9. West SCS (South Vietnam)
+        vec![[110.2, 12.5], [110.0, 14.2]], // 10. West SCS (Central Vietnam)
         vec![[108.1, 21.4], [108.15, 20.8], [107.55, 20.0]], // Gulf of Tonkin
     ];
     all_lines.extend(nine_dashes);
@@ -468,7 +494,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(&out_path, &txt)?;
     println!(
         "rings: {} ({} pts), lines: {} ({} pts) -> wrote {} ({:.1} KB)",
-        keep_rings.len(), ring_pts, keep_lines.len(), line_pts, out_path, txt.len() as f64 / 1024.0
+        keep_rings.len(),
+        ring_pts,
+        keep_lines.len(),
+        line_pts,
+        out_path,
+        txt.len() as f64 / 1024.0
     );
     Ok(())
 }

@@ -1310,16 +1310,24 @@ fn main() {
                 let get_f64 = |key: &[u8]| -> Option<f64> {
                     let mut k = 0;
                     while k + key.len() + 2 <= tag.len() {
-                        if &tag[k..k + key.len()] == key && tag[k + key.len()] == b'=' && tag[k + key.len() + 1] == b'"' {
+                        if &tag[k..k + key.len()] == key
+                            && tag[k + key.len()] == b'='
+                            && tag[k + key.len() + 1] == b'"'
+                        {
                             let start = k + key.len() + 2;
                             let len = tag[start..].iter().position(|&b| b == b'"')?;
-                            return std::str::from_utf8(&tag[start..start + len]).ok()?.parse().ok();
+                            return std::str::from_utf8(&tag[start..start + len])
+                                .ok()?
+                                .parse()
+                                .ok();
                         }
                         k += 1;
                     }
                     None
                 };
-                if let (Some(idf), Some(lat), Some(lon)) = (get_f64(b"id"), get_f64(b"lat"), get_f64(b"lon")) {
+                if let (Some(idf), Some(lat), Some(lon)) =
+                    (get_f64(b"id"), get_f64(b"lat"), get_f64(b"lon"))
+                {
                     let id = idf as i64;
                     if needed.contains(&id) {
                         coords.insert(id, [lon, lat]);
@@ -1367,13 +1375,19 @@ fn main() {
     let mut selected: Vec<String> = ranked.iter().take(top_n).map(|(c, _)| c.clone()).collect();
     if !selected.contains(&"拉萨".to_string()) {
         if let Some((_, n)) = lhasa_entry {
-            println!("Adding Lhasa (拉萨) as a special featured origin city ({} outbound trains)", n);
+            println!(
+                "Adding Lhasa (拉萨) as a special featured origin city ({} outbound trains)",
+                n
+            );
             selected.push("拉萨".to_string());
         }
     }
     if !selected.contains(&"香港".to_string()) {
         if let Some((_, n)) = hk_entry {
-            println!("Adding Hong Kong (香港) as a special featured origin city ({} outbound trains)", n);
+            println!(
+                "Adding Hong Kong (香港) as a special featured origin city ({} outbound trains)",
+                n
+            );
             selected.push("香港".to_string());
         }
     }
