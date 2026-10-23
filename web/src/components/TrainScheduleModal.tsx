@@ -20,6 +20,11 @@ interface Props {
   direction?: string;
 }
 
+interface AlignedStop extends ScheduleStop {
+  simArrMins: number;
+  simDepMins: number;
+}
+
 export default function TrainScheduleModal({
   code,
   onClose,
@@ -79,33 +84,105 @@ export default function TrainScheduleModal({
     );
   }, [stops, originStationZh, originCityZh, originCityEn]);
 
+  // Align schedule stops chronologically and anchor to the selected trainVM's simulation departure/arrival
+  const alignedStops = useMemo<AlignedStop[] | null>(() => {
+    if (!stops || stops.length === 0) return null;
+
+    // Step 1: Unroll schedule minutes monotonically along route to handle midnight rollovers
+    let currentDay = 0;
+    let prevMins = stops[0].depMins >= 0 ? stops[0].depMins : stops[0].arrMins;
+
+    const unrolled = stops.map((s) => {
+      let unrolledArr = -1;
+      let unrolledDep = -1;
+
+      if (s.arrMins >= 0) {
+        if (s.arrMins < prevMins) {
+          currentDay += 1;
+        }
+        unrolledArr = currentDay * 1440 + s.arrMins;
+        prevMins = s.arrMins;
+      }
+
+      if (s.depMins >= 0) {
+        if (s.depMins < prevMins) {
+          currentDay += 1;
+        }
+        unrolledDep = currentDay * 1440 + s.depMins;
+        prevMins = s.depMins;
+      }
+
+      return {
+        ...s,
+        unrolledArr,
+        unrolledDep,
+      };
+    });
+
+    // Step 2: Find the anchor stop corresponding to the selected station/city
+    let anchorIdx = -1;
+    if (trainVM) {
+      anchorIdx = unrolled.findIndex(
+        (s) =>
+          (originStationZh && (s.stZh === originStationZh || s.stEn === originStationZh)) ||
+          (originCityZh && (s.stZh === originCityZh || s.stZh.startsWith(originCityZh))) ||
+          (originCityEn &&
+            (s.stEn.toLowerCase() === originCityEn.toLowerCase() ||
+              s.stEn.toLowerCase().startsWith(originCityEn.toLowerCase()))),
+      );
+    }
+
+    let timeShift = 0;
+    if (anchorIdx >= 0 && trainVM) {
+      const anchor = unrolled[anchorIdx];
+      const isArrVM =
+        (trainVM as any).depMins === undefined && (trainVM as any).arrMins !== undefined;
+      if (isArrVM && anchor.unrolledArr >= 0) {
+        timeShift = (trainVM as any).arrMins - anchor.unrolledArr;
+      } else if (anchor.unrolledDep >= 0) {
+        timeShift = trainVM.depMins - anchor.unrolledDep;
+      }
+    }
+
+    return unrolled.map((s) => ({
+      ...s,
+      simArrMins: s.unrolledArr >= 0 ? s.unrolledArr + timeShift : -1,
+      simDepMins: s.unrolledDep >= 0 ? s.unrolledDep + timeShift : -1,
+    }));
+  }, [stops, trainVM, originStationZh, originCityZh, originCityEn]);
+
   // Determine current active trip status
   const currentStatus = useMemo(() => {
-    if (!stops || stops.length === 0) return null;
-    const first = stops[0];
-    const last = stops[stops.length - 1];
+    if (!alignedStops || alignedStops.length === 0) return null;
+    const first = alignedStops[0];
+    const last = alignedStops[alignedStops.length - 1];
 
-    if (liveTime < first.depMins) {
-      const wait = Math.round(first.depMins - liveTime);
+    if (liveTime < first.simDepMins) {
+      const wait = Math.max(0, Math.round(first.simDepMins - liveTime));
       return {
-        state: "pre",
+        state: "pre" as const,
         text: `Departs ${first.stZh} in ${wait > 60 ? `${Math.floor(wait / 60)}h ${wait % 60}m` : `${wait}m`} (at ${first.dep})`,
       };
     }
-    if (liveTime >= last.arrMins) {
+    if (liveTime >= last.simArrMins) {
       return {
-        state: "post",
+        state: "post" as const,
         text: `Completed journey to ${last.stZh} at ${last.arr}`,
       };
     }
 
     // Check if currently stopped at a station
-    for (let i = 0; i < stops.length; i++) {
-      const s = stops[i];
-      if (s.arrMins >= 0 && s.depMins >= 0 && liveTime >= s.arrMins && liveTime <= s.depMins) {
-        const rem = Math.max(0, Math.round(s.depMins - liveTime));
+    for (let i = 0; i < alignedStops.length; i++) {
+      const s = alignedStops[i];
+      if (
+        s.simArrMins >= 0 &&
+        s.simDepMins >= 0 &&
+        liveTime >= s.simArrMins &&
+        liveTime <= s.simDepMins
+      ) {
+        const rem = Math.max(0, Math.round(s.simDepMins - liveTime));
         return {
-          state: "stopped",
+          state: "stopped" as const,
           text: `Stopped at ${s.stZh} · Departs in ${rem}m (${s.dep})`,
           stopIdx: i,
         };
@@ -113,11 +190,11 @@ export default function TrainScheduleModal({
     }
 
     // In transit between stops
-    for (let i = 0; i < stops.length - 1; i++) {
-      const curr = stops[i];
-      const next = stops[i + 1];
-      if (liveTime >= curr.depMins && liveTime < next.arrMins) {
-        const eta = Math.max(0, Math.round(next.arrMins - liveTime));
+    for (let i = 0; i < alignedStops.length - 1; i++) {
+      const curr = alignedStops[i];
+      const next = alignedStops[i + 1];
+      if (liveTime >= curr.simDepMins && liveTime < next.simArrMins) {
+        const eta = Math.max(0, Math.round(next.simArrMins - liveTime));
         return {
           state: "transit" as const,
           text: `En route: ${curr.stZh} ➔ ${next.stZh} · ETA in ${eta}m (${next.arr})`,
@@ -129,23 +206,23 @@ export default function TrainScheduleModal({
     }
 
     return null;
-  }, [stops, liveTime]);
+  }, [alignedStops, liveTime]);
 
   const overallProgress = useMemo(() => {
-    if (!stops || stops.length === 0) return 0;
-    const first = stops[0];
-    const last = stops[stops.length - 1];
-    const totalTrip = Math.max(1, last.arrMins - first.depMins);
-    return Math.max(0, Math.min(1, (liveTime - first.depMins) / totalTrip));
-  }, [stops, liveTime]);
+    if (!alignedStops || alignedStops.length === 0) return 0;
+    const first = alignedStops[0];
+    const last = alignedStops[alignedStops.length - 1];
+    const totalTrip = Math.max(1, last.simArrMins - first.simDepMins);
+    return Math.max(0, Math.min(1, (liveTime - first.simDepMins) / totalTrip));
+  }, [alignedStops, liveTime]);
 
   const legProgress = useMemo(() => {
-    if (!currentStatus || currentStatus.state !== "transit" || !stops) return 0;
-    const curr = stops[currentStatus.fromIdx];
-    const next = stops[currentStatus.toIdx];
-    const legDur = Math.max(1, next.arrMins - curr.depMins);
-    return Math.max(0, Math.min(1, (liveTime - curr.depMins) / legDur));
-  }, [currentStatus, stops, liveTime]);
+    if (!currentStatus || currentStatus.state !== "transit" || !alignedStops) return 0;
+    const curr = alignedStops[currentStatus.fromIdx];
+    const next = alignedStops[currentStatus.toIdx];
+    const legDur = Math.max(1, next.simArrMins - curr.simDepMins);
+    return Math.max(0, Math.min(1, (liveTime - curr.simDepMins) / legDur));
+  }, [currentStatus, alignedStops, liveTime]);
 
   if (!code) return null;
 
@@ -447,7 +524,7 @@ export default function TrainScheduleModal({
         </div>
 
         {/* Live Journey Progress Track */}
-        {stops && stops.length > 0 && (
+        {alignedStops && alignedStops.length > 0 && (
           <div
             style={{
               padding: "10px 20px 12px 20px",
@@ -526,7 +603,7 @@ export default function TrainScheduleModal({
 
         {/* Timetable Table */}
         <div style={{ overflowY: "auto", flex: 1, padding: "4px 0" }}>
-          {!stops ? (
+          {!alignedStops ? (
             <div style={{ padding: "36px", textAlign: "center", color: dark ? "#9CA3AF" : "#64748B" }}>
               {schedulesData ? "Schedule not available for this service." : "Loading national timetable asset (~336 KB)..."}
             </div>
@@ -556,30 +633,30 @@ export default function TrainScheduleModal({
                 </tr>
               </thead>
               <tbody>
-                {stops.flatMap((s, idx) => {
+                {alignedStops.flatMap((s, idx) => {
                   const isOriginCity = originStop && s.stIdx === originStop.stIdx;
                   const isCurrent =
                     typeof liveTime === "number" &&
-                    s.arrMins >= 0 &&
-                    s.depMins >= 0 &&
-                    liveTime >= s.arrMins &&
-                    liveTime <= s.depMins;
+                    s.simArrMins >= 0 &&
+                    s.simDepMins >= 0 &&
+                    liveTime >= s.simArrMins &&
+                    liveTime <= s.simDepMins;
                   const isPast =
                     typeof liveTime === "number" &&
-                    s.depMins >= 0 &&
-                    liveTime > s.depMins;
+                    s.simDepMins >= 0 &&
+                    liveTime > s.simDepMins;
                   const isNextStop =
                     currentStatus?.state === "transit" &&
                     currentStatus.toIdx === idx;
 
-                  const jumpTime = s.arrMins >= 0 ? s.arrMins : s.depMins;
+                  const jumpTime = s.simArrMins >= 0 ? s.simArrMins : s.simDepMins;
 
                   const rows = [
                     <tr
                       key={`stop-${idx}`}
                       onClick={() => {
-                        if (jumpTime >= 0 && onJumpToTime) {
-                          onJumpToTime(jumpTime);
+                        if (jumpTime !== undefined && onJumpToTime) {
+                          onJumpToTime(Math.max(0, jumpTime));
                         }
                       }}
                       title={onJumpToTime ? `Click to jump simulation to ${s.stZh} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
@@ -796,7 +873,7 @@ export default function TrainScheduleModal({
                                 }}
                               >
                                 <span>
-                                  EN ROUTE: {s.stZh} ➔ {stops[idx + 1].stZh}
+                                  EN ROUTE: {s.stZh} ➔ {alignedStops[idx + 1].stZh}
                                 </span>
                                 <span>
                                   {Math.round(legProgress * 100)}% · {currentStatus.eta}m to arrival
@@ -849,7 +926,7 @@ export default function TrainScheduleModal({
           }}
         >
           <span>Tip: Click any station row to jump simulation time</span>
-          <span>{stops ? `${stops.length} calling stops` : ""}</span>
+          <span>{alignedStops ? `${alignedStops.length} calling stops` : ""}</span>
         </div>
       </div>
     </div>

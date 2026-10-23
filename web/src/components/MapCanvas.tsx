@@ -689,23 +689,36 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       : null;
     const isoSecs = isoTrain ? isoTrain.secs : null;
 
-    if (isoSecs && isoSecs.length > 0) {
+    if (isoTrain) {
       // Pass 1: faded ambient flows across the network
-      strokeFlowList(activeFlows, P.current.dark ? 0.12 : 0.15, effectiveMaxN);
+      strokeFlowList(activeFlows, P.current.dark ? 0.06 : 0.08, effectiveMaxN);
 
-      // Pass 2: illuminate the exact physical corridor of the isolated train
+      // Pass 2: illuminate the exact physical corridor of the isolated train as a crisp thin line
       const isHs = isoTrain.cls === "G" || isoTrain.cls === "D" || isoTrain.cls === "C";
       const isoColor = isHs ? "#F59E0B" : "#06B6D4";
       ctx.globalAlpha = 1.0;
-      ctx.lineWidth = Math.max(3.5, 4.0 * (S.current.view.scale / 10));
+      ctx.lineWidth = 2.0;
       ctx.strokeStyle = isoColor;
       ctx.lineCap = "round";
-      ctx.beginPath();
-      for (let i = 0; i < isoSecs.length; i++) {
-        const s = isoSecs[i];
-        traceInto(ctx, pts, off[s], len[s]);
+      ctx.lineJoin = "round";
+      ctx.setLineDash([]);
+
+      if (isoSecs && isoSecs.length > 0) {
+        ctx.beginPath();
+        for (let i = 0; i < isoSecs.length; i++) {
+          const s = isoSecs[i];
+          traceInto(ctx, pts, off[s], len[s]);
+        }
+        ctx.stroke();
+      } else {
+        const destIdx = (isoTrain as any).tcIdx ?? (isoTrain as any).fcIdx;
+        const ch = cur.chords.find((c) => c.b === destIdx);
+        if (ch) {
+          ctx.beginPath();
+          traceInto(ctx, ch.flat, 0, ch.count);
+          ctx.stroke();
+        }
       }
-      ctx.stroke();
     } else if (destSecCounts) {
       // Pass 1: faded background of ALL flows at current trunk width
       strokeFlowList(activeFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
@@ -841,7 +854,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       }
     }
 
-    if (destSecCounts) {
+    const isIsolated = Boolean(P.current.isolatedTrainCode);
+    if (isIsolated) {
+      infraPass(false, P.current.dark ? 0.08 : 0.1);
+      ctx.globalAlpha = 1.0;
+    } else if (destSecCounts) {
       infraPass(false, P.current.dark ? 0.18 : 0.2);
       if (destSecCounts.size > 0) infraPass(true, 1.0);
       ctx.globalAlpha = 1.0;
@@ -857,12 +874,17 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   ) {
     const cur = P.current.cur;
     if (!cur) return;
-    if (hasSelectedDest) ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
+    const isIsolated = Boolean(P.current.isolatedTrainCode);
+    if (isIsolated) {
+      ctx.globalAlpha = P.current.dark ? 0.05 : 0.08;
+    } else if (hasSelectedDest) {
+      ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
+    }
     for (let i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
       if (highlight === ch) continue;
       if (!inViewBB(ch.bb.x0, ch.bb.y0, ch.bb.x1, ch.bb.y1, 0.35)) continue;
-      const w = widthOf(ch.n);
+      const w = isIsolated ? 1.5 : widthOf(ch.n);
       ctx.lineWidth = w;
       ctx.strokeStyle = pal.chord;
       ctx.setLineDash([Math.max(3, w * 1.1), Math.max(2.5, w * 0.8)]);
@@ -872,7 +894,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     ctx.globalAlpha = 1.0;
     ctx.setLineDash([]);
-    if (highlight) {
+    if (highlight && !isIsolated) {
       const hw = widthOf(highlight.n) + 1.6;
       ctx.lineWidth = hw;
       ctx.strokeStyle = pal.flowHi;
