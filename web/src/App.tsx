@@ -20,6 +20,7 @@ import type {
 import {
   buildOrigin,
   classIndex,
+  enName,
   filterOriginByClasses,
   FLOW_CLASSES,
   prepAtlas,
@@ -58,7 +59,7 @@ const OUTLINE_URL = "assets/china-outline.json";
 // the text is unchanged apart from the geometry-precision sentence,
 // which now states the v2 encoding.
 const ABOUT =
-  "Minard-style passenger rail flow maps for China's top 100 rail cities. " +
+  "Minard-style passenger rail flow maps for China's top rail cities. " +
   "Flow line width reflects daily train frequency along each railway corridor. " +
   "In the outbound view, trains are traced from the origin city outward to their destinations; " +
   "in the inbound view, trains are traced from their starting stations through all intermediate calls into the selected city. " +
@@ -188,6 +189,20 @@ function parseInitialCamera(): {
   return null;
 }
 
+function matchesCity(o: { zh: string; en: string }, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  const qClean = q.replace(/[\s\-_'’]+/g, "");
+  const enFixed = enName(o.en).toLowerCase();
+  const enRaw = o.en.toLowerCase();
+  return (
+    o.zh === query.trim() ||
+    enFixed === q ||
+    enRaw === q ||
+    enFixed.replace(/[\s\-_'’]+/g, "") === qClean ||
+    enRaw.replace(/[\s\-_'’]+/g, "") === qClean
+  );
+}
+
 export default function App() {
   const [atlas, setAtlas] = useState<DecodedAtlas | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -240,7 +255,7 @@ export default function App() {
     if (!atlasRef.current || idx < 0 || idx >= atlasRef.current.data.origins.length) return;
     const o = atlasRef.current.data.origins[idx];
     const params = new URLSearchParams(window.location.search);
-    params.set("city", o.en);
+    params.set("city", enName(o.en));
     const camera = cam || lastCameraRef.current;
     if (camera) {
       params.set("lat", camera.lat.toFixed(4));
@@ -392,13 +407,7 @@ export default function App() {
         let def = 0;
         const cityParam = new URLSearchParams(window.location.search).get("city");
         if (cityParam) {
-          const q = cityParam.trim().toLowerCase();
-          const match = data.origins.findIndex(
-            (o) =>
-              o.zh === cityParam ||
-              o.en.toLowerCase() === q ||
-              o.en.toLowerCase().replace(/\s+/g, "") === q.replace(/\s+/g, ""),
-          );
+          const match = data.origins.findIndex((o) => matchesCity(o, cityParam));
           if (match >= 0) def = match;
         } else {
           for (let j = 0; j < data.origins.length; j++) {
@@ -593,12 +602,8 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const cp = params.get("city");
       if (cp && atlasRef.current) {
-        const q = cp.trim().toLowerCase();
-        const idx = atlasRef.current.data.origins.findIndex(
-          (o) =>
-            o.zh === cp ||
-            o.en.toLowerCase() === q ||
-            o.en.toLowerCase().replace(/\s+/g, "") === q.replace(/\s+/g, ""),
+        const idx = atlasRef.current.data.origins.findIndex((o) =>
+          matchesCity(o, cp),
         );
         if (idx >= 0 && idx !== originIdx) {
           setPanelCity(null);
@@ -733,7 +738,7 @@ export default function App() {
           </h1>
           <p className="subtitle">
             Flow diagram of trains departing and arriving across China&rsquo;s
-            top rail cities (plus Lhasa). The width of each line refers to the number of
+            top rail cities. The width of each line refers to the number of
             daily trains along that particular piece of track &mdash; spanning{" "}
             <b>7,253</b> scheduled daily passenger services (of over{" "}
             <b>12,000</b> nationwide) across China&rsquo;s{" "}

@@ -372,12 +372,14 @@ export default function Histograms({
     });
 
     const size = unit === "km" ? 100 : 50;
+    const maxCap = unit === "km" ? 3000 : 2000;
     const vals = rows.map((d) =>
       unit === "km" ? d.distKm : d.distKm * 0.621371,
     );
     let maxV = 0;
     for (const v of vals) if (v > maxV) maxV = v;
-    const nb = Math.max(1, Math.floor(maxV / size) + 1);
+    const maxBins = Math.floor(maxCap / size) + 1;
+    const nb = Math.max(1, Math.min(maxBins, Math.floor(maxV / size) + 1));
     const dist = new Array<number>(nb).fill(0);
     for (const v of vals) {
       const b = Math.min(nb - 1, Math.floor(v / size));
@@ -393,9 +395,12 @@ export default function Histograms({
     }
     const lastStart = (nb - 1) * size;
     const u = unit === "km" ? " km" : " mi";
+    const capLabel = unit === "km" ? "+3000km" : "+2000mi";
     const ranges = dist.map((_, b) =>
       b === nb - 1
-        ? lastStart.toLocaleString("en-US") + "+" + u
+        ? (lastStart >= maxCap
+            ? capLabel
+            : lastStart.toLocaleString("en-US") + "+" + u)
         : (b * size).toLocaleString("en-US") +
           "–" +
           ((b + 1) * size).toLocaleString("en-US") +
@@ -422,13 +427,16 @@ export default function Histograms({
     const span = nb * size;
     const xFor = (v: number) => PAD_L + (v / span) * PLOT_W;
     const ticks: Tick[] = [{ x: xFor(0), label: "0", anchor: "start" }];
-    for (let v = 500; v + size * 2 <= lastStart; v += 500) {
+    const step = unit === "km" ? 500 : 250;
+    for (let v = step; v + size * 2 <= lastStart; v += step) {
       ticks.push({ x: xFor(v), label: v.toLocaleString("en-US"), anchor: "middle" });
     }
     if (lastStart > 0) {
       ticks.push({
         x: xFor(lastStart),
-        label: lastStart.toLocaleString("en-US") + "+",
+        label: lastStart >= maxCap
+          ? capLabel
+          : lastStart.toLocaleString("en-US") + "+",
         anchor: "middle",
       });
     }
