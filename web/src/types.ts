@@ -268,6 +268,8 @@ export interface DepVM {
   distKm: number; // journey distance for binning: km when routed, else crow-flies origin → terminus city
   hay: string; // lowercase search haystack
   secs: number[]; // section indices traversed by this train
+  secStarts?: Float64Array;
+  totalDist?: number;
 }
 
 /** One train calling at a destination city, joined to its departure row. */
@@ -304,6 +306,8 @@ export interface ArrVM {
   distKm: number; // journey distance for binning: km when known, else crow-flies source city → selected city
   hay: string; // lowercase search haystack
   secs: number[]; // section indices traversed by this train (in reverse: arrival to origin)
+  secStarts?: Float64Array;
+  totalDist?: number;
 }
 
 /** One train arriving from a source city, joined to its arrival row. */
@@ -353,6 +357,22 @@ export interface SchedulesData {
   schedules: Record<string, [number, number, number, number, number?][]>;
 }
 
+export interface PrepTrain {
+  code: string;
+  cls: string;
+  fromStation: string;
+  toStation: string;
+  depTime: string;
+  arrTime: string;
+  depMins: number;
+  arrMins: number;
+  dur: number;
+  totalDist: number;
+  secs: number[];
+  secStarts: Float64Array;
+  secRevs: Uint8Array;
+}
+
 export interface DayTimelineVM {
   stepMins: number; // 5
   numSteps: number; // total steps across all days
@@ -361,6 +381,7 @@ export interface DayTimelineVM {
   secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(numSteps) of cumulative train count
   maxFlowSteps: Uint16Array; // length numSteps: max flow count across all sections at each step
   getActiveTrains: (tMins: number) => ActiveTrainVM[];
+  getPrepTrain: (code: string) => PrepTrain | undefined;
   totalTrains: number;
   getDepartedCount: (tMins: number) => number;
   getArrivedCount: (tMins: number) => number;

@@ -20,6 +20,7 @@ import type {
   OriginVM,
   OutlineData,
   Palette,
+  PrepTrain,
   RampStop,
   ScheduleStop,
   SchedulesData,
@@ -891,6 +892,7 @@ export function buildDayTimeline(
       secFlowSteps,
       maxFlowSteps,
       getActiveTrains: () => [],
+      getPrepTrain: () => undefined,
       totalTrains: 0,
       getDepartedCount: () => 0,
       getArrivedCount: () => 0,
@@ -906,22 +908,6 @@ export function buildDayTimeline(
     if (!secFlowSteps.has(s)) {
       secFlowSteps.set(s, new Uint16Array(numSteps));
     }
-  }
-
-  interface PrepTrain {
-    code: string;
-    cls: string;
-    fromStation: string;
-    toStation: string;
-    depTime: string;
-    arrTime: string;
-    depMins: number;
-    arrMins: number;
-    dur: number;
-    totalDist: number;
-    secs: number[];
-    secStarts: Float64Array;
-    secRevs: Uint8Array;
   }
 
   const prepTrains: PrepTrain[] = [];
@@ -1046,6 +1032,10 @@ export function buildDayTimeline(
     const toStation = (train as any).tsZh || "";
     const depTime = train.dep || "";
     const arrTime = train.arr || "";
+
+    train.secs = routeSecs;
+    train.secStarts = secStarts;
+    train.totalDist = totalDist;
 
     prepTrains.push({
       code: train.code,
@@ -1263,6 +1253,11 @@ export function buildDayTimeline(
     return count;
   }
 
+  const prepMap = new Map<string, PrepTrain>();
+  for (let i = 0; i < prepTrains.length; i++) {
+    prepMap.set(prepTrains[i].code, prepTrains[i]);
+  }
+
   return {
     stepMins,
     numSteps,
@@ -1271,6 +1266,7 @@ export function buildDayTimeline(
     secFlowSteps,
     maxFlowSteps,
     getActiveTrains,
+    getPrepTrain: (code: string) => prepMap.get(code),
     totalTrains,
     getDepartedCount,
     getArrivedCount,

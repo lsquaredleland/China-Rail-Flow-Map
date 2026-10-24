@@ -369,6 +369,44 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ly = y;
     }
   }
+  function tracePartialSec(
+    ctx: CanvasRenderingContext2D,
+    arr: ArrayLike<number>,
+    off: number,
+    count: number,
+    endLon: number,
+    endLat: number,
+  ) {
+    if (count <= 0) return;
+    let bestK = 0;
+    let bestD2 = 1e9;
+    for (let k = 0; k < count; k++) {
+      const d2 =
+        (arr[off + k * 2] - endLon) ** 2 +
+        (arr[off + k * 2 + 1] - endLat) ** 2;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        bestK = k;
+      }
+    }
+    let lx = -1e9,
+      ly = -1e9,
+      started = false;
+    for (let i = 0; i <= bestK; i++) {
+      const x = X(arr[off + i * 2]),
+        y = Y(arr[off + i * 2 + 1]);
+      const dx = x - lx,
+        dy = y - ly;
+      if (started && dx * dx + dy * dy < 0.42 && i !== bestK) continue;
+      if (!started) {
+        ctx.moveTo(x, y);
+        started = true;
+      } else ctx.lineTo(x, y);
+      lx = x;
+      ly = y;
+    }
+    ctx.lineTo(X(endLon), Y(endLat));
+  }
   function drawOutline(ctx: CanvasRenderingContext2D, pal: Palette) {
     const outline = P.current.outline;
     if (!outline) return;
@@ -555,6 +593,62 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     return null;
   }
 
+  function getActiveDestSectionCounts(tMins: number): Map<number, number> {
+    const counts = new Map<number, number>();
+    const cur = P.current.cur;
+    const dest = P.current.panelDest;
+    if (!dest || !cur) return counts;
+
+    if (P.current.direction === "out") {
+      const d = dest as DestVM;
+      const calls = d.calls || [];
+      for (let i = 0; i < calls.length; i++) {
+        const c = calls[i];
+        const dep = c.dep;
+        if (!dep || !dep.secs) continue;
+        const lim = Math.min(dep.secs.length, c.secCnt);
+        const totalDist = dep.totalDist || 1;
+        const dur = dep.dur > 0 ? dep.dur : 1;
+        const depMins = dep.depMins >= 0 ? dep.depMins : 0;
+        const secStarts = dep.secStarts;
+
+        for (let k = 0; k < lim; k++) {
+          const distBefore = secStarts ? secStarts[k] : (k / lim) * totalDist;
+          const frac = distBefore / totalDist;
+          const tEnter = depMins + frac * dur;
+          if (tMins >= tEnter) {
+            const s = dep.secs[k];
+            counts.set(s, (counts.get(s) || 0) + 1);
+          }
+        }
+      }
+    } else {
+      const s = dest as SrcVM;
+      const inCalls = s.inCalls || [];
+      for (let i = 0; i < inCalls.length; i++) {
+        const c = inCalls[i];
+        const arr = c.arr;
+        if (!arr || !arr.secs) continue;
+        const lim = Math.min(arr.secs.length, c.secCnt);
+        const totalDist = arr.totalDist || 1;
+        const dur = arr.dur > 0 ? arr.dur : 1;
+        const depMins = arr.depMins >= 0 ? arr.depMins : 0;
+        const secStarts = arr.secStarts;
+
+        for (let k = 0; k < lim; k++) {
+          const distBefore = secStarts ? secStarts[k] : (k / lim) * totalDist;
+          const frac = distBefore / totalDist;
+          const tEnter = depMins + frac * dur;
+          if (tMins >= tEnter) {
+            const secId = arr.secs[k];
+            counts.set(secId, (counts.get(secId) || 0) + 1);
+          }
+        }
+      }
+    }
+    return counts;
+  }
+
   // Flow sections batched into one stroke per (width, colour) bucket
   // (0.25 px width steps). When a station is selected (`destSecCounts`),
   // Pass 1 draws all origin flows faded at full trunk width, and Pass 2
@@ -708,19 +802,75 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.lineJoin = "round";
       ctx.setLineDash([]);
 
+      const animTime = S.current.animTime;
+      const depMins = isoTrain.depMins >= 0 ? isoTrain.depMins : 0;
+      const dur = isoTrain.dur > 0 ? isoTrain.dur : 1;
+      const arrMins = depMins + dur;
+      const isProgressive = isAnimated && timeline && animTime < timeline.totalMins;
+
       if (isoSecs && isoSecs.length > 0) {
-        ctx.beginPath();
-        for (let i = 0; i < isoSecs.length; i++) {
-          const s = isoSecs[i];
-          traceInto(ctx, pts, off[s], len[s]);
+        if (!isProgressive || animTime >= arrMins) {
+          ctx.beginPath();
+          for (let i = 0; i < isoSecs.length; i++) {
+            const s = isoSecs[i];
+            traceInto(ctx, pts, off[s], len[s]);
+          }
+          ctx.stroke();
+        } else if (animTime >= depMins) {
+          const totalDist = isoTrain.totalDist || 1;
+          const alpha = Math.min(1.0, Math.max(0.0, (animTime - depMins) / dur));
+          const targetDist = alpha * totalDist;
+          const secStarts = isoTrain.secStarts;
+          let curSecIdx = 0;
+          if (secStarts) {
+            while (
+              curSecIdx < isoSecs.length - 1 &&
+              secStarts[curSecIdx + 1] <= targetDist
+            ) {
+              curSecIdx++;
+            }
+          } else {
+            curSecIdx = Math.min(
+              isoSecs.length - 1,
+              Math.floor(alpha * isoSecs.length),
+            );
+          }
+
+          const curTr = timeline.getActiveTrains(animTime).find(
+            (t) => t.code === isoTrain.code,
+          );
+
+          ctx.beginPath();
+          for (let i = 0; i < curSecIdx; i++) {
+            const s = isoSecs[i];
+            traceInto(ctx, pts, off[s], len[s]);
+          }
+          if (curSecIdx < isoSecs.length) {
+            const curS = isoSecs[curSecIdx];
+            if (curTr) {
+              tracePartialSec(ctx, pts, off[curS], len[curS], curTr.lon, curTr.lat);
+            } else {
+              traceInto(ctx, pts, off[curS], len[curS]);
+            }
+          }
+          ctx.stroke();
         }
-        ctx.stroke();
       } else {
         const destIdx = (isoTrain as any).tcIdx ?? (isoTrain as any).fcIdx;
         const ch = cur.chords.find((c) => c.b === destIdx);
         if (ch) {
           ctx.beginPath();
-          traceInto(ctx, ch.flat, 0, ch.count);
+          if (!isProgressive || animTime >= arrMins) {
+            traceInto(ctx, ch.flat, 0, ch.count);
+          } else if (animTime >= depMins) {
+            const curTr = timeline?.getActiveTrains(animTime).find(
+              (t) => t.code === isoTrain.code,
+            );
+            if (curTr) {
+              ctx.moveTo(X(ch.flat[0]), Y(ch.flat[1]));
+              ctx.lineTo(X(curTr.lon), Y(curTr.lat));
+            }
+          }
           ctx.stroke();
         }
       }
@@ -730,23 +880,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       // Pass 2: exact city-pair flow on top at widthOf(subN) and flowColor(subN, effectiveMaxN, pal)
       if (destSecCounts.size > 0) {
         const subFlows: { s: number; n: number }[] = [];
-        if (isAnimated && timeline) {
-          const staticFlowMap = new Map<number, number>();
-          for (let i = 0; i < flows.length; i++) {
-            staticFlowMap.set(flows[i].s, flows[i].n);
-          }
-          for (let i = 0; i < activeFlows.length; i++) {
-            const af = activeFlows[i];
-            const destN = destSecCounts.get(af.s) || 0;
-            if (destN > 0) {
-              const totalN = staticFlowMap.get(af.s) || af.n;
-              const subN = Math.min(
-                destN,
-                Math.max(1, Math.round(af.n * (destN / totalN))),
-              );
-              if (subN > 0) {
-                subFlows.push({ s: af.s, n: subN });
-              }
+        if (isAnimated && timeline && S.current.animTime < timeline.totalMins) {
+          const activeCounts = getActiveDestSectionCounts(S.current.animTime);
+          for (const [s, subN] of activeCounts.entries()) {
+            if (subN > 0) {
+              subFlows.push({ s, n: subN });
             }
           }
         } else {
@@ -885,10 +1023,25 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     } else if (hasSelectedDest) {
       ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
     }
+    const st = S.current;
+    const isAnimated = st.animEnabled && !P.current.showInfra;
+    const timeline = st.timeline;
     for (let i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
       if (highlight === ch) continue;
       if (!inViewBB(ch.bb.x0, ch.bb.y0, ch.bb.x1, ch.bb.y1, 0.35)) continue;
+      if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+        if (isIsolated) {
+          const isoTrain = cur.deps?.find((t) => t.code === P.current.isolatedTrainCode);
+          if (!isoTrain || (isoTrain as any).tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
+            continue;
+          }
+        } else {
+          const destTrains = (cur.deps || []).filter((d) => d.tcIdx === ch.b);
+          const hasDeparted = destTrains.some((d) => st.animTime >= d.depMins);
+          if (!hasDeparted) continue;
+        }
+      }
       const w = isIsolated ? 1.5 : widthOf(ch.n);
       ctx.lineWidth = w;
       ctx.strokeStyle = pal.chord;
@@ -916,6 +1069,32 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     sIdx: number,
     n: number,
   ) {
+    const st = S.current;
+    const isAnimated = st.animEnabled && !P.current.showInfra;
+    const timeline = st.timeline;
+    if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+      const step = Math.min(
+        timeline.numSteps - 1,
+        Math.max(0, Math.floor(st.animTime / timeline.stepMins)),
+      );
+      if (P.current.isolatedTrainCode) {
+        const isoTrain = (P.current.direction === "out" ? P.current.cur?.deps : P.current.cur?.arrs)?.find(
+          (t) => t.code === P.current.isolatedTrainCode,
+        );
+        if (!isoTrain || !isoTrain.secs || !isoTrain.secs.includes(sIdx) || st.animTime < isoTrain.depMins) {
+          return;
+        }
+      } else if (P.current.panelDest) {
+        const activeCounts = getActiveDestSectionCounts(st.animTime);
+        if ((activeCounts.get(sIdx) ?? 0) <= 0) {
+          return;
+        }
+      } else {
+        if ((timeline.secFlowSteps.get(sIdx)?.[step] ?? 0) <= 0) {
+          return;
+        }
+      }
+    }
     const set = flowsSet();
     if (!set) return;
     const isFerry =
@@ -1907,6 +2086,55 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let bestDist = 10;
     let i: number, k: number;
     const destSecCounts = getDestSectionCounts();
+    const st = S.current;
+    const isAnimated = st.animEnabled && !P.current.showInfra;
+    const timeline = st.timeline;
+    const step =
+      isAnimated && timeline
+        ? Math.min(
+            timeline.numSteps - 1,
+            Math.max(0, Math.floor(st.animTime / timeline.stepMins)),
+          )
+        : 0;
+
+    let activeDestCounts: Map<number, number> | null = null;
+    if (destSecCounts && isAnimated && timeline && st.animTime < timeline.totalMins) {
+      activeDestCounts = getActiveDestSectionCounts(st.animTime);
+    }
+
+    let activeIsoSecs: Set<number> | null = null;
+    if (P.current.isolatedTrainCode && isAnimated && timeline && st.animTime < timeline.totalMins) {
+      activeIsoSecs = new Set<number>();
+      const isoTrain = (P.current.direction === "out" ? cur.deps : cur.arrs).find(
+        (t) => t.code === P.current.isolatedTrainCode,
+      );
+      if (isoTrain && isoTrain.secs && st.animTime >= isoTrain.depMins) {
+        const depMins = isoTrain.depMins >= 0 ? isoTrain.depMins : 0;
+        const dur = isoTrain.dur > 0 ? isoTrain.dur : 1;
+        const totalDist = isoTrain.totalDist || 1;
+        const alpha = Math.min(1.0, (st.animTime - depMins) / dur);
+        const targetDist = alpha * totalDist;
+        const secStarts = isoTrain.secStarts;
+        let curSecIdx = 0;
+        if (secStarts) {
+          while (
+            curSecIdx < isoTrain.secs.length - 1 &&
+            secStarts[curSecIdx + 1] <= targetDist
+          ) {
+            curSecIdx++;
+          }
+        } else {
+          curSecIdx = Math.min(
+            isoTrain.secs.length - 1,
+            Math.floor(alpha * isoTrain.secs.length),
+          );
+        }
+        for (let j = 0; j <= curSecIdx; j++) {
+          activeIsoSecs.add(isoTrain.secs[j]);
+        }
+      }
+    }
+
     for (i = 0; i < flows.length; i++) {
       const f = flows[i];
       const s = f.s;
@@ -1916,6 +2144,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         (!destSecCounts.has(s) || (destSecCounts.get(s) ?? 0) <= 0)
       ) {
         continue;
+      }
+      if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+        if (activeDestCounts) {
+          if ((activeDestCounts.get(s) ?? 0) <= 0) continue;
+        } else if (activeIsoSecs !== null) {
+          if (!activeIsoSecs.has(s)) continue;
+        } else {
+          const activeN = timeline.secFlowSteps.get(s)?.[step] ?? 0;
+          if (activeN <= 0) continue;
+        }
       }
       if (
         lon < sec.bb[s * 4] - thrDeg ||
@@ -1958,6 +2196,18 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let chordBest: ChordVM | null = null;
     for (i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
+      if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+        if (P.current.isolatedTrainCode) {
+          const isoTrain = cur.deps?.find((t) => t.code === P.current.isolatedTrainCode);
+          if (!isoTrain || (isoTrain as any).tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
+            continue;
+          }
+        } else {
+          const destTrains = (cur.deps || []).filter((d) => d.tcIdx === ch.b);
+          const hasDeparted = destTrains.some((d) => st.animTime >= d.depMins);
+          if (!hasDeparted) continue;
+        }
+      }
       if (
         lon < ch.bb.x0 - thrDeg ||
         lon > ch.bb.x1 + thrDeg ||
