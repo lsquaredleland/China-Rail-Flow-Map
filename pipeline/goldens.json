@@ -19,7 +19,9 @@
     "chengdu_cq_in_orig": 54,
     "chengdu_cq_in_fastest": 62,
     "dropped_chains": 0,
-    "flow_lost": 0
+    "flow_lost": 0,
+    "dep_stops_total": 235264,
+    "dep_rows_with_uncalled_stations": 11951
   },
   "max": {
     "chord_leg_rows": 1850,
@@ -27,6 +29,7 @@
     "continuity_gaps_le6km": 64399,
     "dep_rows_jump_gt35km_inside_chords": 0,
     "dep_rows_jump_gt35km_outside_chords": 0,
-    "nonmonotone_sec_cnt_trains": 48
+    "nonmonotone_sec_cnt_trains": 48,
+    "dep_stops_time_regressions": 0
   }
 }

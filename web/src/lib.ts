@@ -571,6 +571,7 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       secs: ds.secs,
       secRevs: ds.revs,
       chordLegs: (o.dep_chord_legs && o.dep_chord_legs[di]) || [],
+      stopPos: (o.dep_stop_pos && o.dep_stop_pos[di]) || [],
     };
     rec.hay = (
       rec.code +
@@ -1053,43 +1054,6 @@ export function buildDayTimeline(
   // Every origin flow section gets a step array, even if no dot enters it.
   const flowSecs = (cur.flows || []).map((f) => f.s);
 
-  interface RawStopCall {
-    cityZh: string;
-    cityEn: string;
-    pt: [number, number];
-    arrMins: number;
-    depMins: number | null;
-    isTerm: boolean;
-    secCnt: number;
-  }
-  const callsByTrain = new Map<number, RawStopCall[]>();
-  if (cur.dests && cur.o.calls) {
-    const rawCalls = cur.o.calls;
-    for (let di = 0; di < rawCalls.length; di++) {
-      const destCalls = rawCalls[di] || [];
-      const dest = cur.dests[di];
-      if (!dest) continue;
-      for (let ci = 0; ci < destCalls.length; ci++) {
-        const c = destCalls[ci];
-        const trainIdx = c[0];
-        let list = callsByTrain.get(trainIdx);
-        if (!list) {
-          list = [];
-          callsByTrain.set(trainIdx, list);
-        }
-        list.push({
-          cityZh: dest.zh,
-          cityEn: dest.en,
-          pt: dest.pt,
-          arrMins: c[3] * 1440 + c[1],
-          depMins: c[4] === 1 ? null : c[3] * 1440 + c[2],
-          isTerm: c[4] === 1,
-          secCnt: c[5] !== undefined ? c[5] : (rawTrains[trainIdx]?.secs.length ?? 0),
-        });
-      }
-    }
-  }
-
   const prepTrains: PrepTrain[] = [];
   // Per train: each distinct section it covers and the minute its dot first
   // enters it (the flow lighting). Kept so a filtered subset re-tallies
@@ -1112,6 +1076,7 @@ export function buildDayTimeline(
     // the widest join inside the leg's [s0, s1] window (one per join), as long
     // as the crow-flies gap there. The dot crosses it on a straight line.
     const virt = new Float64Array(nSecs + 1);
+    const virtStop = new Int32Array(nSecs + 1).fill(-1); // stop the gap departs from
     for (const leg of train.chordLegs || []) {
       let bestJ = -1;
       let bestGap = 0;
@@ -1122,7 +1087,10 @@ export function buildDayTimeline(
           bestJ = j;
         }
       }
-      if (bestJ > 0) virt[bestJ] = bestGap;
+      if (bestJ > 0) {
+        virt[bestJ] = bestGap;
+        virtStop[bestJ] = leg[0];
+      }
     }
 
     let totalDist = 0;
@@ -1160,44 +1128,43 @@ export function buildDayTimeline(
     const depTime = train.dep || "";
     const arrTime = train.arr || "";
 
-    const trainCalls = callsByTrain.get(ti) || [];
-    trainCalls.sort((a, b) => a.arrMins - b.arrMins);
-
+    // Dwell stops at station level: every stop after boarding, at its exact
+    // path position (dep_stop_pos), with the schedule's times. The terminus
+    // is the final stop, at the path end.
     const stops: PrepTrainStop[] = [];
-    if (trainCalls.length > 0 && routeSecs.length > 0) {
+    const sched = atlas.schedules ? atlas.schedules[train.t] : undefined;
+    const nStops = train.stopPos.length;
+    if (sched && nStops > 0 && nStops === train.stops && sched.length > nStops) {
+      const b = sched.length - 1 - nStops;
+      const rb = sched[b];
+      // schedule minutes run from the train's first day; shift them into the
+      // boarding day's frame that depMins uses
+      const depB = rb[3] * 1440 + rb[2] + (rb[1] >= 0 && rb[2] < rb[1] ? 1440 : 0);
+      const rel = (day: number, m: number) => day * 1440 + m - depB + depMins;
+      const stTable = atlas.data.station_table;
       let prevDist = 0;
-      for (let ci = 0; ci < trainCalls.length; ci++) {
-        const call = trainCalls[ci];
-        if (call.isTerm) {
-          stops.push({
-            cityZh: call.cityZh,
-            cityEn: call.cityEn,
-            arrMins: call.arrMins,
-            depMins: null,
-            dist: totalDist,
-            isTerm: true,
-          });
-          continue;
-        }
-        // Exact: the route position where this call's leg ends.
-        // Calls sharing one join with a chord ahead of them stop before it; the
-        // last one stops after it (a stop's dot sits on the near side of the gap
-        // it departs across).
-        const k = call.secCnt;
-        const next = trainCalls[ci + 1];
-        const beforeGap = k < nSecs && virt[k] > 0 && next !== undefined && !next.isTerm && next.secCnt === k;
-        const dist = Math.max(
-          prevDist,
-          k >= nSecs ? totalDist : beforeGap ? secStarts[k] - virt[k] : secStarts[k],
-        );
+      for (let i = 0; i < nStops; i++) {
+        const j = b + 1 + i;
+        const r = sched[j];
+        const st = stTable[r[0]];
+        const isTerm = i === nStops - 1;
+        const k = train.stopPos[i];
+        // A stop that departs across a chord gap at its own join sits on the
+        // near side of it.
+        const dist = isTerm
+          ? totalDist
+          : Math.max(
+              prevDist,
+              k >= nSecs ? totalDist : virt[k] > 0 && virtStop[k] === j ? secStarts[k] - virt[k] : secStarts[k],
+            );
         prevDist = dist;
         stops.push({
-          cityZh: call.cityZh,
-          cityEn: call.cityEn,
-          arrMins: call.arrMins,
-          depMins: call.depMins,
+          cityZh: st ? st.zh : "",
+          cityEn: st ? st.en : "",
+          arrMins: rel(r[3], r[1]),
+          depMins: isTerm || r[2] < 0 ? null : rel(r[3] + (r[2] < r[1] ? 1 : 0), r[2]),
           dist,
-          isTerm: false,
+          isTerm,
         });
       }
     }

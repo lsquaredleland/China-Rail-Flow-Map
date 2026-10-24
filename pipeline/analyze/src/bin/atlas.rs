@@ -1092,6 +1092,8 @@ struct AtlasOrigin {
     /// (unresolved, or a gap > CHORD_GAP_KM): the leg departs the train's
     /// stop index `stop`; its sections are dep_secs[s0..s1].
     dep_chord_legs: Vec<Vec<[usize; 3]>>,
+    /// Per dep: path position of every stop after boarding (station level).
+    dep_stop_pos: Vec<Vec<usize>>,
     inbound: u64,
     srcs: Vec<[i64; 8]>,
     in_calls: Vec<InCallList>,
@@ -2115,6 +2117,8 @@ fn main() {
         leg_fwd: Vec<bool>,
         /// Per leg: index of its departing stop in the train's stop list.
         leg_stop: Vec<usize>,
+        /// Index of the boarding stop in the train's stop list.
+        board: usize,
     }
     type TrainLegs = (usize, Vec<(String, String, String)>);
     struct CityWork {
@@ -2128,6 +2132,11 @@ fn main() {
         train_leg_keys: Vec<TrainLegs>,
     }
     let mut works: Vec<CityWork> = Vec::new();
+    // dep rows with stations that have no city call: [home city, terminus
+    // city, intermediate city, any]; and the distinct trains behind "any"
+    let mut skipped_rows = [0u64; 4];
+    let mut skipped_trains: HashSet<String> = HashSet::new();
+    let mut skipped_example: [Option<String>; 3] = [None, None, None];
     let mut throat_stations: HashSet<String> = HashSet::new();
     for home_city in selected.iter() {
         let mut out_stats: HashMap<String, DestStats> = HashMap::new();
@@ -2178,8 +2187,10 @@ fn main() {
                 leg_keys: legs.clone(),
                 leg_fwd,
                 leg_stop,
+                board: cd_idx,
             });
             let mut seen_dest: HashSet<String> = HashSet::new();
+            let mut skipped = [false; 3];
             let mut cum_km = 0f64;
             let mut cum_ok = true;
             let mut last_k = cd_idx;
@@ -2198,6 +2209,19 @@ fn main() {
                     last_k += 1;
                 }
                 if &cities[j] == home_city || !seen_dest.insert(cities[j].clone()) {
+                    // a station with no city call of its own: in the home
+                    // city, at the terminus city, or in an intermediate city
+                    let class = if &cities[j] == home_city {
+                        0
+                    } else if j == cities.len() - 1 {
+                        1
+                    } else {
+                        2
+                    };
+                    skipped[class] = true;
+                    skipped_example[class].get_or_insert_with(|| {
+                        format!("{} from {}: {}", t.code, home_city, names[j])
+                    });
                     continue;
                 }
                 let dest = cities[j].clone();
@@ -2244,6 +2268,13 @@ fn main() {
                 if let Some(d0) = deps.last_mut() {
                     d0.km = cum_km;
                 }
+            }
+            for (n, hit) in skipped_rows.iter_mut().zip(skipped) {
+                *n += hit as u64;
+            }
+            if skipped.iter().any(|&x| x) {
+                skipped_rows[3] += 1;
+                skipped_trains.insert(t.code.clone());
             }
             train_legs.push((class_idx(&t.train_class), legs));
         }
@@ -2984,6 +3015,10 @@ fn main() {
         let mut dep_secs: Vec<Vec<i64>> = Vec::with_capacity(w.deps.len());
         let mut dep_leg_sec_cnt: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
         let mut dep_chord_legs: Vec<Vec<[usize; 3]>> = Vec::with_capacity(w.deps.len());
+        // dep_stop_pos: per dep row, the path position of every stop after
+        // boarding (entries before it = prefix_cnt at its stop), station
+        // level; times and stations come from schedules[t]
+        let mut dep_stop_pos: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
         for d in w.deps.iter() {
             let mut secs_ord: Vec<i64> = Vec::new();
             let mut prefix_cnt: Vec<usize> = vec![0; d.leg_keys.len() + 1];
@@ -3007,6 +3042,11 @@ fn main() {
                 prefix_cnt[li + 1] = secs_ord.len();
             }
             chord_legs_out += chord_legs.len();
+            dep_stop_pos.push(
+                ((d.board + 1)..=(d.board + d.stops_after as usize))
+                    .map(|j| prefix_cnt[d.leg_stop.partition_point(|&s| s < j)])
+                    .collect(),
+            );
             dep_secs.push(secs_ord);
             dep_leg_sec_cnt.push(prefix_cnt);
             dep_chord_legs.push(chord_legs);
@@ -3334,6 +3374,7 @@ fn main() {
             deps,
             dep_secs,
             dep_chord_legs,
+            dep_stop_pos,
             inbound: iw.arrivals,
             srcs,
             in_calls: in_calls_out,
@@ -3345,6 +3386,15 @@ fn main() {
     }
 
     println!("pair identity mismatches: {}", pair_mismatch);
+    println!(
+        "dep rows with stations lacking a city call: {} ({} trains): home city {}, terminus city {}, intermediate city {}",
+        skipped_rows[3],
+        skipped_trains.len(),
+        skipped_rows[0],
+        skipped_rows[1],
+        skipped_rows[2]
+    );
+    println!("  examples (home / terminus / intermediate): {skipped_example:?}");
     println!(
         "chord legs (per-train rows): out {} in {}",
         chord_legs_out, chord_legs_in

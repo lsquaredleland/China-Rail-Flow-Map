@@ -183,8 +183,8 @@ Always set `CRFM_OUTPUT_DIR` / `ATLAS_OUT` / `--out-dir`: `output/` in this
 repo is a symlink into `china-rail-handoff-v3/output`. Section indices change
 on every run (HashMap iteration), so ship the whole five-file pack together.
 
-**Tables format `fmt: 3`** (`atlas-v2-{out,in}-tables`, documented in the
-`atlaspack.rs` header):
+**Tables format `fmt: 4`** (`atlas-v2-{out,in}-tables`, documented in the
+`atlaspack.rs` header; 4 = 3 plus `dep_stop_pos`):
 - `dep_secs` / `arr_secs` are in **travel order**; an entry `~s` (= `-(s+1)`)
   means section `s` is travelled against its stored point order. A train
   that runs back over track it already used repeats those sections; only
@@ -195,6 +195,11 @@ on every run (HashMap iteration), so ship the whole five-file pack together.
   track geometry. `stop` is the schedule index of the departing stop;
   `[s0, s1)` is the half-open range of path positions the leg produced.
   The track either side of the gap is at positions `s0-1` and `s1`.
+- `dep_stop_pos`: per dep row, one entry per stop after boarding (station
+  level; city calls keep only the first station of each city): the number
+  of `dep_secs` entries before that stop. The terminus is at the path end.
+  The stops are `schedules[t][len - stops ..]`, which give stations and
+  times; the client builds its dwells from these (O14).
 - `atlas-v2-schedules.json` is generated from `data/raw/stops*.jsonl`,
   indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm]`
   and station names normalized.
@@ -345,14 +350,15 @@ Rebase deliberately with `audit --update-goldens`. Dropped chains / flow lost
 are enforced only in the full audit, not `--pack-only`. Current key values:
 - 102 origins (incl. 香港); Chengdu outbound 564 trains / widest 144 /
   564 fully tracked; Chengdu inbound widest 105
-- chord-leg rows 15,270 (13,420 router `#cv3` nodes without coordinates,
-  1,587 inbound-only legs, 263 real geometry gaps). These are pre-existing,
-  not a regression.
-- rows with a >35 km jump outside chord legs: 0 (old client chainer: 5,804)
-- continuity gaps: 61,807 of ≤6 km (station throats), 417 over 6 km
-- known gaps: router-only nodes get no coordinates in `atlas`; inbound-only
-  legs stay unresolved; 1.3 km station-throat trims leave gaps in per-train
-  paths (see `optimization-progress.md` backlog O1–O5)
+- chord-leg rows 1,850 (1,587 inbound-only legs, 263 real geometry gaps;
+  the 13,420 router-coordinate rows were fixed by O4)
+- rows with a >35 km jump: 0 inside or outside chord legs (old client
+  chainer: 5,804)
+- continuity gaps: 64,399 of ≤6 km (station throats), 436 over 6 km
+- station-level stops (O14): 235,264 `dep_stop_pos` entries; 11,951 dep
+  rows have stations without a city call of their own
+- known gaps: inbound-only legs stay unresolved; 1.3 km station-throat
+  trims leave gaps in per-train paths (see `optimization-progress.md`)
 
 The list below is the **historical** 2026-10-22 origin-environment build. It
 matches neither the live pack nor any build reproducible from disk; kept
