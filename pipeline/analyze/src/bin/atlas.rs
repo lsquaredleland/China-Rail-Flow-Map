@@ -1467,9 +1467,8 @@ fn resolve_leg3(
 }
 
 /// Geometry lookup for the section/chord passes: pair keys read the
-/// pair cache, variant keys the variant cache (populated during the
-/// outbound resolution loop; inbound-only variant legs stay unresolved
-/// — the known deferred inbound-resolution behaviour).
+/// pair cache, variant keys the variant cache (populated by the outbound
+/// resolution loop and the inbound pass after it).
 fn leg_seqs<'c>(
     key: &(String, String, String),
     cache: &'c PairCache,
@@ -2510,19 +2509,47 @@ fn main() {
             train_leg_keys: train_leg_keys_in,
         });
     }
+    // Inbound legs resolve exactly like outbound ones. Legs before the first
+    // selected city on a train are never seen outbound, so resolve them here
+    // (cached per key, so outbound legs are unaffected). Their stations trim
+    // throats in the inbound pass only, which keeps outbound flows unchanged.
+    let mut in_throat_stations = throat_stations.clone();
+    for key in in_works
+        .iter()
+        .flat_map(|w| w.train_leg_keys.iter())
+        .flat_map(|(_, legs)| legs.iter())
+    {
+        in_throat_stations.insert(key.0.clone());
+        in_throat_stations.insert(key.1.clone());
+        resolve_leg3(
+            key,
+            &path_map,
+            &adj_pure,
+            &adj,
+            &pair_len,
+            &station_pt,
+            &mut leg_cache,
+            &mut variant_cache,
+            &mut variant_stats,
+        );
+    }
 
     // ---- global atomic sections over the union of all selected cities ----
-    let mut station_grid: HashMap<(i32, i32), Vec<[f64; 2]>> = HashMap::new();
-    for nm in throat_stations.iter() {
-        if let Some(p) = station_pt(nm) {
-            let ll = [p[1], p[0]];
-            station_grid
-                .entry(((ll[0] * 50.0).floor() as i32, (ll[1] * 50.0).floor() as i32))
-                .or_default()
-                .push(ll);
+    let throat_grid = |names: &HashSet<String>| {
+        let mut grid: HashMap<(i32, i32), Vec<[f64; 2]>> = HashMap::new();
+        for nm in names.iter() {
+            if let Some(p) = station_pt(nm) {
+                let ll = [p[1], p[0]];
+                grid.entry(((ll[0] * 50.0).floor() as i32, (ll[1] * 50.0).floor() as i32))
+                    .or_default()
+                    .push(ll);
+            }
         }
-    }
-    let near_station = |pt: &[f64; 2]| -> bool {
+        grid
+    };
+    let station_grid = throat_grid(&throat_stations);
+    let in_station_grid = throat_grid(&in_throat_stations);
+    let near_station = |station_grid: &HashMap<(i32, i32), Vec<[f64; 2]>>, pt: &[f64; 2]| -> bool {
         let gx = (pt[0] * 50.0).floor() as i32;
         let gy = (pt[1] * 50.0).floor() as i32;
         for dx in -1..=1 {
@@ -2559,7 +2586,7 @@ fn main() {
                             _ => continue,
                         };
                         let mid = [(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0];
-                        if near_station(&mid) {
+                        if near_station(&station_grid, &mid) {
                             continue;
                         }
                         eset.insert(if win[0] < win[1] {
@@ -2751,7 +2778,7 @@ fn main() {
                             _ => continue,
                         };
                         let mid = [(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0];
-                        if near_station(&mid) {
+                        if near_station(&in_station_grid, &mid) {
                             continue;
                         }
                         eset.insert(if win[0] < win[1] {

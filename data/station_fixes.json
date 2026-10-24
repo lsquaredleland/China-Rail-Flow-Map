@@ -1,0 +1,6 @@
+{
+  "阳江": {
+    "note": "O9: trains calling at 阳江 (深茂铁路: 台山, 开平南, 恩平, 江门, 电白, 茂名, 阳东, 阳西, 马踏) use the 深茂 station; the analyzer also chose the old 阳阳铁路 阳江 at (21.864, 111.877)",
+    "clusters_chosen": [{"point": [21.813, 111.986]}]
+  }
+}
