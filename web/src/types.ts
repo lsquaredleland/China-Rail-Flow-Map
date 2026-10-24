@@ -96,7 +96,7 @@ export interface RawOrigin {
   flows: RawFlow[]; // fmt 5 on the wire: sorted by section, column 0 delta-coded; decoded at load
   chords: RawChord[];
   deps?: RawDep[];
-  dep_secs?: number[][]; // travel order; ~s = section walked in reverse
+  dep_secs?: number[][]; // travel order; ~s = walked in reverse; ids >= sections.length are throats
   dep_chord_legs?: ChordLeg[][];
   dep_stop_pos?: number[][]; // per dep row: path position of each stop after boarding
   inbound: number;
@@ -117,6 +117,9 @@ export interface SharedData {
   sections: RawSection[];
   in_sections: RawSection[];
   network: string[]; // encoded backdrop polylines
+  /** fmt 6 (O1): station-throat pieces, geometry only. Path entry `n + j`
+      (n = that direction's section count) is throat j; never a flow. */
+  throats: string[];
 }
 
 /** atlas-v2-out-map.json: every origin's identity + outbound map
@@ -129,7 +132,7 @@ export interface OutMapData {
 /** A leg with no track geometry: [stop index, first section, last section]. */
 export type ChordLeg = [number, number, number];
 
-/** One origin's entry in atlas-v2-out-tables.json (fmt 5): the per-row
+/** One origin's entry in atlas-v2-out-tables.json (fmt 6): the per-row
     paths are not stored; `dep_off` locates each dep row's slice of its
     train's full path. */
 export interface OutTablesPackOrigin {
@@ -138,7 +141,7 @@ export interface OutTablesPackOrigin {
   dep_off: number[];
 }
 
-/** atlas-v2-out-tables.json (fmt 5), as shipped: per-train full paths,
+/** atlas-v2-out-tables.json (fmt 6), as shipped: per-train full paths,
     stop positions and chord legs (full-path coordinates). Origins are
     parallel by index. Expanded by expandOutTables at load. */
 export interface OutTablesPack {
@@ -176,7 +179,7 @@ export interface InMapData {
   origins: InMapOrigin[];
 }
 
-/** One origin's entry in atlas-v2-in-tables.json (fmt 5): `arr_len` is
+/** One origin's entry in atlas-v2-in-tables.json (fmt 6): `arr_len` is
     the length of each arr row's prefix of its train's full path. */
 export interface InTablesPackOrigin {
   arrs: RawArr[];
@@ -184,7 +187,7 @@ export interface InTablesPackOrigin {
   arr_len: number[];
 }
 
-/** atlas-v2-in-tables.json (fmt 5), as shipped. Expanded by expandInTables. */
+/** atlas-v2-in-tables.json (fmt 6), as shipped. Expanded by expandInTables. */
 export interface InTablesPack {
   fmt: number;
   paths: number[][];
@@ -241,6 +244,8 @@ export interface DecodedAtlas {
   sec: DecodedSet;
   inSec: DecodedSet;
   net: DecodedSet;
+  /** Station-throat geometry (O1): only the dot animation reads it. */
+  thr: DecodedSet;
   extent: Extent;
   /** schedules[t] once the schedules asset has loaded (station-level dwells). */
   schedules?: SchedulesData["schedules"];
@@ -318,11 +323,12 @@ export interface DepVM {
   km: number; // rail journey distance to the final stop, -1 when unrouted
   distKm: number; // journey distance for binning: km when routed, else crow-flies origin → terminus city
   hay: string; // lowercase search haystack
-  secs: number[]; // section ids traversed by this train, in travel order
+  secs: number[]; // flow section ids traversed by this train, in travel order (no throats)
   secRevs: Uint8Array; // 1 where the section is walked end to start
   t: number; // train_table index (keys the schedules file)
-  chordLegs: ChordLeg[];
-  stopPos: number[]; // path position of each stop after boarding (dep_stop_pos)
+  path: number[]; // the raw path: flow sections and throats (fmt 6), signed
+  chordLegs: ChordLeg[]; // positions in `path`
+  stopPos: number[]; // `path` position of each stop after boarding (dep_stop_pos)
 }
 
 /** One train calling at a destination city, joined to its departure row. */
@@ -358,10 +364,11 @@ export interface ArrVM {
   km: number; // rail journey km from the origin; -1 when unknown
   distKm: number; // journey distance for binning: km when known, else crow-flies source city → selected city
   hay: string; // lowercase search haystack
-  secs: number[]; // section ids traversed by this train, in travel order
+  secs: number[]; // flow section ids traversed by this train, in travel order (no throats)
   secRevs: Uint8Array; // 1 where the section is walked end to start
   t: number; // train_table index (keys the schedules file)
-  chordLegs: ChordLeg[];
+  path: number[]; // the raw path: flow sections and throats (fmt 6), signed
+  chordLegs: ChordLeg[]; // positions in `path`
 }
 
 /** One train arriving from a source city, joined to its arrival row. */
@@ -430,6 +437,15 @@ export interface PrepTrainStop {
   isTerm: boolean;
 }
 
+/** A station-throat piece on a train's route (O1): the dot runs along throat
+    `thr` (reversed when `rev`) between route distances d0 and d1. */
+export interface ThroatSpan {
+  d0: number;
+  d1: number;
+  thr: number;
+  rev: boolean;
+}
+
 /** A stretch of a train's route with no track geometry, drawn as a straight line. */
 export interface ChordSpan {
   d0: number; // route distance where the span starts
@@ -453,11 +469,12 @@ export interface PrepTrain {
   arrMins: number;
   dur: number;
   totalDist: number;
-  secs: number[];
-  secStarts: Float64Array;
+  secs: number[]; // flow sections only, as DepVM.secs
+  secStarts: Float64Array; // route distance where each of `secs` starts
   secRevs: Uint8Array;
   stops?: PrepTrainStop[];
   chordSpans?: ChordSpan[];
+  throatSpans?: ThroatSpan[];
 }
 
 export interface DayTimelineVM {

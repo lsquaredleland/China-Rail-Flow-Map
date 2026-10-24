@@ -210,11 +210,11 @@ Always set `CRFM_OUTPUT_DIR` / `ATLAS_OUT` / `--out-dir`: `output/` in this
 repo is a symlink into `china-rail-handoff-v3/output`. Section indices change
 on every run (HashMap iteration), so ship the whole five-file pack together.
 
-**Pack format `fmt: 5`** (every one of shared / out-map / in-map /
-out-tables / in-tables carries `fmt: 5`; the client refuses anything else.
+**Pack format `fmt: 6`** (every one of shared / out-map / in-map /
+out-tables / in-tables carries `fmt: 6`; the client refuses anything else.
 Documented in the `atlaspack.rs` header; 5 = 4 plus renumbered sections, delta
-map flows and per-train paths, O15 + O6). The *decoded* per-row meaning is
-unchanged from fmt 4:
+map flows and per-train paths, O15 + O6; 6 = 5 plus station throats in the
+paths, O1). The *decoded* per-row meaning is fmt 4's plus the throats:
 - **Section ids** are renumbered "long paths first", per direction
   (`sections` for outbound, `in_sections` for inbound, independently).
 - **Map flows** (`flows`, `in_flows`) are sorted by section id; column 0 is
@@ -226,13 +226,26 @@ unchanged from fmt 4:
   per-row `dep_chord_legs` / `dep_stop_pos` / `arr_chord_legs` below are
   rebuilt exactly. `atlaspack` hard-asserts every row is such a slice.
 - `atlas-v2-{out,in}.json` are no longer written.
+- **Station throats (O1, fmt 6):** `throats` in the shared file is a list of
+  polylines (geometry only). `near_station` keeps the track within 1.3 km of
+  every stop out of the flow sections; each maximal run of those edges inside
+  one leg is a throat (deduped globally, simplified like the sections). Path
+  entry `n + j` (`~(n + j)` when reversed), with `n` = that direction's
+  section count, is throat `j`. Throats are never flows: no map flow rows, no
+  `sec_cnt`, no flow counting. Removing them from a path gives the fmt 5 path
+  exactly (`scripts/check_pack_roundtrip.mjs` proves it on a whole pack).
 
 Decoded per-row fields (what `lib.ts` `expandOutTables` / `expandInTables`
 rebuild, and what `audit` expands to):
 - `dep_secs` / `arr_secs` are in **travel order**; an entry `~s` (= `-(s+1)`)
   means section `s` is travelled against its stored point order. A train
   that runs back over track it already used repeats those sections; only
-  back-to-back duplicates collapse. Flow counting still dedupes per train.
+  back-to-back duplicates collapse (of the same signed section, also across
+  throats in between). Flow counting still dedupes per train. Entries `>= n`
+  are throats (above).
+- Positions (`dep_chord_legs`, `arr_chord_legs`, `dep_stop_pos`, and
+  `dep_off` / `arr_len`) index the whole path, throats included; `sec_cnt`
+  counts flow sections only.
 - `sec_cnt`: outbound = prefix count (origin → stop); inbound = trailing
   count (boarding stop → arrival).
 - `dep_chord_legs` / `arr_chord_legs`: `[stop, s0, s1]` per leg with no
@@ -241,7 +254,9 @@ rebuild, and what `audit` expands to):
   The track either side of the gap is at positions `s0-1` and `s1`.
 - `dep_stop_pos`: per dep row, one entry per stop after boarding (station
   level; city calls keep only the first station of each city): the number
-  of `dep_secs` entries before that stop. The terminus is at the path end.
+  of `dep_secs` entries before that stop. The stop sits at the start of the
+  departing leg's first entry, i.e. its throat at the station, so dwells sit
+  at the station (not 1.3 km down the line). The terminus is at the path end.
   The stops are `schedules[t][len - stops ..]`, which give stations and
   times; the client builds its dwells from these (O14).
 - `atlas-v2-schedules.json` is generated from `data/raw/stops*.jsonl`,
@@ -398,11 +413,16 @@ are enforced only in the full audit, not `--pack-only`. Current key values:
   the 13,420 router-coordinate rows were fixed by O4)
 - rows with a >35 km jump: 0 inside or outside chord legs (old client
   chainer: 5,804)
-- continuity gaps: 64,399 of ≤6 km (station throats), 436 over 6 km
+- continuity gaps (joins outside chord legs, throats included since O1):
+  43 in (3, 6] km and 149 over 6 km (before O1: 64,852 and 391), 103,390
+  over 0.1 km (gated as `continuity_gaps_gt100m`). Most of the rest are
+  0.1–1 km hops at a stop where the arriving and departing legs' geometry end
+  on different station nodes.
 - station-level stops (O14): 235,264 `dep_stop_pos` entries; 11,951 dep
   rows have stations without a city call of their own
-- known gaps: inbound-only legs stay unresolved; 1.3 km station-throat
-  trims leave gaps in per-train paths (see `optimization-progress.md`)
+- known gaps: inbound-only legs stay unresolved; flows still trim 1.3 km
+  around stations (paths bridge them with throats, O1; see
+  `optimization-progress.md`)
 
 The list below is the **historical** 2026-10-22 origin-environment build. It
 matches neither the live pack nor any build reproducible from disk; kept

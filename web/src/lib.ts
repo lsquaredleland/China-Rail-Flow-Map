@@ -29,6 +29,7 @@ import type {
 
   PrepTrain,
   ChordSpan,
+  ThroatSpan,
   PrepTrainStop,
   RampStop,
   RawFlow,
@@ -475,6 +476,7 @@ export function prepAtlas(data: AtlasData): DecodedAtlas {
     data.in_sections.map((s) => (s.h ? 1 : 0)),
   );
   const net = decodeSet(data.network);
+  const thr = decodeSet(data.throats || []);
   const e = { lon0: 1e9, lat0: 1e9, lon1: -1e9, lat1: -1e9 };
   for (let i = 0; i < data.network.length; i++) {
     if (net.bb[i * 4] < e.lon0) e.lon0 = net.bb[i * 4];
@@ -493,7 +495,7 @@ export function prepAtlas(data: AtlasData): DecodedAtlas {
   e.lon1 += 1.2;
   e.lat0 -= 1.0;
   e.lat1 += 1.0;
-  return { data, sec, inSec, net, extent: e };
+  return { data, sec, inSec, net, thr, extent: e };
 }
 
 /** Decode the China + islands outline rings and Nine-dash line once. */
@@ -602,7 +604,8 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
     const fs = data.station_table[d[1]];
     const ts = data.station_table[d[3]];
     const tc = data.city_table[d[4]];
-    const ds = decodeSecs(o.dep_secs && o.dep_secs[di]);
+    const dp = (o.dep_secs && o.dep_secs[di]) || [];
+    const ds = decodeSecs(dp, data.sections.length);
     const rec: DepVM = {
       t: d[0],
       code: t.code,
@@ -625,6 +628,7 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       hay: "",
       secs: ds.secs,
       secRevs: ds.revs,
+      path: dp,
       chordLegs: (o.dep_chord_legs && o.dep_chord_legs[di]) || [],
       stopPos: (o.dep_stop_pos && o.dep_stop_pos[di]) || [],
     };
@@ -744,7 +748,8 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
     const fs = data.station_table[a[1]];
     const ts = data.station_table[a[4]];
     const fc = data.city_table[a[2]];
-    const as = decodeSecs(o.arr_secs && o.arr_secs[ai]);
+    const ap = (o.arr_secs && o.arr_secs[ai]) || [];
+    const as = decodeSecs(ap, data.in_sections.length);
     const rec: ArrVM = {
       t: a[0],
       code: t.code,
@@ -768,6 +773,7 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       hay: "",
       secs: as.secs,
       secRevs: as.revs,
+      path: ap,
       chordLegs: (o.arr_chord_legs && o.arr_chord_legs[ai]) || [],
     };
     rec.hay = (
@@ -1055,13 +1061,16 @@ function timeAtDist(pt: PrepTrain, dist: number): number {
   return legStartTime + hi * legDur;
 }
 
-/* ---------- fmt 5 decode ---------- */
+/* ---------- fmt 6 decode ---------- */
 // The packs ship sections renumbered, map flows sorted + delta-coded and
 // per-row paths deduplicated into per-train paths (see atlaspack.rs). These
-// rebuild exactly the per-row shapes the rest of the client reads.
+// rebuild exactly the per-row shapes the rest of the client reads. fmt 6 =
+// fmt 5 plus station throats in the paths (O1): positions (dep_off, arr_len,
+// chord legs, stop positions) index the whole path; decodeSecs drops the
+// throats for everything but the dot animation.
 
 /** The data pack format every file must carry. */
-export const DATA_FMT = 5;
+export const DATA_FMT = 6;
 
 /** Throw a FmtError unless `fmt` is the supported pack format. */
 export function requireFmt(fmt: unknown, url: string): void {
@@ -1088,7 +1097,7 @@ function chordsByTrain(chords: [number, ChordLeg[]][]): Map<number, ChordLeg[]> 
   return new Map(chords);
 }
 
-/** Rebuild per-row dep_secs / dep_chord_legs / dep_stop_pos from the fmt 5 out tables. */
+/** Rebuild per-row dep_secs / dep_chord_legs / dep_stop_pos from the fmt 6 out tables. */
 export function expandOutTables(d: OutTablesPack): OutTablesData {
   const chords = chordsByTrain(d.chords);
   return {
@@ -1114,7 +1123,7 @@ export function expandOutTables(d: OutTablesPack): OutTablesData {
   };
 }
 
-/** Rebuild per-row arr_secs / arr_chord_legs from the fmt 5 in tables. */
+/** Rebuild per-row arr_secs / arr_chord_legs from the fmt 6 in tables. */
 export function expandInTables(d: InTablesPack): InTablesData {
   const chords = chordsByTrain(d.chords);
   return {
@@ -1132,21 +1141,35 @@ export function expandInTables(d: InTablesPack): InTablesData {
   };
 }
 
-/** Decode a travel-ordered section list: `~s` marks a section walked in reverse. */
-function decodeSecs(raw: number[] | undefined): { secs: number[]; revs: Uint8Array } {
-  const n = raw ? raw.length : 0;
-  const secs: number[] = new Array(n);
-  const revs = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    const v = raw![i];
-    if (v < 0) {
-      secs[i] = ~v;
-      revs[i] = 1;
-    } else {
-      secs[i] = v;
-    }
+/** Decode a travel-ordered path into its flow sections: `~s` marks a
+    section walked in reverse; entries >= nSec are throats (O1) and are
+    dropped, so flows, counts and highlights never see them. */
+export function decodeSecs(raw: number[] | undefined, nSec: number): { secs: number[]; revs: Uint8Array } {
+  const secs: number[] = [];
+  const revs: number[] = [];
+  for (const v of raw || []) {
+    const id = v < 0 ? ~v : v;
+    if (id >= nSec) continue;
+    secs.push(id);
+    revs.push(v < 0 ? 1 : 0);
   }
-  return { secs, revs };
+  return { secs, revs: Uint8Array.from(revs) };
+}
+
+/** The throat span containing route distance `d` (spans are sorted and disjoint). */
+function throatAt(spans: ThroatSpan[], d: number): ThroatSpan | undefined {
+  let lo = 0;
+  let hi = spans.length - 1;
+  let best = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (spans[mid].d0 <= d) {
+      best = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  const c = best >= 0 ? spans[best] : undefined;
+  return c && d <= c.d1 && c.d1 > c.d0 ? c : undefined;
 }
 
 interface TrainEntries {
@@ -1182,6 +1205,10 @@ export function buildDayTimeline(
   }
 
   const { secLengths, secCumLens } = getSecGeometry(secSet);
+  // Station throats (O1): path entries >= nSecAll, geometry only
+  const nSecAll = secSet.len.length;
+  const thrSet = atlas.thr;
+  const thrGeo = getSecGeometry(thrSet);
 
   // Every origin flow section gets a step array, even if no dot enters it.
   const flowSecs = (cur.flows || []).map((f) => f.s);
@@ -1198,21 +1225,28 @@ export function buildDayTimeline(
 
     const secRevs = train.secRevs;
     const nSecs = routeSecs.length;
+    // Distance space runs over the whole path (flow sections and throats),
+    // so the dot moves through stations; chord legs and stops index it.
+    const path = train.path || [];
+    const nPath = path.length;
     const endPt = (i: number, atEnd: boolean): [number, number] => {
-      const sec = routeSecs[i];
-      const k = atEnd !== (secRevs[i] === 1) ? secSet.len[sec] - 1 : 0;
-      return [secSet.pts[secSet.off[sec] + k * 2], secSet.pts[secSet.off[sec] + k * 2 + 1]];
+      const v = path[i];
+      const id = v < 0 ? ~v : v;
+      const set = id < nSecAll ? secSet : thrSet;
+      const g = id < nSecAll ? id : id - nSecAll;
+      const k = atEnd !== v < 0 ? set.len[g] - 1 : 0;
+      return [set.pts[set.off[g] + k * 2], set.pts[set.off[g] + k * 2 + 1]];
     };
 
     // Legs without track geometry get a virtual length in distance space: at
     // the widest join inside the leg's [s0, s1] window (one per join), as long
     // as the crow-flies gap there. The dot crosses it on a straight line.
-    const virt = new Float64Array(nSecs + 1);
-    const virtStop = new Int32Array(nSecs + 1).fill(-1); // stop the gap departs from
+    const virt = new Float64Array(nPath + 1);
+    const virtStop = new Int32Array(nPath + 1).fill(-1); // stop the gap departs from
     for (const leg of train.chordLegs || []) {
       let bestJ = -1;
       let bestGap = 0;
-      for (let j = Math.max(1, leg[1]); j <= Math.min(nSecs - 1, leg[2]); j++) {
+      for (let j = Math.max(1, leg[1]); j <= Math.min(nPath - 1, leg[2]); j++) {
         const gap = haversineKm(endPt(j - 1, true), endPt(j, false));
         if (gap > bestGap) {
           bestGap = gap;
@@ -1226,9 +1260,12 @@ export function buildDayTimeline(
     }
 
     let totalDist = 0;
-    const secStarts = new Float64Array(nSecs); // where each entry's own track starts
+    const pathStarts = new Float64Array(nPath); // where each path entry's own track starts
+    const secStarts = new Float64Array(nSecs); // the same, for the flow sections only
     const chordSpans: ChordSpan[] = [];
-    for (let i = 0; i < nSecs; i++) {
+    const throatSpans: ThroatSpan[] = [];
+    let fi = 0;
+    for (let i = 0; i < nPath; i++) {
       if (virt[i] > 0) {
         const p0 = endPt(i - 1, true);
         const p1 = endPt(i, false);
@@ -1242,8 +1279,17 @@ export function buildDayTimeline(
         });
         totalDist += virt[i];
       }
-      secStarts[i] = totalDist;
-      totalDist += secLengths[routeSecs[i]] || 0;
+      pathStarts[i] = totalDist;
+      const v = path[i];
+      const id = v < 0 ? ~v : v;
+      if (id < nSecAll) {
+        secStarts[fi++] = totalDist;
+        totalDist += secLengths[id] || 0;
+      } else {
+        const len = thrGeo.secLengths[id - nSecAll] || 0;
+        throatSpans.push({ d0: totalDist, d1: totalDist + len, thr: id - nSecAll, rev: v < 0 });
+        totalDist += len;
+      }
     }
 
     const dur = train.dur > 0 ? train.dur : 1;
@@ -1287,7 +1333,7 @@ export function buildDayTimeline(
           ? totalDist
           : Math.max(
               prevDist,
-              k >= nSecs ? totalDist : virt[k] > 0 && virtStop[k] === j ? secStarts[k] - virt[k] : secStarts[k],
+              k >= nPath ? totalDist : virt[k] > 0 && virtStop[k] === j ? pathStarts[k] - virt[k] : pathStarts[k],
             );
         prevDist = dist;
         stops.push({
@@ -1319,6 +1365,7 @@ export function buildDayTimeline(
       secRevs,
       stops: stops.length > 0 ? stops : undefined,
       chordSpans: chordSpans.length > 0 ? chordSpans : undefined,
+      throatSpans: throatSpans.length > 0 ? throatSpans : undefined,
     });
 
     // Each section counts once per train, from the minute the dot first
@@ -1472,31 +1519,47 @@ export function buildDayTimeline(
           }
         }
 
-        // Find which section in the route
-        let secIdx = 0;
-        while (
-          secIdx < pt.secs.length - 1 &&
-          pt.secStarts[secIdx + 1] <= targetDist
-        ) {
-          secIdx++;
+        // The station throat the dot is on (O1), else the section in the route
+        const th = pt.throatSpans ? throatAt(pt.throatSpans, targetDist) : undefined;
+        let gSet = secSet;
+        let gCum = secCumLens;
+        let s: number;
+        let distInSec: number;
+        let isSecRev: boolean;
+        let sLen: number;
+        if (th) {
+          gSet = thrSet;
+          gCum = thrGeo.secCumLens;
+          s = th.thr;
+          distInSec = targetDist - th.d0;
+          isSecRev = th.rev;
+          sLen = thrGeo.secLengths[s] || 0;
+        } else {
+          let secIdx = 0;
+          while (
+            secIdx < pt.secs.length - 1 &&
+            pt.secStarts[secIdx + 1] <= targetDist
+          ) {
+            secIdx++;
+          }
+          s = pt.secs[secIdx];
+          distInSec = targetDist - pt.secStarts[secIdx];
+          isSecRev = pt.secRevs[secIdx] === 1;
+          sLen = secLengths[s] || 0;
         }
-        const s = pt.secs[secIdx];
-        const distInSec = targetDist - pt.secStarts[secIdx];
-        const isSecRev = pt.secRevs[secIdx] === 1;
-        const sLen = secLengths[s] || 0;
         // If traversed in reverse, effective distance along vertices starts from the end
         const distInSecEffective = isSecRev
           ? Math.max(0, Math.min(sLen, sLen - distInSec))
           : distInSec;
 
         // Find which segment within section s
-        const off = secSet.off[s];
-        const cnt = secSet.len[s];
+        const off = gSet.off[s];
+        const cnt = gSet.len[s];
         if (cnt <= 1) {
           if (cnt === 1) {
             active.push({
-              lon: secSet.pts[off],
-              lat: secSet.pts[off + 1],
+              lon: gSet.pts[off],
+              lat: gSet.pts[off + 1],
               heading: 0,
               cls: pt.cls,
               code: pt.code,
@@ -1520,7 +1583,7 @@ export function buildDayTimeline(
           continue;
         }
 
-        const cum = secCumLens[s];
+        const cum = gCum[s];
         let k = 0;
         while (k < cnt - 2 && cum[k + 1] < distInSecEffective) {
           k++;
@@ -1530,10 +1593,10 @@ export function buildDayTimeline(
           segLen > 0
             ? Math.max(0, Math.min(1, (distInSecEffective - cum[k]) / segLen))
             : 0;
-        const lon0 = secSet.pts[off + k * 2];
-        const lat0 = secSet.pts[off + k * 2 + 1];
-        const lon1 = secSet.pts[off + (k + 1) * 2];
-        const lat1 = secSet.pts[off + (k + 1) * 2 + 1];
+        const lon0 = gSet.pts[off + k * 2];
+        const lat0 = gSet.pts[off + k * 2 + 1];
+        const lon1 = gSet.pts[off + (k + 1) * 2];
+        const lat1 = gSet.pts[off + (k + 1) * 2 + 1];
         const lon = lon0 + segAlpha * (lon1 - lon0);
         const lat = lat0 + segAlpha * (lat1 - lat0);
 

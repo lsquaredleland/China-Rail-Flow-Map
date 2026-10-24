@@ -21,15 +21,17 @@
     "dropped_chains": 0,
     "flow_lost": 0,
     "dep_stops_total": 235264,
-    "dep_rows_with_uncalled_stations": 11951
+    "dep_rows_with_uncalled_stations": 11951,
+    "throats": 9128
   },
   "max": {
     "chord_leg_rows": 20,
-    "continuity_gaps_gt6km": 391,
-    "continuity_gaps_le6km": 64852,
+    "continuity_gaps_gt6km": 149,
+    "continuity_gaps_le6km": 43,
     "dep_rows_jump_gt35km_inside_chords": 0,
     "dep_rows_jump_gt35km_outside_chords": 0,
     "nonmonotone_sec_cnt_trains": 49,
-    "dep_stops_time_regressions": 0
+    "dep_stops_time_regressions": 0,
+    "continuity_gaps_gt100m": 103390
   }
 }
