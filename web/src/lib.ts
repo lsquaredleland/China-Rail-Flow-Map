@@ -857,6 +857,40 @@ function getSecGeometry(secSet: DecodedSet): SecGeometryCache {
   return result;
 }
 
+/** Realistic train velocity ramp profile between stops:
+ *  Accelerates smoothly from station stop (sin^2 ramp), cruises at top leg speed,
+ *  and decelerates smoothly into the next station platform. */
+export function trainEase(tau: number, durMins: number): number {
+  if (tau <= 0) return 0;
+  if (tau >= 1) return 1;
+  const accelMins = Math.min(3, durMins * 0.25);
+  const a = Math.max(0.01, Math.min(0.35, accelMins / durMins));
+  const denom = 1 - a;
+  if (tau <= a) {
+    return (0.5 * tau - (a / (2 * Math.PI)) * Math.sin((Math.PI * tau) / a)) / denom;
+  }
+  if (tau >= 1 - a) {
+    const tPrime = 1 - tau;
+    const rem = (0.5 * tPrime - (a / (2 * Math.PI)) * Math.sin((Math.PI * tPrime) / a)) / denom;
+    return 1 - rem;
+  }
+  return (0.5 * a + (tau - a)) / denom;
+}
+
+/** Normalized instantaneous speed fraction in [0, 1] (0 at station halt, 1 at full cruise). */
+export function trainSpeedFrac(tau: number, durMins: number): number {
+  if (tau <= 0 || tau >= 1) return 0;
+  const accelMins = Math.min(3, durMins * 0.25);
+  const a = Math.max(0.01, Math.min(0.35, accelMins / durMins));
+  if (tau <= a) {
+    return Math.sin((Math.PI * tau) / (2 * a)) ** 2;
+  }
+  if (tau >= 1 - a) {
+    return Math.sin((Math.PI * (1 - tau)) / (2 * a)) ** 2;
+  }
+  return 1.0;
+}
+
 export function buildDayTimeline(
   cur: OriginVM,
   atlas: AtlasVM,
@@ -951,6 +985,25 @@ export function buildDayTimeline(
       for (let ci = 0; ci < srcCalls.length; ci++) {
         const c = srcCalls[ci];
         const trainIdx = c[0];
+        const t = rawTrains[trainIdx];
+        if (!t) continue;
+        const trainDep = t.depMins >= 0 ? t.depMins : 0;
+        const trainDur = t.dur > 0 ? t.dur : 1;
+        const trainArr = trainDep + trainDur;
+        const board = c[1];
+        if (board < 0) continue;
+        let unrolledBoard = board;
+        for (let d = 0; d <= 4; d++) {
+          const testT = d * 1440 + board;
+          if (testT >= trainDep - 1 && testT <= trainArr + 1) {
+            unrolledBoard = testT;
+            break;
+          }
+        }
+        const isStarted = c[4] === 1;
+        const stopArr = isStarted ? unrolledBoard : Math.max(trainDep, unrolledBoard - 3);
+        const stopDep = unrolledBoard;
+
         let list = callsByTrain.get(trainIdx);
         if (!list) {
           list = [];
@@ -959,11 +1012,30 @@ export function buildDayTimeline(
         list.push({
           cityZh: src.zh,
           pt: src.pt,
-          arrMins: c[3] * 1440 + c[2],
-          depMins: c[1] >= 0 ? c[3] * 1440 + c[1] : null,
+          arrMins: stopArr,
+          depMins: stopDep,
           isTerm: false,
         });
       }
+    }
+    // Add destination terminus stop for each inbound train at cur.o
+    for (let ti = 0; ti < rawTrains.length; ti++) {
+      const t = rawTrains[ti];
+      const trainDep = t.depMins >= 0 ? t.depMins : 0;
+      const trainDur = t.dur > 0 ? t.dur : 1;
+      const trainArr = trainDep + trainDur;
+      let list = callsByTrain.get(ti);
+      if (!list) {
+        list = [];
+        callsByTrain.set(ti, list);
+      }
+      list.push({
+        cityZh: cur.o.zh,
+        pt: cur.o.pt,
+        arrMins: trainArr,
+        depMins: null,
+        isTerm: true,
+      });
     }
   }
 
@@ -1118,14 +1190,19 @@ export function buildDayTimeline(
           const s = routeSecs[i];
           const off = secSet.off[s];
           const cnt = secSet.len[s];
+          const isRev = secRevsArr[i] === 1;
+          const cum = secCumLens[s];
+          const sLen = secLengths[s] || 0;
           for (let k = 0; k < cnt; k++) {
+            const distInSec = isRev ? (sLen - cum[k]) : cum[k];
+            const routeD = secStarts[i] + distInSec;
+            if (routeD < prevDist - 5) continue;
             const d2 =
               (secSet.pts[off + k * 2] - call.pt[0]) ** 2 +
               (secSet.pts[off + k * 2 + 1] - call.pt[1]) ** 2;
             if (d2 < minD2) {
               minD2 = d2;
-              bestDistOnRoute =
-                secStarts[i] + (k / Math.max(1, cnt - 1)) * (secLengths[s] || 0);
+              bestDistOnRoute = routeD;
             }
           }
         }
@@ -1257,14 +1334,36 @@ export function buildDayTimeline(
       dest.arrTimes = visualArrTimes;
     }
   } else if (!isOut && cur.srcs) {
+    const prepMap = new Map<string, PrepTrain>();
+    for (let i = 0; i < prepTrains.length; i++) {
+      prepMap.set(prepTrains[i].code, prepTrains[i]);
+    }
     for (let si = 0; si < cur.srcs.length; si++) {
       const src = cur.srcs[si];
       const visualArrTimes: number[] = [];
       const inCalls = src.inCalls || [];
       for (let ci = 0; ci < inCalls.length; ci++) {
         const ic = inCalls[ci];
-        if (ic.arrMins >= 0) {
-          visualArrTimes.push(ic.arrMins);
+        const pt = ic.arr ? prepMap.get(ic.arr.code) : null;
+        if (pt && pt.stops) {
+          const st = pt.stops.find((s) => s.cityZh === src.zh);
+          if (st) {
+            visualArrTimes.push(st.arrMins);
+            continue;
+          }
+        }
+        if (ic.arr && ic.boardMins >= 0) {
+          const tDep = ic.arr.depMins >= 0 ? ic.arr.depMins : 0;
+          const tArr = tDep + (ic.arr.dur > 0 ? ic.arr.dur : 1);
+          let unrolled = ic.boardMins;
+          for (let d = 0; d <= 4; d++) {
+            const testT = d * 1440 + ic.boardMins;
+            if (testT >= tDep - 1 && testT <= tArr + 1) {
+              unrolled = testT;
+              break;
+            }
+          }
+          visualArrTimes.push(unrolled);
         }
       }
       visualArrTimes.sort((a, b) => a - b);
@@ -1276,35 +1375,61 @@ export function buildDayTimeline(
     const active: ActiveTrainVM[] = [];
     for (let i = 0; i < prepTrains.length; i++) {
       const pt = prepTrains[i];
+      // 10 min pre-departure boarding dwell at origin
+      const boardStart = Math.max(0, pt.depMins - 10);
+      // 8 min disembarkation dwell at final terminus
+      const termEnd = pt.arrMins + 8;
       if (
-        tMins < pt.depMins ||
-        tMins > pt.arrMins ||
+        tMins < boardStart ||
+        tMins > termEnd ||
         pt.totalDist <= 0 ||
         pt.secs.length === 0
       ) {
         continue;
       }
-      const alpha = Math.max(0, Math.min(1, (tMins - pt.depMins) / pt.dur));
+
       let targetDist: number;
       let isDwelling = false;
       let dwellStation: string | undefined;
+      let dwellStatus: "origin" | "stop" | "dest" | undefined;
+      let dwellDetail: string | undefined;
+      let speedFrac = 1.0;
 
-      const stops = pt.stops;
-      if (stops && stops.length > 0) {
+      if (tMins < pt.depMins) {
+        targetDist = 0;
+        isDwelling = true;
+        dwellStation = pt.fromStation;
+        dwellStatus = "origin";
+        dwellDetail = `Departs ${pt.depTime}`;
+        speedFrac = 0;
+      } else if (tMins >= pt.arrMins) {
+        targetDist = pt.totalDist;
+        isDwelling = true;
+        dwellStation = pt.toStation;
+        dwellStatus = "dest";
+        dwellDetail = "Final Destination";
+        speedFrac = 0;
+      } else {
+        const stops = pt.stops;
         let dwellingFound = false;
-        for (let si = 0; si < stops.length; si++) {
-          const st = stops[si];
-          if (
-            st.depMins !== null &&
-            st.depMins > st.arrMins &&
-            tMins >= st.arrMins &&
-            tMins <= st.depMins
-          ) {
-            targetDist = st.dist;
-            isDwelling = true;
-            dwellStation = st.cityZh;
-            dwellingFound = true;
-            break;
+        if (stops && stops.length > 0) {
+          for (let si = 0; si < stops.length; si++) {
+            const st = stops[si];
+            if (
+              st.depMins !== null &&
+              st.depMins > st.arrMins &&
+              tMins >= st.arrMins &&
+              tMins <= st.depMins
+            ) {
+              targetDist = st.dist;
+              isDwelling = true;
+              dwellStation = st.cityZh;
+              dwellStatus = "stop";
+              dwellDetail = `${fmtClock(st.arrMins)} - ${fmtClock(st.depMins)}`;
+              speedFrac = 0;
+              dwellingFound = true;
+              break;
+            }
           }
         }
         if (!dwellingFound) {
@@ -1312,23 +1437,25 @@ export function buildDayTimeline(
           let legStartTime = pt.depMins;
           let legEndDist = pt.totalDist;
           let legEndTime = pt.arrMins;
-          for (let si = 0; si < stops.length; si++) {
-            const st = stops[si];
-            if (tMins < st.arrMins) {
-              legEndDist = st.dist;
-              legEndTime = st.arrMins;
-              break;
-            } else {
-              legStartDist = st.dist;
-              legStartTime = st.depMins !== null ? st.depMins : st.arrMins;
+          if (stops && stops.length > 0) {
+            for (let si = 0; si < stops.length; si++) {
+              const st = stops[si];
+              if (tMins < st.arrMins) {
+                legEndDist = st.dist;
+                legEndTime = st.arrMins;
+                break;
+              } else {
+                legStartDist = st.dist;
+                legStartTime = st.depMins !== null ? st.depMins : st.arrMins;
+              }
             }
           }
           const legDur = Math.max(1, legEndTime - legStartTime);
-          const legAlpha = Math.max(0, Math.min(1, (tMins - legStartTime) / legDur));
-          targetDist = legStartDist + legAlpha * (legEndDist - legStartDist);
+          const tau = Math.max(0, Math.min(1, (tMins - legStartTime) / legDur));
+          const easedFrac = trainEase(tau, legDur);
+          speedFrac = trainSpeedFrac(tau, legDur);
+          targetDist = legStartDist + easedFrac * (legEndDist - legStartDist);
         }
-      } else {
-        targetDist = alpha * pt.totalDist;
       }
 
       // Find which section in the route
@@ -1364,9 +1491,13 @@ export function buildDayTimeline(
             depTime: pt.depTime,
             arrTime: pt.arrTime,
             durMins: pt.dur,
-            progressPct: Math.round(alpha * 100),
+            progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
             isDwelling,
             dwellStation,
+            dwellStatus,
+            dwellDetail,
+            speedFrac,
+            curDist: targetDist,
           });
         }
         continue;
@@ -1405,9 +1536,13 @@ export function buildDayTimeline(
         depTime: pt.depTime,
         arrTime: pt.arrTime,
         durMins: pt.dur,
-        progressPct: Math.round(alpha * 100),
+        progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
         isDwelling,
         dwellStation,
+        dwellStatus,
+        dwellDetail,
+        speedFrac,
+        curDist: targetDist,
       });
     }
     return active;

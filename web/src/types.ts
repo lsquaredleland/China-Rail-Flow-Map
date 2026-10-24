@@ -339,6 +339,10 @@ export interface ActiveTrainVM {
   progressPct: number;
   isDwelling?: boolean;
   dwellStation?: string;
+  dwellStatus?: "origin" | "stop" | "dest";
+  dwellDetail?: string;
+  speedFrac?: number;
+  curDist?: number;
 }
 
 export interface ScheduleStop {

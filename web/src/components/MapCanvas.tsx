@@ -580,8 +580,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           const c = inCalls[i];
           if (!c.arr || !c.arr.secs) continue;
           const secs = c.arr.secs;
-          const lim = Math.min(secs.length, c.secCnt);
-          for (let k = 0; k < lim; k++) {
+          const startK = Math.max(0, secs.length - c.secCnt);
+          for (let k = startK; k < secs.length; k++) {
             secCounts.set(secs[k], (secCounts.get(secs[k]) || 0) + 1);
           }
         }
@@ -629,14 +629,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         const c = inCalls[i];
         const arr = c.arr;
         if (!arr || !arr.secs) continue;
-        const lim = Math.min(arr.secs.length, c.secCnt);
+        const startK = Math.max(0, arr.secs.length - c.secCnt);
         const totalDist = arr.totalDist || 1;
         const dur = arr.dur > 0 ? arr.dur : 1;
         const depMins = arr.depMins >= 0 ? arr.depMins : 0;
         const secStarts = arr.secStarts;
 
-        for (let k = 0; k < lim; k++) {
-          const distBefore = secStarts ? secStarts[k] : (k / lim) * totalDist;
+        for (let k = startK; k < arr.secs.length; k++) {
+          const distBefore = secStarts ? secStarts[k] : (k / arr.secs.length) * totalDist;
           const frac = distBefore / totalDist;
           const tEnter = depMins + frac * dur;
           if (tMins >= tEnter) {
@@ -817,9 +817,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           }
           ctx.stroke();
         } else if (animTime >= depMins) {
+          const curTr = timeline.getActiveTrains(animTime).find(
+            (t) => t.code === isoTrain.code,
+          );
           const totalDist = isoTrain.totalDist || 1;
-          const alpha = Math.min(1.0, Math.max(0.0, (animTime - depMins) / dur));
-          const targetDist = alpha * totalDist;
+          const targetDist =
+            curTr && curTr.curDist !== undefined
+              ? curTr.curDist
+              : Math.min(1.0, Math.max(0.0, (animTime - depMins) / dur)) * totalDist;
           const secStarts = isoTrain.secStarts;
           let curSecIdx = 0;
           if (secStarts) {
@@ -832,13 +837,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           } else {
             curSecIdx = Math.min(
               isoSecs.length - 1,
-              Math.floor(alpha * isoSecs.length),
+              Math.floor((targetDist / totalDist) * isoSecs.length),
             );
           }
-
-          const curTr = timeline.getActiveTrains(animTime).find(
-            (t) => t.code === isoTrain.code,
-          );
 
           ctx.beginPath();
           for (let i = 0; i < curSecIdx; i++) {
@@ -1201,17 +1202,26 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const inCalls = src?.inCalls;
       if (!inCalls || inCalls.length === 0) return [];
       const times: number[] = [];
+      const prepMap = cur.inTimeline?.getPrepTrain;
       for (let i = 0; i < inCalls.length; i++) {
         const call = inCalls[i];
         if (call.arr && allowedCodes.has(call.arr.code)) {
-          const m =
-            call.arrMins !== undefined
-              ? call.arrMins
-              : call.dayOff * 1440 +
-                parseInt(call.arrTime.slice(0, 2), 10) * 60 +
-                parseInt(call.arrTime.slice(3, 5), 10);
-          if (typeof m === "number" && !isNaN(m) && m >= 0) {
-            times.push(m);
+          const pt = prepMap ? prepMap(call.arr.code) : null;
+          const st = pt?.stops?.find((s) => s.cityZh === src.zh);
+          if (st) {
+            times.push(st.arrMins);
+          } else if (call.boardMins >= 0) {
+            const tDep = call.arr.depMins >= 0 ? call.arr.depMins : 0;
+            const tArr = tDep + (call.arr.dur > 0 ? call.arr.dur : 1);
+            let unrolled = call.boardMins;
+            for (let d = 0; d <= 4; d++) {
+              const testT = d * 1440 + call.boardMins;
+              if (testT >= tDep - 1 && testT <= tArr + 1) {
+                unrolled = testT;
+                break;
+              }
+            }
+            times.push(unrolled);
           }
         }
       }
@@ -1265,7 +1275,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const vx = Math.cos(tr.heading);
       const vy = -Math.sin(tr.heading);
       const isDwelling = Boolean(tr.isDwelling);
-      const actualTailLen = isDwelling ? 0 : isIsolated ? 22 : tailLen;
+      const speedFrac =
+        tr.speedFrac !== undefined ? tr.speedFrac : isDwelling ? 0 : 1;
+      const baseTailLen = isIsolated ? 22 : tailLen;
+      const actualTailLen = isDwelling
+        ? 0
+        : Math.round(baseTailLen * speedFrac);
       if (actualTailLen > 0) {
         const tailX = px - vx * actualTailLen;
         const tailY = py - vy * actualTailLen;
@@ -2397,7 +2412,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         `<span style='font-size:13px;font-weight:600;'>${esc(tr.fromStation || "")} &rarr; ${esc(tr.toStation || "")}</span>` +
         "</div>" +
         (tr.isDwelling
-          ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${esc(tr.dwellStation || "station")}</div>`
+          ? (tr.dwellStatus === "origin"
+            ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${esc(tr.dwellStation || "Origin")} &middot; ${esc(tr.dwellDetail || "")}</div>`
+            : tr.dwellStatus === "dest"
+              ? `<div style='font-size:12px;color:#10B981;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${esc(tr.dwellStation || "Destination")} &middot; Final Stop</div>`
+              : `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${esc(tr.dwellStation || "station")}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
           : "") +
         "<table style='width:100%;margin-bottom:4px;'>" +
         `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +
