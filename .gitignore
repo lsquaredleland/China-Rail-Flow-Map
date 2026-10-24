@@ -21,3 +21,6 @@ data/derived/
 *.osm
 *.osm.gz
 *.pmtiles
+
+# Staged pipeline rebuilds (inputs copied read-only from the handoff; outputs never live)
+staging/

@@ -10,6 +10,35 @@
 //! - All polyline geometry is re-encoded at 1e4 precision (~11 m) instead of
 //!   1e5; the sections were already simplified/rounded near that scale.
 //!
+//! Per-train paths (`fmt: 3`, on out-tables / in-tables):
+//! - `dep_secs` / `arr_secs` list each train's sections in TRAVEL order
+//!   (outbound: from this origin onward; inbound: from the train's first
+//!   stop to its arrival here); a section repeats when the train runs back
+//!   over it (consecutive repeats collapsed; flows are counted per train
+//!   separately, so they are unaffected). A
+//!   value `s >= 0` is section `s` travelled along its stored point order;
+//!   `s < 0` is section `-s - 1` (`!s`) travelled against it.
+//! - Outbound call `sec_cnt`: the first `sec_cnt` entries of `dep_secs`
+//!   run from the origin to that call. Inbound call `sec_cnt`: the LAST
+//!   `sec_cnt` entries of `arr_secs` run from the boarding stop to the
+//!   arrival.
+//! - `dep_chord_legs` / `arr_chord_legs`: per train, `[stop, s0, s1]` for
+//!   each leg without usable track geometry (unresolved, or a gap > 3 km):
+//!   the leg departs the train's stop index `stop` (an index into its
+//!   schedule) and owns path entries `s0..s1` (empty when unresolved).
+//!   Definition: s0/s1 are POSITIONS in the emitted dep_secs/arr_secs
+//!   (not section ids), half-open [s0, s1) = the entries the leg itself
+//!   produced; the gap may sit at any join k in s0..=s1 (join k = between
+//!   entries k-1 and k), so entry s0-1 and entry s1 are the neighbours on
+//!   either side; s0 == s1 means the leg produced no entries and the gap is
+//!   the single join s0 (between entries s0-1 and s0).
+//!
+//! Schedules (`atlas-v2-schedules.json`, generated, not hand-committed):
+//! `schedules[t]` (t = train_table index) is the train's full stop list,
+//! rows `[station_table idx, arr mins, dep mins, day offset, leg km]`
+//! (-1 = no time / unknown km). `extra_stations` stays empty (kept for
+//! the client's type); every stop resolves into station_table.
+//!
 //! Outputs (combined + direction splits for lazy inbound loading), each also
 //! written Brotli-compressed (quality 11) with a `.br` suffix:
 //! - china-flow-atlas-data-v2.json
@@ -18,6 +47,7 @@
 //!   atlas-v2-out-tables.json, atlas-v2-in-map.json, atlas-v2-in-tables.json
 //!   (shared is shared). The four origin files partition the combined
 //!   origins exactly; the packer asserts the partition before writing.
+//! - atlas-v2-schedules.json
 //!
 //! After writing, the packer verifies v2 against v1 by reconstructing the
 //! v1 rows from the v2 arrays (inverse mapping) and comparing every field,
@@ -182,7 +212,9 @@ fn pack_origin(o: &Value) -> Value {
         "deps": arr(get(o, "deps")).iter().map(pack_dep).collect::<Vec<_>>(),
         "arrs": arr(get(o, "arrs")).iter().map(pack_arr).collect::<Vec<_>>(),
         "dep_secs": get(o, "dep_secs"),
+        "dep_chord_legs": get(o, "dep_chord_legs"),
         "arr_secs": get(o, "arr_secs"),
+        "arr_chord_legs": get(o, "arr_chord_legs"),
     })
 }
 
@@ -304,7 +336,9 @@ fn verify(v1: &Value, v2: &Value) -> Result<(), String> {
             "flows",
             "in_flows",
             "dep_secs",
+            "dep_chord_legs",
             "arr_secs",
+            "arr_chord_legs",
         ] {
             if get(o1, key) != get(o2, key) {
                 return Err(format!("origin {} key {key}", get(o1, "zh")));
@@ -414,7 +448,7 @@ fn main() {
         let mut io = Map::new();
         for (k, v) in obj(o) {
             match k.as_str() {
-                "srcs" | "in_calls" | "in_flows" | "arrs" | "arr_secs" => {
+                "srcs" | "in_calls" | "in_flows" | "arrs" | "arr_secs" | "arr_chord_legs" => {
                     io.insert(k.clone(), v.clone());
                 }
                 "inbound" => {
@@ -461,7 +495,7 @@ fn main() {
         .collect();
     let out_tables: Vec<Value> = origins
         .iter()
-        .map(|o| pick(o, &["deps", "calls", "dep_secs"]))
+        .map(|o| pick(o, &["deps", "calls", "dep_secs", "dep_chord_legs"]))
         .collect();
     let in_map: Vec<Value> = origins
         .iter()
@@ -469,7 +503,7 @@ fn main() {
         .collect();
     let in_tables: Vec<Value> = origins
         .iter()
-        .map(|o| pick(o, &["arrs", "in_calls", "arr_secs"]))
+        .map(|o| pick(o, &["arrs", "in_calls", "arr_secs", "arr_chord_legs"]))
         .collect();
     for (i, o) in origins.iter().enumerate() {
         let mut merged = Map::new();
@@ -494,9 +528,13 @@ fn main() {
     by_name.push(("atlas-v2-out.json", json!({ "origins": out_origins })));
     by_name.push(("atlas-v2-in.json", json!({ "origins": in_origins })));
     by_name.push(("atlas-v2-out-map.json", json!({ "origins": out_map })));
-    by_name.push(("atlas-v2-out-tables.json", json!({ "origins": out_tables })));
+    by_name.push(("atlas-v2-out-tables.json", json!({ "fmt": 3, "origins": out_tables })));
     by_name.push(("atlas-v2-in-map.json", json!({ "origins": in_map })));
-    by_name.push(("atlas-v2-in-tables.json", json!({ "origins": in_tables })));
+    by_name.push(("atlas-v2-in-tables.json", json!({ "fmt": 3, "origins": in_tables })));
+    by_name.push((
+        "atlas-v2-schedules.json",
+        json!({ "extra_stations": [], "schedules": get(&v1, "schedules") }),
+    ));
 
     let items: Vec<(&str, Vec<u8>)> = by_name
         .into_iter()

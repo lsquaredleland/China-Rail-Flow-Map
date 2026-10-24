@@ -636,6 +636,22 @@ struct Stop {
     arrive: String,
     depart: String,
 }
+/// One train in data/raw/stops*.jsonl (the 12306 stop-list dump).
+#[derive(Deserialize)]
+struct RawTrain {
+    train_no: String,
+    stops: Vec<RawStop>,
+}
+#[derive(Deserialize)]
+struct RawStop {
+    station_name: String,
+    arrive_time: String,
+    start_time: String,
+}
+/// One schedule row: [station idx, arrive mins, depart mins (-1 = none),
+/// day offset of the call from the train's origin day, leg km from the
+/// previous stop (-1 = unknown)].
+type ScheduleRow = (i64, i64, i64, i64, f64);
 fn mins(s: &str) -> Option<i64> {
     let t = s.trim();
     if t == "----" || t.is_empty() {
@@ -1071,13 +1087,19 @@ struct AtlasOrigin {
     flows: Vec<Vec<usize>>,
     chords: Vec<AtlasChord>,
     deps: Vec<AtlasDep>,
-    pub dep_secs: Vec<Vec<usize>>,
+    pub dep_secs: Vec<Vec<i64>>,
+    /// Per dep: [stop, s0, s1] for each leg without usable geometry
+    /// (unresolved, or a gap > CHORD_GAP_KM): the leg departs the train's
+    /// stop index `stop`; its sections are dep_secs[s0..s1].
+    dep_chord_legs: Vec<Vec<[usize; 3]>>,
     inbound: u64,
     srcs: Vec<[i64; 8]>,
     in_calls: Vec<InCallList>,
     in_flows: Vec<Vec<usize>>,
     arrs: Vec<AtlasArr>,
-    pub arr_secs: Vec<Vec<usize>>,
+    pub arr_secs: Vec<Vec<i64>>,
+    /// Per arr: as dep_chord_legs, positions into arr_secs.
+    arr_chord_legs: Vec<Vec<[usize; 3]>>,
 }
 #[derive(serde::Serialize)]
 struct AtlasOut {
@@ -1090,6 +1112,8 @@ struct AtlasOut {
     train_table: Vec<AtlasTrainRef>,
     network: Vec<String>,
     stats: HashMap<String, i64>,
+    /// Indexed by train_table index t: the train's full stop list.
+    schedules: Vec<Vec<ScheduleRow>>,
 }
 
 /// One train's call at one destination city (first stop in that city).
@@ -1457,6 +1481,151 @@ fn leg_seqs<'c>(
             .and_then(|o| o.as_ref())
     } else {
         vcache.get(key).and_then(|o| o.as_ref())
+    }
+}
+
+/// Internal gap (km) above which a resolved leg counts as a chord leg:
+/// its geometry has a hole the client must bridge, not animate along.
+const CHORD_GAP_KM: f64 = 3.0;
+
+/// A resolved leg's segments as one walk from key.0 to key.1: the
+/// segment order and, per segment, whether it is walked against its
+/// stored vertex order. Stored geometry is not reliably key-ordered
+/// (per-train router paths run in their own train's direction; corridor
+/// chains concatenate pair paths in each pair's own order), so the walk
+/// is derived from coordinates.
+struct LegWalk {
+    steps: Vec<(usize, bool)>,
+    /// Largest hole in the walk (km): between consecutive segments, or
+    /// between consecutive nodes with coordinates inside one segment
+    /// (nodes missing from the extract carry no sections).
+    max_gap: f64,
+}
+
+/// Largest distance (km) spanned by a run of nodes missing coordinates;
+/// infinite when a run of 2+ such nodes is at either end of the segment
+/// (its length is unknown, and the path stops short of the station).
+fn seg_hole(s: &[i64], coords: &HashMap<i64, [f64; 2]>) -> f64 {
+    let (mut last, mut skipped, mut hole) = (None::<[f64; 2]>, 0usize, 0.0f64);
+    for id in s {
+        match coords.get(id) {
+            Some(p) => {
+                match last {
+                    Some(q) if skipped > 0 => hole = hole.max(hav_km_ll(q, *p)),
+                    None if skipped >= 2 => hole = f64::INFINITY,
+                    _ => {}
+                }
+                last = Some(*p);
+                skipped = 0;
+            }
+            None => skipped += 1,
+        }
+    }
+    if skipped >= 2 {
+        hole = f64::INFINITY;
+    }
+    hole
+}
+
+/// Greedy walk over `seqs` from point `from` ([lon, lat]): repeatedly
+/// take the unused segment end nearest the current position. Returns the
+/// steps, the summed gaps incl. the final hop to `to`, the largest inner
+/// gap, and the larger of the two station-to-path gaps.
+fn greedy_walk(
+    ends: &[Option<([f64; 2], [f64; 2])>],
+    from: [f64; 2],
+    to: [f64; 2],
+) -> (Vec<(usize, bool)>, f64, f64, f64) {
+    let mut used = vec![false; ends.len()];
+    let mut steps: Vec<(usize, bool)> = Vec::new();
+    let (mut cur, mut cost, mut max_gap, mut end_gap) = (from, 0.0f64, 0.0f64, 0.0f64);
+    loop {
+        let mut best: Option<(usize, bool, f64)> = None;
+        for (i, e) in ends.iter().enumerate() {
+            if used[i] {
+                continue;
+            }
+            if let Some((s, t)) = e {
+                for (flip, entry) in [(false, *s), (true, *t)] {
+                    let d = hav_km_ll(cur, entry);
+                    if best.is_none_or(|(_, _, bd)| d < bd) {
+                        best = Some((i, flip, d));
+                    }
+                }
+            }
+        }
+        let Some((i, flip, d)) = best else { break };
+        used[i] = true;
+        cost += d;
+        if steps.is_empty() {
+            end_gap = d;
+        } else {
+            max_gap = max_gap.max(d);
+        }
+        steps.push((i, flip));
+        let (s, t) = ends[i].unwrap();
+        cur = if flip { s } else { t };
+    }
+    let last = hav_km_ll(cur, to);
+    (steps, cost + last, max_gap, end_gap.max(last))
+}
+
+/// Orient a resolved leg's segments key.0 -> key.1 (station points
+/// [lon, lat]). Segments without coordinates carry no sections and are
+/// left out. The walk is grown from both ends and the cheaper one kept.
+/// Also returns the walk's larger station-to-path gap: a large one means
+/// a station point is wrong (homonyms), so the orientation is untrusted.
+fn orient_leg(
+    seqs: &[Vec<i64>],
+    coords: &HashMap<i64, [f64; 2]>,
+    p0: [f64; 2],
+    p1: [f64; 2],
+) -> (LegWalk, f64) {
+    let ends: Vec<Option<([f64; 2], [f64; 2])>> = seqs
+        .iter()
+        .map(|s| {
+            let first = s.iter().find_map(|id| coords.get(id))?;
+            let last = s.iter().rev().find_map(|id| coords.get(id))?;
+            Some((*first, *last))
+        })
+        .collect();
+    let hole = seqs.iter().map(|s| seg_hole(s, coords)).fold(0.0, f64::max);
+    let (fw, fw_cost, fw_gap, fw_end) = greedy_walk(&ends, p0, p1);
+    let (bw, bw_cost, bw_gap, bw_end) = greedy_walk(&ends, p1, p0);
+    if bw_cost < fw_cost {
+        let steps = bw.iter().rev().map(|&(i, f)| (i, !f)).collect();
+        (LegWalk { steps, max_gap: bw_gap.max(hole) }, bw_end)
+    } else {
+        (LegWalk { steps: fw, max_gap: fw_gap.max(hole) }, fw_end)
+    }
+}
+
+/// Station-to-path gap (km) above which a leg's station points are not
+/// trusted for orientation; the stored segment order is used instead.
+const ORIENT_TRUST_KM: f64 = 10.0;
+
+/// Visit a leg's track edges in travel order: along the walk when the
+/// train runs key.0 -> key.1 (`fwd`), else the walk reversed.
+fn walk_edges(seqs: &[Vec<i64>], walk: &LegWalk, fwd: bool, mut f: impl FnMut(i64, i64)) {
+    let mut visit = |i: usize, flip: bool| {
+        if flip {
+            for w in seqs[i].windows(2).rev() {
+                f(w[1], w[0]);
+            }
+        } else {
+            for w in seqs[i].windows(2) {
+                f(w[0], w[1]);
+            }
+        }
+    };
+    if fwd {
+        for &(i, flip) in walk.steps.iter() {
+            visit(i, flip);
+        }
+    } else {
+        for &(i, flip) in walk.steps.iter().rev() {
+            visit(i, !flip);
+        }
     }
 }
 
@@ -1922,6 +2091,10 @@ fn main() {
         set: u8,
         km: f64,
         leg_keys: Vec<(String, String, String)>,
+        /// Per leg: travelled key.0 -> key.1 (the key is canonical (min, max)).
+        leg_fwd: Vec<bool>,
+        /// Per leg: index of its departing stop in the train's stop list.
+        leg_stop: Vec<usize>,
     }
     type TrainLegs = (usize, Vec<(String, String, String)>);
     struct CityWork {
@@ -1957,6 +2130,7 @@ fn main() {
             let is_fast = ["G", "D", "C", "S"].contains(&t.train_class.as_str());
             let final_city = cities.last().unwrap().clone();
             let mut legs: Vec<(String, String, String)> = Vec::new();
+            let (mut leg_fwd, mut leg_stop) = (Vec::new(), Vec::new());
             let mut leg_prefix: Vec<usize> = vec![0; names.len()];
             for k in cd_idx..(names.len() - 1) {
                 let (a, b) = (names[k].clone(), names[k + 1].clone());
@@ -1964,6 +2138,8 @@ fn main() {
                     let key = leg_key3(&override_map, t, &a, &b);
                     *leg_count.entry(key.clone()).or_insert(0) += 1;
                     legs.push(key);
+                    leg_fwd.push(a < b);
+                    leg_stop.push(k);
                 }
                 leg_prefix[k + 1] = legs.len();
             }
@@ -1980,6 +2156,8 @@ fn main() {
                 set: if ti < d1_len { 0 } else { 1 },
                 km: -1.0,
                 leg_keys: legs.clone(),
+                leg_fwd,
+                leg_stop,
             });
             let mut seen_dest: HashSet<String> = HashSet::new();
             let mut cum_km = 0f64;
@@ -2120,6 +2298,10 @@ fn main() {
         set: u8,
         km: f64,
         leg_keys: Vec<(String, String, String)>,
+        /// Per leg: travelled key.0 -> key.1 (the key is canonical (min, max)).
+        leg_fwd: Vec<bool>,
+        /// Per leg: index of its departing stop in the train's stop list.
+        leg_stop: Vec<usize>,
     }
     struct InCityWork {
         zh: String,
@@ -2163,11 +2345,14 @@ fn main() {
                 -1.0
             };
             let mut legs: Vec<(String, String, String)> = Vec::new();
+            let (mut leg_fwd, mut leg_stop) = (Vec::new(), Vec::new());
             let mut leg_prefix: Vec<usize> = vec![0; cities.len()];
             for k in 0..cd_in {
                 let (a, b) = (names[k].clone(), names[k + 1].clone());
                 if a != b {
                     legs.push(leg_key3(&override_map, t, &a, &b));
+                    leg_fwd.push(a < b);
+                    leg_stop.push(k);
                 }
                 leg_prefix[k + 1] = legs.len();
             }
@@ -2187,6 +2372,8 @@ fn main() {
                 set: if ti < d1_len { 0 } else { 1 },
                 km: journey_km,
                 leg_keys: legs.clone(),
+                leg_fwd,
+                leg_stop,
             });
             // sources: distinct cities (first index each), home city excluded
             let mut seen_src: HashSet<String> = HashSet::new();
@@ -2436,7 +2623,10 @@ fn main() {
         }
         best.map(|(nm, _)| nm.clone()).unwrap_or_default()
     };
-    let mut edge_to_sec: HashMap<(i64, i64), usize> = HashMap::new();
+    // directed edge -> (section, travelled against the section's stored
+    // point order); built here, where sec_idx is known (chains with too
+    // few points are skipped, so chain and section indices drift).
+    let mut edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
     let mut sections: Vec<AtlasSection> = Vec::new();
     let mut flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); works.len()];
     let mut total_sec_pts = 0usize;
@@ -2456,7 +2646,8 @@ fn main() {
         total_sec_pts += simp.len();
         let sec_idx = sections.len();
         for win in chain.windows(2) {
-            edge_to_sec.insert(ekey(win[0], win[1]), sec_idx);
+            edge_dir_to_sec.insert((win[0], win[1]), (sec_idx, false));
+            edge_dir_to_sec.insert((win[1], win[0]), (sec_idx, true));
         }
         let a_nm = nearest_station(simp[0]);
         let b_nm = nearest_station(*simp.last().unwrap());
@@ -2602,7 +2793,7 @@ fn main() {
         }
         in_section_chains.push((sid, chain));
     }
-    let mut in_edge_to_sec: HashMap<(i64, i64), usize> = HashMap::new();
+    let mut in_edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
     let mut in_sections: Vec<AtlasSection> = Vec::new();
     let mut in_flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); in_works.len()];
     let mut in_total_sec_pts = 0usize;
@@ -2622,7 +2813,8 @@ fn main() {
         in_total_sec_pts += simp.len();
         let sec_idx = in_sections.len();
         for win in chain.windows(2) {
-            in_edge_to_sec.insert(ekey(win[0], win[1]), sec_idx);
+            in_edge_dir_to_sec.insert((win[0], win[1]), (sec_idx, false));
+            in_edge_dir_to_sec.insert((win[1], win[0]), (sec_idx, true));
         }
         let a_nm = nearest_station(simp[0]);
         let b_nm = nearest_station(*simp.last().unwrap());
@@ -2661,32 +2853,136 @@ fn main() {
         in_total_sec_pts
     );
 
+    // ---- leg walks: every resolved leg oriented key.0 -> key.1 ----
+    // One-time direction check: base pair paths must already run
+    // key.0 -> key.1 (fail loudly otherwise); router, variant (via) and
+    // corridor-chain geometry is oriented from coordinates and reported.
+    let mut leg_walks: HashMap<(String, String, String), LegWalk> = HashMap::new();
+    // kind -> [as stored, reversed, mixed, unchecked (station point missing/untrusted)]
+    let mut orient_stats: std::collections::BTreeMap<&str, [u64; 4]> = Default::default();
+    let mut bad_pairs: Vec<String> = Vec::new();
+    let out_keys = works.iter().flat_map(|w| w.deps.iter()).flat_map(|d| d.leg_keys.iter());
+    let in_keys = in_works.iter().flat_map(|w| w.arrs.iter()).flat_map(|a| a.leg_keys.iter());
+    for key in out_keys.chain(in_keys) {
+        if leg_walks.contains_key(key) {
+            continue;
+        }
+        let Some(seqs) = leg_seqs(key, &leg_cache, &variant_cache) else {
+            continue;
+        };
+        let kind = if leg_path(&key.2).is_some() {
+            "router"
+        } else if !key.2.is_empty() {
+            "variant"
+        } else if path_map
+            .get(&(key.0.clone(), key.1.clone()))
+            .is_some_and(|(_, segs)| segs.iter().any(|s| s.len() >= 2))
+        {
+            "pair"
+        } else {
+            "chain"
+        };
+        let st = orient_stats.entry(kind).or_default();
+        let oriented = match (station_pt(&key.0), station_pt(&key.1)) {
+            (Some(p0), Some(p1)) => Some(orient_leg(seqs, &coords, [p0[1], p0[0]], [p1[1], p1[0]])),
+            _ => None,
+        };
+        let stored = || {
+            let ends: Vec<[f64; 2]> = seqs
+                .iter()
+                .flat_map(|s| {
+                    let first = s.iter().find_map(|id| coords.get(id));
+                    let last = s.iter().rev().find_map(|id| coords.get(id));
+                    first.zip(last).map(|(a, b)| [*a, *b])
+                })
+                .flatten()
+                .collect();
+            let max_gap = ends
+                .chunks(2)
+                .collect::<Vec<_>>()
+                .windows(2)
+                .map(|w| hav_km_ll(w[0][1], w[1][0]))
+                .chain(seqs.iter().map(|s| seg_hole(s, &coords)))
+                .fold(0.0, f64::max);
+            LegWalk {
+                steps: (0..seqs.len()).map(|i| (i, false)).collect(),
+                max_gap,
+            }
+        };
+        let walk = match oriented {
+            Some((walk, end_gap)) if end_gap <= ORIENT_TRUST_KM => {
+                let as_stored = walk.steps.windows(2).all(|w| w[0].0 < w[1].0)
+                    && walk.steps.iter().all(|s| !s.1);
+                let reversed = walk.steps.windows(2).all(|w| w[0].0 > w[1].0)
+                    && walk.steps.iter().all(|s| s.1);
+                st[if as_stored {
+                    0
+                } else if reversed {
+                    1
+                } else {
+                    2
+                }] += 1;
+                if kind == "pair" && !as_stored {
+                    bad_pairs.push(format!("{} -> {} {:?}", key.0, key.1, walk.steps));
+                }
+                walk
+            }
+            _ => {
+                st[3] += 1;
+                stored()
+            }
+        };
+        leg_walks.insert(key.clone(), walk);
+    }
+    for (kind, st) in orient_stats.iter() {
+        println!(
+            "leg orientation {kind}: as stored {} reversed {} mixed {} unchecked {}",
+            st[0], st[1], st[2], st[3]
+        );
+    }
+    assert!(
+        bad_pairs.is_empty(),
+        "pair paths not stored key.0 -> key.1: {bad_pairs:?}"
+    );
+    println!("leg orientation: all checked pair paths run key.0 -> key.1");
+
     // ---- assemble origins ----
+    let (mut chord_legs_out, mut chord_legs_in) = (0usize, 0usize);
     let mut pair_mismatch = 0u64;
     let mut origins: Vec<AtlasOrigin> = Vec::new();
     for (ci, w) in works.iter().enumerate() {
-        let mut dep_secs: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
+        // dep_secs: sections in travel order, a section again whenever the
+        // train runs back over it (flows dedupe per train separately, above);
+        // `!sec` (= -(sec + 1)) marks a section travelled against its
+        // stored point order. prefix_cnt[li] = path entries before leg li.
+        let mut dep_secs: Vec<Vec<i64>> = Vec::with_capacity(w.deps.len());
         let mut dep_leg_sec_cnt: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
+        let mut dep_chord_legs: Vec<Vec<[usize; 3]>> = Vec::with_capacity(w.deps.len());
         for d in w.deps.iter() {
-            let mut secs_ord: Vec<usize> = Vec::new();
-            let mut seen_s: HashSet<usize> = HashSet::new();
+            let mut secs_ord: Vec<i64> = Vec::new();
             let mut prefix_cnt: Vec<usize> = vec![0; d.leg_keys.len() + 1];
+            let mut chord_legs: Vec<[usize; 3]> = Vec::new();
             for (li, key) in d.leg_keys.iter().enumerate() {
-                if let Some(seqs) = leg_seqs(key, &leg_cache, &variant_cache) {
-                    for s in seqs.iter() {
-                        for win in s.windows(2) {
-                            if let Some(&sidx) = edge_to_sec.get(&ekey(win[0], win[1])) {
-                                if seen_s.insert(sidx) {
-                                    secs_ord.push(sidx);
-                                }
+                let walk = leg_walks.get(key);
+                if let (Some(seqs), Some(walk)) = (leg_seqs(key, &leg_cache, &variant_cache), walk) {
+                    walk_edges(seqs, walk, d.leg_fwd[li], |u, v| {
+                        if let Some(&(sidx, rev)) = edge_dir_to_sec.get(&(u, v)) {
+                            let s = if rev { !(sidx as i64) } else { sidx as i64 };
+                            if secs_ord.last() != Some(&s) {
+                                secs_ord.push(s);
                             }
                         }
-                    }
+                    });
+                }
+                if walk.is_none_or(|w| w.max_gap > CHORD_GAP_KM) {
+                    chord_legs.push([d.leg_stop[li], prefix_cnt[li], secs_ord.len()]);
                 }
                 prefix_cnt[li + 1] = secs_ord.len();
             }
+            chord_legs_out += chord_legs.len();
             dep_secs.push(secs_ord);
             dep_leg_sec_cnt.push(prefix_cnt);
+            dep_chord_legs.push(chord_legs);
         }
         let dep_lookup: HashMap<DepKey, usize> = w
             .deps
@@ -2820,28 +3116,38 @@ fn main() {
         }
         // ---- inbound assembly for this city ----
         let iw = &in_works[ci];
-        let mut arr_secs: Vec<Vec<usize>> = Vec::with_capacity(iw.arrs.len());
+        // arr_secs: same encoding as dep_secs, in travel order (train
+        // origin -> arrival here). suffix_cnt[li] = sections from leg li
+        // to the arrival, so a call's sec_cnt is the trailing count.
+        let mut arr_secs: Vec<Vec<i64>> = Vec::with_capacity(iw.arrs.len());
         let mut arr_leg_sec_cnt: Vec<Vec<usize>> = Vec::with_capacity(iw.arrs.len());
+        let mut arr_chord_legs: Vec<Vec<[usize; 3]>> = Vec::with_capacity(iw.arrs.len());
         for a in iw.arrs.iter() {
-            let mut secs_ord: Vec<usize> = Vec::new();
-            let mut seen_s: HashSet<usize> = HashSet::new();
-            let mut suffix_cnt: Vec<usize> = vec![0; a.leg_keys.len() + 1];
-            for (li, key) in a.leg_keys.iter().enumerate().rev() {
-                if let Some(seqs) = leg_seqs(key, &leg_cache, &variant_cache) {
-                    for s in seqs.iter().rev() {
-                        for win in s.windows(2).rev() {
-                            if let Some(&sidx) = in_edge_to_sec.get(&ekey(win[0], win[1])) {
-                                if seen_s.insert(sidx) {
-                                    secs_ord.push(sidx);
-                                }
+            let mut secs_ord: Vec<i64> = Vec::new();
+            let mut prefix_cnt: Vec<usize> = vec![0; a.leg_keys.len() + 1];
+            let mut chord_legs: Vec<[usize; 3]> = Vec::new();
+            for (li, key) in a.leg_keys.iter().enumerate() {
+                let walk = leg_walks.get(key);
+                if let (Some(seqs), Some(walk)) = (leg_seqs(key, &leg_cache, &variant_cache), walk) {
+                    walk_edges(seqs, walk, a.leg_fwd[li], |u, v| {
+                        if let Some(&(sidx, rev)) = in_edge_dir_to_sec.get(&(u, v)) {
+                            let s = if rev { !(sidx as i64) } else { sidx as i64 };
+                            if secs_ord.last() != Some(&s) {
+                                secs_ord.push(s);
                             }
                         }
-                    }
+                    });
                 }
-                suffix_cnt[li] = secs_ord.len();
+                if walk.is_none_or(|w| w.max_gap > CHORD_GAP_KM) {
+                    chord_legs.push([a.leg_stop[li], prefix_cnt[li], secs_ord.len()]);
+                }
+                prefix_cnt[li + 1] = secs_ord.len();
             }
+            let total = secs_ord.len();
+            chord_legs_in += chord_legs.len();
             arr_secs.push(secs_ord);
-            arr_leg_sec_cnt.push(suffix_cnt);
+            arr_leg_sec_cnt.push(prefix_cnt.iter().map(|p| total - p).collect());
+            arr_chord_legs.push(chord_legs);
         }
         let arr_lookup: HashMap<ArrKey, usize> = iw
             .arrs
@@ -2999,20 +3305,99 @@ fn main() {
             chords,
             deps,
             dep_secs,
+            dep_chord_legs,
             inbound: iw.arrivals,
             srcs,
             in_calls: in_calls_out,
             in_flows: in_flows_per_city[ci].clone(),
             arrs: arrs_out,
             arr_secs,
+            arr_chord_legs,
         });
     }
 
     println!("pair identity mismatches: {}", pair_mismatch);
     println!(
+        "chord legs (per-train rows): out {} in {}",
+        chord_legs_out, chord_legs_in
+    );
+    println!(
         "variant legs: {} resolved via override tiling, {} fell back to base pair geometry",
         variant_stats.0, variant_stats.1
     );
+    // ---- per-train schedules, indexed by train_table t, from data/raw ----
+    // Names are clean()ed before interning, so every stop resolves into
+    // station_table (appended after the atlas's own stations).
+    let mut raw_stops: HashMap<(u8, String), Vec<RawStop>> = HashMap::new();
+    for (set, file) in [(0u8, "raw/stops.jsonl"), (1, "raw/stops_cs.jsonl")] {
+        for line in fs::read_to_string(data_dir.join(file)).unwrap().lines() {
+            let r: RawTrain = serde_json::from_str(line).unwrap();
+            raw_stops.insert((set, r.train_no), r.stops);
+        }
+    }
+    let mut train_of: HashMap<(String, String), usize> = HashMap::new();
+    for (ti, t) in trains.iter().enumerate() {
+        let prev = train_of.insert((t.code.clone(), t.train_class.clone()), ti);
+        assert!(prev.is_none(), "train_table key collision: {} {}", t.code, t.train_class);
+    }
+    let mut schedules: Vec<Vec<ScheduleRow>> = Vec::with_capacity(train_table.len());
+    let (mut sched_name_mismatch, mut sched_km_unknown) = (0usize, 0usize);
+    for ti in 0..train_table.len() {
+        let tr = &train_table[ti];
+        let ti = train_of[&(tr.code.clone(), tr.class.clone())];
+        let t = &trains[ti];
+        let set = if ti < d1_len { 0u8 } else { 1 };
+        let stops = &raw_stops[&(set, t.train_no.clone())];
+        let names: Vec<String> = stops.iter().map(|s| clean(&s.station_name)).collect();
+        if names != train_names[ti] {
+            sched_name_mismatch += 1;
+        }
+        // day offsets: advance a clock from the origin departure whenever
+        // a stop time wraps past midnight (as travel_time does)
+        let mut clock: Option<i64> = None;
+        let mut advance = |tod: i64| -> i64 {
+            let c = match clock {
+                None => tod,
+                Some(c) => c + (tod - c).rem_euclid(1440),
+            };
+            clock = Some(c);
+            c / 1440
+        };
+        let mut rows: Vec<ScheduleRow> = Vec::with_capacity(stops.len());
+        for (j, s) in stops.iter().enumerate() {
+            let arr = mins(&s.arrive_time);
+            let dep = mins(&s.start_time);
+            let day = arr.map(&mut advance);
+            let day_dep = dep.map(&mut advance);
+            let km = if j == 0 || names[j - 1] == names[j] {
+                0.0
+            } else {
+                match leg_km(&override_map, &pair_len, t, &names[j - 1], &names[j]) {
+                    Some(l) => (l * 10.0).round() / 10.0,
+                    None => {
+                        sched_km_unknown += 1;
+                        -1.0
+                    }
+                }
+            };
+            let st = intern_station(&mut station_table, &mut station_idx, &names[j], &city_en);
+            rows.push((
+                st,
+                arr.unwrap_or(-1),
+                dep.unwrap_or(-1),
+                day.or(day_dep).unwrap_or(0),
+                km,
+            ));
+        }
+        schedules.push(rows);
+    }
+    println!(
+        "schedules: {} trains, {} name mismatches vs timetables, {} legs without km",
+        schedules.len(),
+        sched_name_mismatch,
+        sched_km_unknown
+    );
+
     // ---- network backdrop (shared, polyline-encoded) ----
     let mut network: Vec<String> = Vec::new();
     {
@@ -3047,6 +3432,7 @@ fn main() {
     let out = AtlasOut {
         about: "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e5 precision, [lat, lon] order.".into(),
         origins, sections, in_sections, city_table, station_table, train_table, network, stats,
+        schedules,
     };
     let txt = serde_json::to_string(&out).unwrap();
     fs::write(&out_path, &txt).unwrap();
