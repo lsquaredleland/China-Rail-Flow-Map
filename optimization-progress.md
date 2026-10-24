@@ -16,12 +16,12 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | 2. Generated schedules (pipeline) | done in staging; schedules audit PASS | indexed by `t`; client switched |
 | Goldens gate | `pipeline/goldens.json` + `audit` gate (exact / max counters, `--update-goldens`) | dropped chains / flow lost gated only in full audit, not `--pack-only` |
 | 3. Throat stubs | backlog O1 | |
-| 4. Client on new data | done (4.1–4.5; 4.6 sweep pending, virtual crow-flies spans for chord legs); owner browser check OK | live assets swapped |
+| 4. Client on new data | done (4.1–4.6, virtual crow-flies spans for chord legs); owner browser check OK | live assets swapped |
 | 5. Path dedupe | backlog O6 | |
 
 ## Session 1 outcome (committed 2026-10-24)
 - Phases 0, 1, 2, 4.1–4.5, goldens gate, staged pack swapped into `web/public/assets/` (owner verified in browser: equivalent to pre-port). At commit: typecheck, build and `node staging/scripts/check_client_decode.mjs` pass.
-- **NOT done (agents hit the usage limit mid-task, 2026-10-24):** (a) Phase 4.6 cleanup sweep: may be partially applied, but the committed tree passes all checks; redo the sweep (dead code, stale chainer/calibration comments, unneeded `as any`). (b) `docs/PIPELINE.md`: done (§3 step 5 live recipe + fmt-3 format; §7 now points to `pipeline/goldens.json`).
+- **Finished after the usage-limit interruption:** (a) Phase 4.6 cleanup sweep: done (unused locals, 6 `as any` removed). (b) `docs/PIPELINE.md`: done (§3 step 5 live recipe + fmt-3 format; §7 now points to `pipeline/goldens.json`).
 
 ## Backlog: optional improvements (not started)
 | # | Item | Changes flows? | Notes |
@@ -161,3 +161,4 @@ Read-only, nothing that changes flows. Scripts are in `staging/scripts/` (run fr
 - chord_legs fixed to half-open [s0,s1) (span = exit of entry s0-1 to entry of s1, clamped at path ends; s0==s1 gives a zero-distance span, not drawn). K678 spans end 1.2/10.5/9.7/9.2 km from the nearest station or city centre; typecheck, build and trainDistAt checks pass.
 - goldens: `dropped_chains` = 0 and `flow_lost` = 0 are now `exact` counters, gated at the end of a full `audit` run (exit 1 on breach). `--pack-only` skips them and says so. Full audit on the staged pack: hard checks PASS, goldens PASS, exit 0.
 - Virtual chord length: each chord leg adds a crow-flies span at its widest join in [s0,s1] (not a section: no flows or counts); `secStarts`/`totalDist`/stop dists shift. K678 steps across chord spans max 1.58 km/min; whole trip max 5.72 km/min (t=543, not on a chord: throat gap + cruise); `trainDistAt` monotone, typecheck and build pass.
+- 4.6 sweep: removed 3 unused `cur` locals in MapCanvas and 6 `as any` casts in lib.ts (net -9 lines); no stale chainer/calibration comments, TODOs or debug logs remained; typecheck, build and decode checks pass.

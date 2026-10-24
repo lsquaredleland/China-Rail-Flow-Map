@@ -1076,8 +1076,8 @@ export function buildDayTimeline(
     secCnt: number;
   }
   const callsByTrain = new Map<number, RawStopCall[]>();
-  if (cur.dests && (cur.o as any).calls) {
-    const rawCalls = (cur.o as any).calls as [number, number, number, number, number, number][][];
+  if (cur.dests && cur.o.calls) {
+    const rawCalls = cur.o.calls;
     for (let di = 0; di < rawCalls.length; di++) {
       const destCalls = rawCalls[di] || [];
       const dest = cur.dests[di];
@@ -1162,10 +1162,10 @@ export function buildDayTimeline(
         : 0;
     const arrMins = depMins + dur;
 
-    const fromStation = (train as any).fsZh || "";
-    const fromStationEn = (train as any).fsEn || "";
-    const toStation = (train as any).tsZh || "";
-    const toStationEn = (train as any).tsEn || "";
+    const fromStation = train.fsZh || "";
+    const fromStationEn = train.fsEn || "";
+    const toStation = train.tsZh || "";
+    const toStationEn = train.tsEn || "";
     const depTime = train.dep || "";
     const arrTime = train.arr || "";
 

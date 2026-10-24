@@ -2028,7 +2028,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       st.lastRafTimestamp = null;
       return;
     }
-    const cur = P.current.cur;
     const tl = activeTimeline();
     const totalMins = tl ? tl.totalMins : 1440;
 
@@ -2054,7 +2053,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const st = S.current;
     if (st.animPlaying === playing) return;
     st.animPlaying = playing;
-    const cur = P.current.cur;
     const tl = activeTimeline();
     const totalMins = tl ? tl.totalMins : 1440;
 
@@ -2086,7 +2084,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
   function setTime(tMins: number) {
     const st = S.current;
-    const cur = P.current.cur;
     const tl = activeTimeline();
     const totalMins = tl ? tl.totalMins : 1440;
     st.animTime = Math.max(0, Math.min(totalMins, tMins));
