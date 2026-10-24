@@ -59,11 +59,11 @@ const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
 const OUTLINE_URL = "assets/china-outline.json";
-// Tables carry travel-ordered, oriented section paths (fmt 3); older packs
-// would draw wrong, so refuse them outright.
-function requireFmt3(fmt: unknown, url: string) {
-  if (fmt === 3) return;
-  const msg = `${url}: unsupported tables format ${String(fmt)} (need fmt 3); rebuild the data pack`;
+// Tables carry travel-ordered, oriented section paths with station-level
+// stop positions (fmt 4); older packs would draw wrong, so refuse them.
+function requireFmt4(fmt: unknown, url: string) {
+  if (fmt === 4) return;
+  const msg = `${url}: unsupported tables format ${String(fmt)} (need fmt 4); rebuild the data pack`;
   console.error(msg);
   const err = new Error(msg);
   err.name = "FmtError";
@@ -235,6 +235,19 @@ export default function App() {
   const [inMapLoading, setInMapLoading] = useState(false);
   const atlasRef = useRef<DecodedAtlas | null>(null);
   const outTablesRef = useRef<OutTablesData | null>(null);
+  // The schedules asset, fetched once; the out tables wait for it so every
+  // timeline is built with station-level stops (null if it failed to load).
+  const schedulesRef = useRef<Promise<SchedulesData | null> | null>(null);
+  const schedDataRef = useRef<SchedulesData | null>(null);
+  const loadSchedules = () => {
+    if (!schedulesRef.current) {
+      schedulesRef.current = fetchData<SchedulesData>(SCHEDULES_URL).catch((err) => {
+        console.warn("Failed to load national schedules asset:", err);
+        return null;
+      });
+    }
+    return schedulesRef.current;
+  };
   const inMapDataRef = useRef<InMapData | null>(null);
   const inTablesRef = useRef<InTablesData | null>(null);
   const flightsRef = useRef({
@@ -320,6 +333,7 @@ export default function App() {
     const d = outTablesRef.current;
     const at = atlasRef.current;
     if (!d || !at) return;
+    if (schedDataRef.current) at.schedules = schedDataRef.current.schedules;
     for (let i = 0; i < d.origins.length; i++)
       Object.assign(at.data.origins[i], d.origins[i]);
     setOutTablesReady(true);
@@ -351,9 +365,10 @@ export default function App() {
     }
     if (flightsRef.current.outTables) return;
     flightsRef.current.outTables = true;
-    fetchData<OutTablesData>(OUT_TABLES_URL)
-      .then((d) => {
-        requireFmt3(d.fmt, OUT_TABLES_URL);
+    Promise.all([fetchData<OutTablesData>(OUT_TABLES_URL), loadSchedules()])
+      .then(([d, sched]) => {
+        requireFmt4(d.fmt, OUT_TABLES_URL);
+        schedDataRef.current = sched;
         outTablesRef.current = d;
         flightsRef.current.outTables = false;
         setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
@@ -375,7 +390,7 @@ export default function App() {
     flightsRef.current.inTables = true;
     fetchData<InTablesData>(IN_TABLES_URL)
       .then((d) => {
-        requireFmt3(d.fmt, IN_TABLES_URL);
+        requireFmt4(d.fmt, IN_TABLES_URL);
         inTablesRef.current = d;
         flightsRef.current.inTables = false;
         setLoadError((e) => (e && e.startsWith(IN_TABLES_URL) ? null : e));
@@ -419,11 +434,9 @@ export default function App() {
         if (!cancelled) setOutline(prepOutline(d));
       })
       .catch(() => {});
-    fetchData<SchedulesData>(SCHEDULES_URL)
-      .then((d) => {
-        if (!cancelled) setSchedulesData(d);
-      })
-      .catch((err) => console.warn("Failed to load national schedules asset:", err));
+    loadSchedules().then((d) => {
+      if (!cancelled && d) setSchedulesData(d);
+    });
     // A persisted inbound direction paints its map in phase 1 too, so
     // in-map joins the parallel fetch; identity fields still come from
     // out-map, which always loads.
