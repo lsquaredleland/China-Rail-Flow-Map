@@ -62,15 +62,15 @@ const TIME_BANDS: RampStop[] = [
   [1440, [52, 72, 140]],
 ];
 
-// Night: petrol lifted to #2BB5AC, saffron #F1B94E, and ultramarine lifted to
-// pale periwinkle #A4B8F5 to maintain lightness separation on graphite.
+// Night: petrol and saffron as by day; the 12–24h band is lifted from the
+// ultramarine (2.0:1 on graphite) to periwinkle #8F9CF2 (6.7:1 on #1A1B1E).
 const TIME_BANDS_NIGHT: RampStop[] = [
-  [0, [43, 181, 172]],
-  [210, [43, 181, 172]],
-  [270, [241, 185, 78]],
-  [690, [241, 185, 78]],
-  [750, [164, 184, 245]],
-  [1440, [164, 184, 245]],
+  [0, [20, 116, 111]],
+  [210, [20, 116, 111]],
+  [270, [227, 166, 63]],
+  [690, [227, 166, 63]],
+  [750, [143, 156, 242]],
+  [1440, [143, 156, 242]],
 ];
 
 export function palette(dark: boolean): Palette {
@@ -98,7 +98,7 @@ export function palette(dark: boolean): Palette {
       origin: "#EDEDEA",
       legendInk: "#A3A3A0",
       legendLine: "#C8302A",
-      ramp: TIME_BANDS,
+      ramp: TIME_BANDS_NIGHT,
       outline: "rgba(255,255,255,0.13)",
       dashLine: "rgba(56,189,248,0.40)",
       landFill: "rgba(255,255,255,0.015)",
