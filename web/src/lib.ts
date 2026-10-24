@@ -1184,6 +1184,7 @@ export function buildDayTimeline(
 
     train.secs = routeSecs;
     train.secStarts = secStarts;
+    train.secRevs = secRevs;
     train.totalDist = totalDist;
 
     const trainCalls = callsByTrain.get(ti) || [];
@@ -1376,10 +1377,10 @@ export function buildDayTimeline(
             continue;
           }
         }
-        if (ic.arr && ic.boardMins >= 0) {
+        if (ic.arr && ic.boardMins !== undefined && ic.boardMins >= 0) {
           const tDep = ic.arr.depMins >= 0 ? ic.arr.depMins : 0;
           const tArr = tDep + (ic.arr.dur > 0 ? ic.arr.dur : 1);
-          let unrolled = ic.boardMins;
+          let unrolled: number = ic.boardMins;
           for (let d = 0; d <= 4; d++) {
             const testT = d * 1440 + ic.boardMins;
             if (testT >= tDep - 1 && testT <= tArr + 1) {
@@ -1412,7 +1413,7 @@ export function buildDayTimeline(
         continue;
       }
 
-      let targetDist: number;
+      let targetDist = 0;
       let isDwelling = false;
       let dwellStation: string | undefined;
       let dwellStationEn: string | undefined;

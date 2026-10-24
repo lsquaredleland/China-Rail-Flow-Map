@@ -269,6 +269,7 @@ export interface DepVM {
   hay: string; // lowercase search haystack
   secs: number[]; // section indices traversed by this train
   secStarts?: Float64Array;
+  secRevs?: Uint8Array;
   totalDist?: number;
 }
 
@@ -307,6 +308,7 @@ export interface ArrVM {
   hay: string; // lowercase search haystack
   secs: number[]; // section indices traversed by this train (in reverse: arrival to origin)
   secStarts?: Float64Array;
+  secRevs?: Uint8Array;
   totalDist?: number;
 }
 

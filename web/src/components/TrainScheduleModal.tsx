@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
-import type { DepVM, ArrVM, DistUnit, SchedulesData } from "../types";
+import type { DepVM, ArrVM, DistUnit, SchedulesData, ScheduleStop } from "../types";
 import type { MapApi } from "./MapCanvas";
 import { formatScheduleStops } from "../lib";
 
@@ -895,7 +895,7 @@ export default function TrainScheduleModal({
                   if (
                     currentStatus?.state === "transit" &&
                     currentStatus.fromIdx === idx &&
-                    idx < stops.length - 1
+                    idx < alignedStops.length - 1
                   ) {
                     rows.push(
                       <tr
@@ -928,9 +928,9 @@ export default function TrainScheduleModal({
                               >
                                 <span>
                                   EN ROUTE: {fmtStName(s.stZh, s.stEn)} ➔ {fmtStName(alignedStops[idx + 1].stZh, alignedStops[idx + 1].stEn)}
-                                  {alignedStops[idx + 1].legKm && alignedStops[idx + 1].legKm > 0 ? (
+                                  {alignedStops[idx + 1]?.legKm && alignedStops[idx + 1].legKm! > 0 ? (
                                     <span style={{ opacity: 0.85, fontWeight: 500, marginLeft: 6 }}>
-                                      ({unit === "mi" ? `${(alignedStops[idx + 1].legKm * 0.621371).toFixed(1)} mi` : `${alignedStops[idx + 1].legKm} km`})
+                                      ({unit === "mi" ? `${(alignedStops[idx + 1].legKm! * 0.621371).toFixed(1)} mi` : `${alignedStops[idx + 1].legKm} km`})
                                     </span>
                                   ) : null}
                                 </span>

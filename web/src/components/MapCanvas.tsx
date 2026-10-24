@@ -307,17 +307,21 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     off: number,
     count: number,
     waterMode?: "landOnly" | "waterOnly",
+    isRev: boolean = false,
   ) {
     if (!waterMode) {
       let lx = -1e9,
         ly = -1e9,
         started = false;
-      for (let i = 0; i < count; i++) {
+      const step = isRev ? -1 : 1;
+      const startIdx = isRev ? count - 1 : 0;
+      const endIdx = isRev ? -1 : count;
+      for (let i = startIdx; i !== endIdx; i += step) {
         const x = X(arr[off + i * 2]),
           y = Y(arr[off + i * 2 + 1]);
         const dx = x - lx,
           dy = y - ly;
-        if (started && dx * dx + dy * dy < 0.42 && i !== count - 1) continue;
+        if (started && dx * dx + dy * dy < 0.42 && i !== (isRev ? 0 : count - 1)) continue;
         if (!started) {
           ctx.moveTo(x, y);
           started = true;
@@ -331,13 +335,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let lx = -1e9,
       ly = -1e9,
       started = false;
-    for (let i = 0; i < count; i++) {
+    const step = isRev ? -1 : 1;
+    const startIdx = isRev ? count - 1 : 0;
+    const endIdx = isRev ? -1 : count;
+    for (let i = startIdx; i !== endIdx; i += step) {
       const lon = arr[off + i * 2];
       const lat = arr[off + i * 2 + 1];
 
-      if (i > 0) {
-        const prevLon = arr[off + (i - 1) * 2];
-        const prevLat = arr[off + (i - 1) * 2 + 1];
+      if (i !== startIdx) {
+        const prevLon = arr[off + (i - step) * 2];
+        const prevLat = arr[off + (i - step) * 2 + 1];
         const isWaterCross =
           ((prevLat < 20.10 && lat > 20.18) || (prevLat > 20.18 && lat < 20.10)) &&
           prevLon > 109.9 && prevLon < 110.4 &&
@@ -360,7 +367,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         y = Y(lat);
       const dx = x - lx,
         dy = y - ly;
-      if (started && dx * dx + dy * dy < 0.42 && i !== count - 1) continue;
+      if (started && dx * dx + dy * dy < 0.42 && i !== (isRev ? 0 : count - 1)) continue;
       if (!started) {
         ctx.moveTo(x, y);
         started = true;
@@ -376,6 +383,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     count: number,
     endLon: number,
     endLat: number,
+    isRev: boolean = false,
   ) {
     if (count <= 0) return;
     let bestK = 0;
@@ -392,20 +400,40 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let lx = -1e9,
       ly = -1e9,
       started = false;
-    for (let i = 0; i <= bestK; i++) {
-      const x = X(arr[off + i * 2]),
-        y = Y(arr[off + i * 2 + 1]);
-      const dx = x - lx,
-        dy = y - ly;
-      if (started && dx * dx + dy * dy < 0.42 && i !== bestK) continue;
-      if (!started) {
-        ctx.moveTo(x, y);
-        started = true;
-      } else ctx.lineTo(x, y);
-      lx = x;
-      ly = y;
+    if (!isRev) {
+      for (let i = 0; i <= bestK; i++) {
+        const x = X(arr[off + i * 2]),
+          y = Y(arr[off + i * 2 + 1]);
+        const dx = x - lx,
+          dy = y - ly;
+        if (started && dx * dx + dy * dy < 0.42 && i !== bestK) continue;
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else ctx.lineTo(x, y);
+        lx = x;
+        ly = y;
+      }
+    } else {
+      for (let i = count - 1; i >= bestK; i--) {
+        const x = X(arr[off + i * 2]),
+          y = Y(arr[off + i * 2 + 1]);
+        const dx = x - lx,
+          dy = y - ly;
+        if (started && dx * dx + dy * dy < 0.42 && i !== bestK) continue;
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else ctx.lineTo(x, y);
+        lx = x;
+        ly = y;
+      }
     }
-    ctx.lineTo(X(endLon), Y(endLat));
+    if (!started) {
+      ctx.moveTo(X(endLon), Y(endLat));
+    } else {
+      ctx.lineTo(X(endLon), Y(endLat));
+    }
   }
   function drawOutline(ctx: CanvasRenderingContext2D, pal: Palette) {
     const outline = P.current.outline;
@@ -809,11 +837,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const isProgressive = isAnimated && timeline && animTime < timeline.totalMins;
 
       if (isoSecs && isoSecs.length > 0) {
+        const pt = timeline?.getPrepTrain ? timeline.getPrepTrain(isoTrain.code) : null;
+        const ptSecRevs = pt?.secRevs ?? isoTrain.secRevs;
         if (!isProgressive || animTime >= arrMins) {
           ctx.beginPath();
           for (let i = 0; i < isoSecs.length; i++) {
             const s = isoSecs[i];
-            traceInto(ctx, pts, off[s], len[s]);
+            traceInto(ctx, pts, off[s], len[s], undefined, ptSecRevs ? ptSecRevs[i] === 1 : false);
           }
           ctx.stroke();
         } else if (animTime >= depMins) {
@@ -844,14 +874,15 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           ctx.beginPath();
           for (let i = 0; i < curSecIdx; i++) {
             const s = isoSecs[i];
-            traceInto(ctx, pts, off[s], len[s]);
+            traceInto(ctx, pts, off[s], len[s], undefined, ptSecRevs ? ptSecRevs[i] === 1 : false);
           }
           if (curSecIdx < isoSecs.length) {
             const curS = isoSecs[curSecIdx];
+            const isSecRev = ptSecRevs ? ptSecRevs[curSecIdx] === 1 : false;
             if (curTr) {
-              tracePartialSec(ctx, pts, off[curS], len[curS], curTr.lon, curTr.lat);
+              tracePartialSec(ctx, pts, off[curS], len[curS], curTr.lon, curTr.lat, isSecRev);
             } else {
-              traceInto(ctx, pts, off[curS], len[curS]);
+              traceInto(ctx, pts, off[curS], len[curS], undefined, isSecRev);
             }
           }
           ctx.stroke();
@@ -1026,7 +1057,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     const st = S.current;
     const isAnimated = st.animEnabled && !P.current.showInfra;
-    const timeline = st.timeline;
+    const timeline =
+      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
     for (let i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
       if (highlight === ch) continue;
@@ -1070,9 +1102,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     sIdx: number,
     n: number,
   ) {
+    const cur = P.current.cur;
+    if (!cur) return;
     const st = S.current;
     const isAnimated = st.animEnabled && !P.current.showInfra;
-    const timeline = st.timeline;
+    const timeline =
+      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
     if (isAnimated && timeline && st.animTime < timeline.totalMins) {
       const step = Math.min(
         timeline.numSteps - 1,
@@ -1210,10 +1245,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           const st = pt?.stops?.find((s) => s.cityZh === src.zh);
           if (st) {
             times.push(st.arrMins);
-          } else if (call.boardMins >= 0) {
+          } else if (call.boardMins !== undefined && call.boardMins >= 0) {
             const tDep = call.arr.depMins >= 0 ? call.arr.depMins : 0;
             const tArr = tDep + (call.arr.dur > 0 ? call.arr.dur : 1);
-            let unrolled = call.boardMins;
+            let unrolled: number = call.boardMins;
             for (let d = 0; d <= 4; d++) {
               const testT = d * 1440 + call.boardMins;
               if (testT >= tDep - 1 && testT <= tArr + 1) {
@@ -2119,7 +2154,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const destSecCounts = getDestSectionCounts();
     const st = S.current;
     const isAnimated = st.animEnabled && !P.current.showInfra;
-    const timeline = st.timeline;
+    const timeline =
+      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
     const step =
       isAnimated && timeline
         ? Math.min(
