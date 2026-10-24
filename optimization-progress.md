@@ -21,7 +21,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 
 ## Session 1 outcome (committed 2026-10-24)
 - Phases 0, 1, 2, 4.1–4.5, goldens gate, staged pack swapped into `web/public/assets/` (owner verified in browser: equivalent to pre-port). At commit: typecheck, build and `node staging/scripts/check_client_decode.mjs` pass.
-- **NOT done (agents hit the usage limit mid-task, 2026-10-24):** (a) Phase 4.6 cleanup sweep: may be partially applied, but the committed tree passes all checks; redo the sweep (dead code, stale chainer/calibration comments, unneeded `as any`). (b) `docs/PIPELINE.md` update: untouched. Needed: §3 step 5 real recipe (WITH `data/leg_overrides.json`; `[]` differs by 93,072 edges; `staging/env.sh`; `output/` is a symlink into handoff-v3, so always set output paths; `AUDIT_PACK_DIR` audit + `--update-goldens`), the fmt-3 format (travel-order signed secs, `sec_cnt` outbound prefix / inbound trailing, `chord_legs [stop, s0, s1)` half-open path positions, schedules indexed by `t`), §7 → point to `pipeline/goldens.json` (Chengdu 144/564/105, 102 origins incl. 香港, chord rows 15,270, >35 km jumps outside chords 0), known gaps (router `#cv3` coordinates, inbound-only legs, station throats).
+- **NOT done (agents hit the usage limit mid-task, 2026-10-24):** (a) Phase 4.6 cleanup sweep: may be partially applied, but the committed tree passes all checks; redo the sweep (dead code, stale chainer/calibration comments, unneeded `as any`). (b) `docs/PIPELINE.md`: done (§3 step 5 live recipe + fmt-3 format; §7 now points to `pipeline/goldens.json`).
 
 ## Backlog: optional improvements (not started)
 | # | Item | Changes flows? | Notes |
