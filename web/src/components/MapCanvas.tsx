@@ -180,6 +180,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       allowedCodes: Set<string> | null;
       cityTimes: Map<number, number[]>;
     } | null,
+    activeTrainsMemo: null as {
+      tl: DayTimelineVM;
+      t: number;
+      list: ActiveTrainVM[];
+    } | null,
+    chordDepCache: null as { cur: OriginVM; firstDep: Map<number, number> } | null,
     animTime: 360,
     animPlaying: false,
     animSpeed: 30,
@@ -212,6 +218,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const activeTimeline = (): DayTimelineVM | undefined => {
     const cur = P.current.cur;
     return cur && P.current.direction === "out" ? cur.timeline : undefined;
+  };
+  // The dots at minute t, computed once per frame however many passes ask.
+  const activeTrainsAt = (tl: DayTimelineVM, t: number): ActiveTrainVM[] => {
+    const m = S.current.activeTrainsMemo;
+    if (m && m.tl === tl && m.t === t) return m.list;
+    const list = tl.getActiveTrains(t);
+    S.current.activeTrainsMemo = { tl, t, list };
+    return list;
   };
   /* A filtered view (class, histogram or train filter) is a subset of the
      full origin `baseCur`; selecting a city alone is not a filter. */
@@ -883,7 +897,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           }
           ctx.stroke();
         } else if (animTime >= depMins) {
-          const curTr = timeline.getActiveTrains(animTime).find(
+          const curTr = activeTrainsAt(timeline, animTime).find(
             (t) => t.code === isoTrain.code,
           );
           const totalDist = isoPt?.totalDist || 1;
@@ -931,7 +945,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           if (!isProgressive || animTime >= arrMins) {
             traceInto(ctx, ch.flat, 0, ch.count);
           } else if (animTime >= depMins) {
-            const curTr = timeline?.getActiveTrains(animTime).find(
+            const curTr = timeline && activeTrainsAt(timeline, animTime).find(
               (t) => t.code === isoTrain.code,
             );
             if (curTr) {
@@ -955,7 +969,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         const subFlows: { s: number; n: number }[] = [];
         if (isAnimated && timeline && S.current.animTime < timeline.totalMins) {
           const activeCounts = getActiveDestSectionCounts(S.current.animTime);
-          for (const [s, subN] of activeCounts.entries()) {
+          // Capped by the section's current total (as on main).
+          const activeN = new Map<number, number>();
+          for (const af of activeFlows) activeN.set(af.s, af.n);
+          for (const [s, destN] of activeCounts.entries()) {
+            const subN = Math.min(activeN.get(s) ?? 0, destN);
             if (subN > 0) {
               subFlows.push({ s, n: subN });
             }
@@ -963,7 +981,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         } else {
           for (let i = 0; i < flows.length; i++) {
             const f = flows[i];
-            const subN = destSecCounts.get(f.s) || 0;
+            const subN = Math.min(f.n, destSecCounts.get(f.s) || 0);
             if (subN > 0) {
               subFlows.push({ s: f.s, n: subN });
             }
@@ -1107,20 +1125,37 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const st = S.current;
     const isAnimated = st.animEnabled && !P.current.showInfra && !filtered;
     const timeline = activeTimeline();
+    const gated = isAnimated && !!timeline && st.animTime < timeline.totalMins;
+    const isoTrain = gated && isIsolated
+      ? cur.deps?.find((t) => t.code === P.current.isolatedTrainCode)
+      : undefined;
+    // Per origin view: the first departure towards each chord's terminus.
+    let firstDep: Map<number, number> | null = null;
+    if (gated && !isIsolated) {
+      const c = st.chordDepCache;
+      if (c && c.cur === cur) {
+        firstDep = c.firstDep;
+      } else {
+        firstDep = new Map();
+        for (const d of cur.deps || []) {
+          const prev = firstDep.get(d.tcIdx);
+          if (prev === undefined || d.depMins < prev) firstDep.set(d.tcIdx, d.depMins);
+        }
+        st.chordDepCache = { cur, firstDep };
+      }
+    }
     for (let i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
       if (highlight === ch) continue;
       if (!inViewBB(ch.bb.x0, ch.bb.y0, ch.bb.x1, ch.bb.y1, 0.35)) continue;
-      if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+      if (gated) {
         if (isIsolated) {
-          const isoTrain = cur.deps?.find((t) => t.code === P.current.isolatedTrainCode);
-          if (!isoTrain || (isoTrain as any).tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
+          if (!isoTrain || isoTrain.tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
             continue;
           }
         } else {
-          const destTrains = (cur.deps || []).filter((d) => d.tcIdx === ch.b);
-          const hasDeparted = destTrains.some((d) => st.animTime >= d.depMins);
-          if (!hasDeparted) continue;
+          const dep = firstDep!.get(ch.b);
+          if (dep === undefined || st.animTime < dep) continue;
         }
       }
       const w = isIsolated ? 1.5 : widthOf(ch.n);
@@ -1166,6 +1201,19 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         );
         if (!isoTrain || !isoTrain.secs || !isoTrain.secs.includes(sIdx) || st.animTime < isoTrain.depMins) {
           return;
+        }
+        // Only a section the isolated train has already reached.
+        const isoPt = timeline.getPrepTrain(isoTrain.code);
+        if (isoPt) {
+          const d = trainDistAt(isoPt, st.animTime);
+          let reached = false;
+          for (let k = 0; k < isoPt.secs.length && isoPt.secStarts[k] <= d; k++) {
+            if (isoPt.secs[k] === sIdx) {
+              reached = true;
+              break;
+            }
+          }
+          if (!reached) return;
         }
       } else if (P.current.panelDest) {
         const activeCounts = getActiveDestSectionCounts(st.animTime);
@@ -1339,7 +1387,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const timeline = activeTimeline();
     if (!timeline) return;
 
-    const activeTrains = timeline.getActiveTrains(S.current.animTime);
+    const activeTrains = activeTrainsAt(timeline, S.current.animTime);
     const isolatedCode = P.current.isolatedTrainCode;
     if (!activeTrains || activeTrains.length === 0) return;
 
@@ -2236,11 +2284,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       );
       const isoPt = isoTrain ? timeline.getPrepTrain(isoTrain.code) : undefined;
       if (isoTrain && isoPt && st.animTime >= isoTrain.depMins) {
-        const depMins = isoTrain.depMins >= 0 ? isoTrain.depMins : 0;
-        const dur = isoTrain.dur > 0 ? isoTrain.dur : 1;
-        const totalDist = isoPt.totalDist || 1;
-        const alpha = Math.min(1.0, (st.animTime - depMins) / dur);
-        const targetDist = alpha * totalDist;
+        const targetDist = trainDistAt(isoPt, st.animTime);
         const secStarts = isoPt.secStarts;
         let curSecIdx = 0;
         while (
@@ -2360,7 +2404,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!cur) return null;
     const timeline = activeTimeline();
     if (!timeline) return null;
-    const activeTrains = timeline.getActiveTrains(st.animTime);
+    const activeTrains = activeTrainsAt(timeline, st.animTime);
     if (!activeTrains || activeTrains.length === 0) return null;
 
     const allowedCodes = getAllowedTrainCodes();
@@ -2695,9 +2739,6 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!props.cur || props.cur === curRef.current) return;
     if (curRef.current && props.cur.o === curRef.current.o) {
       curRef.current = props.cur;
-      // A filter change can shorten the timeline (the filtered trains' span).
-      const tl = activeTimeline();
-      if (tl && S.current.animTime > tl.totalMins) S.current.animTime = tl.totalMins;
       draw();
       notifyAnimListeners();
       return;

@@ -65,7 +65,9 @@ function requireFmt3(fmt: unknown, url: string) {
   if (fmt === 3) return;
   const msg = `${url}: unsupported tables format ${String(fmt)} (need fmt 3); rebuild the data pack`;
   console.error(msg);
-  throw new Error(msg);
+  const err = new Error(msg);
+  err.name = "FmtError";
+  throw err;
 }
 
 const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
@@ -354,11 +356,14 @@ export default function App() {
         requireFmt3(d.fmt, OUT_TABLES_URL);
         outTablesRef.current = d;
         flightsRef.current.outTables = false;
+        setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
         applyOutTables();
       })
       .catch((err: Error) => {
         flightsRef.current.outTables = false;
-        setLoadError(err.message);
+        // Only a wrong data format blocks the map; a failed fetch leaves
+        // it usable (the table keeps its loading note), as on main.
+        if (err.name === "FmtError") setLoadError(err.message);
       });
   };
   const ensureInTables = () => {
@@ -373,11 +378,14 @@ export default function App() {
         requireFmt3(d.fmt, IN_TABLES_URL);
         inTablesRef.current = d;
         flightsRef.current.inTables = false;
+        setLoadError((e) => (e && e.startsWith(IN_TABLES_URL) ? null : e));
         applyInTables();
       })
       .catch((err: Error) => {
         flightsRef.current.inTables = false;
-        setLoadError(err.message);
+        // Only a wrong data format blocks the map; a failed fetch leaves
+        // it usable (the table keeps its loading note), as on main.
+        if (err.name === "FmtError") setLoadError(err.message);
       });
   };
   // Phase 3 for inbound: the map file first (paint), and only once it

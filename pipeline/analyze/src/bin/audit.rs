@@ -1493,8 +1493,15 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
 /// `--update-goldens` rewrites the file with the current values (keys
 /// keep their class; new keys go to "max"). Returns false on a breach.
 fn gate_goldens(path: &Path, cur: &BTreeMap<String, i64>, update: bool, partial: bool) -> bool {
-    let old: Value = fs::read_to_string(path)
-        .ok()
+    let text = fs::read_to_string(path).ok();
+    if text.is_none() && !update {
+        println!(
+            "AUDIT goldens FAIL: {} not found (create it with --update-goldens)",
+            path.display()
+        );
+        return false;
+    }
+    let old: Value = text
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_else(|| serde_json::json!({ "exact": {}, "max": {} }));
     if update {

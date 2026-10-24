@@ -20,12 +20,11 @@ export interface TimelineScrubberProps {
 // 25% is dedicated to the trans-continental tail (24h–55h+)
 const SPLIT_SLIDER = 750; // out of 1000
 
+// Day 1 always takes the first 75%, so the fixed ticks and rush zones line
+// up; an origin whose trains all arrive by 24:00 has an empty tail.
 function timeToSlider(tMins: number, totalMins: number): number {
   const tot = Math.max(1440, totalMins);
-  if (tot <= 1440) {
-    return Math.max(0, Math.min(1000, (tMins / 1440) * 1000));
-  }
-  if (tMins <= 1440) {
+  if (tMins <= 1440 || tot <= 1440) {
     return Math.max(0, Math.min(SPLIT_SLIDER, (tMins / 1440) * SPLIT_SLIDER));
   }
   const fracTail = Math.max(0, Math.min(1, (tMins - 1440) / (tot - 1440)));
@@ -35,11 +34,8 @@ function timeToSlider(tMins: number, totalMins: number): number {
 function sliderToTime(sliderVal: number, totalMins: number): number {
   const tot = Math.max(1440, totalMins);
   const s = Math.max(0, Math.min(1000, sliderVal));
-  if (tot <= 1440) {
-    return (s / 1000) * 1440;
-  }
-  if (s <= SPLIT_SLIDER) {
-    return (s / SPLIT_SLIDER) * 1440;
+  if (s <= SPLIT_SLIDER || tot <= 1440) {
+    return (Math.min(s, SPLIT_SLIDER) / SPLIT_SLIDER) * 1440;
   }
   const fracTail = (s - SPLIT_SLIDER) / (1000 - SPLIT_SLIDER);
   return 1440 + fracTail * (tot - 1440);

@@ -1241,18 +1241,21 @@ export function buildDayTimeline(
   return assembleTimeline(prepTrains, trainEntries, flowSecs);
 
   /** The timeline of `trains`: bar length, cumulative flow per section and
-      step, and the per-frame queries. Cheap enough to rerun per filter. */
+      step, and the per-frame queries. Cheap enough to rerun per filter.
+      `spanMins` fixes the bar length (a filtered subset keeps the full
+      origin's, so the scrubber stays put); otherwise it is the trains' own. */
   function assembleTimeline(
     trains: PrepTrain[],
     entries: TrainEntries[],
     initSecs: number[],
+    spanMins?: number,
   ): DayTimelineVM {
     // Track max arrival time across all services (ending time of the bar varies depending on the last train)
     let maxArrMins = 0;
     for (let ti = 0; ti < trains.length; ti++) {
       if (trains[ti].arrMins > maxArrMins) maxArrMins = trains[ti].arrMins;
     }
-    const totalMins = Math.max(60, Math.ceil(maxArrMins / 5) * 5);
+    const totalMins = spanMins ?? Math.max(60, Math.ceil(maxArrMins / 5) * 5);
     const totalDays = Math.max(1, Math.ceil(totalMins / 1440));
     const numSteps = Math.ceil(totalMins / stepMins);
     const secFlowSteps = new Map<number, Uint16Array>();
@@ -1511,7 +1514,7 @@ export function buildDayTimeline(
           subTrains.push(trains[i]);
           subEntries.push(entries[i]);
         }
-        return assembleTimeline(subTrains, subEntries, []);
+        return assembleTimeline(subTrains, subEntries, [], totalMins);
       },
     };
   }

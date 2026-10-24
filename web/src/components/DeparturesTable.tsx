@@ -156,7 +156,9 @@ function TrainCell({
       onClick={
         onClick
           ? (e) => {
-              // The schedule link must not also toggle the row's train filter.
+              // Shift/cmd/ctrl clicks belong to the row's train selection;
+              // a plain click opens the schedule without toggling the row.
+              if (e.shiftKey || e.metaKey || e.ctrlKey) return;
               e.stopPropagation();
               onClick();
             }
@@ -341,12 +343,6 @@ export default function DeparturesTable({
         : matchCityFromQuery(cur, direction, rawQ),
     [cur, direction, panelCity, rawQ],
   );
-
-  useEffect(() => {
-    if (!panelCity && matched.city) {
-      onSelectCity?.(matched.city);
-    }
-  }, [matched.city, panelCity, onSelectCity]);
 
   const activeCity: CityPointVM | null = useMemo(() => {
     const raw = panelCity || matched.city;

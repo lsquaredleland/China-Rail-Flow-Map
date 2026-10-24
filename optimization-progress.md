@@ -35,6 +35,10 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O7 | 48 inbound loop trains with non-monotone `sec_cnt` | no | documented quirk (cutoff clamps to 0); decide whether to fix |
 | O8 | Gate `dropped chains` / `flow lost` in `--pack-only` audits too | no | currently only the full audit enforces them |
 | O9 | Fill real OSM geometry gaps (平昌→达州, 南京→扬州, …) | yes | data work, prerequisite noted in PIPELINE.md §4 |
+| O10 | Move the client city-coordinate patches (lib.ts `prepAtlas`: 铜仁, 兰溪, 溆浦) into the pipeline gazetteer | no flows; dest points + `distKm` change | from the PR #1 review (B); the pipeline should be the source of truth |
+| O11 | ~~U-turn overlap fix~~ | — | **Won't do** (owner 2026-10-24): a train reversing over track at a station is acceptable behaviour |
+| O12 | CI pack audit: run `audit --pack-only` on committed `web/public/assets` against `pipeline/goldens.json`; PR job diffs the PR's pack vs main's at edge level (like `secdiff`) and posts a summary comment | no | CI can't rebuild (needs 513 MB OSM + handoff inputs), so audit the committed pack; catches bad asset swaps and surfaces flow changes like O4 at review time |
+| O13 | Client regression tests (`bun test` in `web/tests/`): promote `staging/scripts/check_client_decode.mjs` + `check_filter_animation.mjs`; invariants on real assets (trainDistAt monotone, dwell == stop.dist, final-step flows == static flows with/without filters, animated trains ⊆ filter, 0 jumps outside chord legs) + snapshot tests (per-hour departed/arrived, per-section flow at fixed times for 2–3 origins) | no | wire into CI's web job |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
 
@@ -193,3 +197,44 @@ Reviewer, look closely at:
 - Filtered views use the static full-origin scale (`baseMaxN`), not the per-step `maxFlowSteps`, so filtered bands start thin and grow into their final proportional width.
 - The isolation pill (top centre) can overlap main's filter bar (top left) on narrow screens.
 - Not browser-tested: the new filter/animation interplay and the train-number click vs row-select change.
+
+#### O2/O4 investigation (pipeline-phase12)
+Read-only on `pipeline/` (the merge is in progress). Tools: `staging/scripts/atlasdiag/` (HEAD `atlas.rs` copy plus dumps: `ATLAS_DIAG` per-leg causes, `ATLAS_ROWS` per-row leg prefixes, `DIAG_TRAIN`/`DIAG_ORIGIN` edge-level hit/trim/nocoord per leg), `staging/scripts/o2.py` (output in `o2-result.txt`). O4 prototype: `staging/o4-proto/` (separate crate) plus `staging/o4.patch`; build in `staging/o4-build/`.
+
+**O2: the 417 gaps > 6 km** (out / in):
+- **Dense-station trims, 225 (123 / 102).** Every point of the gap is within 2 km of a station, so `near_station` (1.3 km around every throat station) removes a whole run of consecutive edges. Example: Changsha S-line 观沙岭/开福寺/谷山, 11.3 km gap at (112.959, 28.232)→(112.845, 28.256) on Z332, K932, S7002… Fix: Phase 3 throat stubs for paths (flows keep trimming).
+- **U-turn on one section, 127 (65 / 62).** The path holds S then !S at a leg join. A section is a constant-signature chain and can extend past where the train turns. Cases: (i) the next leg's geometry overlaps a few throat edges of the previous leg's section in reverse (K1160 新沂: the 邳州东–新沂 section is re-emitted reversed at the start of the 临沂东 leg → 25.9 km); (ii) real reversals that use only part of a section (K1297 同心→中卫→中宁, 9.7 km). This class is a side effect of the retrace change (before it, the repeat was deduped away). It is also what the earlier "69 orientation-fixable" were: not a sign bug (edge-direction lookups are exact) but partial traversal of a section. Fix (flow-neutral): count edges per run, and drop an immediately reversed repeat `!S` when it covers less than half of the edges of the preceding run of `S`.
+- **Leg boundary, 55 (27 / 28).** The previous leg's geometry stops short of the station. Example: pair path 阳东–阳江 ends at (111.988, 21.813), 12 km from the 阳江 station point (111.877, 21.864); 茂名/电白–阳江 likewise (C69xx, G1575). These are data gaps in the pair paths (the endpoint is a junction, not the station).
+- **Inside one leg, other, 10.** Not resolved.
+- Previously listed "adjacent to chord leg" and "orientation-fixable" are now 0 as separate classes (they fold into the above).
+
+**O4: router-only nodes have no coordinates.** Cause: `atlas.rs` (HEAD ~l.1736) builds `needed` only from `path_map.values()` (pair paths). `LEG_PATHS` segments (loaded earlier by `load_leg_paths`) are never added, so the OSM scan skips their nodes. Fix: also insert every `LEG_PATHS` segment node into `needed` (8 lines, `staging/o4.patch`). `audit.rs` has the same `needed` logic and needs the same change so its recount matches.
+Prototype result (`staging/o4-build/`, overrides config + retrace): needed / resolved nodes 499,373 / 499,373. Chord rows **15,270 → 1,850** (all 13,420 cause-(d) rows gone; remaining: inbound-only 1,587 (304 legs) + real gaps 263 (5 legs)). >35 km jump rows: 0 outside chord legs, 0 inside. Sections 8,054 → 8,459, in_sections 7,923 → 8,325. Continuity > 6 km 417 → 436 and ≤ 6 km 61,807 → 64,399 (more geometry, more joins). Flows: secdiff `--edges` vs live = 178,238 changed edge entries: **173,847 added** (edges that had no flow), 2,817 up, 1,574 down/removed. No per-origin summary changed (outbound, fully tracked, dests, widest unchanged for every origin). Chengdu goldens unchanged (564 / 610 / 144 / 564 / 0; 558 / 627 / 105; CQ 136/53/62, 136/54/62). Added flow is concentrated on 宝成线 绵阳–广元 (105°E 32°N), 石太线 石家庄–太原 (113–114°E 38°N), Fujian (117–118°E 25°N), around Xi'an (109°E 34°N) and 渝怀/湘黔 (108°E 27°N): the switched router corridors that were drawn without track until now. Needs owner approval (flows change); goldens must be rebased (sections exact, continuity max).
+
+**Other missing-track classes** (leg occurrences out / in; distinct pairs):
+- bridged pair paths: 167 / 166 (7 pairs). 4 have a > 3 km hole and are chord legs: 平顶山西–禹州 154, 禹州–郏县 41, 恩平–阳江 40, 聊城西–菏泽东 20 rows (the real OSM gaps, O9).
+- via_chain: 2,819 / 2,867 (106 pairs). One has a hole (江门–阳江, 8 chord rows).
+- ferry: 71 / 67 (2 pairs, 徐闻–海口, 海口–湛江西). They have ferry-way geometry, so not chords.
+- flagged: 7 / 5 (郏县–郑州东).
+- inbound-only unresolved: 1,587 rows (304 legs), as above.
+- leg geometry ending short of a station: the 55 boundary gaps above.
+
+#### O2/O4 prototypes behind env flags (pipeline-phase12, after merge 7d8dbd0)
+- Rebuilt `target/release` on the merged source; default staged build is unchanged: goldens PASS, hard checks PASS, dropped chains 0 / flow lost 0, secdiff `--edges` vs live 0.
+- `atlas.rs`: `ATLAS_UTURN_TRIM=1` (flow-neutral): `trim_uturns` drops the shorter half of an immediate reversal `S, !S` when it covers under half the other run's edges, and remaps `prefix_cnt` and chord spans. `ATLAS_LEG_PATH_COORDS=1` (CHANGES FLOWS, O4): adds `LEG_PATHS` nodes to `needed`. The same flag is in `audit.rs`, so its recount matches. Both flags are off by default; uncommitted. `cargo fmt --all --check` clean; `cargo clippy --release --workspace --all-targets -- -D warnings` clean.
+- `staging/uturn-build/` (U-turn trim only): secdiff 0; continuity > 6 km **417 → 345**, ≤ 6 km 61,807 → 61,865 (trimmed U-turns become throat-sized gaps); jumps > 35 km outside chords 0. The remaining U-turn gaps are real reversals with about equal runs (K1297 中卫 type).
+- `staging/o4-build/` (both flags): needed nodes 471,960 → 499,373; chord rows 15,270 → 1,850; > 35 km jumps 0 / 0; sections 8,459 / 8,325; continuity > 6 km 364, ≤ 6 km 64,457; secdiff 178,238 changed edges (as in the O4 entry above). Chengdu goldens unchanged.
+- To adopt: flip the flags to defaults (U-turn trim needs no approval beyond a goldens rebase; O4 needs owner approval), then `audit --update-goldens`.
+
+#### PR #1 review fixes (merger)
+- A. `DeparturesTable`: removed the effect that auto-pinned a city matched by the search box (main's behaviour: the matched city filters the table while typing, the rest of the query is the token, so "Chongqing G" works and "Shang" no longer pins 上海).
+- F. `TrainCell`: shift/meta/ctrl clicks pass through to the row (range select, cmd-toggle); only a plain click stops propagation and opens the schedule.
+- Scrubber: a filtered subset now keeps the full origin's span (`assembleTimeline(..., spanMins)`; same `totalMins`/`totalDays`/`numSteps` as `cur.timeline`), so ticks, slider mapping and needle stay put; the earlier clamp on filter change is gone. `TimelineScrubber` always uses the 75 % Day-1 split (`tot = max(1440, totalMins)`, empty tail when every train is in by 24:00), so the fixed ticks (188/375/562/750) and rush zones are correct for short origins too; `sliderToTime` clamps the empty tail to 24:00.
+- C. Only the fmt-3 check (`FmtError`) sets `loadError` (full overlay); a tables-fetch failure leaves the map usable as on main. A successful tables fetch clears an error that came from that same URL.
+- D. Hover hit-test for the isolated train uses `trainDistAt(isoPt, t)` instead of a linear time fraction.
+- E. `drawHighlightSeg` for an isolated train highlights a section only once the train has reached it (`secStarts[k] <= trainDistAt`).
+- G. City-pair sub-flows are capped by the section's total again: static `min(f.n, destN)`, animated `min(current section count, destN)`.
+- H. `audit.rs gate_goldens`: a missing goldens file is a FAIL unless `--update-goldens` is given.
+- Perf: `drawChords` uses a per-view map tcIdx → first departure (was O(chords × deps) per frame) and finds the isolated train once; `getActiveTrains` is memoised per (timeline, minute) via `activeTrainsAt`, shared by `drawTrains`, the isolated-corridor passes and the hover hit-test.
+- B (client city-coordinate patches) unchanged, backlog O10.
+- Checks: bun typecheck/build pass; `check_client_decode.mjs` OK; `check_filter_animation.mjs` OK (now asserts the subset span equals the full origin's; unfiltered still identical to the pre-merge branch); cargo fmt-check/clippy/test pass on a clean checkout of the commit (the working tree holds another agent's uncommitted O4 prototype in `atlas.rs`/`audit.rs`, not included).
