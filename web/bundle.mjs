@@ -2,7 +2,25 @@
    dist/index.html carries. Run with: bun bundle.mjs
    Produces dist/index.html from index.template.html (head + CSS verbatim)
    and copies public/assets into dist/assets. */
-import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+
+// Content-hash the Brotli data packs: public/assets/<name>.json.br is
+// served as dist/assets/<name>.<hash8>.json.br so the files can be
+// `immutable`, and the name -> hashed-path map is baked into the bundle
+// (index.html is the revalidated entry point that carries it). Source
+// names stay unchanged for the pipeline scripts.
+const assetManifest = {};
+const hashedAssets = [];
+for (const f of readdirSync("public/assets")) {
+  if (!f.endsWith(".json.br")) continue;
+  const bytes = readFileSync(`public/assets/${f}`);
+  const h = createHash("sha256").update(bytes).digest("hex").slice(0, 8);
+  const hashed = f.replace(/\.json\.br$/, `.${h}.json.br`);
+  assetManifest[`assets/${f.slice(0, -3)}`] = `assets/${hashed}`;
+  hashedAssets.push([f, hashed, bytes]);
+}
+const manifestDefine = { __ASSET_MANIFEST__: JSON.stringify(assetManifest) };
 
 let rawJs;
 if (typeof Bun !== "undefined") {
@@ -11,7 +29,7 @@ if (typeof Bun !== "undefined") {
     minify: true,
     format: "iife",
     target: "browser",
-    define: { "process.env.NODE_ENV": '"production"' },
+    define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
   });
   if (!result.success) {
     for (const log of result.logs) console.error(log);
@@ -26,7 +44,7 @@ if (typeof Bun !== "undefined") {
     minify: true,
     format: "iife",
     target: "es2020",
-    define: { "process.env.NODE_ENV": '"production"' },
+    define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
     write: false,
   });
   rawJs = res.outputFiles[0].text;
@@ -48,6 +66,11 @@ if (!tpl.includes("/*__BUNDLE__*/")) {
 mkdirSync("dist", { recursive: true });
 for (const f of readdirSync("public")) {
   cpSync(`public/${f}`, `dist/${f}`, { recursive: true });
+}
+// Swap the unhashed packs the copy above brought along for hashed ones.
+for (const [f, hashed, bytes] of hashedAssets) {
+  rmSync(`dist/assets/${f}`);
+  writeFileSync(`dist/assets/${hashed}`, bytes);
 }
 writeFileSync(
   "dist/index.html",
