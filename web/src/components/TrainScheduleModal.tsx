@@ -26,6 +26,13 @@ interface AlignedStop extends ScheduleStop {
   simDepMins: number;
 }
 
+function fmtStName(zh: string, en?: string): string {
+  if (en && en !== zh) {
+    return `${zh} (${en})`;
+  }
+  return zh;
+}
+
 export default function TrainScheduleModal({
   code,
   onClose,
@@ -70,6 +77,13 @@ export default function TrainScheduleModal({
   // Identify the station corresponding to the currently selected city (e.g. Guangzhou, Wuhan, Beijing)
   const originStationZh = trainVM
     ? ((trainVM as any).fsZh || (trainVM as any).tsZh || "")
+    : "";
+
+  const originStDisplay = trainVM
+    ? fmtStName((trainVM as any).fsZh || "", (trainVM as any).fsEn)
+    : "";
+  const destStDisplay = trainVM
+    ? fmtStName((trainVM as any).tsZh || "", (trainVM as any).tsEn)
     : "";
 
   const originStop = useMemo(() => {
@@ -163,13 +177,13 @@ export default function TrainScheduleModal({
       const wait = Math.max(0, Math.round(first.simDepMins - liveTime));
       return {
         state: "pre" as const,
-        text: `Departs ${first.stZh} in ${wait > 60 ? `${Math.floor(wait / 60)}h ${wait % 60}m` : `${wait}m`} (at ${first.dep})`,
+        text: `Departs ${fmtStName(first.stZh, first.stEn)} in ${wait > 60 ? `${Math.floor(wait / 60)}h ${wait % 60}m` : `${wait}m`} (at ${first.dep})`,
       };
     }
     if (liveTime >= last.simArrMins) {
       return {
         state: "post" as const,
-        text: `Completed journey to ${last.stZh} at ${last.arr}`,
+        text: `Completed journey to ${fmtStName(last.stZh, last.stEn)} at ${last.arr}`,
       };
     }
 
@@ -185,7 +199,7 @@ export default function TrainScheduleModal({
         const rem = Math.max(0, Math.round(s.simDepMins - liveTime));
         return {
           state: "stopped" as const,
-          text: `Stopped at ${s.stZh} · Departs in ${rem}m (${s.dep})`,
+          text: `Stopped at ${fmtStName(s.stZh, s.stEn)} · Departs in ${rem}m (${s.dep})`,
           stopIdx: i,
         };
       }
@@ -208,7 +222,7 @@ export default function TrainScheduleModal({
             : `${finalM}m`;
         return {
           state: "transit" as const,
-          text: `En route: ${curr.stZh} ➔ ${next.stZh} · ETA in ${finalEtaStr} (${last.arr})`,
+          text: `En route: ${fmtStName(curr.stZh, curr.stEn)} ➔ ${fmtStName(next.stZh, next.stEn)} · ETA in ${finalEtaStr} (${last.arr})`,
           fromIdx: i,
           toIdx: i + 1,
           eta,
@@ -280,7 +294,7 @@ export default function TrainScheduleModal({
         </span>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: "12px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {trainVM ? `${(trainVM as any).fsZh || ""} ➔ ${(trainVM as any).tsZh || ""}` : code}
+            {trainVM ? `${originStDisplay} ➔ ${destStDisplay}` : code}
           </div>
           {currentStatus && (
             <div style={{ fontSize: "11px", color: isIsolated ? "#F59E0B" : dark ? "#9CA3AF" : "#64748B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -383,7 +397,7 @@ export default function TrainScheduleModal({
             </span>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: "16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {trainVM ? `${(trainVM as any).fsZh || ""} ➔ ${(trainVM as any).tsZh || ""}` : `Train ${code} Schedule`}
+                {trainVM ? `${originStDisplay} ➔ ${destStDisplay}` : `Train ${code} Schedule`}
               </div>
               <div
                 style={{
@@ -516,7 +530,7 @@ export default function TrainScheduleModal({
               >
                 <span>📍</span>
                 <span>
-                  {originStop.stZh}: {originStop.arr !== "—" ? `Arr ${originStop.arr} · ` : ""}Dep {originStop.dep}
+                  {fmtStName(originStop.stZh, originStop.stEn)}: {originStop.arr !== "—" ? `Arr ${originStop.arr} · ` : ""}Dep {originStop.dep}
                   {originStop.dwellMins > 0 ? ` (${originStop.dwellMins}m dwell)` : ""}
                 </span>
               </span>
@@ -673,7 +687,7 @@ export default function TrainScheduleModal({
                           onJumpToTime(Math.max(0, jumpTime));
                         }
                       }}
-                      title={onJumpToTime ? `Click to jump simulation to ${s.stZh} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
+                      title={onJumpToTime ? `Click to jump simulation to ${fmtStName(s.stZh, s.stEn)} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
                       style={{
                         borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)"}`,
                         borderLeft: isOriginCity
@@ -913,7 +927,7 @@ export default function TrainScheduleModal({
                                 }}
                               >
                                 <span>
-                                  EN ROUTE: {s.stZh} ➔ {alignedStops[idx + 1].stZh}
+                                  EN ROUTE: {fmtStName(s.stZh, s.stEn)} ➔ {fmtStName(alignedStops[idx + 1].stZh, alignedStops[idx + 1].stEn)}
                                   {alignedStops[idx + 1].legKm && alignedStops[idx + 1].legKm > 0 ? (
                                     <span style={{ opacity: 0.85, fontWeight: 500, marginLeft: 6 }}>
                                       ({unit === "mi" ? `${(alignedStops[idx + 1].legKm * 0.621371).toFixed(1)} mi` : `${alignedStops[idx + 1].legKm} km`})

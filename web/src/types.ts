@@ -332,13 +332,16 @@ export interface ActiveTrainVM {
   cls: string;     // train class e.g. "G", "D", "K", etc.
   code: string;
   fromStation: string;
+  fromStationEn?: string;
   toStation: string;
+  toStationEn?: string;
   depTime: string;
   arrTime: string;
   durMins: number;
   progressPct: number;
   isDwelling?: boolean;
   dwellStation?: string;
+  dwellStationEn?: string;
   dwellStatus?: "origin" | "stop" | "dest";
   dwellDetail?: string;
   speedFrac?: number;
@@ -365,6 +368,7 @@ export interface SchedulesData {
 
 export interface PrepTrainStop {
   cityZh: string;
+  cityEn?: string;
   arrMins: number;
   depMins: number | null;
   dist: number;
@@ -375,7 +379,9 @@ export interface PrepTrain {
   code: string;
   cls: string;
   fromStation: string;
+  fromStationEn?: string;
   toStation: string;
+  toStationEn?: string;
   depTime: string;
   arrTime: string;
   depMins: number;

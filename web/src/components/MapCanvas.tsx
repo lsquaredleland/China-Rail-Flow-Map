@@ -2406,17 +2406,30 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const tr = hit.train;
       const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
       const badgeColor = isHighSpeed ? "#F59E0B" : "#0284C7";
+      const fromDisplay =
+        tr.fromStationEn && tr.fromStationEn !== tr.fromStation
+          ? `${esc(tr.fromStation)} <span style='font-size:11px;font-weight:400;opacity:0.8;'>(${esc(tr.fromStationEn)})</span>`
+          : esc(tr.fromStation || "");
+      const toDisplay =
+        tr.toStationEn && tr.toStationEn !== tr.toStation
+          ? `${esc(tr.toStation)} <span style='font-size:11px;font-weight:400;opacity:0.8;'>(${esc(tr.toStationEn)})</span>`
+          : esc(tr.toStation || "");
+      const dwellName =
+        tr.dwellStationEn && tr.dwellStationEn !== tr.dwellStation
+          ? `${esc(tr.dwellStation || "")} (${esc(tr.dwellStationEn)})`
+          : esc(tr.dwellStation || "");
+
       html =
         "<div class='t-title' style='display:flex;align-items:center;gap:6px;margin-bottom:6px;'>" +
         `<span style='background:${badgeColor};color:#fff;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;font-family:monospace;'>${esc(tr.code)}</span>` +
-        `<span style='font-size:13px;font-weight:600;'>${esc(tr.fromStation || "")} &rarr; ${esc(tr.toStation || "")}</span>` +
+        `<span style='font-size:13px;font-weight:600;'>${fromDisplay} &rarr; ${toDisplay}</span>` +
         "</div>" +
         (tr.isDwelling
           ? (tr.dwellStatus === "origin"
-            ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${esc(tr.dwellStation || "Origin")} &middot; ${esc(tr.dwellDetail || "")}</div>`
+            ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName} &middot; ${esc(tr.dwellDetail || "")}</div>`
             : tr.dwellStatus === "dest"
-              ? `<div style='font-size:12px;color:#10B981;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${esc(tr.dwellStation || "Destination")} &middot; Final Stop</div>`
-              : `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${esc(tr.dwellStation || "station")}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
+              ? `<div style='font-size:12px;color:#10B981;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${dwellName} &middot; Final Stop</div>`
+              : `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
           : "") +
         "<table style='width:100%;margin-bottom:4px;'>" +
         `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +

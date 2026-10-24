@@ -395,6 +395,20 @@ export function flatBB(f: number[]): BBox {
 
 /** Decode the shared geometry once: sections, backdrop network, data extent. */
 export function prepAtlas(data: AtlasData): DecodedAtlas {
+  // Calibrate known city centroid coordinates where historical data used distant sub-stations or geocoding homonyms
+  const CITY_COORD_CORRECTIONS: Record<string, [number, number]> = {
+    铜仁: [109.1995, 27.7306], // Tongren Railway Station & downtown (was Tongren South 50km away in Yuping)
+    兰溪: [119.5074, 29.2152], // Lanxi East Station, Jinhua, Zhejiang (was misgeocoded to Shandong)
+    溆浦: [110.594, 27.908],   // Xupu Station downtown (was Xupu South)
+  };
+  for (let i = 0; i < data.city_table.length; i++) {
+    const c = data.city_table[i];
+    const fix = CITY_COORD_CORRECTIONS[c.zh];
+    if (fix) {
+      c.pt = [fix[0], fix[1]];
+    }
+  }
+
   const sec = decodeSet(
     data.sections.map((s) => s.g),
     data.sections.map((s) => (s.h ? 1 : 0)),
@@ -947,6 +961,7 @@ export function buildDayTimeline(
 
   interface RawStopCall {
     cityZh: string;
+    cityEn: string;
     pt: [number, number];
     arrMins: number;
     depMins: number | null;
@@ -969,6 +984,7 @@ export function buildDayTimeline(
         }
         list.push({
           cityZh: dest.zh,
+          cityEn: dest.en,
           pt: dest.pt,
           arrMins: c[3] * 1440 + c[1],
           depMins: c[4] === 1 ? null : c[3] * 1440 + c[2],
@@ -1011,6 +1027,7 @@ export function buildDayTimeline(
         }
         list.push({
           cityZh: src.zh,
+          cityEn: src.en,
           pt: src.pt,
           arrMins: stopArr,
           depMins: stopDep,
@@ -1031,6 +1048,7 @@ export function buildDayTimeline(
       }
       list.push({
         cityZh: cur.o.zh,
+        cityEn: cur.en || "",
         pt: cur.o.pt,
         arrMins: trainArr,
         depMins: null,
@@ -1158,7 +1176,9 @@ export function buildDayTimeline(
     const arrMins = depMins + dur;
 
     const fromStation = (train as any).fsZh || "";
+    const fromStationEn = (train as any).fsEn || "";
     const toStation = (train as any).tsZh || "";
+    const toStationEn = (train as any).tsEn || "";
     const depTime = train.dep || "";
     const arrTime = train.arr || "";
 
@@ -1177,6 +1197,7 @@ export function buildDayTimeline(
         if (call.isTerm) {
           stops.push({
             cityZh: call.cityZh,
+            cityEn: call.cityEn,
             arrMins: call.arrMins,
             depMins: null,
             dist: totalDist,
@@ -1210,6 +1231,7 @@ export function buildDayTimeline(
         prevDist = dist;
         stops.push({
           cityZh: call.cityZh,
+          cityEn: call.cityEn,
           arrMins: call.arrMins,
           depMins: call.depMins,
           dist,
@@ -1222,7 +1244,9 @@ export function buildDayTimeline(
       code: train.code,
       cls: train.cls,
       fromStation,
+      fromStationEn,
       toStation,
+      toStationEn,
       depTime,
       arrTime,
       depMins,
@@ -1391,6 +1415,7 @@ export function buildDayTimeline(
       let targetDist: number;
       let isDwelling = false;
       let dwellStation: string | undefined;
+      let dwellStationEn: string | undefined;
       let dwellStatus: "origin" | "stop" | "dest" | undefined;
       let dwellDetail: string | undefined;
       let speedFrac = 1.0;
@@ -1399,6 +1424,7 @@ export function buildDayTimeline(
         targetDist = 0;
         isDwelling = true;
         dwellStation = pt.fromStation;
+        dwellStationEn = pt.fromStationEn;
         dwellStatus = "origin";
         dwellDetail = `Departs ${pt.depTime}`;
         speedFrac = 0;
@@ -1406,6 +1432,7 @@ export function buildDayTimeline(
         targetDist = pt.totalDist;
         isDwelling = true;
         dwellStation = pt.toStation;
+        dwellStationEn = pt.toStationEn;
         dwellStatus = "dest";
         dwellDetail = "Final Destination";
         speedFrac = 0;
@@ -1424,6 +1451,7 @@ export function buildDayTimeline(
               targetDist = st.dist;
               isDwelling = true;
               dwellStation = st.cityZh;
+              dwellStationEn = st.cityEn;
               dwellStatus = "stop";
               dwellDetail = `${fmtClock(st.arrMins)} - ${fmtClock(st.depMins)}`;
               speedFrac = 0;
@@ -1487,13 +1515,16 @@ export function buildDayTimeline(
             cls: pt.cls,
             code: pt.code,
             fromStation: pt.fromStation,
+            fromStationEn: pt.fromStationEn,
             toStation: pt.toStation,
+            toStationEn: pt.toStationEn,
             depTime: pt.depTime,
             arrTime: pt.arrTime,
             durMins: pt.dur,
             progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
             isDwelling,
             dwellStation,
+            dwellStationEn,
             dwellStatus,
             dwellDetail,
             speedFrac,
@@ -1532,13 +1563,16 @@ export function buildDayTimeline(
         cls: pt.cls,
         code: pt.code,
         fromStation: pt.fromStation,
+        fromStationEn: pt.fromStationEn,
         toStation: pt.toStation,
+        toStationEn: pt.toStationEn,
         depTime: pt.depTime,
         arrTime: pt.arrTime,
         durMins: pt.dur,
         progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
         isDwelling,
         dwellStation,
+        dwellStationEn,
         dwellStatus,
         dwellDetail,
         speedFrac,
