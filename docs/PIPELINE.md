@@ -158,6 +158,13 @@ Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
 ./target/release/audit        # the audit gate — must report:
                               # dropped chains 0, flow lost 0
 ```
+
+**Asset swap (deploying a rebuilt pack).** `web/public/assets/` carries only
+the `.json.br` files the web app fetches: `atlas-v2-{shared,out-map,out-tables,in-map,in-tables,schedules}.json.br`
+and `china-outline.json.br`. Copy just those. The combined `atlas-v2-{out,in}.json.br`
+and the plain `.json` copies (`atlas-v2-schedules.json`, `china-outline.json`)
+are not fetched by the app (it loads `<url>.br`, with a plain `.json` fallback
+that is not deployed) and only add to the deploy size.
 Format: shared + per-direction map/tables files (`atlas-v2-{shared,out-map,out-tables,in-map,in-tables}.json(.br)`),
 array rows, integer-minute times, geometry at 1e4. Top-100 cut: #1 广州 1,201/day …
 #100 麻城 137/day.
