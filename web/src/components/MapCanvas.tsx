@@ -1982,6 +1982,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         true,
         P.current.showInfra,
         st.animEnabled,
+        stationK(),
       );
     updateScaleBar();
     scheduleViewReport();
