@@ -240,8 +240,21 @@ export function rampColor(mins: number, pal: Palette): string {
 
 // Dot radius is a screen-space size, clamped so a destination stays a
 // marker at any zoom instead of swelling into a blob over the track.
+export const STATION_R_MIN = 2;
+export const STATION_R_MAX = 26;
 export function stationR(trains: number): number {
-  return Math.max(2, Math.min(26, 1.3 + Math.sqrt(trains) * 0.55));
+  return Math.max(
+    STATION_R_MIN,
+    Math.min(STATION_R_MAX, 1.3 + Math.sqrt(trains) * 0.55),
+  );
+}
+
+/** Zoom growth of a dot with base radius r at zoom progress t in [0, 1]:
+    1 at t = 0, and at full zoom 3x for the smallest possible dot easing
+    linearly to 2x for the largest. */
+export function stationZoomK(r: number, t: number): number {
+  const kmax = 3 - (r - STATION_R_MIN) / (STATION_R_MAX - STATION_R_MIN);
+  return 1 + (kmax - 1) * t;
 }
 
 export function fmtTime(m: number | null | undefined): string {

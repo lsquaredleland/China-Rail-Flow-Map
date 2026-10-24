@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import type { Palette } from "../types";
-import { WIDTH_K, flowColor, rampColor, stationR } from "../lib";
+import { WIDTH_K, flowColor, rampColor, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
     the stepped width bar's heights depend on the live zoom ratio. The
@@ -19,6 +19,7 @@ export interface LegendHandle {
     hasOrigin: boolean,
     showInfra?: boolean,
     showAnim?: boolean,
+    stationT?: number,
   ) => void;
 }
 
@@ -71,6 +72,9 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const stepRefs = useRef<(SVGRectElement | null)[]>([]);
   const widthGroupRef = useRef<SVGGElement | null>(null);
   const widthHeadRef = useRef<SVGTextElement | null>(null);
+  const circleRefs = useRef<(SVGCircleElement | null)[]>([]);
+  const circleLabelRefs = useRef<(SVGTextElement | null)[]>([]);
+  const circleHeadRef = useRef<SVGTextElement | null>(null);
   const circleGroupRef = useRef<SVGGElement | null>(null);
   const infraGroupRef = useRef<SVGGElement | null>(null);
   const infraHsrLineRef = useRef<SVGLineElement | null>(null);
@@ -92,6 +96,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         hasOrigin: boolean,
         showInfra?: boolean,
         showAnim?: boolean,
+        stationT = 0,
       ) {
         const svg = svgRef.current;
         if (!svg) return;
@@ -135,8 +140,22 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
             "transform",
             "translate(0 " + base + ")",
           );
-        const circD = stationR(200) * 2;
+        // Sample dots wear the map's zoom factor, laid out left to right
+        // with the same spacing; the largest sets the row height.
+        let cxp = 6;
+        for (let i = 0; i < SAMPLES.length; i++) {
+          const r0 = stationR(SAMPLES[i]);
+          const rr = r0 * stationZoomK(r0, stationT);
+          const ccx = cxp + rr;
+          circleRefs.current[i]?.setAttribute("cx", String(ccx));
+          circleRefs.current[i]?.setAttribute("cy", String(-rr));
+          circleRefs.current[i]?.setAttribute("r", String(rr));
+          circleLabelRefs.current[i]?.setAttribute("x", String(ccx));
+          cxp = ccx + rr + 18;
+        }
+        const circD = stationR(200) * stationZoomK(stationR(200), stationT) * 2;
         const cbase = base + 24 + 8 + circD;
+        circleHeadRef.current?.setAttribute("y", String(-(8 + circD)));
         if (circleGroupRef.current)
           circleGroupRef.current.setAttribute(
             "transform",
@@ -301,6 +320,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               it (baseline − 8 − largest diameter = the old base + 24). */}
           <g ref={circleGroupRef} transform={"translate(0 " + initCbase + ")"}>
             <text
+              ref={circleHeadRef}
               x={4}
               y={-(8 + circD)}
               fontSize={10.5}
@@ -311,9 +331,12 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               Circle size = direct trains/day
             </text>
             <rect x={4} y={0} width={W - 8} height={1} fill="currentColor" />
-            {circles.map((c) => (
+            {circles.map((c, i) => (
               <g key={c.label}>
                 <circle
+                  ref={(el) => {
+                    circleRefs.current[i] = el;
+                  }}
                   cx={c.cx}
                   cy={-c.r}
                   r={c.r}
@@ -321,6 +344,9 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
                   strokeWidth={0.8}
                 />
                 <text
+                  ref={(el) => {
+                    circleLabelRefs.current[i] = el;
+                  }}
                   x={c.cx}
                   y={8}
                   fontSize={10.5}
