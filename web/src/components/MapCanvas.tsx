@@ -8,11 +8,13 @@ import {
   type RefObject,
 } from "react";
 import type {
+  ActiveTrainVM,
   ChordVM,
   CityPointVM,
   DecodedAtlas,
   DecodedOutline,
   DecodedSet,
+  DayTimelineVM,
   DestVM,
   Direction,
   DistUnit,
@@ -20,6 +22,7 @@ import type {
   Hit,
   OriginVM,
   Palette,
+  PrepTrain,
   SrcVM,
 } from "../types";
 import {
@@ -32,6 +35,7 @@ import {
   stationLabel,
   stationR,
   stationRowsHtml,
+  trainDistAt,
 } from "../lib";
 import type { LegendHandle } from "./Legend";
 
@@ -42,6 +46,19 @@ import type { LegendHandle } from "./Legend";
    crisp hairline tracing every corridor at any scale. */
 const INFRA_WIDTH = 1.25;
 
+export interface AnimState {
+  time: number; // minutes from midnight (0 up to totalMins)
+  totalMins: number; // total duration until all trains arrive (e.g. 1440, 2880, 4320)
+  totalDays: number; // number of 24h days needed for complete journeys
+  isPlaying: boolean;
+  speed: number; // seconds per 24h cycle (e.g. 15, 30, 60), default 30
+  departed: number;
+  arrived: number;
+  total: number;
+  enabled: boolean;
+}
+export type AnimListener = (state: AnimState) => void;
+
 /** Camera/tooltip controls the toolbar drives through a ref. */
 export interface MapApi {
   fitCountry: () => void;
@@ -51,6 +68,13 @@ export interface MapApi {
   clearStationHover: () => void;
   selectDestByZh: (zh: string) => void;
   panZoomTo: (lon: number, lat: number, scale: number) => void;
+  setTime: (tMins: number) => void;
+  setPlaying: (playing: boolean) => void;
+  togglePlaying: () => void;
+  setSpeed: (secPerDay: number) => void;
+  setAnimEnabled: (enabled: boolean) => void;
+  getAnimState: () => AnimState;
+  subscribeAnim: (listener: AnimListener) => () => void;
 }
 
 interface Props {
@@ -75,6 +99,10 @@ interface Props {
       canvas. */
   inLoading: boolean;
   onSelectDest: (d: CityPointVM | null) => void;
+  selectedTrainCode?: string | null;
+  onSelectTrain?: (code: string | null) => void;
+  isolatedTrainCode?: string | null;
+  onSelectIsolatedTrain?: (code: string | null) => void;
   legendRef: RefObject<LegendHandle | null>;
   initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
   onViewChange?: (view: {
@@ -139,6 +167,32 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       dir: Direction;
       counts: Map<number, number> | null;
     } | null,
+    activeDestCache: null as {
+      cur: OriginVM;
+      dest: CityPointVM;
+      items: { pt: PrepTrain; entries: { sec: number; pos: number }[] }[];
+    } | null,
+    selCache: null as {
+      cur: OriginVM;
+      panelDest: CityPointVM | null;
+      iso: string | null;
+      dir: Direction;
+      allowedCodes: Set<string> | null;
+      cityTimes: Map<number, number[]>;
+    } | null,
+    activeTrainsMemo: null as {
+      tl: DayTimelineVM;
+      t: number;
+      list: ActiveTrainVM[];
+    } | null,
+    chordDepCache: null as { cur: OriginVM; firstDep: Map<number, number> } | null,
+    animTime: 360,
+    animPlaying: false,
+    animSpeed: 30,
+    animEnabled: false,
+    animListeners: new Set<AnimListener>(),
+    lastRafTimestamp: null as number | null,
+    animRafId: null as number | null,
   });
 
   /* ---------- camera helpers ---------- */
@@ -159,6 +213,32 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const cur = P.current.cur;
     if (!cur) return [];
     return P.current.direction === "out" ? cur.flows : cur.inFlows;
+  };
+  // Inbound has no timeline: the animation is outbound-only.
+  const activeTimeline = (): DayTimelineVM | undefined => {
+    const cur = P.current.cur;
+    return cur && P.current.direction === "out" ? cur.timeline : undefined;
+  };
+  // The dots at minute t, computed once per frame however many passes ask.
+  const activeTrainsAt = (tl: DayTimelineVM, t: number): ActiveTrainVM[] => {
+    const m = S.current.activeTrainsMemo;
+    if (m && m.tl === tl && m.t === t) return m.list;
+    const list = tl.getActiveTrains(t);
+    S.current.activeTrainsMemo = { tl, t, list };
+    return list;
+  };
+  /* A filtered view (class, histogram or train filter) is a subset of the
+     full origin `baseCur`; selecting a city alone is not a filter. */
+  const isFilteredView = (): boolean => {
+    const cur = P.current.cur;
+    const baseCur = P.current.baseCur;
+    if (!cur || !baseCur || cur === baseCur) return false;
+    return (
+      cur.deps.length !== baseCur.deps.length ||
+      cur.arrs.length !== baseCur.arrs.length ||
+      cur.flows.length !== baseCur.flows.length ||
+      cur.maxFlow !== baseCur.maxFlow
+    );
   };
   const flowsSet = (): DecodedSet | null => {
     const atlas = P.current.atlas;
@@ -276,17 +356,21 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     off: number,
     count: number,
     waterMode?: "landOnly" | "waterOnly",
+    isRev: boolean = false,
   ) {
     if (!waterMode) {
       let lx = -1e9,
         ly = -1e9,
         started = false;
-      for (let i = 0; i < count; i++) {
+      const step = isRev ? -1 : 1;
+      const startIdx = isRev ? count - 1 : 0;
+      const endIdx = isRev ? -1 : count;
+      for (let i = startIdx; i !== endIdx; i += step) {
         const x = X(arr[off + i * 2]),
           y = Y(arr[off + i * 2 + 1]);
         const dx = x - lx,
           dy = y - ly;
-        if (started && dx * dx + dy * dy < 0.42 && i !== count - 1) continue;
+        if (started && dx * dx + dy * dy < 0.42 && i !== (isRev ? 0 : count - 1)) continue;
         if (!started) {
           ctx.moveTo(x, y);
           started = true;
@@ -300,13 +384,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let lx = -1e9,
       ly = -1e9,
       started = false;
-    for (let i = 0; i < count; i++) {
+    const step = isRev ? -1 : 1;
+    const startIdx = isRev ? count - 1 : 0;
+    const endIdx = isRev ? -1 : count;
+    for (let i = startIdx; i !== endIdx; i += step) {
       const lon = arr[off + i * 2];
       const lat = arr[off + i * 2 + 1];
 
-      if (i > 0) {
-        const prevLon = arr[off + (i - 1) * 2];
-        const prevLat = arr[off + (i - 1) * 2 + 1];
+      if (i !== startIdx) {
+        const prevLon = arr[off + (i - step) * 2];
+        const prevLat = arr[off + (i - step) * 2 + 1];
         const isWaterCross =
           ((prevLat < 20.10 && lat > 20.18) || (prevLat > 20.18 && lat < 20.10)) &&
           prevLon > 109.9 && prevLon < 110.4 &&
@@ -329,13 +416,72 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         y = Y(lat);
       const dx = x - lx,
         dy = y - ly;
-      if (started && dx * dx + dy * dy < 0.42 && i !== count - 1) continue;
+      if (started && dx * dx + dy * dy < 0.42 && i !== (isRev ? 0 : count - 1)) continue;
       if (!started) {
         ctx.moveTo(x, y);
         started = true;
       } else ctx.lineTo(x, y);
       lx = x;
       ly = y;
+    }
+  }
+  function tracePartialSec(
+    ctx: CanvasRenderingContext2D,
+    arr: ArrayLike<number>,
+    off: number,
+    count: number,
+    endLon: number,
+    endLat: number,
+    isRev: boolean = false,
+  ) {
+    if (count <= 0) return;
+    let bestK = 0;
+    let bestD2 = 1e9;
+    for (let k = 0; k < count; k++) {
+      const d2 =
+        (arr[off + k * 2] - endLon) ** 2 +
+        (arr[off + k * 2 + 1] - endLat) ** 2;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        bestK = k;
+      }
+    }
+    let lx = -1e9,
+      ly = -1e9,
+      started = false;
+    if (!isRev) {
+      for (let i = 0; i <= bestK; i++) {
+        const x = X(arr[off + i * 2]),
+          y = Y(arr[off + i * 2 + 1]);
+        const dx = x - lx,
+          dy = y - ly;
+        if (started && dx * dx + dy * dy < 0.42 && i !== bestK) continue;
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else ctx.lineTo(x, y);
+        lx = x;
+        ly = y;
+      }
+    } else {
+      for (let i = count - 1; i >= bestK; i--) {
+        const x = X(arr[off + i * 2]),
+          y = Y(arr[off + i * 2 + 1]);
+        const dx = x - lx,
+          dy = y - ly;
+        if (started && dx * dx + dy * dy < 0.42 && i !== bestK) continue;
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else ctx.lineTo(x, y);
+        lx = x;
+        ly = y;
+      }
+    }
+    if (!started) {
+      ctx.moveTo(X(endLon), Y(endLat));
+    } else {
+      ctx.lineTo(X(endLon), Y(endLat));
     }
   }
   function drawOutline(ctx: CanvasRenderingContext2D, pal: Palette) {
@@ -495,7 +641,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           if (!c.dep || !c.dep.secs) continue;
           const secs = c.dep.secs;
           const lim = Math.min(secs.length, c.secCnt);
+          const seen = new Set<number>();
           for (let k = 0; k < lim; k++) {
+            if (seen.has(secs[k])) continue;
+            seen.add(secs[k]);
             secCounts.set(secs[k], (secCounts.get(secs[k]) || 0) + 1);
           }
         }
@@ -511,8 +660,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           const c = inCalls[i];
           if (!c.arr || !c.arr.secs) continue;
           const secs = c.arr.secs;
-          const lim = Math.min(secs.length, c.secCnt);
-          for (let k = 0; k < lim; k++) {
+          const startK = Math.max(0, secs.length - c.secCnt);
+          const seen = new Set<number>();
+          for (let k = startK; k < secs.length; k++) {
+            if (seen.has(secs[k])) continue;
+            seen.add(secs[k]);
             secCounts.set(secs[k], (secCounts.get(secs[k]) || 0) + 1);
           }
         }
@@ -522,6 +674,48 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     st.destSecCountsCache = { cur, dest, dir: P.current.direction, counts: null };
     return null;
+  }
+
+  function getActiveDestSectionCounts(tMins: number): Map<number, number> {
+    const counts = new Map<number, number>();
+    const cur = P.current.cur;
+    const dest = P.current.panelDest;
+    const tl = activeTimeline();
+    if (!dest || !cur || !tl || P.current.direction !== "out") return counts;
+
+    // Per-selection: each call's sections (once each, first entry) with their
+    // route position on the train's PrepTrain, so the frame loop only calls
+    // trainDistAt and compares distances.
+    const st = S.current;
+    if (!st.activeDestCache || st.activeDestCache.cur !== cur || st.activeDestCache.dest !== dest) {
+      const items: NonNullable<typeof st.activeDestCache>["items"] = [];
+      const calls = (dest as DestVM).calls || [];
+      for (let i = 0; i < calls.length; i++) {
+        const c = calls[i];
+        const dep = c.dep;
+        if (!dep) continue;
+        const pt = tl.getPrepTrain(dep.code);
+        if (!pt) continue;
+        const lim = Math.min(pt.secs.length, c.secCnt);
+        const seen = new Set<number>();
+        const entries: { sec: number; pos: number }[] = [];
+        for (let k = 0; k < lim; k++) {
+          if (seen.has(pt.secs[k])) continue;
+          seen.add(pt.secs[k]);
+          entries.push({ sec: pt.secs[k], pos: pt.secStarts[k] });
+        }
+        items.push({ pt, entries });
+      }
+      st.activeDestCache = { cur, dest, items };
+    }
+    for (const it of st.activeDestCache.items) {
+      const d = trainDistAt(it.pt, tMins);
+      for (const e of it.entries) {
+        if (e.pos > d) break;
+        counts.set(e.sec, (counts.get(e.sec) || 0) + 1);
+      }
+    }
+    return counts;
   }
 
   // Flow sections batched into one stroke per (width, colour) bucket
@@ -544,16 +738,24 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       P.current.direction === "out" ? baseCur.flows : baseCur.inFlows;
     const baseMaxN =
       P.current.direction === "out" ? baseCur.maxFlow : baseCur.maxInFlow;
-    const effectiveMaxN = Math.max(1, baseMaxN);
-
-    const isFiltered =
-      !!destSecCounts ||
-      (baseCur &&
-        cur &&
-        (cur.deps.length !== baseCur.deps.length ||
-          cur.arrs.length !== baseCur.arrs.length ||
-          cur.flows.length !== baseCur.flows.length ||
-          cur.maxFlow !== baseCur.maxFlow));
+    const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
+    const filtered = isFilteredView();
+    const timeline = activeTimeline();
+    const isAnimated = S.current.animEnabled && !!timeline;
+    const step = isAnimated && timeline
+      ? Math.min(
+          timeline.numSteps - 1,
+          Math.max(0, Math.floor(S.current.animTime / timeline.stepMins)),
+        )
+      : 0;
+    // A filtered view keeps the full origin's scale, so its bands stay
+    // proportional to the faded full-origin context drawn underneath.
+    const curMaxN = filtered
+      ? baseMaxN
+      : isAnimated && timeline
+        ? timeline.maxFlowSteps[step] || maxN
+        : maxN;
+    const effectiveMaxN = Math.max(1, curMaxN);
 
     const isFerry = (s: number) =>
       bb[s * 4 + 1] < 20.15 &&
@@ -636,21 +838,152 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.setLineDash([]);
     }
 
-    const activeFlows = flows;
+    let activeFlows: { s: number; n: number }[];
+    if (isAnimated && timeline) {
+      if (S.current.animTime >= timeline.totalMins) {
+        // At or beyond totalMins, all journeys have completed: show 100% completed network
+        activeFlows = flows;
+      } else {
+        activeFlows = [];
+        for (let i = 0; i < flows.length; i++) {
+          const f = flows[i];
+          const n = timeline.secFlowSteps.get(f.s)?.[step] ?? 0;
+          if (n > 0) {
+            activeFlows.push({ s: f.s, n });
+          }
+        }
+        activeFlows.sort((a, b) => b.n - a.n);
+      }
+    } else {
+      activeFlows = flows;
+    }
 
-    if (destSecCounts) {
-      // Pass 1: faded background of ALL base flows at full trunk width
-      strokeFlowList(baseFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
+    const isolatedCode = P.current.isolatedTrainCode;
+    const isoTrain = isolatedCode
+      ? (P.current.direction === "out" ? cur.deps : cur.arrs).find(
+          (t) => t.code === isolatedCode,
+        )
+      : null;
+    const isoPt = isoTrain ? timeline?.getPrepTrain(isoTrain.code) : undefined;
+    const isoSecs = isoTrain ? (isoPt ? isoPt.secs : isoTrain.secs) : null;
+
+    if (isoTrain) {
+      // Pass 1: faded ambient flows across the network
+      strokeFlowList(activeFlows, P.current.dark ? 0.06 : 0.08, effectiveMaxN);
+
+      // Pass 2: illuminate the exact physical corridor of the isolated train as a crisp thin line
+      const isHs = isoTrain.cls === "G" || isoTrain.cls === "D" || isoTrain.cls === "C";
+      const isoColor = isHs ? "#F59E0B" : "#06B6D4";
+      ctx.globalAlpha = 1.0;
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = isoColor;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.setLineDash([]);
+
+      const animTime = S.current.animTime;
+      const depMins = isoTrain.depMins >= 0 ? isoTrain.depMins : 0;
+      const dur = isoTrain.dur > 0 ? isoTrain.dur : 1;
+      const arrMins = depMins + dur;
+      const isProgressive = isAnimated && timeline && animTime < timeline.totalMins;
+
+      if (isoSecs && isoSecs.length > 0) {
+        const ptSecRevs = isoPt?.secRevs;
+        if (!isProgressive || animTime >= arrMins) {
+          ctx.beginPath();
+          for (let i = 0; i < isoSecs.length; i++) {
+            const s = isoSecs[i];
+            traceInto(ctx, pts, off[s], len[s], undefined, ptSecRevs ? ptSecRevs[i] === 1 : false);
+          }
+          ctx.stroke();
+        } else if (animTime >= depMins) {
+          const curTr = activeTrainsAt(timeline, animTime).find(
+            (t) => t.code === isoTrain.code,
+          );
+          const totalDist = isoPt?.totalDist || 1;
+          const targetDist =
+            curTr && curTr.curDist !== undefined
+              ? curTr.curDist
+              : Math.min(1.0, Math.max(0.0, (animTime - depMins) / dur)) * totalDist;
+          const secStarts = isoPt?.secStarts;
+          let curSecIdx = 0;
+          if (secStarts) {
+            while (
+              curSecIdx < isoSecs.length - 1 &&
+              secStarts[curSecIdx + 1] <= targetDist
+            ) {
+              curSecIdx++;
+            }
+          } else {
+            curSecIdx = Math.min(
+              isoSecs.length - 1,
+              Math.floor((targetDist / totalDist) * isoSecs.length),
+            );
+          }
+
+          ctx.beginPath();
+          for (let i = 0; i < curSecIdx; i++) {
+            const s = isoSecs[i];
+            traceInto(ctx, pts, off[s], len[s], undefined, ptSecRevs ? ptSecRevs[i] === 1 : false);
+          }
+          if (curSecIdx < isoSecs.length) {
+            const curS = isoSecs[curSecIdx];
+            const isSecRev = ptSecRevs ? ptSecRevs[curSecIdx] === 1 : false;
+            if (curTr) {
+              tracePartialSec(ctx, pts, off[curS], len[curS], curTr.lon, curTr.lat, isSecRev);
+            } else {
+              traceInto(ctx, pts, off[curS], len[curS], undefined, isSecRev);
+            }
+          }
+          ctx.stroke();
+        }
+      } else {
+        const destIdx = (isoTrain as any).tcIdx ?? (isoTrain as any).fcIdx;
+        const ch = cur.chords.find((c) => c.b === destIdx);
+        if (ch) {
+          ctx.beginPath();
+          if (!isProgressive || animTime >= arrMins) {
+            traceInto(ctx, ch.flat, 0, ch.count);
+          } else if (animTime >= depMins) {
+            const curTr = timeline && activeTrainsAt(timeline, animTime).find(
+              (t) => t.code === isoTrain.code,
+            );
+            if (curTr) {
+              ctx.moveTo(X(ch.flat[0]), Y(ch.flat[1]));
+              ctx.lineTo(X(curTr.lon), Y(curTr.lat));
+            }
+          }
+          ctx.stroke();
+        }
+      }
+    } else if (destSecCounts) {
+      // Pass 1: faded background: the full origin (static) in a filtered
+      // view, else all flows at their current trunk width
+      strokeFlowList(
+        filtered ? baseFlows : activeFlows,
+        P.current.dark ? 0.16 : 0.18,
+        effectiveMaxN,
+      );
       // Pass 2: exact city-pair flow on top at widthOf(subN) and flowColor(subN, effectiveMaxN, pal)
       if (destSecCounts.size > 0) {
         const subFlows: { s: number; n: number }[] = [];
-        for (let i = 0; i < activeFlows.length; i++) {
-          const af = activeFlows[i];
-          const destN = destSecCounts.get(af.s) || 0;
-          if (destN > 0) {
-            const subN = Math.min(af.n, destN);
+        if (isAnimated && timeline && S.current.animTime < timeline.totalMins) {
+          const activeCounts = getActiveDestSectionCounts(S.current.animTime);
+          // Capped by the section's current total (as on main).
+          const activeN = new Map<number, number>();
+          for (const af of activeFlows) activeN.set(af.s, af.n);
+          for (const [s, destN] of activeCounts.entries()) {
+            const subN = Math.min(activeN.get(s) ?? 0, destN);
             if (subN > 0) {
-              subFlows.push({ s: af.s, n: subN });
+              subFlows.push({ s, n: subN });
+            }
+          }
+        } else {
+          for (let i = 0; i < flows.length; i++) {
+            const f = flows[i];
+            const subN = Math.min(f.n, destSecCounts.get(f.s) || 0);
+            if (subN > 0) {
+              subFlows.push({ s: f.s, n: subN });
             }
           }
         }
@@ -658,7 +991,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         strokeFlowList(subFlows, 1.0, effectiveMaxN);
       }
       ctx.globalAlpha = 1.0;
-    } else if (isFiltered) {
+    } else if (filtered) {
       // Pass 1: faded background of ALL base flows at full trunk width
       strokeFlowList(baseFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
       // Pass 2: exact filtered flows on top at widthOf(f.n) and flowColor(f.n, effectiveMaxN, pal)
@@ -761,7 +1094,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       }
     }
 
-    if (destSecCounts) {
+    const isIsolated = Boolean(P.current.isolatedTrainCode);
+    if (isIsolated) {
+      infraPass(false, P.current.dark ? 0.08 : 0.1);
+      ctx.globalAlpha = 1.0;
+    } else if (destSecCounts) {
       infraPass(false, P.current.dark ? 0.18 : 0.2);
       if (destSecCounts.size > 0) infraPass(true, 1.0);
       ctx.globalAlpha = 1.0;
@@ -776,22 +1113,52 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     hasSelectedDest: boolean,
   ) {
     const cur = P.current.cur;
-    const baseCur = P.current.baseCur || cur;
-    if (!cur || !baseCur) return;
-    const isFiltered =
-      hasSelectedDest ||
-      (baseCur &&
-        cur &&
-        (cur.deps.length !== baseCur.deps.length ||
-          cur.arrs.length !== baseCur.arrs.length ||
-          cur.flows.length !== baseCur.flows.length ||
-          cur.maxFlow !== baseCur.maxFlow));
-    if (isFiltered) ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
-    for (let i = 0; i < baseCur.chords.length; i++) {
-      const ch = baseCur.chords[i];
+    if (!cur) return;
+    const isIsolated = Boolean(P.current.isolatedTrainCode);
+    // In a filtered view every chord is faded context (as on main), not gated by time.
+    const filtered = isFilteredView();
+    if (isIsolated) {
+      ctx.globalAlpha = P.current.dark ? 0.05 : 0.08;
+    } else if (hasSelectedDest || filtered) {
+      ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
+    }
+    const st = S.current;
+    const isAnimated = st.animEnabled && !P.current.showInfra && !filtered;
+    const timeline = activeTimeline();
+    const gated = isAnimated && !!timeline && st.animTime < timeline.totalMins;
+    const isoTrain = gated && isIsolated
+      ? cur.deps?.find((t) => t.code === P.current.isolatedTrainCode)
+      : undefined;
+    // Per origin view: the first departure towards each chord's terminus.
+    let firstDep: Map<number, number> | null = null;
+    if (gated && !isIsolated) {
+      const c = st.chordDepCache;
+      if (c && c.cur === cur) {
+        firstDep = c.firstDep;
+      } else {
+        firstDep = new Map();
+        for (const d of cur.deps || []) {
+          const prev = firstDep.get(d.tcIdx);
+          if (prev === undefined || d.depMins < prev) firstDep.set(d.tcIdx, d.depMins);
+        }
+        st.chordDepCache = { cur, firstDep };
+      }
+    }
+    for (let i = 0; i < cur.chords.length; i++) {
+      const ch = cur.chords[i];
       if (highlight === ch) continue;
       if (!inViewBB(ch.bb.x0, ch.bb.y0, ch.bb.x1, ch.bb.y1, 0.35)) continue;
-      const w = widthOf(ch.n);
+      if (gated) {
+        if (isIsolated) {
+          if (!isoTrain || isoTrain.tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
+            continue;
+          }
+        } else {
+          const dep = firstDep!.get(ch.b);
+          if (dep === undefined || st.animTime < dep) continue;
+        }
+      }
+      const w = isIsolated ? 1.5 : widthOf(ch.n);
       ctx.lineWidth = w;
       ctx.strokeStyle = pal.chord;
       ctx.setLineDash([Math.max(3, w * 1.1), Math.max(2.5, w * 0.8)]);
@@ -801,7 +1168,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     ctx.globalAlpha = 1.0;
     ctx.setLineDash([]);
-    if (highlight) {
+    if (highlight && !isIsolated) {
       const hw = widthOf(highlight.n) + 1.6;
       ctx.lineWidth = hw;
       ctx.strokeStyle = pal.flowHi;
@@ -818,6 +1185,47 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     sIdx: number,
     n: number,
   ) {
+    const cur = P.current.cur;
+    if (!cur) return;
+    const st = S.current;
+    const isAnimated = st.animEnabled && !P.current.showInfra;
+    const timeline = activeTimeline();
+    if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+      const step = Math.min(
+        timeline.numSteps - 1,
+        Math.max(0, Math.floor(st.animTime / timeline.stepMins)),
+      );
+      if (P.current.isolatedTrainCode) {
+        const isoTrain = (P.current.direction === "out" ? P.current.cur?.deps : P.current.cur?.arrs)?.find(
+          (t) => t.code === P.current.isolatedTrainCode,
+        );
+        if (!isoTrain || !isoTrain.secs || !isoTrain.secs.includes(sIdx) || st.animTime < isoTrain.depMins) {
+          return;
+        }
+        // Only a section the isolated train has already reached.
+        const isoPt = timeline.getPrepTrain(isoTrain.code);
+        if (isoPt) {
+          const d = trainDistAt(isoPt, st.animTime);
+          let reached = false;
+          for (let k = 0; k < isoPt.secs.length && isoPt.secStarts[k] <= d; k++) {
+            if (isoPt.secs[k] === sIdx) {
+              reached = true;
+              break;
+            }
+          }
+          if (!reached) return;
+        }
+      } else if (P.current.panelDest) {
+        const activeCounts = getActiveDestSectionCounts(st.animTime);
+        if ((activeCounts.get(sIdx) ?? 0) <= 0) {
+          return;
+        }
+      } else {
+        if ((timeline.secFlowSteps.get(sIdx)?.[step] ?? 0) <= 0) {
+          return;
+        }
+      }
+    }
     const set = flowsSet();
     if (!set) return;
     const isFerry =
@@ -857,12 +1265,262 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     ctx.lineCap = "round";
     ctx.setLineDash([]);
   }
+  function computeAllowedTrainCodes(): Set<string> | null {
+    const iso = P.current.isolatedTrainCode;
+    const cur = P.current.cur;
+    if (iso) {
+      // Intersected with the active filter: a filtered-out train stays hidden.
+      const rows = !cur ? [] : P.current.direction === "out" ? cur.deps : cur.arrs;
+      return new Set(rows.some((t) => t.code === iso) ? [iso] : []);
+    }
+    const pd = P.current.panelDest;
+    if (!pd || !cur) return null;
+
+    const allowed = new Set<string>();
+    if (P.current.direction === "out") {
+      const dest = cur.dests.find((d) => d.idx === pd.idx) || (pd as DestVM);
+      if (dest && dest.calls) {
+        for (let i = 0; i < dest.calls.length; i++) {
+          const c = dest.calls[i];
+          if (c.dep && c.dep.code) {
+            allowed.add(c.dep.code);
+          }
+        }
+      }
+    } else {
+      const src = cur.srcs.find((s) => s.idx === pd.idx) || (pd as SrcVM);
+      if (src && src.inCalls) {
+        for (let i = 0; i < src.inCalls.length; i++) {
+          const c = src.inCalls[i];
+          if (c.arr && c.arr.code) {
+            allowed.add(c.arr.code);
+          }
+        }
+      }
+    }
+    return allowed;
+  }
+
+  function computeCityAllowedArrivalTimes(
+    c: CityPointVM,
+    allowedCodes: Set<string>,
+  ): number[] {
+    if (P.current.direction === "out") {
+      const dest = c as DestVM;
+      const calls = dest?.calls;
+      if (!calls || calls.length === 0) return [];
+      const times: number[] = [];
+      for (let i = 0; i < calls.length; i++) {
+        const call = calls[i];
+        if (call.dep && allowedCodes.has(call.dep.code)) {
+          const m =
+            call.arrMins !== undefined
+              ? call.arrMins
+              : call.dayOff * 1440 +
+                parseInt(call.arr.slice(0, 2), 10) * 60 +
+                parseInt(call.arr.slice(3, 5), 10);
+          if (typeof m === "number" && !isNaN(m) && m >= 0) {
+            times.push(m);
+          }
+        }
+      }
+      times.sort((a, b) => a - b);
+      return times;
+    } else {
+      const src = c as SrcVM;
+      const inCalls = src?.inCalls;
+      if (!inCalls || inCalls.length === 0) return [];
+      const times: number[] = [];
+      for (let i = 0; i < inCalls.length; i++) {
+        const call = inCalls[i];
+        if (call.arr && allowedCodes.has(call.arr.code)) {
+          if (call.boardMins !== undefined && call.boardMins >= 0) {
+            const tDep = call.arr.depMins >= 0 ? call.arr.depMins : 0;
+            const tArr = tDep + (call.arr.dur > 0 ? call.arr.dur : 1);
+            let unrolled: number = call.boardMins;
+            for (let d = 0; d <= 4; d++) {
+              const testT = d * 1440 + call.boardMins;
+              if (testT >= tDep - 1 && testT <= tArr + 1) {
+                unrolled = testT;
+                break;
+              }
+            }
+            times.push(unrolled);
+          }
+        }
+      }
+      times.sort((a, b) => a - b);
+      return times;
+    }
+  }
+
+  /* Per-selection cache: the allowed train set and each city's sorted arrival
+     times, rebuilt only when the origin, panel city, isolated train or
+     direction changes (not per frame, not per dot). */
+  function getSelCache(): NonNullable<typeof S.current.selCache> | null {
+    const cur = P.current.cur;
+    if (!cur) return null;
+    const panelDest = P.current.panelDest ?? null;
+    const iso = P.current.isolatedTrainCode ?? null;
+    const dir = P.current.direction;
+    const c = S.current.selCache;
+    if (c && c.cur === cur && c.panelDest === panelDest && c.iso === iso && c.dir === dir) {
+      return c;
+    }
+    const allowedCodes = computeAllowedTrainCodes();
+    const cityTimes = new Map<number, number[]>();
+    if (allowedCodes) {
+      const pts = points();
+      for (let i = 0; i < pts.length; i++) {
+        cityTimes.set(pts[i].idx, computeCityAllowedArrivalTimes(pts[i], allowedCodes));
+      }
+    }
+    const next = { cur, panelDest, iso, dir, allowedCodes, cityTimes };
+    S.current.selCache = next;
+    return next;
+  }
+  const getAllowedTrainCodes = () => getSelCache()?.allowedCodes ?? null;
+
+  function drawTrains(ctx: CanvasRenderingContext2D, _pal: Palette) {
+    const cur = P.current.cur;
+    if (!cur) return;
+    const timeline = activeTimeline();
+    if (!timeline) return;
+
+    const activeTrains = activeTrainsAt(timeline, S.current.animTime);
+    const isolatedCode = P.current.isolatedTrainCode;
+    if (!activeTrains || activeTrains.length === 0) return;
+
+    const allowedCodes = getAllowedTrainCodes();
+    const { W, H } = S.current;
+    const tailLen = 12;
+
+    for (let i = 0; i < activeTrains.length; i++) {
+      const tr = activeTrains[i];
+      if (allowedCodes && !allowedCodes.has(tr.code)) {
+        continue;
+      }
+      const isIsolated = isolatedCode === tr.code;
+      if (isolatedCode && !isIsolated) {
+        continue;
+      }
+      ctx.globalAlpha = tr.onChord ? 0.45 : 1.0;
+
+      const px = X(tr.lon);
+      const py = Y(tr.lat);
+      if (px < -20 || px > W + 20 || py < -20 || py > H + 20) continue;
+
+      const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
+      const isConv =
+        tr.cls === "Z" || tr.cls === "T" || tr.cls === "K" || tr.cls === "S";
+
+      const glowColor = isHighSpeed
+        ? "#F59E0B"
+        : isConv
+          ? "#06B6D4"
+          : "#E2E8F0";
+
+      // Tail vector pointing backwards from the movement direction
+      // screen vx = cos(heading), vy = -sin(heading) due to equirectangular latitude inversion
+      const vx = Math.cos(tr.heading);
+      const vy = -Math.sin(tr.heading);
+      const isDwelling = Boolean(tr.isDwelling);
+      const speedFrac =
+        tr.speedFrac !== undefined ? tr.speedFrac : isDwelling ? 0 : 1;
+      const baseTailLen = isIsolated ? 22 : tailLen;
+      const actualTailLen = isDwelling || tr.onChord
+        ? 0
+        : Math.round(baseTailLen * speedFrac);
+      if (actualTailLen > 0) {
+        const tailX = px - vx * actualTailLen;
+        const tailY = py - vy * actualTailLen;
+
+        // Draw tapered motion tail
+        const grad = ctx.createLinearGradient(tailX, tailY, px, py);
+        grad.addColorStop(0, "rgba(255, 255, 255, 0)");
+        grad.addColorStop(1, glowColor);
+
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(px, py);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = isIsolated ? 3.5 : 2.5;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+
+      // Outer glow
+      ctx.beginPath();
+      ctx.arc(px, py, isIsolated ? 5.5 : 4, 0, 6.2832);
+      ctx.fillStyle = glowColor;
+      ctx.fill();
+
+      // Inner white core
+      ctx.beginPath();
+      ctx.arc(px, py, isIsolated ? 2.8 : 2, 0, 6.2832);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+
+      // Station dwelling ring indicator (passengers boarding)
+      if (isDwelling) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, isIsolated ? 8.5 : 6.5, 0, 6.2832);
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 1.3;
+        ctx.globalAlpha = 0.85;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // If hovered (while paused), selected, or isolated, draw prominent indicator ring and code tag
+      const isHovered =
+        S.current.hover &&
+        S.current.hover.kind === "train" &&
+        S.current.hover.train.code === tr.code;
+      const isSelected = P.current.selectedTrainCode === tr.code;
+
+      if (isHovered || isSelected || isIsolated) {
+        ctx.beginPath();
+        ctx.arc(px, py, isIsolated ? 9 : 7, 0, 6.2832);
+        ctx.strokeStyle = isIsolated ? glowColor : "#FFFFFF";
+        ctx.lineWidth = isIsolated ? 2.5 : 2.0;
+        ctx.stroke();
+
+        ctx.font = "bold 10px monospace";
+        const tagText = isIsolated ? `${tr.code} · ${tr.progressPct}%` : tr.code;
+        const tagMetrics = ctx.measureText(tagText);
+        const tagW = tagMetrics.width + 8;
+        const tagH = 16;
+        const tagX = px - tagW / 2;
+        const tagY = py - 18;
+
+        ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+        ctx.beginPath();
+        ctx.roundRect(tagX, tagY, tagW, tagH, 3);
+        ctx.fill();
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(tagText, px, tagY + tagH / 2);
+      }
+    }
+    ctx.globalAlpha = 1.0;
+  }
   function drawStations(ctx: CanvasRenderingContext2D, pal: Palette) {
     const cur = P.current.cur;
     if (!cur) return;
     const { W, H, hover } = S.current;
     const pts = points();
 
+    const timeline = activeTimeline();
+    const isAnimated = S.current.animEnabled && !!timeline;
+
+    const sel = getSelCache();
     function drawDot(c: CityPointVM) {
       if (
         c.pt[0] < toLon(-30) ||
@@ -871,9 +1529,49 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         c.pt[1] > toLat(-30)
       )
         return;
+
+      const allowedCodes = getAllowedTrainCodes();
+      const cityArrTimes = allowedCodes
+        ? sel?.cityTimes.get(c.idx) ?? null
+        : c.arrTimes || null;
+      const totalCityTrains = allowedCodes
+        ? cityArrTimes
+          ? cityArrTimes.length
+          : 0
+        : c.trains;
+
+      // Dynamic city circle sizing: circle grows only when an allowed train arrives at this city
+      let effectiveTrains = totalCityTrains;
+      let recentArrival = false;
+      let pulseDt = 0;
+      if (isAnimated && timeline) {
+        const t = S.current.animTime;
+        if (t >= timeline.totalMins) {
+          // Finished: all trips completed
+          effectiveTrains = totalCityTrains;
+        } else if (cityArrTimes && cityArrTimes.length > 0) {
+          let count = 0;
+          for (let k = 0; k < cityArrTimes.length; k++) {
+            if (cityArrTimes[k] <= t) count++;
+            else break;
+          }
+          effectiveTrains = count;
+          if (count > 0) {
+            const lastArr = cityArrTimes[count - 1];
+            const dt = t - lastArr;
+            if (dt >= 0 && dt <= 20) {
+              recentArrival = true;
+              pulseDt = dt;
+            }
+          }
+        } else {
+          effectiveTrains = 0;
+        }
+      }
+
       const x = X(c.pt[0]),
         y = Y(c.pt[1]),
-        r = stationR(c.trains);
+        r = stationR(effectiveTrains);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 6.2832);
       // Dot colour is the fastest-time band — always on, no toggle.
@@ -883,6 +1581,19 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.lineWidth = P.current.dark ? 3.0 : 1.5;
       ctx.strokeStyle = pal.dotEdge;
       ctx.stroke();
+
+      // Golden arrival pulse ripple when an allowed train has arrived at this city (never outside allowed trains)
+      if (recentArrival && isAnimated && (!allowedCodes || totalCityTrains > 0)) {
+        const frac = pulseDt / 20;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r + frac * 7, 0, 6.2832);
+        ctx.strokeStyle = P.current.dark ? "#F59E0B" : "#D97706";
+        ctx.globalAlpha = Math.max(0, 1 - frac);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     const pd = P.current.panelDest;
@@ -1245,6 +1956,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     // The Infrastructure overlay is superimposed on the flows (below
     // the hover highlight, dots and labels).
     if (P.current.showInfra) drawInfra(ctx, pal, destSecCounts);
+    if (st.animEnabled) drawTrains(ctx, pal);
     if (st.hover && st.hover.kind === "seg")
       drawHighlightSeg(
         ctx,
@@ -1260,6 +1972,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         st.view.scale / st.fitScale,
         true,
         P.current.showInfra,
+        st.animEnabled,
       );
     updateScaleBar();
     scheduleViewReport();
@@ -1346,6 +2059,146 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     });
   }
 
+  /* ---------- 24h timeline animation controls ---------- */
+  function getAnimState(): AnimState {
+    const st = S.current;
+    const cur = P.current.cur;
+    const tl = activeTimeline();
+    let total = tl ? tl.totalTrains : 0;
+    let departed = tl ? tl.getDepartedCount(st.animTime) : 0;
+    let arrived = tl ? tl.getArrivedCount(st.animTime) : 0;
+    const totalMins = tl ? tl.totalMins : 1440;
+    const totalDays = tl ? tl.totalDays : 1;
+
+    const allowedCodes = getAllowedTrainCodes();
+    if (allowedCodes && cur && tl) {
+      total = allowedCodes.size;
+      let depCount = 0;
+      let arrCount = 0;
+      for (const code of allowedCodes) {
+        const pt = tl.getPrepTrain(code);
+        if (!pt) continue;
+        if (pt.depMins <= st.animTime) depCount++;
+        if (pt.arrMins <= st.animTime) arrCount++;
+      }
+      departed = depCount;
+      arrived = arrCount;
+    }
+
+    return {
+      time: st.animTime,
+      totalMins,
+      totalDays,
+      isPlaying: st.animPlaying,
+      speed: st.animSpeed,
+      departed,
+      arrived,
+      total,
+      enabled: st.animEnabled,
+    };
+  }
+
+  function notifyAnimListeners() {
+    const state = getAnimState();
+    S.current.animListeners.forEach((listener) => {
+      try {
+        listener(state);
+      } catch (err) {
+        console.error("AnimListener error:", err);
+      }
+    });
+  }
+
+  function animLoop(timestamp: number) {
+    const st = S.current;
+    if (!st.animPlaying) {
+      st.animRafId = null;
+      st.lastRafTimestamp = null;
+      return;
+    }
+    const tl = activeTimeline();
+    const totalMins = tl ? tl.totalMins : 1440;
+
+    if (st.lastRafTimestamp !== null) {
+      const dt = (timestamp - st.lastRafTimestamp) / 1000;
+      if (dt > 0 && dt < 2) {
+        // Accelerate tail playback (Day 2-3) by 2.5x so watching terminal arrivals stays dynamic
+        const tailMult = st.animTime > 1440 ? 2.5 : 1.0;
+        const deltaMins = (dt / Math.max(1, st.animSpeed)) * 1440 * tailMult;
+        st.animTime = st.animTime + deltaMins;
+        if (st.animTime >= totalMins) {
+          st.animTime = 0;
+        }
+        draw();
+        notifyAnimListeners();
+      }
+    }
+    st.lastRafTimestamp = timestamp;
+    st.animRafId = requestAnimationFrame(animLoop);
+  }
+
+  function setPlaying(playing: boolean) {
+    const st = S.current;
+    if (st.animPlaying === playing) return;
+    st.animPlaying = playing;
+    const tl = activeTimeline();
+    const totalMins = tl ? tl.totalMins : 1440;
+
+    if (playing) {
+      if (!st.animEnabled) {
+        st.animEnabled = true;
+      }
+      if (st.animTime >= totalMins) {
+        st.animTime = 0;
+      }
+      st.lastRafTimestamp = null;
+      if (st.animRafId !== null) {
+        cancelAnimationFrame(st.animRafId);
+      }
+      st.animRafId = requestAnimationFrame(animLoop);
+    } else {
+      if (st.animRafId !== null) {
+        cancelAnimationFrame(st.animRafId);
+        st.animRafId = null;
+      }
+      st.lastRafTimestamp = null;
+    }
+    notifyAnimListeners();
+  }
+
+  function togglePlaying() {
+    setPlaying(!S.current.animPlaying);
+  }
+
+  function setTime(tMins: number) {
+    const st = S.current;
+    const tl = activeTimeline();
+    const totalMins = tl ? tl.totalMins : 1440;
+    st.animTime = Math.max(0, Math.min(totalMins, tMins));
+    draw();
+    notifyAnimListeners();
+  }
+
+  function setSpeed(secPerDay: number) {
+    S.current.animSpeed = Math.max(1, secPerDay);
+    notifyAnimListeners();
+  }
+
+  function setAnimEnabled(enabled: boolean) {
+    const st = S.current;
+    st.animEnabled = enabled;
+    draw();
+    notifyAnimListeners();
+  }
+
+  function subscribeAnim(listener: AnimListener): () => void {
+    S.current.animListeners.add(listener);
+    listener(getAnimState());
+    return () => {
+      S.current.animListeners.delete(listener);
+    };
+  }
+
   /* ---------- hit testing & tooltip ---------- */
   function distToSeg(
     px: number,
@@ -1407,6 +2260,45 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let bestDist = 10;
     let i: number, k: number;
     const destSecCounts = getDestSectionCounts();
+    const st = S.current;
+    const isAnimated = st.animEnabled && !P.current.showInfra;
+    const timeline = activeTimeline();
+    const step =
+      isAnimated && timeline
+        ? Math.min(
+            timeline.numSteps - 1,
+            Math.max(0, Math.floor(st.animTime / timeline.stepMins)),
+          )
+        : 0;
+
+    let activeDestCounts: Map<number, number> | null = null;
+    if (destSecCounts && isAnimated && timeline && st.animTime < timeline.totalMins) {
+      activeDestCounts = getActiveDestSectionCounts(st.animTime);
+    }
+
+    let activeIsoSecs: Set<number> | null = null;
+    if (P.current.isolatedTrainCode && isAnimated && timeline && st.animTime < timeline.totalMins) {
+      activeIsoSecs = new Set<number>();
+      const isoTrain = (P.current.direction === "out" ? cur.deps : cur.arrs).find(
+        (t) => t.code === P.current.isolatedTrainCode,
+      );
+      const isoPt = isoTrain ? timeline.getPrepTrain(isoTrain.code) : undefined;
+      if (isoTrain && isoPt && st.animTime >= isoTrain.depMins) {
+        const targetDist = trainDistAt(isoPt, st.animTime);
+        const secStarts = isoPt.secStarts;
+        let curSecIdx = 0;
+        while (
+          curSecIdx < isoPt.secs.length - 1 &&
+          secStarts[curSecIdx + 1] <= targetDist
+        ) {
+          curSecIdx++;
+        }
+        for (let j = 0; j <= curSecIdx; j++) {
+          activeIsoSecs.add(isoPt.secs[j]);
+        }
+      }
+    }
+
     for (i = 0; i < flows.length; i++) {
       const f = flows[i];
       const s = f.s;
@@ -1416,6 +2308,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         (!destSecCounts.has(s) || (destSecCounts.get(s) ?? 0) <= 0)
       ) {
         continue;
+      }
+      if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+        if (activeDestCounts) {
+          if ((activeDestCounts.get(s) ?? 0) <= 0) continue;
+        } else if (activeIsoSecs !== null) {
+          if (!activeIsoSecs.has(s)) continue;
+        } else {
+          const activeN = timeline.secFlowSteps.get(s)?.[step] ?? 0;
+          if (activeN <= 0) continue;
+        }
       }
       if (
         lon < sec.bb[s * 4] - thrDeg ||
@@ -1458,6 +2360,18 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     let chordBest: ChordVM | null = null;
     for (i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
+      if (isAnimated && timeline && st.animTime < timeline.totalMins) {
+        if (P.current.isolatedTrainCode) {
+          const isoTrain = cur.deps?.find((t) => t.code === P.current.isolatedTrainCode);
+          if (!isoTrain || (isoTrain as any).tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
+            continue;
+          }
+        } else {
+          const destTrains = (cur.deps || []).filter((d) => d.tcIdx === ch.b);
+          const hasDeparted = destTrains.some((d) => st.animTime >= d.depMins);
+          if (!hasDeparted) continue;
+        }
+      }
       if (
         lon < ch.bb.x0 - thrDeg ||
         lon > ch.bb.x1 + thrDeg ||
@@ -1482,7 +2396,38 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     return chordBest ? { kind: "chord", chord: chordBest } : null;
   }
+  function pickTrain(px: number, py: number): Hit | null {
+    const st = S.current;
+    // Paused only: moving train tooltips are strictly active when visualization is paused
+    if (!st.animEnabled || st.animPlaying) return null;
+    const cur = P.current.cur;
+    if (!cur) return null;
+    const timeline = activeTimeline();
+    if (!timeline) return null;
+    const activeTrains = activeTrainsAt(timeline, st.animTime);
+    if (!activeTrains || activeTrains.length === 0) return null;
+
+    const allowedCodes = getAllowedTrainCodes();
+    let bestDist = 14;
+    let bestTrain: ActiveTrainVM | null = null;
+    for (let i = 0; i < activeTrains.length; i++) {
+      const tr = activeTrains[i];
+      if (allowedCodes && !allowedCodes.has(tr.code)) {
+        continue;
+      }
+      const tx = X(tr.lon);
+      const ty = Y(tr.lat);
+      const d = Math.hypot(px - tx, py - ty);
+      if (d < bestDist) {
+        bestDist = d;
+        bestTrain = tr;
+      }
+    }
+    return bestTrain ? { kind: "train", train: bestTrain } : null;
+  }
   function pick(px: number, py: number): Hit | null {
+    const tr = pickTrain(px, py);
+    if (tr) return tr;
     const c = pickStation(px, py);
     if (c) return c;
     return pickSegment(px, py);
@@ -1589,6 +2534,45 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           `<div class='t-sub' style='color:${blueCol};font-weight:600'>` +
           "粤海铁路轮渡 (Guangdong–Hainan Train Ferry) &middot; Qiongzhou Strait crossing</div>";
       }
+    } else if (hit.kind === "train") {
+      const tr = hit.train;
+      const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
+      const badgeColor = isHighSpeed ? "#F59E0B" : "#0284C7";
+      const fromDisplay =
+        tr.fromStationEn && tr.fromStationEn !== tr.fromStation
+          ? `${esc(tr.fromStation)} <span style='font-size:11px;font-weight:400;opacity:0.8;'>(${esc(tr.fromStationEn)})</span>`
+          : esc(tr.fromStation || "");
+      const toDisplay =
+        tr.toStationEn && tr.toStationEn !== tr.toStation
+          ? `${esc(tr.toStation)} <span style='font-size:11px;font-weight:400;opacity:0.8;'>(${esc(tr.toStationEn)})</span>`
+          : esc(tr.toStation || "");
+      const dwellName =
+        tr.dwellStationEn && tr.dwellStationEn !== tr.dwellStation
+          ? `${esc(tr.dwellStation || "")} (${esc(tr.dwellStationEn)})`
+          : esc(tr.dwellStation || "");
+
+      html =
+        "<div class='t-title' style='display:flex;align-items:center;gap:6px;margin-bottom:6px;'>" +
+        `<span style='background:${badgeColor};color:#fff;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;font-family:monospace;'>${esc(tr.code)}</span>` +
+        `<span style='font-size:13px;font-weight:600;'>${fromDisplay} &rarr; ${toDisplay}</span>` +
+        "</div>" +
+        (tr.isDwelling
+          ? (tr.dwellStatus === "origin"
+            ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName} &middot; ${esc(tr.dwellDetail || "")}</div>`
+            : tr.dwellStatus === "dest"
+              ? `<div style='font-size:12px;color:#10B981;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${dwellName} &middot; Final Stop</div>`
+              : `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
+          : "") +
+        (tr.onChord
+          ? "<div style='font-size:12px;color:#9CA3AF;margin-bottom:6px;'>No track geometry on this leg (straight-line stand-in)</div>"
+          : "") +
+        "<table style='width:100%;margin-bottom:4px;'>" +
+        `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +
+        `<tr><td>Arrival</td><td style='text-align:right'><b>${esc(tr.arrTime)}</b></td></tr>` +
+        `<tr><td>Duration</td><td style='text-align:right'>${Math.floor(tr.durMins / 60)}h ${tr.durMins % 60}m</td></tr>` +
+        `<tr><td>Journey Progress</td><td style='text-align:right'><b>${tr.progressPct}%</b></td></tr>` +
+        "</table>" +
+        `<div class='t-sub' style='margin-top:6px;color:${badgeColor};font-weight:600;'>Click train to inspect full station schedule</div>`;
     }
     tooltip.innerHTML = html;
     tooltip.classList.add("show");
@@ -1611,6 +2595,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (a.kind !== b.kind) return false;
     if (a.kind === "seg" && b.kind === "seg") return a.s === b.s;
     if (a.kind === "chord" && b.kind === "chord") return a.chord === b.chord;
+    if (a.kind === "train" && b.kind === "train") return a.train.code === b.train.code;
     if (a.kind === "station" && b.kind === "station")
       return a.station === b.station;
     return true; // origin
@@ -1670,11 +2655,26 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         st.view.ty = st.H / 2 + lat * scale;
         draw();
       },
+      setTime,
+      setPlaying,
+      togglePlaying,
+      setSpeed,
+      setAnimEnabled,
+      getAnimState,
+      subscribeAnim,
     }),
     [],
   );
 
   /* ---------- lifecycle ---------- */
+  useEffect(() => {
+    return () => {
+      if (S.current.animRafId !== null) {
+        cancelAnimationFrame(S.current.animRafId);
+        S.current.animRafId = null;
+      }
+    };
+  }, []);
   // Wheel zoom needs a non-passive listener (React attaches passive ones).
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1740,6 +2740,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (curRef.current && props.cur.o === curRef.current.o) {
       curRef.current = props.cur;
       draw();
+      notifyAnimListeners();
       return;
     }
     const isFirstOrigin = curRef.current === null;
@@ -1752,6 +2753,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       st.initialViewApplied = true;
     }
     resize();
+    notifyAnimListeners();
     setSwitching(true);
     const raf = requestAnimationFrame(() =>
       requestAnimationFrame(() => setSwitching(false)),
@@ -1763,6 +2765,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   // Toggle / theme / direction / selected-station changes just need a redraw.
   useEffect(() => {
     draw();
+    notifyAnimListeners();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     props.showNetwork,
@@ -1867,6 +2870,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           // the floating tooltip; another destination updates it.
           P.current.onSelectDest(hit.station);
           hideTooltip();
+        } else if (hit && hit.kind === "train") {
+          P.current.onSelectTrain?.(hit.train.code);
+          hideTooltip();
         } else if (hit) {
           st.pinned = true;
           showTooltip(hit, p.x, p.y);
@@ -1905,9 +2911,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         onPointerCancel={endPointer}
         onPointerLeave={onPointerLeave}
       />
-      {(!cur || inLoading) && (
+      {(!cur || inLoading || loadError) && (
         <div id="loading" style={cur ? { pointerEvents: "none" } : undefined}>
-          {loadError && !cur
+          {loadError
             ? "The timetable data could not be loaded (" + loadError + ")."
             : "Unfolding the timetable…"}
         </div>

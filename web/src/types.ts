@@ -96,13 +96,15 @@ export interface RawOrigin {
   flows: RawFlow[];
   chords: RawChord[];
   deps?: RawDep[];
-  dep_secs?: number[][];
+  dep_secs?: number[][]; // travel order; ~s = section walked in reverse
+  dep_chord_legs?: ChordLeg[][];
   inbound: number;
   srcs?: RawSrc[];
   in_calls?: RawInCall[][]; // parallel to srcs: in_calls[i] = trains arriving from srcs[i]'s city
   in_flows?: RawFlow[]; // [index into in_sections, trains/day]
   arrs?: RawArr[];
   arr_secs?: number[][];
+  arr_chord_legs?: ChordLeg[][];
 }
 
 /** atlas-v2-shared.json: the tables and geometry every origin shares. */
@@ -121,15 +123,20 @@ export interface OutMapData {
   origins: RawOrigin[];
 }
 
+/** A leg with no track geometry: [stop index, first section, last section]. */
+export type ChordLeg = [number, number, number];
+
 /** One origin's entry in atlas-v2-out-tables.json. */
 export interface OutTablesOrigin {
   deps: RawDep[];
   calls: RawCall[][];
   dep_secs: number[][];
+  dep_chord_legs: ChordLeg[][];
 }
 
 /** atlas-v2-out-tables.json: origins parallel by index. */
 export interface OutTablesData {
+  fmt: number;
   origins: OutTablesOrigin[];
 }
 
@@ -149,10 +156,12 @@ export interface InTablesOrigin {
   arrs: RawArr[];
   in_calls: RawInCall[][];
   arr_secs: number[][];
+  arr_chord_legs: ChordLeg[][];
 }
 
 /** atlas-v2-in-tables.json: origins parallel by index. */
 export interface InTablesData {
+  fmt: number;
   origins: InTablesOrigin[];
 }
 
@@ -226,6 +235,7 @@ export interface CityPointVM {
   crow: number; // crow-flies km
   rail: number; // rail km, -1 when unknown
   nn: number; // nearest-neighbour distance in degrees (label placement order)
+  arrTimes?: number[]; // sorted arrival minutes for dynamic circle expansion
 }
 
 export interface DestVM extends CityPointVM {
@@ -266,7 +276,10 @@ export interface DepVM {
   km: number; // rail journey distance to the final stop, -1 when unrouted
   distKm: number; // journey distance for binning: km when routed, else crow-flies origin → terminus city
   hay: string; // lowercase search haystack
-  secs: number[]; // section indices traversed by this train
+  secs: number[]; // section ids traversed by this train, in travel order
+  secRevs: Uint8Array; // 1 where the section is walked end to start
+  t: number; // train_table index (keys the schedules file)
+  chordLegs: ChordLeg[];
 }
 
 /** One train calling at a destination city, joined to its departure row. */
@@ -278,6 +291,7 @@ export interface CallVM {
   dayOff: number; // arrival day offset relative to the boarding day
   term: boolean; // true when the train's final destination is this city
   secCnt: number; // number of section indices from origin to this stop
+  arrMins?: number; // total arrival minutes from midnight including dayOff
 }
 
 /** One train arriving in the selected city, joined to its tables. */
@@ -301,7 +315,10 @@ export interface ArrVM {
   km: number; // rail journey km from the origin; -1 when unknown
   distKm: number; // journey distance for binning: km when known, else crow-flies source city → selected city
   hay: string; // lowercase search haystack
-  secs: number[]; // section indices traversed by this train (in reverse: arrival to origin)
+  secs: number[]; // section ids traversed by this train, in travel order
+  secRevs: Uint8Array; // 1 where the section is walked end to start
+  t: number; // train_table index (keys the schedules file)
+  chordLegs: ChordLeg[];
 }
 
 /** One train arriving from a source city, joined to its arrival row. */
@@ -315,6 +332,105 @@ export interface InCallVM {
   bsZh: string; // boarding station in the source city
   bsEn: string;
   secCnt: number; // number of section indices from arrival back to boarding stop
+  arrMins?: number; // total arrival minutes in selected city
+  boardMins?: number; // boarding minutes in source city
+}
+
+export interface ActiveTrainVM {
+  lon: number;
+  lat: number;
+  heading: number; // in radians
+  cls: string;     // train class e.g. "G", "D", "K", etc.
+  code: string;
+  fromStation: string;
+  fromStationEn?: string;
+  toStation: string;
+  toStationEn?: string;
+  depTime: string;
+  arrTime: string;
+  durMins: number;
+  progressPct: number;
+  isDwelling?: boolean;
+  dwellStation?: string;
+  dwellStationEn?: string;
+  dwellStatus?: "origin" | "stop" | "dest";
+  dwellDetail?: string;
+  speedFrac?: number;
+  curDist?: number;
+  onChord?: boolean; // on a leg with no track geometry (straight-line stand-in)
+}
+
+export interface ScheduleStop {
+  stIdx: number;
+  stZh: string;
+  stEn: string;
+  arr: string;
+  dep: string;
+  arrMins: number;
+  depMins: number;
+  dayOff: number;
+  dwellMins: number;
+  legKm?: number;
+}
+
+export interface SchedulesData {
+  extra_stations: string[];
+  schedules: [number, number, number, number, number?][][]; // indexed by train_table index
+}
+
+export interface PrepTrainStop {
+  cityZh: string;
+  cityEn?: string;
+  arrMins: number;
+  depMins: number | null;
+  dist: number;
+  isTerm: boolean;
+}
+
+/** A stretch of a train's route with no track geometry, drawn as a straight line. */
+export interface ChordSpan {
+  d0: number; // route distance where the span starts
+  d1: number; // route distance where it ends
+  lon0: number;
+  lat0: number;
+  lon1: number;
+  lat1: number;
+}
+
+export interface PrepTrain {
+  code: string;
+  cls: string;
+  fromStation: string;
+  fromStationEn?: string;
+  toStation: string;
+  toStationEn?: string;
+  depTime: string;
+  arrTime: string;
+  depMins: number;
+  arrMins: number;
+  dur: number;
+  totalDist: number;
+  secs: number[];
+  secStarts: Float64Array;
+  secRevs: Uint8Array;
+  stops?: PrepTrainStop[];
+  chordSpans?: ChordSpan[];
+}
+
+export interface DayTimelineVM {
+  stepMins: number; // 5
+  numSteps: number; // total steps across all days
+  totalMins: number; // total duration until all trains arrive (e.g. 1440, 2880, 4320)
+  totalDays: number; // number of 24h cycles needed for all trains to complete
+  secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(numSteps) of cumulative train count
+  maxFlowSteps: Uint16Array; // length numSteps: max flow count across all sections at each step
+  getActiveTrains: (tMins: number) => ActiveTrainVM[];
+  getPrepTrain: (code: string) => PrepTrain | undefined;
+  totalTrains: number;
+  getDepartedCount: (tMins: number) => number;
+  getArrivedCount: (tMins: number) => number;
+  /** The same timeline restricted to the trains in `codes` (a filtered view). */
+  subset: (codes: Set<string>) => DayTimelineVM;
 }
 
 export interface DistBinFilter {
@@ -355,6 +471,7 @@ export interface OriginVM {
   srcs: SrcVM[]; // sorted by trains/day desc
   arrs: ArrVM[];
   maxInFlow: number;
+  timeline?: DayTimelineVM;
 }
 
 export type DistUnit = "km" | "mi";
@@ -365,7 +482,8 @@ export type Hit =
   | { kind: "origin" }
   | { kind: "station"; station: CityPointVM }
   | { kind: "seg"; s: number; n: number; subN?: number }
-  | { kind: "chord"; chord: ChordVM };
+  | { kind: "chord"; chord: ChordVM }
+  | { kind: "train"; train: ActiveTrainVM };
 
 export type RampStop = [number, [number, number, number]];
 

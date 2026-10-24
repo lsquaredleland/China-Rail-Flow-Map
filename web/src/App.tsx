@@ -16,6 +16,7 @@ import type {
   OutMapData,
   OutTablesData,
   OutlineData,
+  SchedulesData,
   SharedData,
   SrcVM,
 } from "./types";
@@ -24,7 +25,6 @@ import {
   classIndex,
   enName,
   filterOrigin,
-  filterOriginByClasses,
   FLOW_CLASSES,
   prepAtlas,
   prepOutline,
@@ -35,6 +35,8 @@ import Legend, { type LegendHandle } from "./components/Legend";
 import DestinationPanel from "./components/DestinationPanel";
 import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
+import TimelineScrubber from "./components/TimelineScrubber";
+import TrainScheduleModal from "./components/TrainScheduleModal";
 
 // The v2 atlas dataset ships in five split files (same origin order
 // throughout): the shared tables and geometry, and per direction a map
@@ -57,6 +59,18 @@ const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
 const OUTLINE_URL = "assets/china-outline.json";
+// Tables carry travel-ordered, oriented section paths (fmt 3); older packs
+// would draw wrong, so refuse them outright.
+function requireFmt3(fmt: unknown, url: string) {
+  if (fmt === 3) return;
+  const msg = `${url}: unsupported tables format ${String(fmt)} (need fmt 3); rebuild the data pack`;
+  console.error(msg);
+  const err = new Error(msg);
+  err.name = "FmtError";
+  throw err;
+}
+
+const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
 
 // The v2 files carry no `about` blurb (v1 embedded one in the data);
 // the text is unchanged apart from the geometry-precision sentence,
@@ -251,6 +265,11 @@ export default function App() {
   const [selectedDurBins, setSelectedDurBins] = useState<DurBinFilter[]>([]);
   const [selectedTrainCodes, setSelectedTrainCodes] = useState<string[]>([]);
   const [dark, setDarkState] = useState<boolean>(initialDark);
+  const [showTimeline] = useState<boolean>(true);
+  const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
+  const [selectedTrainCode, setSelectedTrainCode] = useState<string | null>(null);
+  const [isolatedTrainCode, setIsolatedTrainCode] = useState<string | null>(null);
+  const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(true);
 
   const mapRef = useRef<MapApi | null>(null);
   const legendRef = useRef<LegendHandle | null>(null);
@@ -334,12 +353,17 @@ export default function App() {
     flightsRef.current.outTables = true;
     fetchData<OutTablesData>(OUT_TABLES_URL)
       .then((d) => {
+        requireFmt3(d.fmt, OUT_TABLES_URL);
         outTablesRef.current = d;
         flightsRef.current.outTables = false;
+        setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
         applyOutTables();
       })
-      .catch(() => {
+      .catch((err: Error) => {
         flightsRef.current.outTables = false;
+        // Only a wrong data format blocks the map; a failed fetch leaves
+        // it usable (the table keeps its loading note), as on main.
+        if (err.name === "FmtError") setLoadError(err.message);
       });
   };
   const ensureInTables = () => {
@@ -351,12 +375,17 @@ export default function App() {
     flightsRef.current.inTables = true;
     fetchData<InTablesData>(IN_TABLES_URL)
       .then((d) => {
+        requireFmt3(d.fmt, IN_TABLES_URL);
         inTablesRef.current = d;
         flightsRef.current.inTables = false;
+        setLoadError((e) => (e && e.startsWith(IN_TABLES_URL) ? null : e));
         applyInTables();
       })
-      .catch(() => {
+      .catch((err: Error) => {
         flightsRef.current.inTables = false;
+        // Only a wrong data format blocks the map; a failed fetch leaves
+        // it usable (the table keeps its loading note), as on main.
+        if (err.name === "FmtError") setLoadError(err.message);
       });
   };
   // Phase 3 for inbound: the map file first (paint), and only once it
@@ -390,6 +419,11 @@ export default function App() {
         if (!cancelled) setOutline(prepOutline(d));
       })
       .catch(() => {});
+    fetchData<SchedulesData>(SCHEDULES_URL)
+      .then((d) => {
+        if (!cancelled) setSchedulesData(d);
+      })
+      .catch((err) => console.warn("Failed to load national schedules asset:", err));
     // A persisted inbound direction paints its map in phase 1 too, so
     // in-map joins the parallel fetch; identity fields still come from
     // out-map, which always loads.
@@ -504,6 +538,12 @@ export default function App() {
       distUnit,
     ],
   );
+
+  const selectedTrainVM = useMemo(() => {
+    if (!selectedTrainCode || !cur) return null;
+    const list = direction === "out" ? cur.deps : cur.arrs;
+    return list.find((t) => t.code === selectedTrainCode) || null;
+  }, [selectedTrainCode, cur, direction]);
 
   const availableClasses: Set<string> = useMemo(() => {
     if (!cur) return new Set(FLOW_CLASSES);
@@ -713,8 +753,11 @@ export default function App() {
   // direction's tables are on their way.
   const setDirection = (d: Direction) => {
     if (d === direction) return;
-    if (d === "in") ensureInMap();
-    else ensureOutTables();
+    if (d === "in") {
+      ensureInMap();
+    } else {
+      ensureOutTables();
+    }
     setPanelCity(null);
     clearFilters();
     setDirectionState(d);
@@ -724,6 +767,15 @@ export default function App() {
       /* storage unavailable */
     }
   };
+
+  useEffect(() => {
+    if (direction === "in") {
+      setIsTimelineCollapsed(true);
+      setIsolatedTrainCode(null);
+      mapRef.current?.setPlaying?.(false);
+      mapRef.current?.setAnimEnabled?.(false);
+    }
+  }, [direction]);
 
   // Esc dismisses the city panel (and its table filter).
   useEffect(() => {
@@ -1087,10 +1139,89 @@ export default function App() {
           loadError={loadError}
           inLoading={direction === "in" && inMapLoading}
           onSelectDest={handleSelectDest}
+          selectedTrainCode={selectedTrainCode}
+          onSelectTrain={setSelectedTrainCode}
+          isolatedTrainCode={isolatedTrainCode}
+          onSelectIsolatedTrain={setIsolatedTrainCode}
           legendRef={legendRef}
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
+          {direction === "out" && isolatedTrainCode && (
+            <div
+              style={{
+                position: "absolute",
+                top: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 100,
+                background: dark
+                  ? "rgba(17, 24, 39, 0.94)"
+                  : "rgba(255, 255, 255, 0.95)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid #F59E0B",
+                borderRadius: "30px",
+                padding: "6px 16px",
+                boxShadow: "0 10px 25px -5px rgba(0,0,0,0.35)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                fontSize: "13px",
+                color: dark ? "#F3F4F6" : "#111827",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: "#F59E0B",
+                  boxShadow: "0 0 8px #F59E0B",
+                }}
+              />
+              <span>
+                Isolated:{" "}
+                <strong style={{ fontFamily: "monospace", fontWeight: 800 }}>
+                  {isolatedTrainCode}
+                </strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedTrainCode(isolatedTrainCode)}
+                style={{
+                  border: "none",
+                  background: dark
+                    ? "rgba(255,255,255,0.12)"
+                    : "rgba(0,0,0,0.08)",
+                  color: "inherit",
+                  cursor: "pointer",
+                  padding: "3px 8px",
+                  borderRadius: "12px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                }}
+              >
+                Timetable
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsolatedTrainCode(null)}
+                style={{
+                  border: "none",
+                  background: "none",
+                  cursor: "pointer",
+                  color: dark ? "#9CA3AF" : "#64748B",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  padding: "0 4px",
+                }}
+                title="Exit single train isolation"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <ActiveFilterBar
             classes={selectedClasses}
             hours={
@@ -1152,8 +1283,73 @@ export default function App() {
             />
           </div>
 
+          {direction === "out" && isTimelineCollapsed && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "16px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 30,
+                pointerEvents: "auto",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTimelineCollapsed(false);
+                  mapRef.current?.setAnimEnabled?.(true);
+                  mapRef.current?.setSpeed?.(30);
+                  mapRef.current?.setTime?.(360);
+                  mapRef.current?.setPlaying?.(true);
+                }}
+                style={{
+                  background: dark ? "#27272A" : "#FFFFFF",
+                  color: dark ? "#EDEDEA" : "#111111",
+                  border: dark
+                    ? "1.5px solid rgba(255, 255, 255, 0.25)"
+                    : "1.5px solid #111111",
+                  borderRadius: "20px",
+                  padding: "6px 20px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.25)",
+                  transition: "transform 0.12s ease, background 0.15s ease",
+                }}
+                title="Expand 24h train flow animation controls"
+              >
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: "#C8302A",
+                    boxShadow: "0 0 8px #C8302A",
+                  }}
+                />
+                <span>24h Flow Animation · Expand ▴</span>
+              </button>
+            </div>
+          )}
         </MapCanvas>
 
+        {direction === "out" && showTimeline && !isTimelineCollapsed && (
+          <TimelineScrubber
+            mapRef={mapRef}
+            dark={dark}
+            direction={direction}
+            originZh={cur?.o.zh}
+            onCollapse={() => {
+              setIsTimelineCollapsed(true);
+              mapRef.current?.setPlaying?.(false);
+              mapRef.current?.setAnimEnabled?.(false);
+            }}
+          />
+        )}
       </div>
 
       <DeparturesTable
@@ -1170,6 +1366,10 @@ export default function App() {
           closePanel();
           setSelectedTrainCodes([]);
         }}
+        onSelectTrain={setSelectedTrainCode}
+        isolatedTrainCode={isolatedTrainCode}
+        onClearTrainIsolation={() => setIsolatedTrainCode(null)}
+        onSelectCity={(c) => handleSelectDest(c)}
         selectedHour={selectedHour}
         selectedHours={selectedHours}
         onSelectHour={setSelectedHour}
@@ -1191,6 +1391,28 @@ export default function App() {
       </footer>
 
       <Footnote cur={cur} direction={direction} />
+
+      <TrainScheduleModal
+        code={selectedTrainCode}
+        trainT={selectedTrainVM ? selectedTrainVM.t : null}
+        onClose={() => setSelectedTrainCode(null)}
+        schedulesData={schedulesData}
+        stationTable={atlas ? atlas.data.station_table : []}
+        dark={dark}
+        unit={distUnit}
+        trainVM={selectedTrainVM}
+        isIsolated={isolatedTrainCode === selectedTrainCode}
+        onToggleIsolate={(c) => {
+          setIsolatedTrainCode((prev) => (prev === c ? null : c));
+        }}
+        onJumpToTime={(mins) => {
+          mapRef.current?.setTime(mins);
+        }}
+        mapRef={mapRef}
+        originCityZh={cur?.o.zh}
+        originCityEn={cur?.en}
+        direction={direction}
+      />
     </>
   );
 }

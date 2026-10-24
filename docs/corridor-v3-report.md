@@ -1,10 +1,14 @@
-# corridor-v3 — per-train corridor routing (STAGING, not applied)
+# corridor-v3 — per-train corridor routing (APPLIED TO PRODUCTION)
 
-Built 2026-10-22. Nothing here touches the live data in `output/`, the
-original app in `china-rail-flow-map/`, or the production pipeline's
-behaviour: `atlas`/`audit` gained an `ATLAS_LEG_PATHS` switch that is a
-no-op when unset (control run: 0 changed atomic edges, 0 per-origin
-summary changes vs the live rebuild). **Swap only on the owner's go-ahead.**
+Built 2026-10-22, Promoted to Production 2026-10-23 per owner go-ahead.
+Applied to production assets in `output/` and `web/public/assets/` via `pair_paths_canonical.json` and `leg_paths.json`.
+
+> [!NOTE]
+> **Footnote on 12306 Ground-Truth Verification:**
+> Final automated verification against official 12306 timetable route filings is deferred to a follow-up verification pass. Current routing relies on learned class run-time likelihoods + intermediate stop evidence (94.0% leave-one-out precision).
+>
+> **Policy on Distinct Line Alignments:**
+> Parallel lines bearing distinct names (e.g. `京广高速` and `济郑高速` on approach to 新乡东) must NOT be merged. They are physically distinct infrastructure corridors and are preserved as separate tracks.
 
 ## What changed in the design
 

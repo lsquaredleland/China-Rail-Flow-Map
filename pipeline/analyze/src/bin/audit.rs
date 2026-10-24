@@ -1,8 +1,9 @@
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use serde_json::Value;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const CORE: &[&str] = &[
     "北京",
@@ -995,14 +996,18 @@ type LegPathMap = HashMap<String, (Vec<Vec<i64>>, f64)>;
 
 static LEG_PATHS: std::sync::OnceLock<LegPathMap> = std::sync::OnceLock::new();
 
-/// Load ATLAS_LEG_PATHS (if set) into the override map and LEG_PATHS.
+/// Load ATLAS_LEG_PATHS (or default corridor-v3 leg_paths) into the override map and LEG_PATHS.
 /// Keyed by train_no; by public code only when train_no is absent
 /// (codes are reused across physical trains).
-fn load_leg_paths(map: &mut OverrideMap) {
+fn load_leg_paths(map: &mut OverrideMap, data_dir: &Path) {
     let mut paths: LegPathMap = HashMap::new();
-    if let Ok(p) = env::var("ATLAS_LEG_PATHS") {
-        let recs: Vec<LegPath> = serde_json::from_str(&fs::read_to_string(&p).unwrap()).unwrap();
-        println!("leg paths loaded: {} from {}", recs.len(), p);
+    let p_path = env::var("ATLAS_LEG_PATHS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| data_dir.join("derived/corridor-v3/leg_paths.json"));
+    if p_path.exists() {
+        let recs: Vec<LegPath> =
+            serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
+        println!("leg paths loaded: {} from {}", recs.len(), p_path.display());
         for r in recs {
             let key_id = if r.train_no.is_empty() {
                 r.code
@@ -1184,7 +1189,393 @@ fn leg_seqs<'c>(
     }
 }
 
+/// Decode a v2-pack polyline (1e4 precision) into [lon, lat] degrees.
+fn decode_poly4(s: &str) -> Vec<[f64; 2]> {
+    let bytes = s.as_bytes();
+    let (mut i, mut lat, mut lon) = (0usize, 0i64, 0i64);
+    let mut pts = Vec::new();
+    while i < bytes.len() {
+        let mut vals = [0i64; 2];
+        for v in vals.iter_mut() {
+            let (mut shift, mut acc) = (0u32, 0i64);
+            loop {
+                let b = (bytes[i] - 63) as i64;
+                i += 1;
+                acc |= (b & 0x1f) << shift;
+                shift += 5;
+                if b < 0x20 {
+                    break;
+                }
+            }
+            *v = if acc & 1 != 0 { !(acc >> 1) } else { acc >> 1 };
+        }
+        lat += vals[0];
+        lon += vals[1];
+        pts.push([lon as f64 / 1e4, lat as f64 / 1e4]);
+    }
+    pts
+}
+
+/// Phase 1-2 checks on a packed v2 build (env AUDIT_PACK_DIR): oriented
+/// per-train path continuity outside chord legs, monotone call cutoffs,
+/// schedule coverage, and the Chengdu goldens. Returns whether the hard
+/// checks pass, plus the counters that goldens.json gates on.
+fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
+    let load = |n: &str| -> Value {
+        serde_json::from_str(&fs::read_to_string(dir.join(n)).unwrap()).unwrap()
+    };
+    let shared = load("atlas-v2-shared.json");
+    let out_map = load("atlas-v2-out-map.json");
+    let in_map = load("atlas-v2-in-map.json");
+    let out_t = load("atlas-v2-out-tables.json");
+    let in_t = load("atlas-v2-in-tables.json");
+    let sch = load("atlas-v2-schedules.json");
+    let arr = |v: &Value| -> Vec<Value> { v.as_array().cloned().unwrap_or_default() };
+    let int = |v: &Value| v.as_i64().unwrap();
+    let mut ok = true;
+    for (name, t) in [("out-tables", &out_t), ("in-tables", &in_t)] {
+        let fmt = t.get("fmt").and_then(Value::as_i64);
+        println!("AUDIT pack {name} fmt: {fmt:?}");
+        ok &= fmt == Some(3);
+    }
+    let ends = |key: &str| -> Vec<([f64; 2], [f64; 2])> {
+        arr(&shared[key])
+            .iter()
+            .map(|s| {
+                let p = decode_poly4(s["g"].as_str().unwrap());
+                (p[0], *p.last().unwrap())
+            })
+            .collect()
+    };
+    let (out_ends, in_ends) = (ends("sections"), ends("in_sections"));
+    let codes: Vec<String> = arr(&shared["train_table"])
+        .iter()
+        .map(|t| t["code"].as_str().unwrap().to_string())
+        .collect();
+    let zh: Vec<String> = arr(&out_map["origins"])
+        .iter()
+        .map(|o| o["zh"].as_str().unwrap().to_string())
+        .collect();
+    // ---- path continuity: exit of oriented section k-1 -> entry of k ----
+    let mut worst: Vec<(f64, String)> = Vec::new();
+    let (mut checked, mut gaps, mut chord_rows, mut chord_legs) = (0u64, 0u64, 0u64, 0u64);
+    // gaps up to 6 km are station-throat trims (B8, optional Phase 3)
+    let mut throat_gaps = 0u64;
+    let mut bad_trains: HashSet<(usize, &str, usize)> = HashSet::new();
+    let mut sec_cnt_over = 0u64;
+    // outbound rows with a > 35 km jump, inside chord legs only / outside
+    let (mut jump_in, mut jump_out) = (0i64, 0i64);
+    for (label, tables, secs_key, chords_key, rows_key, ends) in [
+        (
+            "out",
+            &out_t,
+            "dep_secs",
+            "dep_chord_legs",
+            "deps",
+            &out_ends,
+        ),
+        ("in", &in_t, "arr_secs", "arr_chord_legs", "arrs", &in_ends),
+    ] {
+        for (oi, o) in arr(&tables["origins"]).iter().enumerate() {
+            let rows = arr(&o[rows_key]);
+            let chords = arr(&o[chords_key]);
+            for (ri, path) in arr(&o[secs_key]).iter().enumerate() {
+                let path: Vec<i64> = arr(path).iter().map(int).collect();
+                let mut exempt: HashSet<usize> = HashSet::new();
+                let cl = arr(&chords[ri]);
+                if !cl.is_empty() {
+                    chord_rows += 1;
+                }
+                for c in cl.iter() {
+                    chord_legs += 1;
+                    for k in int(&c[1])..=int(&c[2]) {
+                        exempt.insert(k as usize);
+                    }
+                }
+                let oriented = |v: i64| -> ([f64; 2], [f64; 2]) {
+                    if v >= 0 {
+                        ends[v as usize]
+                    } else {
+                        let (a, b) = ends[!v as usize];
+                        (b, a)
+                    }
+                };
+                let (mut j_in, mut j_out) = (false, false);
+                for k in 1..path.len() {
+                    let gap = hav_km_ll(oriented(path[k - 1]).1, oriented(path[k]).0);
+                    if exempt.contains(&k) {
+                        j_in |= gap > 35.0;
+                        continue;
+                    }
+                    j_out |= gap > 35.0;
+                    checked += 1;
+                    if gap > 3.0 {
+                        gaps += 1;
+                        if gap <= 6.0 {
+                            throat_gaps += 1;
+                        }
+                        bad_trains.insert((oi, label, ri));
+                        let code = &codes[int(&rows[ri][0]) as usize];
+                        worst.push((
+                            gap,
+                            format!("{} {label} {code} at {k}/{}", zh[oi], path.len()),
+                        ));
+                    }
+                }
+                if label == "out" {
+                    jump_out += j_out as i64;
+                    jump_in += (j_in && !j_out) as i64;
+                }
+            }
+            // ---- cutoffs: per train, sec_cnt never decreases as calls
+            // move away from this city (outbound: later arrival; inbound:
+            // later boarding = shorter ride) ----
+            let calls_key = if label == "out" { "calls" } else { "in_calls" };
+            let mut per: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
+            for cell in arr(&o[calls_key]).iter() {
+                for r in arr(cell).iter() {
+                    let (idx, t1, t2, off) = (int(&r[0]), int(&r[1]), int(&r[2]), int(&r[3]));
+                    let cnt = int(&r[if label == "out" { 5 } else { 6 }]);
+                    let len = arr(&o[secs_key][idx as usize]).len() as i64;
+                    if cnt > len {
+                        sec_cnt_over += 1;
+                    }
+                    let key = if label == "out" {
+                        off * 1440 + t1
+                    } else {
+                        off * 1440 + t2 - t1
+                    };
+                    per.entry(idx).or_default().push((key, cnt));
+                }
+            }
+            for v in per.values_mut() {
+                v.sort();
+                if v.windows(2).any(|w| w[1].1 < w[0].1) {
+                    worst.push((-1.0, format!("{} {label} non-monotone sec_cnt", zh[oi])));
+                }
+            }
+        }
+    }
+    let non_mono: Vec<&(f64, String)> = worst.iter().filter(|w| w.0 < 0.0).collect();
+    println!(
+        "AUDIT pack chord legs: {chord_legs} on {chord_rows} train rows (gaps inside are exempt)"
+    );
+    println!(
+        "AUDIT pack path continuity: {gaps} gaps > 3 km in {checked} joins outside chord legs ({} train rows); {throat_gaps} of them <= 6 km (station throats), {} > 6 km",
+        bad_trains.len(),
+        gaps - throat_gaps
+    );
+    let mut gap_list: Vec<&(f64, String)> = worst.iter().filter(|w| w.0 >= 0.0).collect();
+    gap_list.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    for (g, what) in gap_list.iter().take(20) {
+        println!("   {g:>8.1} km  {what}");
+    }
+    println!(
+        "AUDIT pack sec_cnt: {} trains non-monotone, {sec_cnt_over} cutoffs beyond path length",
+        non_mono.len()
+    );
+    println!("AUDIT pack outbound rows with a > 35 km jump: {jump_out} outside chord legs, {jump_in} only inside");
+    ok &= sec_cnt_over == 0;
+    // ---- schedules: every row's train has one, consistent with the row ----
+    let scheds = arr(&sch["schedules"]);
+    let extra = arr(&sch["extra_stations"]).len();
+    let n_st = arr(&shared["station_table"]).len() as i64;
+    let mut bad_idx = 0u64;
+    for s in scheds.iter() {
+        for r in arr(s).iter() {
+            if !(0..n_st).contains(&int(&r[0])) {
+                bad_idx += 1;
+            }
+        }
+    }
+    let (mut rows_n, mut missing, mut mismatch) = (0u64, 0u64, 0u64);
+    for o in arr(&out_t["origins"]).iter() {
+        for d in arr(&o["deps"]).iter() {
+            rows_n += 1;
+            let s = scheds.get(int(&d[0]) as usize).map(arr).unwrap_or_default();
+            if s.is_empty() {
+                missing += 1;
+                continue;
+            }
+            // [t, fs, dep, ts, tc, arr, dur, stops, km]: boarding call at fs/dep,
+            // `stops` calls after it, ending at ts
+            let p = s
+                .iter()
+                .position(|r| int(&r[0]) == int(&d[1]) && int(&r[2]) == int(&d[2]));
+            let fine = p.is_some_and(|p| (s.len() - 1 - p) as i64 == int(&d[7]))
+                && int(&s.last().unwrap()[0]) == int(&d[3]);
+            if !fine {
+                mismatch += 1;
+            }
+        }
+    }
+    for o in arr(&in_t["origins"]).iter() {
+        for a in arr(&o["arrs"]).iter() {
+            rows_n += 1;
+            let s = scheds.get(int(&a[0]) as usize).map(arr).unwrap_or_default();
+            if s.is_empty() {
+                missing += 1;
+                continue;
+            }
+            // [t, fs, fc, dep, ts, arr, dur, stops, km]: first stop fs/dep,
+            // arrival here is call index `stops`, at ts/arr
+            let k = int(&a[7]) as usize;
+            let fine = int(&s[0][0]) == int(&a[1])
+                && int(&s[0][2]) == int(&a[3])
+                && s.get(k)
+                    .is_some_and(|r| int(&r[0]) == int(&a[4]) && int(&r[1]) == int(&a[5]));
+            if !fine {
+                mismatch += 1;
+            }
+        }
+    }
+    println!(
+        "AUDIT pack schedules: {} trains, extra_stations {extra}, bad station idx {bad_idx}; {rows_n} dep/arr rows: {missing} without schedule, {mismatch} inconsistent",
+        scheds.len()
+    );
+    ok &= extra == 0 && bad_idx == 0 && missing == 0 && mismatch == 0;
+    let mut g: BTreeMap<String, i64> = BTreeMap::new();
+    let n = |v: &Value| arr(v).len() as i64;
+    g.insert("origins".into(), n(&out_map["origins"]));
+    g.insert("sections".into(), n(&shared["sections"]));
+    g.insert("in_sections".into(), n(&shared["in_sections"]));
+    g.insert("schedules_trains".into(), scheds.len() as i64);
+    g.insert("chord_leg_rows".into(), chord_legs as i64);
+    g.insert("continuity_gaps_le6km".into(), throat_gaps as i64);
+    g.insert("continuity_gaps_gt6km".into(), (gaps - throat_gaps) as i64);
+    g.insert("dep_rows_jump_gt35km_outside_chords".into(), jump_out);
+    g.insert("dep_rows_jump_gt35km_inside_chords".into(), jump_in);
+    g.insert("nonmonotone_sec_cnt_trains".into(), non_mono.len() as i64);
+    // Chengdu goldens (PIPELINE.md section 7 shape)
+    let cities: Vec<String> = arr(&shared["city_table"])
+        .iter()
+        .map(|c| c["zh"].as_str().unwrap().to_string())
+        .collect();
+    if let Some(ci) = zh.iter().position(|z| z == "成都") {
+        let (om, im) = (&out_map["origins"][ci], &in_map["origins"][ci]);
+        let widest = |f: &Value| arr(f).iter().map(|r| int(&r[1])).max().unwrap_or(0);
+        let cq = |rows: &Value| -> Vec<i64> {
+            arr(rows)
+                .iter()
+                .find(|r| cities[int(&r[0]) as usize] == "重庆")
+                .map(|r| arr(r).iter().map(int).collect())
+                .unwrap_or_default()
+        };
+        let (dq, sq) = (cq(&om["dests"]), cq(&im["srcs"]));
+        for (k, v) in [
+            ("out", int(&om["outbound"])),
+            ("dests", n(&om["dests"])),
+            ("widest_out", widest(&om["flows"])),
+            ("fully_tracked", int(&om["fully_tracked"])),
+            ("chords", n(&om["chords"])),
+            ("in", int(&om["inbound"])),
+            ("srcs", n(&im["srcs"])),
+            ("widest_in", widest(&im["in_flows"])),
+            ("cq_out", dq.get(1).copied().unwrap_or(-1)),
+            ("cq_out_term", dq.get(3).copied().unwrap_or(-1)),
+            ("cq_out_fastest", dq.get(4).copied().unwrap_or(-1)),
+            ("cq_in", sq.get(1).copied().unwrap_or(-1)),
+            ("cq_in_orig", sq.get(3).copied().unwrap_or(-1)),
+            ("cq_in_fastest", sq.get(4).copied().unwrap_or(-1)),
+        ] {
+            g.insert(format!("chengdu_{k}"), v);
+        }
+    }
+    println!(
+        "AUDIT pack hard checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    (ok, g)
+}
+
+/// Gate the pack counters against goldens.json: {"exact": {k: v}, "max":
+/// {k: v}}. An exact counter must match; a max counter must not rise.
+/// `--update-goldens` rewrites the file with the current values (keys
+/// keep their class; new keys go to "max"). Returns false on a breach.
+fn gate_goldens(path: &Path, cur: &BTreeMap<String, i64>, update: bool, partial: bool) -> bool {
+    let text = fs::read_to_string(path).ok();
+    if text.is_none() && !update {
+        println!(
+            "AUDIT goldens FAIL: {} not found (create it with --update-goldens)",
+            path.display()
+        );
+        return false;
+    }
+    let old: Value = text
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_else(|| serde_json::json!({ "exact": {}, "max": {} }));
+    if update {
+        let mut out = old.clone();
+        for (k, v) in cur {
+            let class = if old["exact"].get(k).is_some() {
+                "exact"
+            } else {
+                "max"
+            };
+            out[class][k] = serde_json::json!(v);
+        }
+        fs::write(path, serde_json::to_string_pretty(&out).unwrap() + "\n").unwrap();
+        println!("AUDIT goldens: updated {}", path.display());
+        return true;
+    }
+    let mut ok = true;
+    for class in ["exact", "max"] {
+        for (k, want) in old[class].as_object().into_iter().flatten() {
+            let want = want.as_i64().unwrap();
+            if partial && !cur.contains_key(k) {
+                println!("AUDIT goldens skipped {k} (not computed with --pack-only)");
+                continue;
+            }
+            let breach = match cur.get(k) {
+                None => true,
+                Some(&got) => (class == "exact" && got != want) || (class == "max" && got > want),
+            };
+            if breach {
+                ok = false;
+                println!(
+                    "AUDIT goldens BREACH {class} {k}: golden {want}, now {:?}",
+                    cur.get(k)
+                );
+            } else if cur[k] != want {
+                println!(
+                    "AUDIT goldens improved {k}: {want} -> {} (rebase with --update-goldens)",
+                    cur[k]
+                );
+            }
+        }
+    }
+    println!("AUDIT goldens gate: {}", if ok { "PASS" } else { "FAIL" });
+    ok
+}
+
+/// Gate `counters` against `--goldens <path>` (default ./goldens.json);
+/// `--update-goldens` rebases instead. `partial`: the legacy counters were
+/// not computed (`--pack-only`), so golden keys missing here are skipped.
+fn run_goldens_gate(counters: &BTreeMap<String, i64>, partial: bool) -> bool {
+    let args: Vec<String> = env::args().collect();
+    let goldens = args
+        .windows(2)
+        .find(|w| w[0] == "--goldens")
+        .map(|w| PathBuf::from(&w[1]))
+        .unwrap_or_else(|| PathBuf::from("goldens.json"));
+    gate_goldens(
+        &goldens,
+        counters,
+        args.iter().any(|a| a == "--update-goldens"),
+        partial,
+    )
+}
+
 fn main() {
+    let mut pack: Option<(bool, BTreeMap<String, i64>)> = None;
+    if let Ok(dir) = env::var("AUDIT_PACK_DIR") {
+        let r = audit_pack(Path::new(&dir));
+        if env::args().any(|a| a == "--pack-only") {
+            let ok = r.0 & run_goldens_gate(&r.1, true);
+            std::process::exit(if ok { 0 } else { 1 });
+        }
+        pack = Some(r);
+    }
     let data_dir = if let Ok(d) = env::var("CRFM_DATA_DIR") {
         PathBuf::from(d)
     } else if PathBuf::from("data").exists() {
@@ -1204,7 +1595,7 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|_| data_dir.join("leg_overrides.json"));
     let mut override_map = load_overrides(&overrides_path);
-    load_leg_paths(&mut override_map);
+    load_leg_paths(&mut override_map, &data_dir);
     let override_map = override_map;
 
     let load = |p: &PathBuf| -> Deliverable {
@@ -1259,13 +1650,19 @@ fn main() {
     // ---- pair paths ----
     let mut path_map: PathMap = HashMap::new();
     // ATLAS_PAIR_PATHS (comma-separated files) replaces the production
-    // pair geometry, e.g. a staged double-track-canonical set.
+    // pair geometry. Defaults to canonical double-track paths + base pair geometry.
     let pp_files: Vec<PathBuf> = match env::var("ATLAS_PAIR_PATHS") {
         Ok(v) => v.split(',').map(PathBuf::from).collect(),
-        Err(_) => vec![
-            data_dir.join("derived/pair_paths.json"),
-            data_dir.join("derived/cs_out/pair_paths.json"),
-        ],
+        Err(_) => {
+            let canon = data_dir.join("derived/corridor-v3/pair_paths_canonical.json");
+            let mut list = Vec::new();
+            if canon.exists() {
+                list.push(canon);
+            }
+            list.push(data_dir.join("derived/pair_paths.json"));
+            list.push(data_dir.join("derived/cs_out/pair_paths.json"));
+            list
+        }
     };
     for pth in pp_files {
         let pp: PPFile = serde_json::from_str(&fs::read_to_string(&pth).unwrap()).unwrap();
@@ -2153,4 +2550,10 @@ fn main() {
     );
     println!("AUDIT junction flags total: {}", flags);
     println!("AUDIT chains total: {}", n_chains);
+    if let Some((ok, mut counters)) = pack {
+        counters.insert("dropped_chains".into(), dropped_chains as i64);
+        counters.insert("flow_lost".into(), dropped_flow as i64);
+        let ok = ok & run_goldens_gate(&counters, false);
+        std::process::exit(if ok { 0 } else { 1 });
+    }
 }

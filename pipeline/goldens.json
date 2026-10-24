@@ -1,0 +1,32 @@
+{
+  "exact": {
+    "origins": 102,
+    "sections": 8054,
+    "in_sections": 7923,
+    "schedules_trains": 7157,
+    "chengdu_out": 564,
+    "chengdu_dests": 610,
+    "chengdu_widest_out": 144,
+    "chengdu_fully_tracked": 564,
+    "chengdu_chords": 0,
+    "chengdu_in": 558,
+    "chengdu_srcs": 627,
+    "chengdu_widest_in": 105,
+    "chengdu_cq_out": 136,
+    "chengdu_cq_out_term": 53,
+    "chengdu_cq_out_fastest": 62,
+    "chengdu_cq_in": 136,
+    "chengdu_cq_in_orig": 54,
+    "chengdu_cq_in_fastest": 62,
+    "dropped_chains": 0,
+    "flow_lost": 0
+  },
+  "max": {
+    "chord_leg_rows": 15270,
+    "continuity_gaps_gt6km": 417,
+    "continuity_gaps_le6km": 61807,
+    "dep_rows_jump_gt35km_inside_chords": 1191,
+    "dep_rows_jump_gt35km_outside_chords": 0,
+    "nonmonotone_sec_cnt_trains": 48
+  }
+}

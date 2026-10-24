@@ -164,6 +164,41 @@ array rows, integer-minute times, geometry at 1e4. Top-100 cut: #1 广州 1,201/
 - **Infrastructure (`atlas-v2-shared.json`)**: `sections` (4,274 HSR / 3,257 conv) and `in_sections` (4,146 HSR / 3,116 conv) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h.
 - **8-Class Flow Breakdown (`out-map` / `in-map`)**: `flows` and `in_flows` rows pack `[sec_idx, total, g, d, c, s, z, t, k, plain]` (trailing zero counts stripped).
 - **Per-Train Section Indices (`out-tables` / `in-tables`)**: packs ordered section index lists (`dep_secs` / `arr_secs`) and per-call section cutoff counts (`sec_cnt`), allowing the client to highlight exact city-pair train corridors at 100% opacity over ~18% ghosted trunks.
+**Actual live recipe (verified 2026-10-24).** The live pack reproduces only
+WITH `data/leg_overrides.json` (44 variant legs), not the `[]` above; an
+empty-overrides build matches Chengdu's goldens but differs on 93,072
+edges elsewhere. In this repo, rebuild staged:
+```bash
+source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp -c clones of
+                           # handoff-v3 inputs), ATLAS_PAIR_PATHS, ATLAS_LEG_PATHS,
+                           # ATLAS_OVERRIDES=staging/inputs/data/leg_overrides.json
+O=$PWD/../staging/corridor-v3-ordered
+ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
+./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
+AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
+./target/release/secdiff --old ../staging/live-v1/china-flow-atlas-data.json \
+    --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
+```
+Always set `CRFM_OUTPUT_DIR` / `ATLAS_OUT` / `--out-dir`: `output/` in this
+repo is a symlink into `china-rail-handoff-v3/output`. Section indices change
+on every run (HashMap iteration), so ship the whole five-file pack together.
+
+**Tables format `fmt: 3`** (`atlas-v2-{out,in}-tables`, documented in the
+`atlaspack.rs` header):
+- `dep_secs` / `arr_secs` are in **travel order**; an entry `~s` (= `-(s+1)`)
+  means section `s` is travelled against its stored point order. A train
+  that runs back over track it already used repeats those sections; only
+  back-to-back duplicates collapse. Flow counting still dedupes per train.
+- `sec_cnt`: outbound = prefix count (origin → stop); inbound = trailing
+  count (boarding stop → arrival).
+- `dep_chord_legs` / `arr_chord_legs`: `[stop, s0, s1]` per leg with no
+  track geometry. `stop` is the schedule index of the departing stop;
+  `[s0, s1)` is the half-open range of path positions the leg produced.
+  The track either side of the gap is at positions `s0-1` and `s1`.
+- `atlas-v2-schedules.json` is generated from `data/raw/stops*.jsonl`,
+  indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm]`
+  and station names normalized.
+
 **Verify against the goldens (§7) before trusting any rebuild.** Supporting datasets: `./target/release/flowmap` →
 `chengdu-flow-data.json`; `./target/release/flowstations` →
 `china-flow-stations-data.json`; the country outline comes from the
@@ -303,6 +338,25 @@ source-relative arrival differs from the arrivals row — both true in
 their own frame; the join is deliberately unchanged.
 
 ## 7. Goldens — verify every rebuild against these
+
+**Since 2026-10-24 the machine-checked baseline is `pipeline/goldens.json`.**
+`audit` fails on any `exact` counter that changes or `max` counter that rises.
+Rebase deliberately with `audit --update-goldens`. Dropped chains / flow lost
+are enforced only in the full audit, not `--pack-only`. Current key values:
+- 102 origins (incl. 香港); Chengdu outbound 564 trains / widest 144 /
+  564 fully tracked; Chengdu inbound widest 105
+- chord-leg rows 15,270 (13,420 router `#cv3` nodes without coordinates,
+  1,587 inbound-only legs, 263 real geometry gaps). These are pre-existing,
+  not a regression.
+- rows with a >35 km jump outside chord legs: 0 (old client chainer: 5,804)
+- continuity gaps: 61,807 of ≤6 km (station throats), 417 over 6 km
+- known gaps: router-only nodes get no coordinates in `atlas`; inbound-only
+  legs stay unresolved; 1.3 km station-throat trims leave gaps in per-train
+  paths (see `optimization-progress.md` backlog O1–O5)
+
+The list below is the **historical** 2026-10-22 origin-environment build. It
+matches neither the live pack nor any build reproducible from disk; kept
+for provenance only.
 
 - Chengdu outbound: **564 trains / 610 cities / widest 145 / 561 of 564
   fully tracked / 4 chord legs** (corridor-v3, live since 2026-10-22;

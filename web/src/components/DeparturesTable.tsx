@@ -30,6 +30,10 @@ interface Props {
   outTablesReady: boolean;
   inTablesReady: boolean;
   onClearFilter: () => void;
+  onSelectTrain?: (code: string) => void;
+  isolatedTrainCode?: string | null;
+  onClearTrainIsolation?: () => void;
+  onSelectCity?: (city: CityPointVM | null) => void;
   selectedHour?: number | null;
   selectedHours?: number[];
   onSelectHour?: (h: number | null) => void;
@@ -136,15 +140,59 @@ function matchCityFromQuery(
 }
 
 /** The train cell shared by every table mode: class chip and number. */
-function TrainCell({ d }: { d: { code: string; cls: string } }) {
+function TrainCell({
+  d,
+  onClick,
+}: {
+  d: { code: string; cls: string };
+  onClick?: () => void;
+}) {
   const chip = d.cls === "plain" ? "普" : d.cls;
   const num = d.cls === "plain" ? d.code : d.code.replace(/^[A-Z]+/, "");
   const isHs = d.cls === "G" || d.cls === "D" || d.cls === "C";
   return (
-    <>
+    <button
+      type="button"
+      onClick={
+        onClick
+          ? (e) => {
+              // Shift/cmd/ctrl clicks belong to the row's train selection;
+              // a plain click opens the schedule without toggling the row.
+              if (e.shiftKey || e.metaKey || e.ctrlKey) return;
+              e.stopPropagation();
+              onClick();
+            }
+          : undefined
+      }
+      title={onClick ? `View full schedule for train ${d.code}` : undefined}
+      style={{
+        background: "none",
+        border: "none",
+        padding: 0,
+        margin: 0,
+        font: "inherit",
+        color: "inherit",
+        cursor: onClick ? "pointer" : "default",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+      }}
+    >
       <span className={"cls " + (isHs ? "cls-hs" : "cls-conv")}>{chip}</span>
-      <b>{num || d.code}</b>
-    </>
+      <b
+        style={
+          onClick
+            ? {
+                textDecoration: "underline",
+                textDecorationStyle: "dotted",
+                textUnderlineOffset: "3px",
+              }
+            : undefined
+        }
+      >
+        {num || d.code}
+      </b>
+    </button>
   );
 }
 
@@ -167,6 +215,10 @@ export default function DeparturesTable({
   outTablesReady,
   inTablesReady,
   onClearFilter,
+  onSelectTrain,
+  isolatedTrainCode,
+  onClearTrainIsolation,
+  onSelectCity,
   selectedHour: controlledHour,
   selectedHours: controlledHours,
   onSelectHour,
@@ -348,7 +400,11 @@ export default function DeparturesTable({
     distKm: number,
     durMins: number,
     cls: string,
+    code?: string,
   ) => {
+    if (isolatedTrainCode && (!code || code !== isolatedTrainCode)) {
+      return false;
+    }
     if (selectedClasses.length > 0 && !selectedClasses.includes(cls)) {
       return false;
     }
@@ -383,6 +439,7 @@ export default function DeparturesTable({
 
   const hasExtraFilters =
     !!q ||
+    Boolean(isolatedTrainCode) ||
     selectedClasses.length > 0 ||
     activeHours.length > 0 ||
     activeDistBins.length > 0 ||
@@ -398,11 +455,9 @@ export default function DeparturesTable({
   }, [srcFilter]);
 
   const handleClearChip = () => {
-    if (matched.city && !panelCity) {
-      setQuery("");
-    } else {
-      onClearFilter();
-    }
+    setQuery("");
+    onClearFilter();
+    onSelectCity?.(null);
   };
 
   /* ---------------- tables still in flight ---------------- */
@@ -519,7 +574,15 @@ export default function DeparturesTable({
     const calls = destFilter.calls;
     const termCount = destFilter.terminating;
     const list = calls.filter((c) => {
-      if (!matchesRowFilters(c.dep.dep, c.dep.distKm, c.dep.dur, c.dep.cls))
+      if (
+        !matchesRowFilters(
+          c.dep.dep,
+          c.dep.distKm,
+          c.dep.dur,
+          c.dep.cls,
+          c.dep.code,
+        )
+      )
         return false;
       if (!q) return true;
       if (c.dep.hay.indexOf(q) !== -1) return true;
@@ -685,7 +748,12 @@ export default function DeparturesTable({
                   }
                 >
                   <td className="c-train">
-                    <TrainCell d={d} />
+                    <TrainCell
+                      d={d}
+                      onClick={
+                        onSelectTrain ? () => onSelectTrain(d.code) : undefined
+                      }
+                    />
                   </td>
                   <td className="c-time">{d.dep}</td>
                   <td>
@@ -729,7 +797,15 @@ export default function DeparturesTable({
     /* ---------------- inbound source mode ---------------- */
     const calls = srcFilter.inCalls;
     const list = calls.filter((c) => {
-      if (!matchesRowFilters(c.arr.arr, c.arr.distKm, c.arr.dur, c.arr.cls))
+      if (
+        !matchesRowFilters(
+          c.arr.arr,
+          c.arr.distKm,
+          c.arr.dur,
+          c.arr.cls,
+          c.arr.code,
+        )
+      )
         return false;
       if (!q) return true;
       if (c.arr.hay.indexOf(q) !== -1) return true;
@@ -898,7 +974,12 @@ export default function DeparturesTable({
                   }
                 >
                   <td className="c-train">
-                    <TrainCell d={a} />
+                    <TrainCell
+                      d={a}
+                      onClick={
+                        onSelectTrain ? () => onSelectTrain(a.code) : undefined
+                      }
+                    />
                   </td>
                   <td className="c-time">
                     {c.board}
@@ -945,7 +1026,7 @@ export default function DeparturesTable({
     const arrs = cur.arrs;
     const list: ArrVM[] = arrs.filter(
       (a) =>
-        matchesRowFilters(a.arr, a.distKm, a.dur, a.cls) &&
+        matchesRowFilters(a.arr, a.distKm, a.dur, a.cls, a.code) &&
         (!q || a.hay.indexOf(q) !== -1),
     );
     const { key: ak, dir: adir } = arrSort;
@@ -1090,7 +1171,12 @@ export default function DeparturesTable({
                 onClick={(e) => handleRowClick(a.code, i, e, list)}
               >
                 <td className="c-train">
-                  <TrainCell d={a} />
+                  <TrainCell
+                    d={a}
+                    onClick={
+                      onSelectTrain ? () => onSelectTrain(a.code) : undefined
+                    }
+                  />
                 </td>
                 <td>
                   <span className="to-city">
@@ -1122,7 +1208,7 @@ export default function DeparturesTable({
     const deps = cur ? cur.deps : [];
     const list = deps.filter(
       (d) =>
-        matchesRowFilters(d.dep, d.distKm, d.dur, d.cls) &&
+        matchesRowFilters(d.dep, d.distKm, d.dur, d.cls, d.code) &&
         (!q || d.hay.indexOf(q) !== -1),
     );
     const { key, dir } = sort;
@@ -1253,7 +1339,12 @@ export default function DeparturesTable({
                 onClick={(e) => handleRowClick(d.code, i, e, list)}
               >
                 <td className="c-train">
-                  <TrainCell d={d} />
+                  <TrainCell
+                    d={d}
+                    onClick={
+                      onSelectTrain ? () => onSelectTrain(d.code) : undefined
+                    }
+                  />
                 </td>
                 <td className="c-time">{d.dep}</td>
                 <td>
@@ -1361,6 +1452,31 @@ export default function DeparturesTable({
             );
           })}
         </div>
+        {isolatedTrainCode ? (
+          <span
+            className="dep-chip"
+            style={{
+              background: "#2563EB",
+              color: "#FFFFFF",
+              borderColor: "#1D4ED8",
+            }}
+          >
+            Isolated:{" "}
+            <b style={{ marginLeft: 4, color: "#FFFFFF" }}>
+              {isolatedTrainCode}
+            </b>
+            {onClearTrainIsolation ? (
+              <button
+                type="button"
+                aria-label="Clear train isolation"
+                onClick={onClearTrainIsolation}
+                style={{ color: "#FFFFFF" }}
+              >
+                &times;
+              </button>
+            ) : null}
+          </span>
+        ) : null}
         {chipNode}
         {selectedTrainCodes.length > 0 ? (
           <span className="dep-chip">

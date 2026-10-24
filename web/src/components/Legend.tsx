@@ -18,6 +18,7 @@ export interface LegendHandle {
     zoomRatio: number,
     hasOrigin: boolean,
     showInfra?: boolean,
+    showAnim?: boolean,
   ) => void;
 }
 
@@ -74,6 +75,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const infraGroupRef = useRef<SVGGElement | null>(null);
   const infraHsrLineRef = useRef<SVGLineElement | null>(null);
   const infraConvLineRef = useRef<SVGLineElement | null>(null);
+  const animGroupRef = useRef<SVGGElement | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(
     () =>
       typeof window !== "undefined" &&
@@ -89,6 +91,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         zoomRatio: number,
         hasOrigin: boolean,
         showInfra?: boolean,
+        showAnim?: boolean,
       ) {
         const svg = svgRef.current;
         if (!svg) return;
@@ -139,12 +142,21 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
             "transform",
             "translate(0 " + cbase + ")",
           );
+        const animH = showAnim ? 48 : 0;
+        if (animGroupRef.current) {
+          animGroupRef.current.style.display = showAnim ? "" : "none";
+          animGroupRef.current.setAttribute(
+            "transform",
+            "translate(0 " + (cbase + 24) + ")",
+          );
+        }
         const infraH = showInfra ? 44 : 0;
+        const infraBase = cbase + 24 + animH;
         if (infraGroupRef.current) {
           infraGroupRef.current.style.display = showInfra ? "" : "none";
           infraGroupRef.current.setAttribute(
             "transform",
-            "translate(0 " + (cbase + 24) + ")",
+            "translate(0 " + infraBase + ")",
           );
         }
         if (infraHsrLineRef.current)
@@ -152,7 +164,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         if (infraConvLineRef.current)
           infraConvLineRef.current.setAttribute("stroke", pal.infraConv);
         const totalH = Math.round(
-          headH + 15 + barH + 14 + 24 + 8 + circD + 14 + infraH,
+          headH + 15 + barH + 14 + 24 + 8 + circD + 14 + animH + infraH,
         );
         svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
         svg.setAttribute("height", String(totalH));
@@ -321,6 +333,40 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
                 </text>
               </g>
             ))}
+          </g>
+          {/* Animated trains key (shown when Flow Animation is running):
+              colour swatches for High-speed (G/D/C) vs. Conventional (K/T/Z/S) */}
+          <g
+            ref={animGroupRef}
+            transform={"translate(0 " + (initCbase + 24) + ")"}
+            style={{ display: "none" }}
+          >
+            <text
+              x={4}
+              y={0}
+              fontSize={10.5}
+              fontFamily={FONT}
+              fill="currentColor"
+              dominantBaseline="middle"
+            >
+              Trains in motion = train class
+            </text>
+            <g transform="translate(0, 16)">
+              <line x1={4} y1={0} x2={16} y2={0} stroke="#F59E0B" strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
+              <circle cx={18} cy={0} r={4.5} fill="#F59E0B" />
+              <circle cx={18} cy={0} r={2} fill="#ffffff" />
+              <text x={28} y={0} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
+                High-speed (G / D / C)
+              </text>
+            </g>
+            <g transform="translate(0, 32)">
+              <line x1={4} y1={0} x2={16} y2={0} stroke="#06B6D4" strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
+              <circle cx={18} cy={0} r={4.5} fill="#06B6D4" />
+              <circle cx={18} cy={0} r={2} fill="#ffffff" />
+              <text x={28} y={0} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
+                Conventional (K / T / Z / S)
+              </text>
+            </g>
           </g>
           {/* Infrastructure overlay key (shown when Infrastructure is active):
               two colour swatches for high-speed rail (HSR) vs. conventional rail. */}
