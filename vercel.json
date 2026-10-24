@@ -5,8 +5,26 @@
   "outputDirectory": "web/dist",
   "headers": [
     {
+      "source": "/(|index.html)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/assets/(.*)",
       "headers": [
+    {
+      "source": "/(|index.html)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"

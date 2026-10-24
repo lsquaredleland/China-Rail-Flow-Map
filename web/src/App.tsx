@@ -108,9 +108,18 @@ const ABOUT =
       out-map .br (571,195 B) ≈ 1.09 MB, decoded byte-identical to the
       plain splits;
    4. else fall back to the plain .json split. */
+declare const __ASSET_MANIFEST__: Record<string, string> | undefined;
+/* The build content-hashes the .br packs (web/bundle.mjs) and bakes the
+   name -> hashed-path map into the bundle; unhashed names (dev, or a
+   missing entry) resolve to the plain twin path. */
+function brUrl(jsonUrl: string): string {
+  const m =
+    typeof __ASSET_MANIFEST__ === "undefined" ? undefined : __ASSET_MANIFEST__;
+  return (m && m[jsonUrl]) || jsonUrl + ".br";
+}
 async function fetchData<T>(jsonUrl: string): Promise<T> {
   try {
-    const res = await fetch(jsonUrl + ".br");
+    const res = await fetch(brUrl(jsonUrl));
     if (res.ok) {
       const buf = await res.arrayBuffer();
       const u8 = new Uint8Array(buf);
