@@ -39,7 +39,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O11 | ~~U-turn overlap fix~~ | — | **Won't do** (owner 2026-10-24): a train reversing over track at a station is acceptable behaviour |
 | O12 | CI pack audit: run `audit --pack-only` on committed `web/public/assets` against `pipeline/goldens.json`; PR job diffs the PR's pack vs main's at edge level (like `secdiff`) and posts a summary comment | no | CI can't rebuild (needs 513 MB OSM + handoff inputs), so audit the committed pack; catches bad asset swaps and surfaces flow changes like O4 at review time |
 | O13 | Client regression tests (`bun test` in `web/tests/`): promote `staging/scripts/check_client_decode.mjs` + `check_filter_animation.mjs`; invariants on real assets (trainDistAt monotone, dwell == stop.dist, final-step flows == static flows with/without filters, animated trains ⊆ filter, 0 jumps outside chord legs) + snapshot tests (per-hour departed/arrived, per-section flow at fixed times for 2–3 origins) | no | wire into CI's web job |
-| O14 | ✅ DONE (PR pending review, branch `fix/o14-station-dwells`): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
+| O14 | ✅ DONE (PR #5, open): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
 
