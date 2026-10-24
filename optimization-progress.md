@@ -41,7 +41,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O13 | Client regression tests (`bun test` in `web/tests/`): promote `staging/scripts/check_client_decode.mjs` + `check_filter_animation.mjs`; invariants on real assets (trainDistAt monotone, dwell == stop.dist, final-step flows == static flows with/without filters, animated trains ⊆ filter, 0 jumps outside chord legs) + snapshot tests (per-hour departed/arrived, per-section flow at fixed times for 2–3 origins) | no | wire into CI's web job |
 | O14 | ✅ DONE (PR #5, open): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
 | O15 | ✅ DONE (with O6, PR open): renumber sections (long paths first) + sort map flow rows + delta `sec_idx` | no (ids only) | fmt 5: out-map -535 KB, in-map -524 KB, shared -16 KB; first paint 1.62 -> 1.07 MB (-34%); see #### O15 + O6 |
-| O16 | Lazy-load schedules after first paint (background, alongside the tables) | no | -419 KB at first paint; O14 now needs schedules for dwells, so load them right after first paint, not on modal open |
+| O16 | ✅ DONE (in the fmt 5 PR): schedules load after first paint, in parallel with the out-tables | no | first paint (shared + out-map + outline) 2.07 -> 1.10 MB with O15; out-tables still wait for schedules, so dwells are never wrong; the schedule modal requests them itself and shows its loading note |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
 

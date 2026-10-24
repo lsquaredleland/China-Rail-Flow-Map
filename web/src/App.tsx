@@ -52,7 +52,8 @@ import TrainScheduleModal from "./components/TrainScheduleModal";
 //   phase 1 — shared + out-map in parallel (plus in-map when the
 //     persisted direction is inbound): the map renders and is fully
 //     interactive on this data alone;
-//   phase 2 — the active direction's tables file, fetched immediately
+//   phase 2 — the active direction's tables file (with the schedules asset,
+//     O16, in parallel), fetched immediately
 //     behind phase 1; the departures table and histograms fill in
 //     when it lands;
 //   phase 3 — the other direction loads the same way on the first
@@ -247,8 +248,10 @@ export default function App() {
   const [inMapLoading, setInMapLoading] = useState(false);
   const atlasRef = useRef<DecodedAtlas | null>(null);
   const outTablesRef = useRef<OutTablesData | null>(null);
-  // The schedules asset, fetched once; the out tables wait for it so every
-  // timeline is built with station-level stops (null if it failed to load).
+  // The schedules asset (O16): not part of first paint. It is fetched once, in
+  // parallel with the out tables, which wait for it so every timeline is
+  // built with station-level stops (null if it failed to load); an opened
+  // schedule modal also requests it.
   const schedulesRef = useRef<Promise<SchedulesData | null> | null>(null);
   const schedDataRef = useRef<SchedulesData | null>(null);
   const loadSchedules = () => {
@@ -293,6 +296,16 @@ export default function App() {
   const [showTimeline] = useState<boolean>(true);
   const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
   const [selectedTrainCode, setSelectedTrainCode] = useState<string | null>(null);
+  useEffect(() => {
+    if (selectedTrainCode === null) return;
+    let live = true;
+    loadSchedules().then((d) => {
+      if (live && d) setSchedulesData(d);
+    });
+    return () => {
+      live = false;
+    };
+  }, [selectedTrainCode]);
   const [isolatedTrainCode, setIsolatedTrainCode] = useState<string | null>(null);
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(true);
 
@@ -381,6 +394,7 @@ export default function App() {
       .then(([d, sched]) => {
         requireFmt(d.fmt, OUT_TABLES_URL);
         schedDataRef.current = sched;
+        if (sched) setSchedulesData(sched);
         outTablesRef.current = expandOutTables(d);
         flightsRef.current.outTables = false;
         setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
@@ -447,9 +461,6 @@ export default function App() {
         if (!cancelled) setOutline(prepOutline(d));
       })
       .catch(() => {});
-    loadSchedules().then((d) => {
-      if (!cancelled && d) setSchedulesData(d);
-    });
     // A persisted inbound direction paints its map in phase 1 too, so
     // in-map joins the parallel fetch; identity fields still come from
     // out-map, which always loads.
