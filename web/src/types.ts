@@ -268,6 +268,7 @@ export interface DepVM {
   distKm: number; // journey distance for binning: km when routed, else crow-flies origin → terminus city
   hay: string; // lowercase search haystack
   secs: number[]; // section indices traversed by this train
+  rawSecs?: number[];
   secStarts?: Float64Array;
   secRevs?: Uint8Array;
   totalDist?: number;

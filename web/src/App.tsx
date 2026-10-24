@@ -672,8 +672,15 @@ export default function App() {
   // direction's tables are on their way.
   const setDirection = (d: Direction) => {
     if (d === direction) return;
-    if (d === "in") ensureInMap();
-    else ensureOutTables();
+    if (d === "in") {
+      ensureInMap();
+      setIsTimelineCollapsed(true);
+      setIsolatedTrainCode(null);
+      mapRef.current?.setPlaying?.(false);
+      mapRef.current?.setAnimEnabled?.(false);
+    } else {
+      ensureOutTables();
+    }
     setPanelCity(null);
     setDirectionState(d);
     try {
@@ -682,6 +689,15 @@ export default function App() {
       /* storage unavailable */
     }
   };
+
+  useEffect(() => {
+    if (direction === "in") {
+      setIsTimelineCollapsed(true);
+      setIsolatedTrainCode(null);
+      mapRef.current?.setPlaying?.(false);
+      mapRef.current?.setAnimEnabled?.(false);
+    }
+  }, [direction]);
 
   // Esc dismisses the city panel (and its table filter).
   useEffect(() => {
@@ -1029,7 +1045,7 @@ export default function App() {
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
-          {isolatedTrainCode && (
+          {direction === "out" && isolatedTrainCode && (
             <div
               style={{
                 position: "absolute",
@@ -1123,7 +1139,7 @@ export default function App() {
             />
           </div>
 
-          {isTimelineCollapsed && (
+          {direction === "out" && isTimelineCollapsed && (
             <div
               style={{
                 position: "absolute",
@@ -1177,7 +1193,7 @@ export default function App() {
           )}
         </MapCanvas>
 
-        {showTimeline && !isTimelineCollapsed && (
+        {direction === "out" && showTimeline && !isTimelineCollapsed && (
           <TimelineScrubber
             mapRef={mapRef}
             dark={dark}

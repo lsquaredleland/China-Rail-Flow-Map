@@ -7,6 +7,8 @@ web/node_modules/
 web/dist/
 .DS_Store
 *.log
+.omc/
+**/.omc/
 
 # Local-only raw timetable dumps, OSM extracts, and derived routing caches
 output
