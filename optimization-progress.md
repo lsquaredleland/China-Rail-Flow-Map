@@ -30,7 +30,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O2 | Triage the 417 continuity gaps over 6 km | no | 69 orientation-fixable, rest unexplained (e.g. K237 69.7 km); scripts in `staging/scripts/` |
 | O3 | Chord legs at a path end | no | no virtual span there, so the dot waits, then appears; use the stop/city point as the far end |
 | O4 | ✅ DONE (PR #2, merged 2026-10-24): fix router `#cv3` node coordinates in `atlas.rs` | **yes**: owner approval + staged diff | 13,420 chord rows / 223 legs (e.g. K118 成都西→广元) |
-| O5 | Resolve inbound-only legs | **yes**: owner approval | 1,587 chord rows / 304 legs; after O4+O5 only ~5 real gap legs remain |
+| O5 | ✅ DONE (PR #7): resolve inbound-only legs | **yes**: owner approval | 1,587 chord rows / 304 legs; after O4+O5 only ~5 real gap legs remain |
 | O6 | ✅ DONE (with O15, PR open): per-train path dedupe | no | fmt 5: per-train `paths` / `stop_pos` / `chords`, per-row `dep_off` / `arr_len`; out-tables -304 KB, in-tables -121 KB; see #### O15 + O6 |
 | O7 | 48 inbound loop trains with non-monotone `sec_cnt` | no | documented quirk (cutoff clamps to 0); decide whether to fix |
 | O8 | Gate `dropped chains` / `flow lost` in `--pack-only` audits too | no | currently only the full audit enforces them |
@@ -42,6 +42,8 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O14 | ✅ DONE (PR #5, open): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
 | O15 | ✅ DONE (with O6, PR open): renumber sections (long paths first) + sort map flow rows + delta `sec_idx` | no (ids only) | fmt 5: out-map -535 KB, in-map -524 KB, shared -16 KB; first paint 1.62 -> 1.07 MB (-34%); see #### O15 + O6 |
 | O16 | ✅ DONE (in the fmt 5 PR): schedules load after first paint, in parallel with the out-tables | no | first paint (shared + out-map + outline) 2.07 -> 1.10 MB with O15; out-tables still wait for schedules, so dwells are never wrong; the schedule modal requests them itself and shows its loading note |
+| O17 | Make the corridor-v3 router deterministic | possibly | found in O5/O9 (PR #7): two control runs on identical inputs differed on 490 legs, so a full router rerun can't be shipped as-is (PR #7 spliced only the 阳江 records). Fix the iteration/tie-break order, then a full rerun becomes reviewable |
+| O18 | Make `atlas` section numbering deterministic | no | HashMap iteration renumbers sections every run; fmt 5 renumbers anyway, but determinism would make packs byte-reproducible and diffs trivial |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
 
