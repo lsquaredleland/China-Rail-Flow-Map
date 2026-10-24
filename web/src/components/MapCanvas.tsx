@@ -147,6 +147,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const S = useRef({
     view: { scale: 10, tx: 0, ty: 0 } as View,
     fitScale: 10,
+    viewKey: "",
     W: 0,
     H: 0,
     DPR: 1,
@@ -317,12 +318,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const pt = cur.o.pt;
     fitExtent(pt[0] - 1.7, pt[1] - 1.3, pt[0] + 1.7, pt[1] + 1.3, 0.98);
   }
-  /* Station size factor: 1 at the national fit, log-growing to 3.5x at
+  /* Station size factor: 1 at the national fit, log-growing to 2.5x at
      the maximum zoom (fitScale * 60, see zoomAt). Once per frame/pick. */
   function stationK() {
     const { view, fitScale } = S.current;
     const t = Math.log(view.scale / fitScale) / Math.log(60);
-    return 1 + 2.5 * Math.min(1, Math.max(0, t));
+    return 1 + 1.5 * Math.min(1, Math.max(0, t));
   }
   function zoomAt(px: number, py: number, factor: number) {
     const st = S.current;
@@ -1985,7 +1986,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         stationK(),
       );
     updateScaleBar();
-    scheduleViewReport();
+    // Only a moved view re-arms the debounce: the animation loop draws
+    // every frame and would otherwise keep postponing the URL update.
+    const vk = st.view.scale + "|" + st.view.tx + "|" + st.view.ty;
+    if (vk !== st.viewKey) {
+      st.viewKey = vk;
+      scheduleViewReport();
+    }
   }
 
   function reportViewChange() {
@@ -2008,7 +2015,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (viewReportTimerRef.current) clearTimeout(viewReportTimerRef.current);
     viewReportTimerRef.current = window.setTimeout(() => {
       reportViewChange();
-    }, 200);
+    }, 250);
   }
 
   function resize() {
