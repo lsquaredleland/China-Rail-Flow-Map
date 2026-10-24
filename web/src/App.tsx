@@ -12,9 +12,11 @@ import type {
   DurBinFilter,
   InMapData,
   InTablesData,
+  InTablesPack,
   OriginVM,
   OutMapData,
   OutTablesData,
+  OutTablesPack,
   OutlineData,
   SchedulesData,
   SharedData,
@@ -23,11 +25,15 @@ import type {
 import {
   buildOrigin,
   classIndex,
+  decodeFlows,
+  expandInTables,
+  expandOutTables,
   enName,
   filterOrigin,
   FLOW_CLASSES,
   prepAtlas,
   prepOutline,
+  requireFmt,
 } from "./lib";
 import CityPicker from "./components/CityPicker";
 import MapCanvas, { type MapApi } from "./components/MapCanvas";
@@ -59,15 +65,21 @@ const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
 const OUTLINE_URL = "assets/china-outline.json";
-// Tables carry travel-ordered, oriented section paths with station-level
-// stop positions (fmt 4); older packs would draw wrong, so refuse them.
-function requireFmt4(fmt: unknown, url: string) {
-  if (fmt === 4) return;
-  const msg = `${url}: unsupported tables format ${String(fmt)} (need fmt 4); rebuild the data pack`;
-  console.error(msg);
-  const err = new Error(msg);
-  err.name = "FmtError";
-  throw err;
+// Every data file carries the pack format (fmt 5: renumbered sections,
+// delta-coded map flows, per-train paths); older packs would draw wrong,
+// so each file is checked on load and refused otherwise.
+// Fetch the out/in map files with their flows decoded and format checked.
+async function fetchOutMap(): Promise<OutMapData> {
+  const d = await fetchData<OutMapData>(OUT_MAP_URL);
+  requireFmt(d.fmt, OUT_MAP_URL);
+  for (const o of d.origins) decodeFlows(o.flows);
+  return d;
+}
+async function fetchInMap(): Promise<InMapData> {
+  const d = await fetchData<InMapData>(IN_MAP_URL);
+  requireFmt(d.fmt, IN_MAP_URL);
+  for (const o of d.origins) decodeFlows(o.in_flows);
+  return d;
 }
 
 const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
@@ -365,11 +377,11 @@ export default function App() {
     }
     if (flightsRef.current.outTables) return;
     flightsRef.current.outTables = true;
-    Promise.all([fetchData<OutTablesData>(OUT_TABLES_URL), loadSchedules()])
+    Promise.all([fetchData<OutTablesPack>(OUT_TABLES_URL), loadSchedules()])
       .then(([d, sched]) => {
-        requireFmt4(d.fmt, OUT_TABLES_URL);
+        requireFmt(d.fmt, OUT_TABLES_URL);
         schedDataRef.current = sched;
-        outTablesRef.current = d;
+        outTablesRef.current = expandOutTables(d);
         flightsRef.current.outTables = false;
         setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
         applyOutTables();
@@ -388,10 +400,10 @@ export default function App() {
     }
     if (flightsRef.current.inTables) return;
     flightsRef.current.inTables = true;
-    fetchData<InTablesData>(IN_TABLES_URL)
+    fetchData<InTablesPack>(IN_TABLES_URL)
       .then((d) => {
-        requireFmt4(d.fmt, IN_TABLES_URL);
-        inTablesRef.current = d;
+        requireFmt(d.fmt, IN_TABLES_URL);
+        inTablesRef.current = expandInTables(d);
         flightsRef.current.inTables = false;
         setLoadError((e) => (e && e.startsWith(IN_TABLES_URL) ? null : e));
         applyInTables();
@@ -414,15 +426,16 @@ export default function App() {
     if (flightsRef.current.inMap) return;
     flightsRef.current.inMap = true;
     setInMapLoading(true);
-    fetchData<InMapData>(IN_MAP_URL)
+    fetchInMap()
       .then((d) => {
         inMapDataRef.current = d;
         flightsRef.current.inMap = false;
         applyInMap(); // chains the tables fetch once the atlas exists
       })
-      .catch(() => {
+      .catch((err: Error) => {
         flightsRef.current.inMap = false;
         setInMapLoading(false);
+        if (err.name === "FmtError") setLoadError(err.message);
       });
   };
 
@@ -446,12 +459,15 @@ export default function App() {
       Promise<OutMapData>,
       Promise<InMapData | null> | null,
     ] = [
-      fetchData<SharedData>(SHARED_URL),
-      fetchData<OutMapData>(OUT_MAP_URL),
+      fetchData<SharedData>(SHARED_URL).then((d) => {
+        requireFmt(d.fmt, SHARED_URL);
+        return d;
+      }),
+      fetchOutMap(),
       // A failed in-map fetch must not sink phase 1: it resolves to
       // null here and the staged loader retries it below.
       persistedIn
-        ? fetchData<InMapData>(IN_MAP_URL).catch(() => null)
+        ? fetchInMap().catch(() => null)
         : null,
     ];
     Promise.all(phase1)

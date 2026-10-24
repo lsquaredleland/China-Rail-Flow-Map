@@ -17,7 +17,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | Goldens gate | `pipeline/goldens.json` + `audit` gate (exact / max counters, `--update-goldens`) | dropped chains / flow lost gated only in full audit, not `--pack-only` |
 | 3. Throat stubs | backlog O1 | |
 | 4. Client on new data | done (4.1–4.6, virtual crow-flies spans for chord legs); owner browser check OK | live assets swapped |
-| 5. Path dedupe | backlog O6 | |
+| 5. Path dedupe | ✅ O6 (with O15), PR open | fmt 5 |
 
 ## Session 1 outcome (committed 2026-10-24)
 - Phases 0, 1, 2, 4.1–4.5, goldens gate, staged pack swapped into `web/public/assets/` (owner verified in browser: equivalent to pre-port). At commit: typecheck, build and `node staging/scripts/check_client_decode.mjs` pass.
@@ -31,7 +31,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O3 | Chord legs at a path end | no | no virtual span there, so the dot waits, then appears; use the stop/city point as the far end |
 | O4 | ✅ DONE (PR #2, merged 2026-10-24): fix router `#cv3` node coordinates in `atlas.rs` | **yes**: owner approval + staged diff | 13,420 chord rows / 223 legs (e.g. K118 成都西→广元) |
 | O5 | Resolve inbound-only legs | **yes**: owner approval | 1,587 chord rows / 304 legs; after O4+O5 only ~5 real gap legs remain |
-| O6 | Phase 5 per-train path dedupe | no | measured: -149 KB out-tables / -118 KB in-tables (brotli already absorbs most repetition); re-express O14 `dep_stop_pos` relative to the shared path |
+| O6 | ✅ DONE (with O15, PR open): per-train path dedupe | no | fmt 5: per-train `paths` / `stop_pos` / `chords`, per-row `dep_off` / `arr_len`; out-tables -304 KB, in-tables -121 KB; see #### O15 + O6 |
 | O7 | 48 inbound loop trains with non-monotone `sec_cnt` | no | documented quirk (cutoff clamps to 0); decide whether to fix |
 | O8 | Gate `dropped chains` / `flow lost` in `--pack-only` audits too | no | currently only the full audit enforces them |
 | O9 | Fill real OSM geometry gaps (平昌→达州, 南京→扬州, …) | yes | data work, prerequisite noted in PIPELINE.md §4 |
@@ -40,7 +40,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O12 | CI pack audit: run `audit --pack-only` on committed `web/public/assets` against `pipeline/goldens.json`; PR job diffs the PR's pack vs main's at edge level (like `secdiff`) and posts a summary comment | no | CI can't rebuild (needs 513 MB OSM + handoff inputs), so audit the committed pack; catches bad asset swaps and surfaces flow changes like O4 at review time |
 | O13 | Client regression tests (`bun test` in `web/tests/`): promote `staging/scripts/check_client_decode.mjs` + `check_filter_animation.mjs`; invariants on real assets (trainDistAt monotone, dwell == stop.dist, final-step flows == static flows with/without filters, animated trains ⊆ filter, 0 jumps outside chord legs) + snapshot tests (per-hour departed/arrived, per-section flow at fixed times for 2–3 origins) | no | wire into CI's web job |
 | O14 | ✅ DONE (PR #5, open): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
-| O15 | Renumber sections (long paths first) + sort map flow rows by section + delta `sec_idx` | no (ids only) | measured: out-map -536 KB, in-map -524 KB, shared -11 KB; first paint -34%; ~70 lines; see `staging/sizeexplore/REPORT.md` |
+| O15 | ✅ DONE (with O6, PR open): renumber sections (long paths first) + sort map flow rows + delta `sec_idx` | no (ids only) | fmt 5: out-map -535 KB, in-map -524 KB, shared -16 KB; first paint 1.62 -> 1.07 MB (-34%); see #### O15 + O6 |
 | O16 | Lazy-load schedules after first paint (background, alongside the tables) | no | -419 KB at first paint; O14 now needs schedules for dwells, so load them right after first paint, not on modal open |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
@@ -284,6 +284,12 @@ Read-only; scripts and decoded live pack in `staging/spotcheck/` (`g1.py`, `g2.p
   - `check_filter_animation.mjs` (BASE_REF=HEAD): steps, counters and final-step flows equal; dot positions differ by design. OK.
   - typecheck/build pass; `cargo fmt --check`, `clippy --workspace --all-targets -D warnings` and `cargo test` (9) pass.
   - Build: `staging/o14-build/` (env.sh config). Scripts: in this worktree's `staging/scripts/` (untracked; O13 would promote them).
+
+#### O15 + O6 (fmt 5: compact pack)
+- **Format** (`atlaspack.rs` header, `docs/PIPELINE.md`): sections renumbered long-paths-first per direction; map flows sorted by section id with delta-coded column 0; per-train `paths` (raw signed ids) with per-row `dep_off` (suffix) / `arr_len` (prefix); `stop_pos` and `chords` stored once per train in full-path coordinates (measured smaller than per-row copies: stop_pos 180 -> 53 KB, chords 1.1 -> 0.3 KB brotli). Every file carries `fmt: 5`. `atlas-v2-{out,in}.json` are no longer written.
+- **Safety:** atlaspack hard-asserts every row is an exact slice of its train's full path and that chord legs / stop positions rebuild exactly. Client decodes once at load into the same VMs (`expandOutTables`, `expandInTables`, `decodeFlows` in `lib.ts`). `audit` expands fmt 5 independently.
+- **Proof:** `scripts/check_pack_roundtrip.mjs <fmt4 dir> <fmt5 dir>` (real `lib.ts`): 102 origins, 59,875 rows, 1,850 chord legs, 235,264 stop positions, 574,819 flow rows identical by geometry. Audit output byte-identical to fmt 4 apart from the `fmt` lines; goldens unchanged (none are id-dependent); secdiff `--edges` = 0 (atlas.rs untouched).
+- **Known benign change:** map flows are now in section-id order, so equal-`n` flows tie-break in a different (previously arbitrary) draw order after the client's stable sort by `n`.
 
 ## Planned: repo migration (owner-approved 2026-10-24, run AFTER O14 and O5/O9 land)
 - New primary checkout: fresh clone of github.com/lsquaredleland/China-Rail-Flow-Map at `~/Downloads/china-rail-flow-map`.
