@@ -66,8 +66,8 @@ const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
 const OUTLINE_URL = "assets/china-outline.json";
-// Every data file carries the pack format (fmt 5: renumbered sections,
-// delta-coded map flows, per-train paths); older packs would draw wrong,
+// Every data file carries the pack format (fmt 6: renumbered sections,
+// delta-coded map flows, per-train paths with station throats); older packs would draw wrong,
 // so each file is checked on load and refused otherwise.
 // Fetch the out/in map files with their flows decoded and format checked.
 async function fetchOutMap(): Promise<OutMapData> {

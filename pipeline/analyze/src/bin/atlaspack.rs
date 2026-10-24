@@ -11,7 +11,7 @@
 //!   1e5; the sections were already simplified/rounded near that scale.
 //!
 //! Per-train paths (`dep_secs` / `arr_secs` semantics; the five-file split
-//! stores them deduplicated as `fmt: 5`, see below). In the combined file:
+//! stores them deduplicated as `fmt: 6`, see below). In the combined file:
 //! - `dep_secs` / `arr_secs` list each train's sections in TRAVEL order
 //!   (outbound: from this origin onward; inbound: from the train's first
 //!   stop to its arrival here); a section repeats when the train runs back
@@ -19,10 +19,25 @@
 //!   separately, so they are unaffected). A
 //!   value `s >= 0` is section `s` travelled along its stored point order;
 //!   `s < 0` is section `-s - 1` (`!s`) travelled against it.
-//! - Outbound call `sec_cnt`: the first `sec_cnt` entries of `dep_secs`
-//!   run from the origin to that call. Inbound call `sec_cnt`: the LAST
-//!   `sec_cnt` entries of `arr_secs` run from the boarding stop to the
-//!   arrival.
+//! - Station throats (O1, fmt 6): an entry whose id (after `!`) is `>= n`,
+//!   n = the direction's section count (`sections.len()` in `dep_secs`,
+//!   `in_sections.len()` in `arr_secs`), is throat `id - n` of the shared
+//!   `throats` list: geometry only (polylines like `network`). A throat is a
+//!   maximal run of consecutive track edges inside one leg that
+//!   `near_station` (1.3 km around every stop) keeps out of the flow
+//!   sections; legs are split at their stops, so a station sits exactly
+//!   between the arriving leg's last throat and the departing leg's first.
+//!   Throats are deduped globally by node chain (one id per piece, `!` when
+//!   walked against its stored order) and simplified like sections. They are
+//!   never flows: no map flow row, no call `sec_cnt`, no flow counting.
+//!   Removing them from a path leaves exactly the pre-O1 (fmt 5) path.
+//! - Positions vs counts: every POSITION below (chord legs, stop positions,
+//!   `dep_off` / `arr_len`) indexes the whole path, throats included. The
+//!   call `sec_cnt` COUNTS flow sections only:
+//! - Outbound call `sec_cnt`: the first `sec_cnt` flow sections of
+//!   `dep_secs` run from the origin to that call. Inbound call `sec_cnt`:
+//!   the LAST `sec_cnt` flow sections of `arr_secs` run from the boarding
+//!   stop to the arrival.
 //! - `dep_chord_legs` / `arr_chord_legs`: per train, `[stop, s0, s1]` for
 //!   each leg without usable track geometry (unresolved, or a gap > 3 km):
 //!   the leg departs the train's stop index `stop` (an index into its
@@ -34,19 +49,23 @@
 //!   either side; s0 == s1 means the leg produced no entries and the gap is
 //!   the single join s0 (between entries s0-1 and s0).
 //! - `dep_stop_pos`: per dep row, one entry per stop after boarding, in
-//!   stop order: the number of dep_secs entries before that stop (the stop
-//!   sits at the start of entry `pos`; the terminus has pos == path length).
+//!   stop order: the number of dep_secs entries (throats included) before
+//!   that stop. The stop sits at the start of entry `pos`, which is the
+//!   departing leg's first entry: its throat at the station when it has one,
+//!   so dwells sit at the station itself; the terminus has pos == path length
+//!   (the end of the arriving leg's last throat).
 //!   Station level, unlike the city calls (first station per city only).
 //!   The stops are `schedules[t][len - stops ..]` (`stops` = the dep row's
 //!   stop count), which give their stations and times.
 //!
-//! Five-file split, `fmt: 5` (O15 + O6; every file carries `fmt: 5` and the
-//! client refuses anything else, so ids can never be mixed across formats):
+//! Five-file split, `fmt: 6` (O15 + O6 = fmt 5, plus O1's throats; every file
+//! carries `fmt: 6` and the client refuses anything else, so ids can never
+//! be mixed across formats):
 //! - O15 section renumbering. Per direction the sections are renumbered
 //!   "long paths first": the longest path of each train (trains in first-seen
 //!   order, stable-sorted by descending length) lists its not-yet-seen
 //!   sections in path order, then every remaining section keeps its old
-//!   relative order. `sections` / `in_sections` in the shared file, the map
+//!   relative order. Throat ids are not renumbered. `sections` / `in_sections` in the shared file, the map
 //!   flows and all path ids use the new numbering (out and in independently).
 //!   Map flow rows (`flows`, `in_flows`) are sorted by section id and
 //!   delta-encoded: column 0 is the difference to the previous row's section
@@ -351,10 +370,10 @@ fn verify(v1: &Value, v2: &Value) -> Result<(), String> {
             }
         }
     }
-    {
-        let (a, b) = (arr(get(v1, "network")), arr(get(v2, "network")));
+    for key in ["network", "throats"] {
+        let (a, b) = (arr(get(v1, key)), arr(get(v2, key)));
         if a.len() != b.len() {
-            return Err("network count".into());
+            return Err(format!("{key} count"));
         }
         for (s1, s2) in a.iter().zip(b.iter()) {
             check_geom(s1.as_str().unwrap(), s2.as_str().unwrap())?;
@@ -440,9 +459,9 @@ fn verify(v1: &Value, v2: &Value) -> Result<(), String> {
     Ok(())
 }
 
-// ---------------- fmt 5: renumbering (O15) + path dedupe (O6) ----------------
+// ------- fmt 6: renumbering (O15) + path dedupe (O6) + throats (O1) -------
 
-const FMT: i64 = 5;
+const FMT: i64 = 6;
 
 /// Which per-direction fields to pack.
 struct Dir {
@@ -469,8 +488,12 @@ fn ints(v: &Value) -> Vec<i64> {
     arr(v).iter().map(|x| x.as_i64().unwrap()).collect()
 }
 
+/// Section ids go through `perm`; throat entries (`>= perm.len()`, O1) keep
+/// their id.
 fn remap(v: i64, perm: &[usize]) -> i64 {
-    if v >= 0 {
+    if (if v >= 0 { v } else { !v }) as usize >= perm.len() {
+        v
+    } else if v >= 0 {
         perm[v as usize] as i64
     } else {
         !(perm[(!v) as usize] as i64)
@@ -500,7 +523,7 @@ fn renumber(origins: &[Value], d: &Dir, n_secs: usize) -> Vec<usize> {
     for (_, p) in &best {
         for &v in p {
             let s = if v >= 0 { v } else { !v } as usize;
-            if !seen[s] {
+            if s < n_secs && !seen[s] {
                 seen[s] = true;
                 order.push(s);
             }
@@ -680,6 +703,8 @@ fn main() {
         "in_sections": pack_sections(get(&v1, "in_sections")),
         "network": arr(get(&v1, "network")).iter()
             .map(|s| json!(requant(s.as_str().unwrap()))).collect::<Vec<_>>(),
+        "throats": arr(get(&v1, "throats")).iter()
+            .map(|s| json!(requant(s.as_str().unwrap()))).collect::<Vec<_>>(),
     });
     let origins: Vec<Value> = arr(get(&v1, "origins")).iter().map(pack_origin).collect();
     let mut combined = shared.clone();
@@ -759,7 +784,7 @@ fn main() {
     }
     println!("five-file partition: PASS (all origins reconstruct exactly)");
 
-    // fmt 5: renumber sections per direction, dedupe the per-row paths into
+    // fmt 6: renumber sections per direction, dedupe the per-row paths into
     // per-train tables, sort + delta-encode the map flows.
     let n_trains = arr(get(&v1, "train_table")).len();
     let perm_out = renumber(&origins, &OUT, arr(get(&shared, "sections")).len());
@@ -817,7 +842,7 @@ fn main() {
         ooff,
     );
     let in_tables5 = tables5(&in_tables, &["arr_secs", "arr_chord_legs"], "arr_len", ilen);
-    println!("fmt 5 pack: PASS (every row is an exact slice of its train's full path)");
+    println!("fmt 6 pack: PASS (every row is an exact slice of its train's full path)");
 
     use rayon::prelude::*;
 

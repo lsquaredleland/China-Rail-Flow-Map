@@ -1312,7 +1312,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     for (name, t) in [("out-tables", &out_t), ("in-tables", &in_t)] {
         let fmt = t.get("fmt").and_then(Value::as_i64);
         println!("AUDIT pack {name} fmt: {fmt:?}");
-        ok &= fmt == Some(5);
+        ok &= fmt == Some(6);
     }
     for (name, m) in [
         ("shared", &shared),
@@ -1321,7 +1321,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     ] {
         let fmt = m.get("fmt").and_then(Value::as_i64);
         println!("AUDIT pack {name} fmt: {fmt:?}");
-        ok &= fmt == Some(5);
+        ok &= fmt == Some(6);
     }
     if ok {
         expand_tables(&mut out_t, true);
@@ -1336,7 +1336,31 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
             })
             .collect()
     };
-    let (out_ends, in_ends) = (ends("sections"), ends("in_sections"));
+    // O1: path entries >= the section count are throats (`throats[v - n]`),
+    // so the end lists run sections then throats and index by entry id
+    let throat_ends: Vec<([f64; 2], [f64; 2])> = arr(&shared["throats"])
+        .iter()
+        .map(|s| {
+            let p = decode_poly4(s.as_str().unwrap());
+            (p[0], *p.last().unwrap())
+        })
+        .collect();
+    let (n_out, n_in) = (
+        arr(&shared["sections"]).len(),
+        arr(&shared["in_sections"]).len(),
+    );
+    let (mut out_ends, mut in_ends) = (ends("sections"), ends("in_sections"));
+    out_ends.extend(&throat_ends);
+    in_ends.extend(&throat_ends);
+    // flow sections among a path's entries (throats excluded)
+    let flow_len = |path: &[Value], n: usize| -> i64 {
+        path.iter()
+            .filter(|v| {
+                let v = v.as_i64().unwrap();
+                ((if v >= 0 { v } else { !v }) as usize) < n
+            })
+            .count() as i64
+    };
     let codes: Vec<String> = arr(&shared["train_table"])
         .iter()
         .map(|t| t["code"].as_str().unwrap().to_string())
@@ -1348,13 +1372,16 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     // ---- path continuity: exit of oriented section k-1 -> entry of k ----
     let mut worst: Vec<(f64, String)> = Vec::new();
     let (mut checked, mut gaps, mut chord_rows, mut chord_legs) = (0u64, 0u64, 0u64, 0u64);
-    // gaps up to 6 km are station-throat trims (B8, optional Phase 3)
+    // gaps up to 6 km were station-throat trims (B8) until O1's throats
     let mut throat_gaps = 0u64;
+    // finer tiers of the same joins: gap > 0.1 km, (0.1, 1], (1, 3]
+    let (mut gaps_100m, mut tier_1km, mut tier_3km) = (0u64, 0u64, 0u64);
+    let mut throat_refs = 0u64;
     let mut bad_trains: HashSet<(usize, &str, usize)> = HashSet::new();
     let mut sec_cnt_over = 0u64;
     // outbound rows with a > 35 km jump, inside chord legs only / outside
     let (mut jump_in, mut jump_out) = (0i64, 0i64);
-    for (label, tables, secs_key, chords_key, rows_key, ends) in [
+    for (label, tables, secs_key, chords_key, rows_key, ends, n_secs) in [
         (
             "out",
             &out_t,
@@ -1362,14 +1389,27 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
             "dep_chord_legs",
             "deps",
             &out_ends,
+            n_out,
         ),
-        ("in", &in_t, "arr_secs", "arr_chord_legs", "arrs", &in_ends),
+        (
+            "in",
+            &in_t,
+            "arr_secs",
+            "arr_chord_legs",
+            "arrs",
+            &in_ends,
+            n_in,
+        ),
     ] {
         for (oi, o) in arr(&tables["origins"]).iter().enumerate() {
             let rows = arr(&o[rows_key]);
             let chords = arr(&o[chords_key]);
             for (ri, path) in arr(&o[secs_key]).iter().enumerate() {
                 let path: Vec<i64> = arr(path).iter().map(int).collect();
+                throat_refs += path
+                    .iter()
+                    .filter(|&&v| (if v >= 0 { v } else { !v }) as usize >= n_secs)
+                    .count() as u64;
                 let mut exempt: HashSet<usize> = HashSet::new();
                 let cl = arr(&chords[ri]);
                 if !cl.is_empty() {
@@ -1398,6 +1438,14 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                     }
                     j_out |= gap > 35.0;
                     checked += 1;
+                    if gap > 0.1 {
+                        gaps_100m += 1;
+                        if gap <= 1.0 {
+                            tier_1km += 1;
+                        } else if gap <= 3.0 {
+                            tier_3km += 1;
+                        }
+                    }
                     if gap > 3.0 {
                         gaps += 1;
                         if gap <= 6.0 {
@@ -1425,7 +1473,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                 for r in arr(cell).iter() {
                     let (idx, t1, t2, off) = (int(&r[0]), int(&r[1]), int(&r[2]), int(&r[3]));
                     let cnt = int(&r[if label == "out" { 5 } else { 6 }]);
-                    let len = arr(&o[secs_key][idx as usize]).len() as i64;
+                    let len = flow_len(&arr(&o[secs_key][idx as usize]), n_secs);
                     if cnt > len {
                         sec_cnt_over += 1;
                     }
@@ -1450,8 +1498,16 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         "AUDIT pack chord legs: {chord_legs} on {chord_rows} train rows (gaps inside are exempt)"
     );
     println!(
+        "AUDIT pack throats: {} pieces, {throat_refs} path entries (out + in rows)",
+        throat_ends.len()
+    );
+    println!(
         "AUDIT pack path continuity: {gaps} gaps > 3 km in {checked} joins outside chord legs ({} train rows); {throat_gaps} of them <= 6 km (station throats), {} > 6 km",
         bad_trains.len(),
+        gaps - throat_gaps
+    );
+    println!(
+        "AUDIT pack path continuity tiers: {gaps_100m} joins > 0.1 km: {tier_1km} in (0.1, 1], {tier_3km} in (1, 3], {throat_gaps} in (3, 6], {} > 6 km",
         gaps - throat_gaps
     );
     let mut gap_list: Vec<&(f64, String)> = worst.iter().filter(|w| w.0 >= 0.0).collect();
@@ -1560,6 +1616,8 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                 dep_b += 1440;
             }
             let rel = |day: i64, m: i64| day * 1440 + m - dep_b + int(&d[2]);
+            // calls count flow sections only (O1): a stop's flow position
+            let secs_d = arr(&o["dep_secs"][di]);
             let mut times: Vec<i64> = Vec::new();
             let mut row: Vec<(i64, i64)> = Vec::new();
             for (i, p) in pos.iter().enumerate() {
@@ -1569,7 +1627,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                 if r[2] >= 0 && i + 1 < pos.len() {
                     times.push(rel(r[3] + i64::from(r[2] < r[1]), r[2]));
                 }
-                row.push((a, *p));
+                row.push((a, flow_len(&secs_d[..*p as usize], n_out)));
             }
             if times.windows(2).any(|w| w[1] < w[0]) {
                 st_time_back += 1;
@@ -1612,6 +1670,8 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     g.insert("chord_leg_rows".into(), chord_legs as i64);
     g.insert("continuity_gaps_le6km".into(), throat_gaps as i64);
     g.insert("continuity_gaps_gt6km".into(), (gaps - throat_gaps) as i64);
+    g.insert("continuity_gaps_gt100m".into(), gaps_100m as i64);
+    g.insert("throats".into(), throat_ends.len() as i64);
     g.insert("dep_rows_jump_gt35km_outside_chords".into(), jump_out);
     g.insert("dep_rows_jump_gt35km_inside_chords".into(), jump_in);
     g.insert("nonmonotone_sec_cnt_trains".into(), non_mono.len() as i64);

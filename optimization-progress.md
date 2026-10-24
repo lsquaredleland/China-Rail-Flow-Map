@@ -15,7 +15,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | 1. Ordered, oriented paths (pipeline) | done in staging; full audit + goldens PASS; 0 changed edges vs live | retrace fix in; >35 km jumps outside chord legs = 0 (live old chainer: 5,804 rows) |
 | 2. Generated schedules (pipeline) | done in staging; schedules audit PASS | indexed by `t`; client switched |
 | Goldens gate | `pipeline/goldens.json` + `audit` gate (exact / max counters, `--update-goldens`) | dropped chains / flow lost gated only in full audit, not `--pack-only` |
-| 3. Throat stubs | backlog O1 | |
+| 3. Throat stubs | ✅ O1, PR open | fmt 6 |
 | 4. Client on new data | done (4.1–4.6, virtual crow-flies spans for chord legs); owner browser check OK | live assets swapped |
 | 5. Path dedupe | ✅ O6 (with O15), PR open | fmt 5 |
 
@@ -26,7 +26,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 ## Backlog: optional improvements (not started)
 | # | Item | Changes flows? | Notes |
 |---|---|---|---|
-| O1 | Phase 3 station-throat stubs | no | removes the 61,807 gaps of ≤6 km at stations (trains hop a few km at stations today); ~728 distinct joins, ~2k points, ~62k path refs; then tighten the continuity gate |
+| O1 | ✅ DONE (PR open): Phase 3 station-throat stubs | no | fmt 6: 9,128 geometry-only throats in the paths; continuity (3, 6] km 64,852 -> 43, > 6 km 391 -> 149; +248 KB brotli; see #### O1 |
 | O2 | Triage the 417 continuity gaps over 6 km | no | 69 orientation-fixable, rest unexplained (e.g. K237 69.7 km); scripts in `staging/scripts/` |
 | O3 | Chord legs at a path end | no | no virtual span there, so the dot waits, then appears; use the stop/city point as the far end |
 | O4 | ✅ DONE (PR #2, merged 2026-10-24): fix router `#cv3` node coordinates in `atlas.rs` | **yes**: owner approval + staged diff | 13,420 chord rows / 223 legs (e.g. K118 成都西→广元) |
@@ -292,6 +292,15 @@ Read-only; scripts and decoded live pack in `staging/spotcheck/` (`g1.py`, `g2.p
 - **Safety:** atlaspack hard-asserts every row is an exact slice of its train's full path and that chord legs / stop positions rebuild exactly. Client decodes once at load into the same VMs (`expandOutTables`, `expandInTables`, `decodeFlows` in `lib.ts`). `audit` expands fmt 5 independently.
 - **Proof:** `scripts/check_pack_roundtrip.mjs <fmt4 dir> <fmt5 dir>` (real `lib.ts`): 102 origins, 59,875 rows, 1,850 chord legs, 235,264 stop positions, 574,819 flow rows identical by geometry. Audit output byte-identical to fmt 4 apart from the `fmt` lines; goldens unchanged (none are id-dependent); secdiff `--edges` = 0 (atlas.rs untouched).
 - **Known benign change:** map flows are now in section-id order, so equal-`n` flows tie-break in a different (previously arbitrary) draw order after the client's stable sort by `n`.
+
+#### O1 (fmt 6: station-throat stubs)
+- **Format** (`atlaspack.rs` header, `docs/PIPELINE.md`): shared `throats` (polylines, geometry only). A throat = a maximal run of consecutive edges inside one leg that `near_station` keeps out of the flow sections (outbound grid for out rows, O5's inbound grid for in rows), deduped globally by node chain, simplified like sections (`dp_keep` 0.00035, `round_pt` 4), runs < 20 m dropped. Path entry `n + j` (`~` = reversed), n = that direction's section count. Positions (chord legs, `stop_pos`, `dep_off`, `arr_len`) index the whole path; call `sec_cnt` counts flow sections only. A stop sits at the start of the departing leg's first entry (its station throat), so dwells sit at the station.
+- **Flows untouched:** flow-only sequences are unchanged by construction (a same-section repeat across throats drops the throats: 0 cases). secdiff `--edges` vs the new-main build = 0. Client: `decodeSecs` drops throats, so `DepVM.secs`, `PrepTrain.secs`/`secStarts`, flows, `secFlowSteps`, city-pair highlights never see them; only `getActiveTrains` interpolates on `PrepTrain.throatSpans`.
+- **Proof:** `scripts/strip_throats.mjs` strips the throats from the v1 file; main's atlaspack packs that into fmt 5; `scripts/check_pack_roundtrip.mjs <fmt5> <fmt6>` (client lib): 102 origins, 59,875 rows, 20 chord legs, 235,264 stop positions, 577,776 flow rows identical, 1,665,388 throat entries stripped.
+- **Continuity tiers** (joins outside chord legs; main -> O1): > 0.1 km 1,139,525 -> 103,390; (0.1, 1] 20,010 -> 97,492; (1, 3] 1,054,272 -> 5,706; (3, 6] 64,852 -> 43; > 6 km 391 -> 149. Most of the remaining 0.1-1 km joins are where the arriving and departing legs' geometry end on different station nodes. New gate `continuity_gaps_gt100m` (max) and exact `throats`.
+- **Size** (brotli, vs main's assets): shared +69 KB, out-tables +97 KB, in-tables +88 KB, maps/schedules ~0: **+248 KB**. 21.6k throat points.
+- **Spot check** (`staging/o1-build/spot_o1.mjs`, G3764 + K678 from every origin): max 1-second jump within 3 min of a stop 3.02 -> 0.54 km; dot-to-station distance during dwells max 1.73 -> 0.76 km (typically 1.3 -> < 0.3 km).
+- Build: `staging/o1-build/o1v2` (env.sh + the O9 inputs, `staging/o1-build/env-o9.sh`); baseline `staging/o1-build/main2`.
 
 ## Planned: repo migration (owner-approved 2026-10-24, run AFTER O14 and O5/O9 land)
 - New primary checkout: fresh clone of github.com/lsquaredleland/China-Rail-Flow-Map at `~/Downloads/china-rail-flow-map`.
