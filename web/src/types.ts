@@ -93,7 +93,7 @@ export interface RawOrigin {
   fully_tracked: number;
   dests: RawDest[];
   calls?: RawCall[][]; // parallel to dests: calls[i] = trains calling at dests[i]'s city
-  flows: RawFlow[];
+  flows: RawFlow[]; // fmt 5 on the wire: sorted by section, column 0 delta-coded; decoded at load
   chords: RawChord[];
   deps?: RawDep[];
   dep_secs?: number[][]; // travel order; ~s = section walked in reverse
@@ -110,6 +110,7 @@ export interface RawOrigin {
 
 /** atlas-v2-shared.json: the tables and geometry every origin shares. */
 export interface SharedData {
+  fmt: number;
   city_table: RawCity[];
   station_table: RawStation[];
   train_table: RawTrain[];
@@ -121,25 +122,45 @@ export interface SharedData {
 /** atlas-v2-out-map.json: every origin's identity + outbound map
     fields — the phase-1 file the first paint is built from. */
 export interface OutMapData {
+  fmt: number;
   origins: RawOrigin[];
 }
 
 /** A leg with no track geometry: [stop index, first section, last section]. */
 export type ChordLeg = [number, number, number];
 
-/** One origin's entry in atlas-v2-out-tables.json. */
+/** One origin's entry in atlas-v2-out-tables.json (fmt 5): the per-row
+    paths are not stored; `dep_off` locates each dep row's slice of its
+    train's full path. */
+export interface OutTablesPackOrigin {
+  deps: RawDep[];
+  calls: RawCall[][];
+  dep_off: number[];
+}
+
+/** atlas-v2-out-tables.json (fmt 5), as shipped: per-train full paths,
+    stop positions and chord legs (full-path coordinates). Origins are
+    parallel by index. Expanded by expandOutTables at load. */
+export interface OutTablesPack {
+  fmt: number;
+  paths: number[][];
+  stop_pos: number[][];
+  chords: [number, ChordLeg[]][];
+  origins: OutTablesPackOrigin[];
+}
+
+/** One origin's out tables, expanded to per-row paths. */
 export interface OutTablesOrigin {
   deps: RawDep[];
   calls: RawCall[][];
   dep_secs: number[][];
   dep_chord_legs: ChordLeg[][];
-  /** Per dep row: path position of every stop after boarding (fmt 4). */
+  /** Per dep row: path position of every stop after boarding. */
   dep_stop_pos: number[][];
 }
 
-/** atlas-v2-out-tables.json: origins parallel by index. */
+/** The out tables after expandOutTables. */
 export interface OutTablesData {
-  fmt: number;
   origins: OutTablesOrigin[];
 }
 
@@ -151,10 +172,27 @@ export interface InMapOrigin {
 
 /** atlas-v2-in-map.json: origins parallel by index. */
 export interface InMapData {
+  fmt: number;
   origins: InMapOrigin[];
 }
 
-/** One origin's entry in atlas-v2-in-tables.json: inbound tables. */
+/** One origin's entry in atlas-v2-in-tables.json (fmt 5): `arr_len` is
+    the length of each arr row's prefix of its train's full path. */
+export interface InTablesPackOrigin {
+  arrs: RawArr[];
+  in_calls: RawInCall[][];
+  arr_len: number[];
+}
+
+/** atlas-v2-in-tables.json (fmt 5), as shipped. Expanded by expandInTables. */
+export interface InTablesPack {
+  fmt: number;
+  paths: number[][];
+  chords: [number, ChordLeg[]][];
+  origins: InTablesPackOrigin[];
+}
+
+/** One origin's in tables, expanded to per-row paths. */
 export interface InTablesOrigin {
   arrs: RawArr[];
   in_calls: RawInCall[][];
@@ -162,9 +200,8 @@ export interface InTablesOrigin {
   arr_chord_legs: ChordLeg[][];
 }
 
-/** atlas-v2-in-tables.json: origins parallel by index. */
+/** The in tables after expandInTables. */
 export interface InTablesData {
-  fmt: number;
   origins: InTablesOrigin[];
 }
 

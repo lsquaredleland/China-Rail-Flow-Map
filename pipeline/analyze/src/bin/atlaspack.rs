@@ -10,7 +10,8 @@
 //! - All polyline geometry is re-encoded at 1e4 precision (~11 m) instead of
 //!   1e5; the sections were already simplified/rounded near that scale.
 //!
-//! Per-train paths (`fmt: 4`, on out-tables / in-tables; 4 = 3 + `dep_stop_pos`):
+//! Per-train paths (`dep_secs` / `arr_secs` semantics; the five-file split
+//! stores them deduplicated as `fmt: 5`, see below). In the combined file:
 //! - `dep_secs` / `arr_secs` list each train's sections in TRAVEL order
 //!   (outbound: from this origin onward; inbound: from the train's first
 //!   stop to its arrival here); a section repeats when the train runs back
@@ -39,16 +40,49 @@
 //!   The stops are `schedules[t][len - stops ..]` (`stops` = the dep row's
 //!   stop count), which give their stations and times.
 //!
+//! Five-file split, `fmt: 5` (O15 + O6; every file carries `fmt: 5` and the
+//! client refuses anything else, so ids can never be mixed across formats):
+//! - O15 section renumbering. Per direction the sections are renumbered
+//!   "long paths first": the longest path of each train (trains in first-seen
+//!   order, stable-sorted by descending length) lists its not-yet-seen
+//!   sections in path order, then every remaining section keeps its old
+//!   relative order. `sections` / `in_sections` in the shared file, the map
+//!   flows and all path ids use the new numbering (out and in independently).
+//!   Map flow rows (`flows`, `in_flows`) are sorted by section id and
+//!   delta-encoded: column 0 is the difference to the previous row's section
+//!   id (the first row is relative to 0); the other columns are unchanged.
+//! - O6 per-train paths. Every table file carries `paths[t]`, the longest
+//!   `dep_secs` (out) / `arr_secs` (in) row of train `t`, in raw signed ids
+//!   (no deltas: they would break the repeats brotli exploits). Every row of
+//!   `t` is a clean slice of it, hard-asserted at pack time: an out row is
+//!   the suffix `paths[t][dep_off[i]..]` (`dep_off` per origin), an in row
+//!   the prefix `paths[t][..arr_len[i]]` (`arr_len` per origin).
+//!   `dep_off` / `arr_len` are explicit because 37 outbound / 31 inbound
+//!   trains revisit sections (the slice start is not derivable from ids).
+//!   Out-tables also carry `stop_pos[t]`, the longest row's `dep_stop_pos`
+//!   in full-path coordinates; a row with `n = stops` takes the last `n`
+//!   entries minus `dep_off`. `chords` is `[[t, legs]]` for trains whose
+//!   longest row has chord legs, legs in full-path positions; an out row
+//!   keeps the legs with `s0 >= dep_off` (positions minus `dep_off`), an in
+//!   row the legs with `s1 <= arr_len`. All of it is asserted to rebuild
+//!   today's per-row `dep_secs` / `dep_chord_legs` / `dep_stop_pos` /
+//!   `arr_secs` / `arr_chord_legs` exactly. Per-train chords and stop
+//!   positions measured smaller than per-row copies (stop_pos 180 KB -> 53 KB
+//!   brotli, chords 1.1 KB -> 0.3 KB).
+//! - `atlas-v2-out.json` / `atlas-v2-in.json` are no longer written (unused,
+//!   and their ids would not match the renumbered shared file); the combined
+//!   `china-flow-atlas-data-v2.json` keeps the original numbering.
+//!
 //! Schedules (`atlas-v2-schedules.json`, generated, not hand-committed):
 //! `schedules[t]` (t = train_table index) is the train's full stop list,
 //! rows `[station_table idx, arr mins, dep mins, day offset, leg km]`
 //! (-1 = no time / unknown km). `extra_stations` stays empty (kept for
 //! the client's type); every stop resolves into station_table.
 //!
-//! Outputs (combined + direction splits for lazy inbound loading), each also
-//! written Brotli-compressed (quality 11) with a `.br` suffix:
-//! - china-flow-atlas-data-v2.json
-//! - atlas-v2-shared.json / atlas-v2-out.json / atlas-v2-in.json
+//! Outputs, each also written Brotli-compressed (quality 11) with a `.br`
+//! suffix:
+//! - china-flow-atlas-data-v2.json (original section numbering)
+//! - atlas-v2-shared.json
 //! - Five-file split (first-paint staging): atlas-v2-out-map.json,
 //!   atlas-v2-out-tables.json, atlas-v2-in-map.json, atlas-v2-in-tables.json
 //!   (shared is shared). The four origin files partition the combined
@@ -406,6 +440,216 @@ fn verify(v1: &Value, v2: &Value) -> Result<(), String> {
     Ok(())
 }
 
+// ---------------- fmt 5: renumbering (O15) + path dedupe (O6) ----------------
+
+const FMT: i64 = 5;
+
+/// Which per-direction fields to pack.
+struct Dir {
+    out: bool,
+    rows: &'static str,
+    secs: &'static str,
+    chords: &'static str,
+}
+
+const OUT: Dir = Dir {
+    out: true,
+    rows: "deps",
+    secs: "dep_secs",
+    chords: "dep_chord_legs",
+};
+const IN: Dir = Dir {
+    out: false,
+    rows: "arrs",
+    secs: "arr_secs",
+    chords: "arr_chord_legs",
+};
+
+fn ints(v: &Value) -> Vec<i64> {
+    arr(v).iter().map(|x| x.as_i64().unwrap()).collect()
+}
+
+fn remap(v: i64, perm: &[usize]) -> i64 {
+    if v >= 0 {
+        perm[v as usize] as i64
+    } else {
+        !(perm[(!v) as usize] as i64)
+    }
+}
+
+/// Old section id -> new id, "long paths first" (see the header).
+fn renumber(origins: &[Value], d: &Dir, n_secs: usize) -> Vec<usize> {
+    let mut best: Vec<(i64, Vec<i64>)> = Vec::new(); // first-seen train order
+    let mut at: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+    for o in origins {
+        for (row, path) in arr(get(o, d.rows)).iter().zip(arr(get(o, d.secs))) {
+            let (t, path) = (arr(row)[0].as_i64().unwrap(), ints(path));
+            match at.get(&t) {
+                None => {
+                    at.insert(t, best.len());
+                    best.push((t, path));
+                }
+                Some(&i) if path.len() > best[i].1.len() => best[i].1 = path,
+                _ => {}
+            }
+        }
+    }
+    best.sort_by_key(|(_, p)| std::cmp::Reverse(p.len())); // stable
+    let mut seen = vec![false; n_secs];
+    let mut order = Vec::with_capacity(n_secs);
+    for (_, p) in &best {
+        for &v in p {
+            let s = if v >= 0 { v } else { !v } as usize;
+            if !seen[s] {
+                seen[s] = true;
+                order.push(s);
+            }
+        }
+    }
+    order.extend((0..n_secs).filter(|&s| !seen[s]));
+    let mut perm = vec![0usize; n_secs];
+    for (new, &old) in order.iter().enumerate() {
+        perm[old] = new;
+    }
+    perm
+}
+
+/// Sort map flow rows by (new) section id and delta-encode column 0.
+fn pack_flows(rows: &Value, perm: &[usize]) -> Value {
+    let mut r: Vec<Vec<Value>> = arr(rows)
+        .iter()
+        .map(|f| {
+            let mut f = arr(f).clone();
+            f[0] = json!(perm[f[0].as_u64().unwrap() as usize]);
+            f
+        })
+        .collect();
+    r.sort_by_key(|f| f[0].as_u64().unwrap());
+    let mut prev = 0u64;
+    for f in r.iter_mut() {
+        let id = f[0].as_u64().unwrap();
+        f[0] = json!(id - prev);
+        prev = id;
+    }
+    Value::Array(r.into_iter().map(Value::Array).collect())
+}
+
+/// Rebuild one row's chord legs from the train's full-path legs.
+fn row_legs(full: &[Vec<i64>], d: &Dir, off: i64, len: i64) -> Vec<Vec<i64>> {
+    full.iter()
+        .filter(|l| if d.out { l[1] >= off } else { l[2] <= len })
+        .map(|l| {
+            if d.out {
+                vec![l[0], l[1] - off, l[2] - off]
+            } else {
+                l.clone()
+            }
+        })
+        .collect()
+}
+
+/// A train's full path, stop positions and chord legs (raw old ids).
+type FullPath = (Vec<i64>, Vec<i64>, Vec<Vec<i64>>);
+
+/// Dedupe one direction's per-row paths into per-train tables. Returns
+/// (paths, stop_pos (out only), chords, per-origin offsets/lengths); ids are
+/// remapped through `perm`. Every row is asserted to be the exact slice.
+fn pack_paths(
+    origins: &[Value],
+    d: &Dir,
+    n_trains: usize,
+    perm: &[usize],
+) -> (Vec<Value>, Vec<Value>, Vec<Value>, Vec<Value>) {
+    // The longest row per train is its full path.
+    let mut full: Vec<Option<(usize, usize)>> = vec![None; n_trains];
+    for (oi, o) in origins.iter().enumerate() {
+        for (ri, (row, path)) in arr(get(o, d.rows))
+            .iter()
+            .zip(arr(get(o, d.secs)))
+            .enumerate()
+        {
+            let t = arr(row)[0].as_u64().unwrap() as usize;
+            let l = arr(path).len();
+            if full[t].is_none_or(|(fo, fr)| l > arr(&get(&origins[fo], d.secs)[fr]).len()) {
+                full[t] = Some((oi, ri));
+            }
+        }
+    }
+    let at = |(oi, ri): (usize, usize), key: &str| get(&origins[oi], key)[ri].clone();
+    let mut paths = Vec::new();
+    let mut stop_pos = Vec::new();
+    let mut chords = Vec::new();
+    let mut fulls: Vec<FullPath> = Vec::new();
+    for (t, f) in full.iter().enumerate() {
+        let Some(f) = *f else {
+            fulls.push(Default::default());
+            paths.push(json!([]));
+            stop_pos.push(json!([]));
+            continue;
+        };
+        let p = ints(&at(f, d.secs));
+        let sp = if d.out {
+            ints(&at(f, "dep_stop_pos"))
+        } else {
+            vec![]
+        };
+        let ch: Vec<Vec<i64>> = arr(&at(f, d.chords)).iter().map(ints).collect();
+        paths.push(json!(p.iter().map(|&v| remap(v, perm)).collect::<Vec<_>>()));
+        stop_pos.push(json!(sp));
+        if !ch.is_empty() {
+            chords.push(json!([t, ch]));
+        }
+        fulls.push((p, sp, ch));
+    }
+    let mut per_origin = Vec::new();
+    for (oi, o) in origins.iter().enumerate() {
+        let mut marks = Vec::new();
+        for (ri, row) in arr(get(o, d.rows)).iter().enumerate() {
+            let t = arr(row)[0].as_u64().unwrap() as usize;
+            let (fp, fsp, fch) = &fulls[t];
+            let p = ints(&get(o, d.secs)[ri]);
+            let (off, len) = if d.out {
+                ((fp.len() - p.len()) as i64, p.len() as i64)
+            } else {
+                (0, p.len() as i64)
+            };
+            let slice = if d.out {
+                &fp[off as usize..]
+            } else {
+                &fp[..p.len()]
+            };
+            assert!(
+                slice == &p[..],
+                "{} row {oi}/{ri}: path is not a clean slice of train {t}'s full path",
+                d.rows
+            );
+            let legs: Vec<Vec<i64>> = arr(&get(o, d.chords)[ri]).iter().map(ints).collect();
+            assert_eq!(
+                row_legs(fch, d, off, len),
+                legs,
+                "{} row {oi}/{ri}: chord legs",
+                d.rows
+            );
+            if d.out {
+                let n = arr(row)[7].as_u64().unwrap() as usize;
+                let want = ints(&get(o, "dep_stop_pos")[ri]);
+                let got: Vec<i64> = fsp[fsp.len() - n..].iter().map(|x| x - off).collect();
+                assert_eq!(got, want, "dep row {oi}/{ri}: stop positions");
+                marks.push(json!(off));
+            } else {
+                marks.push(json!(len));
+            }
+        }
+        per_origin.push(Value::Array(marks));
+    }
+    (paths, stop_pos, chords, per_origin)
+}
+
+fn with_fmt(mut m: Map<String, Value>) -> Value {
+    m.insert("fmt".into(), json!(FMT));
+    Value::Object(m)
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let argval = |name: &str| -> Option<String> {
@@ -447,30 +691,6 @@ fn main() {
     verify(&v1, &combined).expect("v2 verification failed");
     println!("verify: PASS (rows reconstructed identical; geometry within half a 1e4 step)");
 
-    // Direction splits: outbound fields in one file, inbound in the other,
-    // both parallel to the shared origins order.
-    let mut out_origins = Vec::new();
-    let mut in_origins = Vec::new();
-    for o in &origins {
-        let mut oo = Map::new();
-        let mut io = Map::new();
-        for (k, v) in obj(o) {
-            match k.as_str() {
-                "srcs" | "in_calls" | "in_flows" | "arrs" | "arr_secs" | "arr_chord_legs" => {
-                    io.insert(k.clone(), v.clone());
-                }
-                "inbound" => {
-                    oo.insert(k.clone(), v.clone());
-                    io.insert(k.clone(), v.clone());
-                }
-                _ => {
-                    oo.insert(k.clone(), v.clone());
-                }
-            }
-        }
-        out_origins.push(Value::Object(oo));
-        in_origins.push(Value::Object(io));
-    }
     // Five-file split: per direction, map aggregates (what first paint
     // needs) ship separately from the per-train table rows (interaction
     // data). Identity fields ride in out-map, which always loads first,
@@ -539,22 +759,86 @@ fn main() {
     }
     println!("five-file partition: PASS (all origins reconstruct exactly)");
 
+    // fmt 5: renumber sections per direction, dedupe the per-row paths into
+    // per-train tables, sort + delta-encode the map flows.
+    let n_trains = arr(get(&v1, "train_table")).len();
+    let perm_out = renumber(&origins, &OUT, arr(get(&shared, "sections")).len());
+    let perm_in = renumber(&origins, &IN, arr(get(&shared, "in_sections")).len());
+    let reorder = |secs: &Value, perm: &[usize]| -> Value {
+        let mut v = vec![Value::Null; perm.len()];
+        for (old, s) in arr(secs).iter().enumerate() {
+            v[perm[old]] = s.clone();
+        }
+        Value::Array(v)
+    };
+    let mut shared5 = obj(&shared).clone();
+    shared5.insert(
+        "sections".into(),
+        reorder(get(&shared, "sections"), &perm_out),
+    );
+    shared5.insert(
+        "in_sections".into(),
+        reorder(get(&shared, "in_sections"), &perm_in),
+    );
+    let shared5 = with_fmt(shared5);
+    let (op, osp, och, ooff) = pack_paths(&origins, &OUT, n_trains, &perm_out);
+    let (ip, _, ich, ilen) = pack_paths(&origins, &IN, n_trains, &perm_in);
+    let map5 = |maps: &[Value], key: &str, perm: &[usize]| -> Vec<Value> {
+        maps.iter()
+            .map(|m| {
+                let mut m = obj(m).clone();
+                if let Some(f) = m.get_mut(key) {
+                    *f = pack_flows(f, perm);
+                }
+                Value::Object(m)
+            })
+            .collect()
+    };
+    let out_map5 = map5(&out_map, "flows", &perm_out);
+    let in_map5 = map5(&in_map, "in_flows", &perm_in);
+    let tables5 = |tables: &[Value], drop: &[&str], mark: &str, marks: Vec<Value>| -> Vec<Value> {
+        tables
+            .iter()
+            .zip(marks)
+            .map(|(t, m)| {
+                let mut t = obj(t).clone();
+                for k in drop {
+                    t.remove(*k);
+                }
+                t.insert(mark.into(), m);
+                Value::Object(t)
+            })
+            .collect()
+    };
+    let out_tables5 = tables5(
+        &out_tables,
+        &["dep_secs", "dep_chord_legs", "dep_stop_pos"],
+        "dep_off",
+        ooff,
+    );
+    let in_tables5 = tables5(&in_tables, &["arr_secs", "arr_chord_legs"], "arr_len", ilen);
+    println!("fmt 5 pack: PASS (every row is an exact slice of its train's full path)");
+
     use rayon::prelude::*;
 
     let mut by_name: Vec<(&str, Value)> = Vec::new();
     by_name.push(("china-flow-atlas-data-v2.json", combined));
-    by_name.push(("atlas-v2-shared.json", shared));
-    by_name.push(("atlas-v2-out.json", json!({ "origins": out_origins })));
-    by_name.push(("atlas-v2-in.json", json!({ "origins": in_origins })));
-    by_name.push(("atlas-v2-out-map.json", json!({ "origins": out_map })));
+    by_name.push(("atlas-v2-shared.json", shared5));
+    by_name.push((
+        "atlas-v2-out-map.json",
+        json!({ "fmt": FMT, "origins": out_map5 }),
+    ));
     by_name.push((
         "atlas-v2-out-tables.json",
-        json!({ "fmt": 4, "origins": out_tables }),
+        json!({ "fmt": FMT, "paths": op, "stop_pos": osp, "chords": och, "origins": out_tables5 }),
     ));
-    by_name.push(("atlas-v2-in-map.json", json!({ "origins": in_map })));
+    by_name.push((
+        "atlas-v2-in-map.json",
+        json!({ "fmt": FMT, "origins": in_map5 }),
+    ));
     by_name.push((
         "atlas-v2-in-tables.json",
-        json!({ "fmt": 4, "origins": in_tables }),
+        json!({ "fmt": FMT, "paths": ip, "chords": ich, "origins": in_tables5 }),
     ));
     by_name.push((
         "atlas-v2-schedules.json",

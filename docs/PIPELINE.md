@@ -154,7 +154,7 @@ Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
 ./target/release/atlas        # → china-flow-atlas-data.json (v1 combined)
 ./target/release/atlaspack    # → the v2 five-file pack + combined v2:
 #   atlas-v2-{shared,out-map,out-tables,in-map,in-tables}.json(.br)
-#   atlas-v2-{out,in}.json(.br), china-flow-atlas-data-v2.json(.br)
+#   china-flow-atlas-data-v2.json(.br)  (original section numbering)
 ./target/release/audit        # the audit gate — must report:
                               # dropped chains 0, flow lost 0
 ```
@@ -190,8 +190,25 @@ Always set `CRFM_OUTPUT_DIR` / `ATLAS_OUT` / `--out-dir`: `output/` in this
 repo is a symlink into `china-rail-handoff-v3/output`. Section indices change
 on every run (HashMap iteration), so ship the whole five-file pack together.
 
-**Tables format `fmt: 4`** (`atlas-v2-{out,in}-tables`, documented in the
-`atlaspack.rs` header; 4 = 3 plus `dep_stop_pos`):
+**Pack format `fmt: 5`** (every one of shared / out-map / in-map /
+out-tables / in-tables carries `fmt: 5`; the client refuses anything else.
+Documented in the `atlaspack.rs` header; 5 = 4 plus renumbered sections, delta
+map flows and per-train paths, O15 + O6). The *decoded* per-row meaning is
+unchanged from fmt 4:
+- **Section ids** are renumbered "long paths first", per direction
+  (`sections` for outbound, `in_sections` for inbound, independently).
+- **Map flows** (`flows`, `in_flows`) are sorted by section id; column 0 is
+  the delta to the previous row's section id, the other columns are unchanged.
+- **Per-train paths:** tables carry `paths[t]` (the longest row of train `t`,
+  raw signed ids). Out rows are suffixes `paths[t][dep_off[i]..]`, in rows are
+  prefixes `paths[t][..arr_len[i]]`; out-tables also carry `stop_pos[t]` and
+  both carry `chords` (`[[t, legs]]`) in full-path coordinates, from which the
+  per-row `dep_chord_legs` / `dep_stop_pos` / `arr_chord_legs` below are
+  rebuilt exactly. `atlaspack` hard-asserts every row is such a slice.
+- `atlas-v2-{out,in}.json` are no longer written.
+
+Decoded per-row fields (what `lib.ts` `expandOutTables` / `expandInTables`
+rebuild, and what `audit` expands to):
 - `dep_secs` / `arr_secs` are in **travel order**; an entry `~s` (= `-(s+1)`)
   means section `s` is travelled against its stored point order. A train
   that runs back over track it already used repeats those sections; only

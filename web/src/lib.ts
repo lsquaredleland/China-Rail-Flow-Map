@@ -7,6 +7,7 @@ import type {
   AtlasData,
   AtlasVM,
   BBox,
+  ChordLeg,
   DayTimelineVM,
   DecodedAtlas,
   DecodedOutline,
@@ -17,14 +18,20 @@ import type {
   DistUnit,
   DurBinFilter,
   FlowVM,
+  InTablesData,
+  InTablesPack,
   OriginFilterCriteria,
   OriginVM,
   OutlineData,
+  OutTablesData,
+  OutTablesPack,
   Palette,
+
   PrepTrain,
   ChordSpan,
   PrepTrainStop,
   RampStop,
+  RawFlow,
   ScheduleStop,
   SchedulesData,
   SrcVM,
@@ -1033,6 +1040,83 @@ function timeAtDist(pt: PrepTrain, dist: number): number {
     else hi = mid;
   }
   return legStartTime + hi * legDur;
+}
+
+/* ---------- fmt 5 decode ---------- */
+// The packs ship sections renumbered, map flows sorted + delta-coded and
+// per-row paths deduplicated into per-train paths (see atlaspack.rs). These
+// rebuild exactly the per-row shapes the rest of the client reads.
+
+/** The data pack format every file must carry. */
+export const DATA_FMT = 5;
+
+/** Throw a FmtError unless `fmt` is the supported pack format. */
+export function requireFmt(fmt: unknown, url: string): void {
+  if (fmt === DATA_FMT) return;
+  const msg = `${url}: unsupported data format ${String(fmt)} (need fmt ${DATA_FMT}); rebuild the data pack`;
+  console.error(msg);
+  const err = new Error(msg);
+  err.name = "FmtError";
+  throw err;
+}
+
+/** Undo the delta coding of map flow rows in place: column 0 becomes the section id. */
+export function decodeFlows(rows: RawFlow[] | undefined): void {
+  if (!rows) return;
+  let id = 0;
+  for (let i = 0; i < rows.length; i++) {
+    id += rows[i][0];
+    rows[i][0] = id;
+  }
+}
+
+/** Per-train chord legs by train index. */
+function chordsByTrain(chords: [number, ChordLeg[]][]): Map<number, ChordLeg[]> {
+  return new Map(chords);
+}
+
+/** Rebuild per-row dep_secs / dep_chord_legs / dep_stop_pos from the fmt 5 out tables. */
+export function expandOutTables(d: OutTablesPack): OutTablesData {
+  const chords = chordsByTrain(d.chords);
+  return {
+    origins: d.origins.map((o) => {
+      const dep_secs: number[][] = [];
+      const dep_chord_legs: ChordLeg[][] = [];
+      const dep_stop_pos: number[][] = [];
+      for (let i = 0; i < o.deps.length; i++) {
+        const row = o.deps[i];
+        const t = row[0];
+        const off = o.dep_off[i];
+        dep_secs.push(d.paths[t].slice(off));
+        dep_chord_legs.push(
+          (chords.get(t) || [])
+            .filter((l) => l[1] >= off)
+            .map((l): ChordLeg => [l[0], l[1] - off, l[2] - off]),
+        );
+        const sp = d.stop_pos[t];
+        dep_stop_pos.push(sp.slice(sp.length - row[7]).map((p) => p - off));
+      }
+      return { deps: o.deps, calls: o.calls, dep_secs, dep_chord_legs, dep_stop_pos };
+    }),
+  };
+}
+
+/** Rebuild per-row arr_secs / arr_chord_legs from the fmt 5 in tables. */
+export function expandInTables(d: InTablesPack): InTablesData {
+  const chords = chordsByTrain(d.chords);
+  return {
+    origins: d.origins.map((o) => {
+      const arr_secs: number[][] = [];
+      const arr_chord_legs: ChordLeg[][] = [];
+      for (let i = 0; i < o.arrs.length; i++) {
+        const t = o.arrs[i][0];
+        const len = o.arr_len[i];
+        arr_secs.push(d.paths[t].slice(0, len));
+        arr_chord_legs.push((chords.get(t) || []).filter((l) => l[2] <= len));
+      }
+      return { arrs: o.arrs, in_calls: o.in_calls, arr_secs, arr_chord_legs };
+    }),
+  };
 }
 
 /** Decode a travel-ordered section list: `~s` marks a section walked in reverse. */
