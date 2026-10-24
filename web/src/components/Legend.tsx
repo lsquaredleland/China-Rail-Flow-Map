@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import type { Palette } from "../types";
-import { WIDTH_K, flowColor, rampColor, stationR } from "../lib";
+import { WIDTH_K, flowColor, rampColor, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
     the stepped width bar's heights depend on the live zoom ratio. The
@@ -19,7 +19,7 @@ export interface LegendHandle {
     hasOrigin: boolean,
     showInfra?: boolean,
     showAnim?: boolean,
-    stationK?: number,
+    stationT?: number,
   ) => void;
 }
 
@@ -96,7 +96,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         hasOrigin: boolean,
         showInfra?: boolean,
         showAnim?: boolean,
-        stationK = 1,
+        stationT = 0,
       ) {
         const svg = svgRef.current;
         if (!svg) return;
@@ -144,7 +144,8 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         // with the same spacing; the largest sets the row height.
         let cxp = 6;
         for (let i = 0; i < SAMPLES.length; i++) {
-          const rr = stationR(SAMPLES[i]) * stationK;
+          const r0 = stationR(SAMPLES[i]);
+          const rr = r0 * stationZoomK(r0, stationT);
           const ccx = cxp + rr;
           circleRefs.current[i]?.setAttribute("cx", String(ccx));
           circleRefs.current[i]?.setAttribute("cy", String(-rr));
@@ -152,7 +153,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           circleLabelRefs.current[i]?.setAttribute("x", String(ccx));
           cxp = ccx + rr + 18;
         }
-        const circD = stationR(200) * stationK * 2;
+        const circD = stationR(200) * stationZoomK(stationR(200), stationT) * 2;
         const cbase = base + 24 + 8 + circD;
         circleHeadRef.current?.setAttribute("y", String(-(8 + circD)));
         if (circleGroupRef.current)

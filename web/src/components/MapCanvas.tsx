@@ -34,6 +34,7 @@ import {
   sourceRowsHtml,
   stationLabel,
   stationR,
+  stationZoomK,
   stationRowsHtml,
   trainDistAt,
 } from "../lib";
@@ -318,12 +319,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const pt = cur.o.pt;
     fitExtent(pt[0] - 1.7, pt[1] - 1.3, pt[0] + 1.7, pt[1] + 1.3, 0.98);
   }
-  /* Station size factor: 1 at the national fit, log-growing to 2.5x at
-     the maximum zoom (fitScale * 60, see zoomAt). Once per frame/pick. */
-  function stationK() {
+  /* Zoom progress for station sizes: 0 at the national fit, 1 at the
+     maximum zoom (fitScale * 60, see zoomAt), log-spaced. Once per
+     frame/pick; each dot's growth then follows its own base radius. */
+  function stationT() {
     const { view, fitScale } = S.current;
     const t = Math.log(view.scale / fitScale) / Math.log(60);
-    return 1 + 1.5 * Math.min(1, Math.max(0, t));
+    return Math.min(1, Math.max(0, t));
   }
   function zoomAt(px: number, py: number, factor: number) {
     const st = S.current;
@@ -1524,7 +1526,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!cur) return;
     const { W, H, hover } = S.current;
     const pts = points();
-    const sk = stationK();
+    const sk = stationT();
 
     const timeline = activeTimeline();
     const isAnimated = S.current.animEnabled && !!timeline;
@@ -1580,7 +1582,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
       const x = X(c.pt[0]),
         y = Y(c.pt[1]),
-        r = stationR(effectiveTrains) * sk;
+        r0 = stationR(effectiveTrains),
+        kd = stationZoomK(r0, sk),
+        r = r0 * kd;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 6.2832);
       // Dot colour is the fastest-time band — always on, no toggle.
@@ -1596,7 +1600,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         const frac = pulseDt / 20;
         ctx.save();
         ctx.beginPath();
-        ctx.arc(x, y, r + frac * 7 * sk, 0, 6.2832);
+        ctx.arc(x, y, r + frac * 7 * kd, 0, 6.2832);
         ctx.strokeStyle = P.current.dark ? "#F59E0B" : "#D97706";
         ctx.globalAlpha = Math.max(0, 1 - frac);
         ctx.lineWidth = 1.5;
@@ -1683,7 +1687,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (P.current.panelDest) {
       const pd = P.current.panelDest;
       ctx.beginPath();
-      ctx.arc(X(pd.pt[0]), Y(pd.pt[1]), stationR(pd.trains) * sk + 3.8, 0, 6.2832);
+      ctx.arc(X(pd.pt[0]), Y(pd.pt[1]), stationR(pd.trains) * stationZoomK(stationR(pd.trains), sk) + 3.8, 0, 6.2832);
       ctx.strokeStyle = P.current.dark ? "#EDEDEA" : "#111111";
       ctx.lineWidth = 3.0;
       ctx.stroke();
@@ -1691,7 +1695,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (hover && hover.kind === "station") {
       const hc = hover.station;
       ctx.beginPath();
-      ctx.arc(X(hc.pt[0]), Y(hc.pt[1]), stationR(hc.trains) * sk + 3.5, 0, 6.2832);
+      ctx.arc(X(hc.pt[0]), Y(hc.pt[1]), stationR(hc.trains) * stationZoomK(stationR(hc.trains), sk) + 3.5, 0, 6.2832);
       ctx.strokeStyle = P.current.dark ? "#EDEDEA" : "#111111";
       ctx.lineWidth = 2.0;
       ctx.stroke();
@@ -1720,7 +1724,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!cur) return;
     const { W, H, view, fitScale, labelWidthCache } = S.current;
     const showDest = P.current.showLabels;
-    const sk = stationK();
+    const sk = stationT();
     const placed: { x: number; y: number; w: number; h: number }[] = [];
     ctx.textBaseline = "middle";
     function hits(box: { x: number; y: number; w: number; h: number }) {
@@ -1846,7 +1850,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const pd = P.current.panelDest;
       place(
         { zh: pd.zh, en: pd.en, pt: pd.pt },
-        { fs: 12.5, weight: "700", pad: 5, off: stationR(pd.trains) * sk + 5, isBoxed: true },
+        { fs: 12.5, weight: "700", pad: 5, off: stationR(pd.trains) * stationZoomK(stationR(pd.trains), sk) + 5, isBoxed: true },
       );
     }
     if (!showDest) return;
@@ -1906,12 +1910,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const t = cands[k];
       let ok: boolean;
       if (t.trains >= 50)
-        ok = place(t, { fs: 14, weight: "700", pad: 4, off: stationR(t.trains) * sk + 2 });
+        ok = place(t, { fs: 14, weight: "700", pad: 4, off: stationR(t.trains) * stationZoomK(stationR(t.trains), sk) + 2 });
       else if (t.trains >= 20)
-        ok = place(t, { fs: 12, weight: "600", pad: 2.5, off: stationR(t.trains) * sk + 2 });
+        ok = place(t, { fs: 12, weight: "600", pad: 2.5, off: stationR(t.trains) * stationZoomK(stationR(t.trains), sk) + 2 });
       else if (t.trains >= 5)
-        ok = place(t, { fs: 11, weight: "600", pad: 2, off: stationR(t.trains) * sk + 2 });
-      else ok = place(t, { fs: 11, weight: "", pad: 2, off: stationR(t.trains) * sk + 2 });
+        ok = place(t, { fs: 11, weight: "600", pad: 2, off: stationR(t.trains) * stationZoomK(stationR(t.trains), sk) + 2 });
+      else ok = place(t, { fs: 11, weight: "", pad: 2, off: stationR(t.trains) * stationZoomK(stationR(t.trains), sk) + 2 });
       if (!ok && t.endpoint >= 1) unplacedTermini.push(t);
     }
     // Candidates that lost every spot at full size and end routes get
@@ -1920,13 +1924,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     for (let k = 0; k < unplacedTermini.length; k++) {
       const u = unplacedTermini[k];
       if (
-        !place(u, { fs: 10.5, weight: "600", pad: 1.2, off: stationR(u.trains) * sk + 1.5 })
+        !place(u, { fs: 10.5, weight: "600", pad: 1.2, off: stationR(u.trains) * stationZoomK(stationR(u.trains), sk) + 1.5 })
       ) {
         place(u, {
           fs: 10.5,
           weight: "600",
           pad: 1.2,
-          off: stationR(u.trains) * sk + 1.5,
+          off: stationR(u.trains) * stationZoomK(stationR(u.trains), sk) + 1.5,
           far: true,
         });
       }
@@ -1983,7 +1987,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         true,
         P.current.showInfra,
         st.animEnabled,
-        stationK(),
+        stationT(),
       );
     updateScaleBar();
     // Only a moved view re-arms the debounce: the animation loop draws
@@ -2240,8 +2244,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const { W, H } = S.current;
     const pts = points();
     let best: CityPointVM | null = null;
-    const hitR = 14 * stationK();
-    let bestD2 = hitR * hitR;
+    const sk = stationT();
+    let bestD2 = Infinity;
     for (let i = 0; i < pts.length; i++) {
       const c = pts[i];
       const x = X(c.pt[0]),
@@ -2250,7 +2254,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const dx = px - x,
         dy = py - y,
         d2 = dx * dx + dy * dy;
-      if (d2 <= bestD2) {
+      const hitR = 14 * stationZoomK(stationR(c.trains), sk);
+      if (d2 <= hitR * hitR && d2 <= bestD2) {
         best = c;
         bestD2 = d2;
       }
