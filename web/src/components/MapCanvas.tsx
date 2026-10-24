@@ -1264,22 +1264,25 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       // screen vx = cos(heading), vy = -sin(heading) due to equirectangular latitude inversion
       const vx = Math.cos(tr.heading);
       const vy = -Math.sin(tr.heading);
-      const actualTailLen = isIsolated ? 22 : tailLen;
-      const tailX = px - vx * actualTailLen;
-      const tailY = py - vy * actualTailLen;
+      const isDwelling = Boolean(tr.isDwelling);
+      const actualTailLen = isDwelling ? 0 : isIsolated ? 22 : tailLen;
+      if (actualTailLen > 0) {
+        const tailX = px - vx * actualTailLen;
+        const tailY = py - vy * actualTailLen;
 
-      // Draw tapered motion tail
-      const grad = ctx.createLinearGradient(tailX, tailY, px, py);
-      grad.addColorStop(0, "rgba(255, 255, 255, 0)");
-      grad.addColorStop(1, glowColor);
+        // Draw tapered motion tail
+        const grad = ctx.createLinearGradient(tailX, tailY, px, py);
+        grad.addColorStop(0, "rgba(255, 255, 255, 0)");
+        grad.addColorStop(1, glowColor);
 
-      ctx.beginPath();
-      ctx.moveTo(tailX, tailY);
-      ctx.lineTo(px, py);
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = isIsolated ? 3.5 : 2.5;
-      ctx.lineCap = "round";
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(px, py);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = isIsolated ? 3.5 : 2.5;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
 
       // Outer glow
       ctx.beginPath();
@@ -1292,6 +1295,18 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       ctx.arc(px, py, isIsolated ? 2.8 : 2, 0, 6.2832);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
+
+      // Station dwelling ring indicator (passengers boarding)
+      if (isDwelling) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, isIsolated ? 8.5 : 6.5, 0, 6.2832);
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 1.3;
+        ctx.globalAlpha = 0.85;
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // If hovered (while paused), selected, or isolated, draw prominent indicator ring and code tag
       const isHovered =
@@ -2381,6 +2396,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         `<span style='background:${badgeColor};color:#fff;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;font-family:monospace;'>${esc(tr.code)}</span>` +
         `<span style='font-size:13px;font-weight:600;'>${esc(tr.fromStation || "")} &rarr; ${esc(tr.toStation || "")}</span>` +
         "</div>" +
+        (tr.isDwelling
+          ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${esc(tr.dwellStation || "station")}</div>`
+          : "") +
         "<table style='width:100%;margin-bottom:4px;'>" +
         `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +
         `<tr><td>Arrival</td><td style='text-align:right'><b>${esc(tr.arrTime)}</b></td></tr>` +

@@ -21,6 +21,7 @@ import type {
   OutlineData,
   Palette,
   PrepTrain,
+  PrepTrainStop,
   RampStop,
   ScheduleStop,
   SchedulesData,
@@ -910,6 +911,62 @@ export function buildDayTimeline(
     }
   }
 
+  interface RawStopCall {
+    cityZh: string;
+    pt: [number, number];
+    arrMins: number;
+    depMins: number | null;
+    isTerm: boolean;
+  }
+  const callsByTrain = new Map<number, RawStopCall[]>();
+  if (isOut && cur.dests && (cur.o as any).calls) {
+    const rawCalls = (cur.o as any).calls as [number, number, number, number, number, number][][];
+    for (let di = 0; di < rawCalls.length; di++) {
+      const destCalls = rawCalls[di] || [];
+      const dest = cur.dests[di];
+      if (!dest) continue;
+      for (let ci = 0; ci < destCalls.length; ci++) {
+        const c = destCalls[ci];
+        const trainIdx = c[0];
+        let list = callsByTrain.get(trainIdx);
+        if (!list) {
+          list = [];
+          callsByTrain.set(trainIdx, list);
+        }
+        list.push({
+          cityZh: dest.zh,
+          pt: dest.pt,
+          arrMins: c[3] * 1440 + c[1],
+          depMins: c[4] === 1 ? null : c[3] * 1440 + c[2],
+          isTerm: c[4] === 1,
+        });
+      }
+    }
+  } else if (!isOut && cur.srcs && (cur.o as any).in_calls) {
+    const rawInCalls = (cur.o as any).in_calls as [number, number, number, number, number, number][][];
+    for (let si = 0; si < rawInCalls.length; si++) {
+      const srcCalls = rawInCalls[si] || [];
+      const src = cur.srcs[si];
+      if (!src) continue;
+      for (let ci = 0; ci < srcCalls.length; ci++) {
+        const c = srcCalls[ci];
+        const trainIdx = c[0];
+        let list = callsByTrain.get(trainIdx);
+        if (!list) {
+          list = [];
+          callsByTrain.set(trainIdx, list);
+        }
+        list.push({
+          cityZh: src.zh,
+          pt: src.pt,
+          arrMins: c[3] * 1440 + c[2],
+          depMins: c[1] >= 0 ? c[3] * 1440 + c[1] : null,
+          isTerm: false,
+        });
+      }
+    }
+  }
+
   const prepTrains: PrepTrain[] = [];
 
   for (let ti = 0; ti < rawTrains.length; ti++) {
@@ -1037,6 +1094,53 @@ export function buildDayTimeline(
     train.secStarts = secStarts;
     train.totalDist = totalDist;
 
+    const trainCalls = callsByTrain.get(ti) || [];
+    trainCalls.sort((a, b) => a.arrMins - b.arrMins);
+
+    const stops: PrepTrainStop[] = [];
+    if (trainCalls.length > 0 && routeSecs.length > 0) {
+      let prevDist = 0;
+      for (let ci = 0; ci < trainCalls.length; ci++) {
+        const call = trainCalls[ci];
+        if (call.isTerm) {
+          stops.push({
+            cityZh: call.cityZh,
+            arrMins: call.arrMins,
+            depMins: null,
+            dist: totalDist,
+            isTerm: true,
+          });
+          continue;
+        }
+        let bestDistOnRoute = prevDist;
+        let minD2 = 1e9;
+        for (let i = 0; i < routeSecs.length; i++) {
+          const s = routeSecs[i];
+          const off = secSet.off[s];
+          const cnt = secSet.len[s];
+          for (let k = 0; k < cnt; k++) {
+            const d2 =
+              (secSet.pts[off + k * 2] - call.pt[0]) ** 2 +
+              (secSet.pts[off + k * 2 + 1] - call.pt[1]) ** 2;
+            if (d2 < minD2) {
+              minD2 = d2;
+              bestDistOnRoute =
+                secStarts[i] + (k / Math.max(1, cnt - 1)) * (secLengths[s] || 0);
+            }
+          }
+        }
+        const dist = Math.max(prevDist, Math.min(totalDist, bestDistOnRoute));
+        prevDist = dist;
+        stops.push({
+          cityZh: call.cityZh,
+          arrMins: call.arrMins,
+          depMins: call.depMins,
+          dist,
+          isTerm: false,
+        });
+      }
+    }
+
     prepTrains.push({
       code: train.code,
       cls: train.cls,
@@ -1051,14 +1155,37 @@ export function buildDayTimeline(
       secs: routeSecs,
       secStarts,
       secRevs,
+      stops: stops.length > 0 ? stops : undefined,
     });
 
     // Populate secFlowSteps
     for (let i = 0; i < routeSecs.length; i++) {
       const s_i = routeSecs[i];
       const distBefore = secStarts[i];
-      const frac = totalDist > 0 ? distBefore / totalDist : 0;
-      const tEnter = depMins + frac * dur;
+      let tEnter: number;
+      if (stops.length > 0) {
+        let legStartDist = 0;
+        let legStartTime = depMins;
+        let legEndDist = totalDist;
+        let legEndTime = arrMins;
+        for (let si = 0; si < stops.length; si++) {
+          const st = stops[si];
+          if (distBefore <= st.dist) {
+            legEndDist = st.dist;
+            legEndTime = st.arrMins;
+            break;
+          } else {
+            legStartDist = st.dist;
+            legStartTime = st.depMins !== null ? st.depMins : st.arrMins;
+          }
+        }
+        const legD = Math.max(1, legEndDist - legStartDist);
+        const legAlpha = Math.max(0, Math.min(1, (distBefore - legStartDist) / legD));
+        tEnter = legStartTime + legAlpha * (legEndTime - legStartTime);
+      } else {
+        const frac = totalDist > 0 ? distBefore / totalDist : 0;
+        tEnter = depMins + frac * dur;
+      }
 
       let stepArr = secFlowSteps.get(s_i);
       if (!stepArr) {
@@ -1105,16 +1232,21 @@ export function buildDayTimeline(
           if (call.term) {
             visualArrTimes.push(pt.arrMins);
           } else {
-            const secCnt = call.secCnt;
-            let distToC = 0;
-            if (secCnt >= pt.secStarts.length) {
-              distToC = pt.totalDist;
-            } else if (secCnt > 0) {
-              distToC = pt.secStarts[secCnt];
+            const st = pt.stops?.find((s) => s.cityZh === dest.zh);
+            if (st) {
+              visualArrTimes.push(st.arrMins);
+            } else {
+              const secCnt = call.secCnt;
+              let distToC = 0;
+              if (secCnt >= pt.secStarts.length) {
+                distToC = pt.totalDist;
+              } else if (secCnt > 0) {
+                distToC = pt.secStarts[secCnt];
+              }
+              const frac = pt.totalDist > 0 ? distToC / pt.totalDist : 0;
+              const tArr = pt.depMins + frac * pt.dur;
+              visualArrTimes.push(Math.round(tArr));
             }
-            const frac = pt.totalDist > 0 ? distToC / pt.totalDist : 0;
-            const tArr = pt.depMins + frac * pt.dur;
-            visualArrTimes.push(Math.round(tArr));
           }
         } else if (call.dep) {
           const arrM = call.dur > 0 ? call.dep.depMins + call.dur : call.dep.arrMins;
@@ -1153,7 +1285,51 @@ export function buildDayTimeline(
         continue;
       }
       const alpha = Math.max(0, Math.min(1, (tMins - pt.depMins) / pt.dur));
-      const targetDist = alpha * pt.totalDist;
+      let targetDist: number;
+      let isDwelling = false;
+      let dwellStation: string | undefined;
+
+      const stops = pt.stops;
+      if (stops && stops.length > 0) {
+        let dwellingFound = false;
+        for (let si = 0; si < stops.length; si++) {
+          const st = stops[si];
+          if (
+            st.depMins !== null &&
+            st.depMins > st.arrMins &&
+            tMins >= st.arrMins &&
+            tMins <= st.depMins
+          ) {
+            targetDist = st.dist;
+            isDwelling = true;
+            dwellStation = st.cityZh;
+            dwellingFound = true;
+            break;
+          }
+        }
+        if (!dwellingFound) {
+          let legStartDist = 0;
+          let legStartTime = pt.depMins;
+          let legEndDist = pt.totalDist;
+          let legEndTime = pt.arrMins;
+          for (let si = 0; si < stops.length; si++) {
+            const st = stops[si];
+            if (tMins < st.arrMins) {
+              legEndDist = st.dist;
+              legEndTime = st.arrMins;
+              break;
+            } else {
+              legStartDist = st.dist;
+              legStartTime = st.depMins !== null ? st.depMins : st.arrMins;
+            }
+          }
+          const legDur = Math.max(1, legEndTime - legStartTime);
+          const legAlpha = Math.max(0, Math.min(1, (tMins - legStartTime) / legDur));
+          targetDist = legStartDist + legAlpha * (legEndDist - legStartDist);
+        }
+      } else {
+        targetDist = alpha * pt.totalDist;
+      }
 
       // Find which section in the route
       let secIdx = 0;
@@ -1189,6 +1365,8 @@ export function buildDayTimeline(
             arrTime: pt.arrTime,
             durMins: pt.dur,
             progressPct: Math.round(alpha * 100),
+            isDwelling,
+            dwellStation,
           });
         }
         continue;
@@ -1228,6 +1406,8 @@ export function buildDayTimeline(
         arrTime: pt.arrTime,
         durMins: pt.dur,
         progressPct: Math.round(alpha * 100),
+        isDwelling,
+        dwellStation,
       });
     }
     return active;

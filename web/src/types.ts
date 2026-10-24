@@ -337,6 +337,8 @@ export interface ActiveTrainVM {
   arrTime: string;
   durMins: number;
   progressPct: number;
+  isDwelling?: boolean;
+  dwellStation?: string;
 }
 
 export interface ScheduleStop {
@@ -357,6 +359,14 @@ export interface SchedulesData {
   schedules: Record<string, [number, number, number, number, number?][]>;
 }
 
+export interface PrepTrainStop {
+  cityZh: string;
+  arrMins: number;
+  depMins: number | null;
+  dist: number;
+  isTerm: boolean;
+}
+
 export interface PrepTrain {
   code: string;
   cls: string;
@@ -371,6 +381,7 @@ export interface PrepTrain {
   secs: number[];
   secStarts: Float64Array;
   secRevs: Uint8Array;
+  stops?: PrepTrainStop[];
 }
 
 export interface DayTimelineVM {
