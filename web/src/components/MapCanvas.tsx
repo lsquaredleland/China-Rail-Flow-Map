@@ -1790,6 +1790,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         st.view.scale / st.fitScale,
         true,
         P.current.showInfra,
+        st.animEnabled,
       );
     updateScaleBar();
     scheduleViewReport();

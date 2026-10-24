@@ -197,12 +197,23 @@ export default function TrainScheduleModal({
       const next = alignedStops[i + 1];
       if (liveTime >= curr.simDepMins && liveTime < next.simArrMins) {
         const eta = Math.max(0, Math.round(next.simArrMins - liveTime));
+        const finalEta = Math.max(0, Math.round(last.simArrMins - liveTime));
+        const finalH = Math.floor(finalEta / 60);
+        const finalM = finalEta % 60;
+        const finalEtaStr =
+          finalH > 0
+            ? finalM > 0
+              ? `${finalH}h ${finalM}m`
+              : `${finalH}h`
+            : `${finalM}m`;
         return {
           state: "transit" as const,
-          text: `En route: ${curr.stZh} ➔ ${next.stZh} · ETA in ${eta}m (${next.arr})`,
+          text: `En route: ${curr.stZh} ➔ ${next.stZh} · ETA in ${finalEtaStr} (${last.arr})`,
           fromIdx: i,
           toIdx: i + 1,
           eta,
+          finalEta,
+          finalEtaStr,
         };
       }
     }
