@@ -1,9 +1,9 @@
 """Build O9 pair-path fixes: shortest path over OSM railway=rail ways (no
 construction/proposed/disused), between the station terminal nodes the
-pair's trains actually use, plus explicitly listed connector hops where OSM
-has the track but leaves two parallel tracks unjoined. Edges already used by
-the canonical pair paths / router leg paths cost 1.0x, others 1.3x, so the
-path lands on the same track of a double track (one corridor).
+pair's trains actually use, plus any listed connector hops (none at present).
+Edges already used by the canonical pair paths / router leg paths cost 1.0x,
+others 1.3x, so the path lands on the same track of a double track (one
+corridor).
 
 Usage: python3 -I o9_osm_regions.py <china-rail.osm> osm_regions.json, then
        python3 -I o9_fix_paths.py <osm_regions.json> <pair_paths_canonical.json>
@@ -23,24 +23,20 @@ PAIRS = [
     ("恩平", "阳江", 13584639914, 8976473532,
      "阳江 snapped to the 阳阳铁路 station (21.8635,111.8773); trains use the 深茂铁路 station (21.8131,111.9860)"),
     ("江门", "阳江", 11597704847, 8976473532, "same 阳江 snap (via_chain 台山, 开平南)"),
-    ("聊城西", "菏泽东", 11240372828, 11295367107,
-     "京港高速线 runs into 菏泽东 parallel to 日兰高速线 but shares no node with the station tracks"),
     ("郏县", "郑州东", 12366584438, 8025366872,
      "郏县 snapped to the 禹郏铁路 station (34.0933,113.2415); trains use the 郑渝高铁 station (33.9467,113.2644)"),
 ]
 # Pairs taken as a slice of an existing canonical pair path that runs through
 # both terminals (the scanned regions do not hold its whole route).
 CUTS = {("郏县", "郑州东"): ("平顶山西", "郑州东")}
-# Connector hops (node, node): OSM track on both sides, unjoined at a station throat.
-CONNECTORS = [
-    (10841282297, 9354488248),  # 菏泽东 north throat: 京港高速线 -> 日兰高速线, 80 m
-    (11295367142, 11295367114),  # 菏泽东 south throat: 京港高速线 -> 日兰高速线/动走A线 junction, 80 m
-]
+# Connector hops (node, node) where OSM leaves parallel tracks unjoined at a
+# station throat. None: the owner kept 菏泽东 (京港高速线 unjoined) as a chord.
+CONNECTORS = []
 UNUSED_COST = 1.3
 # The terminal node each station's trains use; every other canonical pair at
-# these stations that ends elsewhere or has a > 3 km hole is rerouted too, so
-# consecutive legs meet at the same station.
-TERMINAL = {"禹州": 11587052472, "阳江": 8976473532, "郏县": 12366584438, "菏泽东": 11295367107}
+# these stations that ends > 3 km from it or has a > 3 km hole is rerouted
+# too, so consecutive legs meet at the same station.
+TERMINAL = {"禹州": 11587052472, "阳江": 8976473532, "郏县": 12366584438}
 
 
 def km(p, q):
@@ -90,7 +86,8 @@ def main():
         a, b = segs[0][0], segs[-1][-1]
         holes = [km(nodes[x[-1]], nodes[y[0]]) for x, y in zip(segs, segs[1:]) if x[-1] in nodes and y[0] in nodes]
         a2, b2 = TERMINAL.get(f, a), TERMINAL.get(t, b)
-        if (a2, b2) != (a, b) or any(h > 3 for h in holes):
+        off = max(km(nodes[a], nodes[a2]), km(nodes[b], nodes[b2])) if a in nodes and b in nodes else 0.0
+        if off > 3 or any(h > 3 for h in holes):
             pairs.append((f, t, a2, b2, "same station cause (auto: %s, ends %s->%s, holes %s)" % (r["status"], a, b, [round(h, 1) for h in holes])))
     out = []
     for a_nm, b_nm, a, b, why in pairs:

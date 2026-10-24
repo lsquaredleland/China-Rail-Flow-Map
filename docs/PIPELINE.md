@@ -179,11 +179,26 @@ edges elsewhere. In this repo, rebuild staged:
 source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp -c clones of
                            # handoff-v3 inputs), ATLAS_PAIR_PATHS, ATLAS_LEG_PATHS,
                            # ATLAS_OVERRIDES=staging/inputs/data/leg_overrides.json
-# O9: pair-path fixes go FIRST (first record per pair wins); they replace the
-# canonical geometry of pairs whose station snapped to a homonym (禹州, 郏县,
-# 阳江) or that miss the unjoined 京港高速线 tracks at 菏泽东. Regenerate with
-# scripts/o9_fix_paths.py (header has the inputs).
-export ATLAS_PAIR_PATHS=$PWD/../data/pair_path_fixes.json,$ATLAS_PAIR_PATHS
+# O9 router inputs (since 2026-10-24). The build reads exactly these files:
+#   ATLAS_LEG_PATHS  = staging/inputs/data/derived/corridor-v3-o9/leg_paths.json
+#   ATLAS_PAIR_PATHS = data/pair_path_fixes.json,
+#                      staging/inputs/data/derived/corridor-v3-o9/pair_paths_canonical.json
+# corridor-v3-o9/ = the shipped corridor-v3 outputs (handoff-v3
+# data/derived/corridor-v3/) with every record touching 阳江 replaced from a
+# router rerun that uses data/station_fixes.json (阳江 = the 深茂铁路 station):
+#   corridor-router --data <copy of handoff-v3 data> --files ../staging/inputs/output \
+#       --out <rerun dir> --station-fixes ../data/station_fixes.json
+#   python3 -I ../scripts/o9_splice_router.py <handoff-v3>/data/derived/corridor-v3 \
+#       <rerun dir> ../staging/inputs/data/derived/corridor-v3-o9 阳江
+# Splice, don't swap: the router is not deterministic run to run (two runs on
+# identical inputs differ on ~400 legs). pair_path_fixes.json goes FIRST (first
+# record per pair wins): pairs whose station snapped to a homonym (禹州, 郏县;
+# 恩平/江门–阳江, which the rerun leaves bridged). Regenerate with
+# scripts/o9_fix_paths.py (header has the inputs). 聊城西–菏泽东 stays a chord
+# (京港高速线 is unjoined at 菏泽东 in OSM; owner: no synthetic connector).
+C=$PWD/../staging/inputs/data/derived/corridor-v3-o9
+export ATLAS_LEG_PATHS=$C/leg_paths.json
+export ATLAS_PAIR_PATHS=$PWD/../data/pair_path_fixes.json,$C/pair_paths_canonical.json
 O=$PWD/../staging/corridor-v3-ordered
 ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O

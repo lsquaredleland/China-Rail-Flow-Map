@@ -21,6 +21,7 @@
 //
 // Usage: corridor-router [--project <dir>] [--files <dir>] [--out <dir>]
 //                        [--limit <n pairs>] [--pair "A,B"] [--threads <n>]
+//                        [--station-fixes <station_resolution-format json>]
 mod graph;
 mod inputs;
 mod model;
@@ -488,12 +489,17 @@ fn main() {
         &data.join("derived/pair_paths.json"),
         &data.join("derived/cs_out/pair_paths.json"),
     ]);
+    // --station-fixes (station_resolution format) is applied last, so it
+    // replaces the analyzer's chosen clusters for the names it lists.
+    let station_fixes = argval("--station-fixes").map(PathBuf::from);
+    let mut resolutions = vec![
+        data.join("station_resolution.json"),
+        data.join("derived/cs_out/station_resolution.json"),
+    ];
+    resolutions.extend(station_fixes);
     let station_pts = inputs::load_station_points(
         &data.join("osm_stations.json"),
-        &[
-            &data.join("station_resolution.json"),
-            &data.join("derived/cs_out/station_resolution.json"),
-        ],
+        &resolutions.iter().map(|p| p.as_path()).collect::<Vec<_>>(),
     );
     timer.mark(&format!(
         "inputs: {} trains, {} production pairs, {} base paths, {} station names",
