@@ -1216,6 +1216,80 @@ fn decode_poly4(s: &str) -> Vec<[f64; 2]> {
     pts
 }
 
+/// Expand a fmt-5 tables file (per-train `paths` / `stop_pos` / `chords` plus
+/// per-origin `dep_off` / `arr_len`) back to per-row `dep_secs` /
+/// `dep_chord_legs` / `dep_stop_pos` (out) or `arr_secs` / `arr_chord_legs`
+/// (in), the shape the checks below read. Independent of atlaspack's packer.
+fn expand_tables(t: &mut Value, out: bool) {
+    let ints = |v: &Value| -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    };
+    let paths: Vec<Vec<i64>> = t["paths"].as_array().unwrap().iter().map(ints).collect();
+    let stop_pos: Vec<Vec<i64>> = if out {
+        t["stop_pos"].as_array().unwrap().iter().map(ints).collect()
+    } else {
+        Vec::new()
+    };
+    let mut chords: HashMap<usize, Vec<Vec<i64>>> = HashMap::new();
+    for c in t["chords"].as_array().unwrap() {
+        let legs = c[1].as_array().unwrap().iter().map(ints).collect();
+        chords.insert(c[0].as_u64().unwrap() as usize, legs);
+    }
+    let (rows_key, mark_key) = if out {
+        ("deps", "dep_off")
+    } else {
+        ("arrs", "arr_len")
+    };
+    for o in t["origins"].as_array_mut().unwrap() {
+        let (mut secs, mut legs_all, mut sp_all) = (Vec::new(), Vec::new(), Vec::new());
+        let marks = ints(&o[mark_key]);
+        for (row, &m) in o[rows_key].as_array().unwrap().iter().zip(&marks) {
+            let tr = row[0].as_u64().unwrap() as usize;
+            let full = &paths[tr];
+            let (lo, hi) = if out {
+                (m as usize, full.len())
+            } else {
+                (0, m as usize)
+            };
+            secs.push(serde_json::json!(full[lo..hi]));
+            let legs: Vec<Vec<i64>> = chords
+                .get(&tr)
+                .into_iter()
+                .flatten()
+                .filter(|l| if out { l[1] >= m } else { l[2] <= m })
+                .map(|l| {
+                    if out {
+                        vec![l[0], l[1] - m, l[2] - m]
+                    } else {
+                        l.clone()
+                    }
+                })
+                .collect();
+            legs_all.push(serde_json::json!(legs));
+            if out {
+                let n = row[7].as_u64().unwrap() as usize;
+                let sp = &stop_pos[tr];
+                let v: Vec<i64> = sp[sp.len() - n..].iter().map(|x| x - m).collect();
+                sp_all.push(serde_json::json!(v));
+            }
+        }
+        let (sk, ck) = if out {
+            ("dep_secs", "dep_chord_legs")
+        } else {
+            ("arr_secs", "arr_chord_legs")
+        };
+        o[sk] = Value::Array(secs);
+        o[ck] = Value::Array(legs_all);
+        if out {
+            o["dep_stop_pos"] = Value::Array(sp_all);
+        }
+    }
+}
+
 /// Phase 1-2 checks on a packed v2 build (env AUDIT_PACK_DIR): oriented
 /// per-train path continuity outside chord legs, monotone call cutoffs,
 /// schedule coverage, and the Chengdu goldens. Returns whether the hard
@@ -1227,8 +1301,10 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     let shared = load("atlas-v2-shared.json");
     let out_map = load("atlas-v2-out-map.json");
     let in_map = load("atlas-v2-in-map.json");
-    let out_t = load("atlas-v2-out-tables.json");
-    let in_t = load("atlas-v2-in-tables.json");
+    let (mut out_t, mut in_t) = (
+        load("atlas-v2-out-tables.json"),
+        load("atlas-v2-in-tables.json"),
+    );
     let sch = load("atlas-v2-schedules.json");
     let arr = |v: &Value| -> Vec<Value> { v.as_array().cloned().unwrap_or_default() };
     let int = |v: &Value| v.as_i64().unwrap();
@@ -1236,7 +1312,20 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     for (name, t) in [("out-tables", &out_t), ("in-tables", &in_t)] {
         let fmt = t.get("fmt").and_then(Value::as_i64);
         println!("AUDIT pack {name} fmt: {fmt:?}");
-        ok &= fmt == Some(4);
+        ok &= fmt == Some(5);
+    }
+    for (name, m) in [
+        ("shared", &shared),
+        ("out-map", &out_map),
+        ("in-map", &in_map),
+    ] {
+        let fmt = m.get("fmt").and_then(Value::as_i64);
+        println!("AUDIT pack {name} fmt: {fmt:?}");
+        ok &= fmt == Some(5);
+    }
+    if ok {
+        expand_tables(&mut out_t, true);
+        expand_tables(&mut in_t, false);
     }
     let ends = |key: &str| -> Vec<([f64; 2], [f64; 2])> {
         arr(&shared[key])
