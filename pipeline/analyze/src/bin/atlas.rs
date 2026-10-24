@@ -1754,6 +1754,13 @@ fn main() {
             }
         }
     }
+    // Router (#cv3) leg paths run over nodes outside the pair paths; without
+    // their coordinates those stretches carry no flow and become chords.
+    for (segs, _) in LEG_PATHS.get().into_iter().flat_map(|m| m.values()) {
+        for s in segs {
+            needed.extend(s.iter().copied());
+        }
+    }
     println!("needed nodes: {}", needed.len());
     let osm_path = env::var("CRFM_OSM_PATH")
         .map(PathBuf::from)
