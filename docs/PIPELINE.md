@@ -197,11 +197,13 @@ O=$PWD/../staging/corridor-v3-ordered
 ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
 AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
-./target/release/secdiff --old ../staging/live-v1/china-flow-atlas-data.json \
+./target/release/secdiff --old ../staging/o1-build/o1v2/china-flow-atlas-data.json \
     --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
 ```
-Always set `CRFM_OUTPUT_DIR` / `ATLAS_OUT` / `--out-dir`: `output/` in this
-repo is a symlink into `china-rail-handoff-v3/output`. Section indices change
+The `--old` baseline is the build behind the committed pack (its `.br` files
+are md5-identical to `web/public/assets`); `staging/live-v1` predates O4-O1 and
+now differs on 273,633 edges. Always set `CRFM_OUTPUT_DIR` / `ATLAS_OUT` /
+`--out-dir` so a build never overwrites `output/` or `web/public/assets`. Section indices change
 on every run (HashMap iteration), so ship the whole five-file pack together.
 
 **Pack format `fmt: 6`** (every one of shared / out-map / in-map /

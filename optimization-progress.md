@@ -302,8 +302,9 @@ Read-only; scripts and decoded live pack in `staging/spotcheck/` (`g1.py`, `g2.p
 - **Spot check** (`staging/o1-build/spot_o1.mjs`, G3764 + K678 from every origin): max 1-second jump within 3 min of a stop 3.02 -> 0.54 km; dot-to-station distance during dwells max 1.73 -> 0.76 km (typically 1.3 -> < 0.3 km).
 - Build: `staging/o1-build/o1v2` (env.sh + the O9 inputs, `staging/o1-build/env-o9.sh`); baseline `staging/o1-build/main2`.
 
-## Planned: repo migration (owner-approved 2026-10-24, run AFTER O14 and O5/O9 land)
-- New primary checkout: fresh clone of github.com/lsquaredleland/China-Rail-Flow-Map at `~/Downloads/china-rail-flow-map`.
-- `/Users/leland/Downloads/china-rail-handoff-v3` currently holds the `.git` dir for ALL worktrees (china-rail-animation, -o4, -o14, -uifix) plus 6.4 GB of gitignored data (`data/osm`, `data/derived`, `data/raw`, `output/`).
-- Steps: push every branch; move the needed ignored data (`data/derived`, `data/raw` if not tracked, the `output/` deliverables) into the new home; replace the `output` symlink with a real dir; update `staging/env.sh` and the memory paths; run one staged rebuild + full audit from the new home; remove the old worktrees (`git worktree remove`).
-- Old folder: per owner, remove everything EXCEPT the OSM files (`data/osm/`). Inventory first, delete carefully, and keep the handoff zip if anyone still uses it.
+## Done: repo migration (2026-10-24)
+- Primary checkout is now `~/Downloads/china-rail-flow-map` (fresh clone). `data/derived`, `data/raw`, `output/` (real dir) and `staging/` were copied in with `cp -c`; `data/osm` is a symlink to `~/Downloads/china-rail-handoff-v3/data/osm`, which is all that remains of the old folder.
+- Verified from the new home: the staged rebuild (O9 rerun + splice byte-identical to `staging/inputs/.../corridor-v3-o9`), full audit + goldens PASS, `secdiff --edges` 0 vs `staging/o1-build/o1v2`, roundtrip OK, `audit --pack-only` PASS on the committed assets, typecheck + build OK.
+- All worktrees removed; branches pushed. The handoff's unpushed local `main` commit is preserved as `backup/handoff-local-main-3484031`; its old stash 686f72a is saved as `staging/handoff-stash-686f72a.patch`.
+- `~/workspace/your_files` and `~/workspace/goals/china-rail-network-map/files` now point at the new `output/`.
+- Follow-up from O1: about 97k joins of 0.1-1 km remain, where the arriving and departing legs end on different station nodes (candidate O19).
