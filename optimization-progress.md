@@ -31,7 +31,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O3 | Chord legs at a path end | no | no virtual span there, so the dot waits, then appears; use the stop/city point as the far end |
 | O4 | ✅ DONE (PR #2, merged 2026-10-24): fix router `#cv3` node coordinates in `atlas.rs` | **yes**: owner approval + staged diff | 13,420 chord rows / 223 legs (e.g. K118 成都西→广元) |
 | O5 | Resolve inbound-only legs | **yes**: owner approval | 1,587 chord rows / 304 legs; after O4+O5 only ~5 real gap legs remain |
-| O6 | Phase 5 per-train path dedupe | no | 29,871 rows for ~7,253 trains; measure the brotli saving first |
+| O6 | Phase 5 per-train path dedupe | no | measured: -149 KB out-tables / -118 KB in-tables (brotli already absorbs most repetition); re-express O14 `dep_stop_pos` relative to the shared path |
 | O7 | 48 inbound loop trains with non-monotone `sec_cnt` | no | documented quirk (cutoff clamps to 0); decide whether to fix |
 | O8 | Gate `dropped chains` / `flow lost` in `--pack-only` audits too | no | currently only the full audit enforces them |
 | O9 | Fill real OSM geometry gaps (平昌→达州, 南京→扬州, …) | yes | data work, prerequisite noted in PIPELINE.md §4 |
@@ -40,6 +40,8 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O12 | CI pack audit: run `audit --pack-only` on committed `web/public/assets` against `pipeline/goldens.json`; PR job diffs the PR's pack vs main's at edge level (like `secdiff`) and posts a summary comment | no | CI can't rebuild (needs 513 MB OSM + handoff inputs), so audit the committed pack; catches bad asset swaps and surfaces flow changes like O4 at review time |
 | O13 | Client regression tests (`bun test` in `web/tests/`): promote `staging/scripts/check_client_decode.mjs` + `check_filter_animation.mjs`; invariants on real assets (trainDistAt monotone, dwell == stop.dist, final-step flows == static flows with/without filters, animated trains ⊆ filter, 0 jumps outside chord legs) + snapshot tests (per-hour departed/arrived, per-section flow at fixed times for 2–3 origins) | no | wire into CI's web job |
 | O14 | ✅ DONE (PR #5, open): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
+| O15 | Renumber sections (long paths first) + sort map flow rows by section + delta `sec_idx` | no (ids only) | measured: out-map -536 KB, in-map -524 KB, shared -11 KB; first paint -34%; ~70 lines; see `staging/sizeexplore/REPORT.md` |
+| O16 | Lazy-load schedules after first paint (background, alongside the tables) | no | -419 KB at first paint; O14 now needs schedules for dwells, so load them right after first paint, not on modal open |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
 
