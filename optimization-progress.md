@@ -162,3 +162,34 @@ Read-only, nothing that changes flows. Scripts are in `staging/scripts/` (run fr
 - goldens: `dropped_chains` = 0 and `flow_lost` = 0 are now `exact` counters, gated at the end of a full `audit` run (exit 1 on breach). `--pack-only` skips them and says so. Full audit on the staged pack: hard checks PASS, goldens PASS, exit 0.
 - Virtual chord length: each chord leg adds a crow-flies span at its widest join in [s0,s1] (not a section: no flows or counts); `secStarts`/`totalDist`/stop dists shift. K678 steps across chord spans max 1.58 km/min; whole trip max 5.72 km/min (t=543, not on a chord: throat gap + cruise); `trainDistAt` monotone, typecheck and build pass.
 - 4.6 sweep: removed 3 unused `cur` locals in MapCanvas and 6 `as any` casts in lib.ts (net -9 lines); no stale chainer/calibration comments, TODOs or debug logs remained; typecheck, build and decode checks pass.
+
+#### Merge with main (merger)
+Merged `origin/main` (a783d37: rustfmt/lint, feature 2 histograms + filter pill bar, proportional filtered bands + shift-click hours/trains, 8e9f4ff animation removal) into `explore/24h-train-flow-animation`. The branch's animation is kept; main's deletions of animation code are not taken.
+
+Conflicts and resolution:
+- `TimelineScrubber.tsx` (modify/delete): kept the branch file.
+- `types.ts`: kept `ActiveTrainVM`, `ScheduleStop`, `SchedulesData`, `PrepTrain*`, `ChordSpan`, `DayTimelineVM`, `OriginVM.timeline`; main's multi-select `OriginFilterCriteria` (hours/distBins/durBins/trainCodes) auto-merged. New: `DayTimelineVM.subset(codes)`.
+- `lib.ts`: kept the branch's timeline/decoder block and the `timeline` getter in `buildOrigin` (the auto-merge had turned `const res: OriginVM = {` back into `return {`; restored); main's multi-bin `filterOrigin` taken. Imports: `ActiveTrainVM`/`DayTimelineVM` restored (auto-merge had dropped them), `DistBinFilter` added, unused `Direction` dropped.
+- `MapCanvas.tsx`: kept `AnimState`, anim state, `drawTrains`, selection caches and the anim controls. Several 8e9f4ff deletions had auto-merged without conflict and were restored by hand: the `MapApi` anim methods, `drawTrains` call in `draw()`, the api object entries, the rAF cleanup effect and three `notifyAnimListeners()` calls. `drawFlows`/`drawChords` combine both sides (below).
+- `App.tsx`: kept the TimelineScrubber/TrainScheduleModal imports and state, the isolation pill, the collapsed-timeline button; added main's `ActiveFilterBar`; `DeparturesTable` gets both prop sets; `onClearFilter` also clears train codes (main). Removed the unused `filterOriginByClasses` import.
+- `DeparturesTable.tsx`: both prop sets. `TrainCell` now stops click propagation, so clicking a train number opens the schedule without also toggling main's row train filter.
+- Pipeline: auto-merged; `cargo fmt --all` then two clippy fixes in branch code (`audit.rs` `.map(&arr)` → `.map(arr)` ×2; `atlas.rs` schedules loop `for tr in &train_table`). Token-level diff vs the branch: only formatting and those fixes; main's outline match-guard rewrite is equivalent (`_ => {}` fallthrough).
+- `bun.lock`, `index.template.html`, `features.md`, `Histograms.tsx`: main's versions (no conflict).
+
+Filter and animation integration:
+- Bug fixed: `filterOrigin` copied `timeline: cur.timeline`, so a filtered view animated every train. It now has its own lazy `timeline` getter, cached per filtered VM (one per filter state through App's `useMemo`), built as `cur.timeline.subset(codes of filtered deps)`.
+- `buildDayTimeline` records each train's (distinct section, entry minute) once. `assembleTimeline(trains, entries)` builds bar length, `secFlowSteps` (start-step counts plus a prefix sum, same numbers as the old per-step loop), `maxFlowSteps` and the queries. `subset` reruns it on the kept trains without rebuilding geometry. 广州: base build 44 ms; filter + subset 0.7–10.4 ms.
+- With a filter: only filtered trains animate. `secFlowSteps` count only those trains, and the final step equals the filtered static flows. Counters and `getPrepTrain` cover only the filtered set. Bar length = the filtered trains' own span; `animTime` is clamped when a filter shortens it. Flows are drawn at the full origin's scale (`baseMaxN`) over the static faded full-origin background, as on main. Chords are faded context, not gated by time. Filtered `dests[].arrTimes` are rebuilt from the filtered calls (they used to be copied unfiltered), so pulses count only filtered trains. Isolation is intersected with the filter (a filtered-out isolated train draws nothing). The city-pair panel already used the filtered `panelCity`.
+- No filter: `filterOrigin` returns the origin itself, and `isFilteredView()` is false, so every path is the branch's.
+
+Verification:
+- `bun install --frozen-lockfile`, `bun run typecheck`, `bun run build`: pass.
+- `node staging/scripts/check_client_decode.mjs`: pass (trainDistAt checks OK).
+- `pipeline/`: `cargo fmt --all -- --check` OK, `cargo clippy --workspace --all-targets -- -D warnings` exit 0, `cargo test --workspace` all ok (9 tests).
+- New `node staging/scripts/check_filter_animation.mjs` (real `lib.ts`): unfiltered 广州 timeline is identical to the pre-merge branch's (`git show HEAD^1:web/src/lib.ts`; set `BASE_REF` to compare against another ref): every `secFlowSteps`/`maxFlowSteps` array, sampled `getActiveTrains`, the counters, and final step = shipped flows on 4,517/4,517 sections. Filters tested: hours 08–09 + 500–1000 km (22 trains), hours 08–09 (162), class G (452), class K + ≤6 h (16). For each: drawn dots ⊆ filter, every drawable filtered train is drawn, final step = filtered flow n with no extra lit sections, monotone growth, counters, pulse times. Result: OK. Note: `staging/` is gitignored, so this script (like `check_client_decode.mjs`) is not in the commit.
+
+Reviewer, look closely at:
+- The bar length now shrinks to the filtered trains' span (e.g. class G 1,435 min vs 4,090). The alternative is to keep the full origin's span.
+- Filtered views use the static full-origin scale (`baseMaxN`), not the per-step `maxFlowSteps`, so filtered bands start thin and grow into their final proportional width.
+- The isolation pill (top centre) can overlap main's filter bar (top left) on narrow screens.
+- Not browser-tested: the new filter/animation interplay and the train-number click vs row-select change.

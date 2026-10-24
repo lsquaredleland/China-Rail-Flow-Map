@@ -1297,11 +1297,12 @@ static LEG_PATHS: std::sync::OnceLock<LegPathMap> = std::sync::OnceLock::new();
 /// (codes are reused across physical trains).
 fn load_leg_paths(map: &mut OverrideMap, data_dir: &Path) {
     let mut paths: LegPathMap = HashMap::new();
-    let p_path = env::var("ATLAS_LEG_PATHS").map(PathBuf::from).unwrap_or_else(|_| {
-        data_dir.join("derived/corridor-v3/leg_paths.json")
-    });
+    let p_path = env::var("ATLAS_LEG_PATHS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| data_dir.join("derived/corridor-v3/leg_paths.json"));
     if p_path.exists() {
-        let recs: Vec<LegPath> = serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
+        let recs: Vec<LegPath> =
+            serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
         println!("leg paths loaded: {} from {}", recs.len(), p_path.display());
         for r in recs {
             let key_id = if r.train_no.is_empty() {
@@ -1594,9 +1595,21 @@ fn orient_leg(
     let (bw, bw_cost, bw_gap, bw_end) = greedy_walk(&ends, p1, p0);
     if bw_cost < fw_cost {
         let steps = bw.iter().rev().map(|&(i, f)| (i, !f)).collect();
-        (LegWalk { steps, max_gap: bw_gap.max(hole) }, bw_end)
+        (
+            LegWalk {
+                steps,
+                max_gap: bw_gap.max(hole),
+            },
+            bw_end,
+        )
     } else {
-        (LegWalk { steps: fw, max_gap: fw_gap.max(hole) }, fw_end)
+        (
+            LegWalk {
+                steps: fw,
+                max_gap: fw_gap.max(hole),
+            },
+            fw_end,
+        )
     }
 }
 
@@ -2861,8 +2874,14 @@ fn main() {
     // kind -> [as stored, reversed, mixed, unchecked (station point missing/untrusted)]
     let mut orient_stats: std::collections::BTreeMap<&str, [u64; 4]> = Default::default();
     let mut bad_pairs: Vec<String> = Vec::new();
-    let out_keys = works.iter().flat_map(|w| w.deps.iter()).flat_map(|d| d.leg_keys.iter());
-    let in_keys = in_works.iter().flat_map(|w| w.arrs.iter()).flat_map(|a| a.leg_keys.iter());
+    let out_keys = works
+        .iter()
+        .flat_map(|w| w.deps.iter())
+        .flat_map(|d| d.leg_keys.iter());
+    let in_keys = in_works
+        .iter()
+        .flat_map(|w| w.arrs.iter())
+        .flat_map(|a| a.leg_keys.iter());
     for key in out_keys.chain(in_keys) {
         if leg_walks.contains_key(key) {
             continue;
@@ -2964,7 +2983,8 @@ fn main() {
             let mut chord_legs: Vec<[usize; 3]> = Vec::new();
             for (li, key) in d.leg_keys.iter().enumerate() {
                 let walk = leg_walks.get(key);
-                if let (Some(seqs), Some(walk)) = (leg_seqs(key, &leg_cache, &variant_cache), walk) {
+                if let (Some(seqs), Some(walk)) = (leg_seqs(key, &leg_cache, &variant_cache), walk)
+                {
                     walk_edges(seqs, walk, d.leg_fwd[li], |u, v| {
                         if let Some(&(sidx, rev)) = edge_dir_to_sec.get(&(u, v)) {
                             let s = if rev { !(sidx as i64) } else { sidx as i64 };
@@ -3128,7 +3148,8 @@ fn main() {
             let mut chord_legs: Vec<[usize; 3]> = Vec::new();
             for (li, key) in a.leg_keys.iter().enumerate() {
                 let walk = leg_walks.get(key);
-                if let (Some(seqs), Some(walk)) = (leg_seqs(key, &leg_cache, &variant_cache), walk) {
+                if let (Some(seqs), Some(walk)) = (leg_seqs(key, &leg_cache, &variant_cache), walk)
+                {
                     walk_edges(seqs, walk, a.leg_fwd[li], |u, v| {
                         if let Some(&(sidx, rev)) = in_edge_dir_to_sec.get(&(u, v)) {
                             let s = if rev { !(sidx as i64) } else { sidx as i64 };
@@ -3338,12 +3359,16 @@ fn main() {
     let mut train_of: HashMap<(String, String), usize> = HashMap::new();
     for (ti, t) in trains.iter().enumerate() {
         let prev = train_of.insert((t.code.clone(), t.train_class.clone()), ti);
-        assert!(prev.is_none(), "train_table key collision: {} {}", t.code, t.train_class);
+        assert!(
+            prev.is_none(),
+            "train_table key collision: {} {}",
+            t.code,
+            t.train_class
+        );
     }
     let mut schedules: Vec<Vec<ScheduleRow>> = Vec::with_capacity(train_table.len());
     let (mut sched_name_mismatch, mut sched_km_unknown) = (0usize, 0usize);
-    for ti in 0..train_table.len() {
-        let tr = &train_table[ti];
+    for tr in &train_table {
         let ti = train_of[&(tr.code.clone(), tr.class.clone())];
         let t = &trains[ti];
         let set = if ti < d1_len { 0u8 } else { 1 };

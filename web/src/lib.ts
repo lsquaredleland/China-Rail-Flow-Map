@@ -13,7 +13,9 @@ import type {
   DecodedSet,
   DepVM,
   DestVM,
+  DistBinFilter,
   DistUnit,
+  DurBinFilter,
   FlowVM,
   OriginFilterCriteria,
   OriginVM,
@@ -1014,6 +1016,11 @@ function decodeSecs(raw: number[] | undefined): { secs: number[]; revs: Uint8Arr
   return { secs, revs };
 }
 
+interface TrainEntries {
+  secs: number[];
+  times: number[];
+}
+
 export function buildDayTimeline(
   cur: OriginVM,
   atlas: AtlasVM,
@@ -1022,49 +1029,29 @@ export function buildDayTimeline(
   const stepMins = 5;
 
   const rawTrains = cur.deps || [];
-  const totalTrains = rawTrains.length;
-
-  // Track max arrival time across all services (ending time of the bar varies depending on the last train)
-  let maxArrMins = 0;
-  for (let ti = 0; ti < rawTrains.length; ti++) {
-    const t = rawTrains[ti];
-    const dm = t.depMins >= 0 ? t.depMins : 0;
-    const dur = t.dur > 0 ? t.dur : 1;
-    const am = dm + dur;
-    if (am > maxArrMins) maxArrMins = am;
-  }
-  const totalMins = Math.max(60, Math.ceil(maxArrMins / 5) * 5);
-  const totalDays = Math.max(1, Math.ceil(totalMins / 1440));
-  const numSteps = Math.ceil(totalMins / stepMins);
-  const secFlowSteps = new Map<number, Uint16Array>();
-  const maxFlowSteps = new Uint16Array(numSteps);
 
   if (!secSet || !secSet.len) {
-    return {
+    const empty: DayTimelineVM = {
       stepMins,
-      numSteps,
-      totalMins,
-      totalDays,
-      secFlowSteps,
-      maxFlowSteps,
+      numSteps: 12,
+      totalMins: 60,
+      totalDays: 1,
+      secFlowSteps: new Map(),
+      maxFlowSteps: new Uint16Array(12),
       getActiveTrains: () => [],
       getPrepTrain: () => undefined,
       totalTrains: 0,
       getDepartedCount: () => 0,
       getArrivedCount: () => 0,
+      subset: () => empty,
     };
+    return empty;
   }
 
   const { secLengths, secCumLens } = getSecGeometry(secSet);
 
-  // Initialize flow sections from cur.flows / cur.inFlows
-  const flows = cur.flows || [];
-  for (let i = 0; i < flows.length; i++) {
-    const s = flows[i].s;
-    if (!secFlowSteps.has(s)) {
-      secFlowSteps.set(s, new Uint16Array(numSteps));
-    }
-  }
+  // Every origin flow section gets a step array, even if no dot enters it.
+  const flowSecs = (cur.flows || []).map((f) => f.s);
 
   interface RawStopCall {
     cityZh: string;
@@ -1104,6 +1091,10 @@ export function buildDayTimeline(
   }
 
   const prepTrains: PrepTrain[] = [];
+  // Per train: each distinct section it covers and the minute its dot first
+  // enters it (the flow lighting). Kept so a filtered subset re-tallies
+  // flows without re-deriving any geometry.
+  const trainEntries: TrainEntries[] = [];
 
   for (let ti = 0; ti < rawTrains.length; ti++) {
     const train = rawTrains[ti];
@@ -1231,259 +1222,299 @@ export function buildDayTimeline(
       chordSpans: chordSpans.length > 0 ? chordSpans : undefined,
     });
 
-    // Populate secFlowSteps: each section counts once per train, from the
-    // minute the dot first enters it.
+    // Each section counts once per train, from the minute the dot first
+    // enters it.
     const seenSecs = new Set<number>();
     const ptLast = prepTrains[prepTrains.length - 1];
+    const entrySecs: number[] = [];
+    const entryTimes: number[] = [];
     for (let i = 0; i < routeSecs.length; i++) {
       const s_i = routeSecs[i];
       if (seenSecs.has(s_i)) continue;
       seenSecs.add(s_i);
-      const tEnter = timeAtDist(ptLast, secStarts[i]);
-
-      let stepArr = secFlowSteps.get(s_i);
-      if (!stepArr) {
-        stepArr = new Uint16Array(numSteps);
-        secFlowSteps.set(s_i, stepArr);
-      }
-
-      // Clamp startStep to [0, numSteps - 1] so that late-departing trains that
-      // traverse sections into the following day contribute their full flow count
-      // by the end of the 24-hour cycle (step 287 / 24:00).
-      const startStep = Math.min(
-        numSteps - 1,
-        Math.max(0, Math.ceil(tEnter / stepMins)),
-      );
-      for (let step = startStep; step < numSteps; step++) {
-        stepArr[step]++;
-      }
+      entrySecs.push(s_i);
+      entryTimes.push(timeAtDist(ptLast, secStarts[i]));
     }
+    trainEntries.push({ secs: entrySecs, times: entryTimes });
   }
 
-  // Max flow across all sections at each 5-min step
-  for (let step = 0; step < numSteps; step++) {
-    let m = 0;
-    for (const arr of secFlowSteps.values()) {
-      if (arr[step] > m) m = arr[step];
+  return assembleTimeline(prepTrains, trainEntries, flowSecs);
+
+  /** The timeline of `trains`: bar length, cumulative flow per section and
+      step, and the per-frame queries. Cheap enough to rerun per filter. */
+  function assembleTimeline(
+    trains: PrepTrain[],
+    entries: TrainEntries[],
+    initSecs: number[],
+  ): DayTimelineVM {
+    // Track max arrival time across all services (ending time of the bar varies depending on the last train)
+    let maxArrMins = 0;
+    for (let ti = 0; ti < trains.length; ti++) {
+      if (trains[ti].arrMins > maxArrMins) maxArrMins = trains[ti].arrMins;
     }
-    maxFlowSteps[step] = m;
-  }
+    const totalMins = Math.max(60, Math.ceil(maxArrMins / 5) * 5);
+    const totalDays = Math.max(1, Math.ceil(totalMins / 1440));
+    const numSteps = Math.ceil(totalMins / stepMins);
+    const secFlowSteps = new Map<number, Uint16Array>();
+    const maxFlowSteps = new Uint16Array(numSteps);
+    for (const s of initSecs) {
+      if (!secFlowSteps.has(s)) secFlowSteps.set(s, new Uint16Array(numSteps));
+    }
 
-  function getActiveTrains(tMins: number): ActiveTrainVM[] {
-    const active: ActiveTrainVM[] = [];
-    for (let i = 0; i < prepTrains.length; i++) {
-      const pt = prepTrains[i];
-      // 10 min pre-departure boarding dwell at origin
-      const boardStart = Math.max(0, pt.depMins - 10);
-      // 8 min disembarkation dwell at final terminus
-      const termEnd = pt.arrMins + 8;
-      if (
-        tMins < boardStart ||
-        tMins > termEnd ||
-        pt.totalDist <= 0 ||
-        pt.secs.length === 0
-      ) {
-        continue;
-      }
-
-      trainState(pt, tMins);
-      const targetDist = trainScratch.dist;
-      const speedFrac = trainScratch.speedFrac;
-      const dw = trainScratch.dwell;
-      const isDwelling = dw !== 0;
-      let dwellStation: string | undefined;
-      let dwellStationEn: string | undefined;
-      let dwellStatus: "origin" | "stop" | "dest" | undefined;
-      let dwellDetail: string | undefined;
-      if (dw === 1) {
-        dwellStation = pt.fromStation;
-        dwellStationEn = pt.fromStationEn;
-        dwellStatus = "origin";
-        dwellDetail = `Departs ${pt.depTime}`;
-      } else if (dw === 3) {
-        dwellStation = pt.toStation;
-        dwellStationEn = pt.toStationEn;
-        dwellStatus = "dest";
-        dwellDetail = "Final Destination";
-      } else if (dw === 2 && trainScratch.stop) {
-        const st = trainScratch.stop;
-        dwellStation = st.cityZh;
-        dwellStationEn = st.cityEn;
-        dwellStatus = "stop";
-        dwellDetail = `${fmtClock(st.arrMins)} - ${fmtClock(st.depMins!)}`;
-      }
-
-      if (pt.chordSpans) {
-        let span: ChordSpan | undefined;
-        for (const c of pt.chordSpans) {
-          if (targetDist >= c.d0 && targetDist <= c.d1 && c.d1 > c.d0) {
-            span = c;
-            break;
-          }
+    // Count each entry at its start step, then accumulate per section. Clamp
+    // startStep to [0, numSteps - 1] so that late-departing trains that
+    // traverse sections into the following day contribute their full flow
+    // count by the last step.
+    for (let ti = 0; ti < entries.length; ti++) {
+      const { secs, times } = entries[ti];
+      for (let k = 0; k < secs.length; k++) {
+        let stepArr = secFlowSteps.get(secs[k]);
+        if (!stepArr) {
+          stepArr = new Uint16Array(numSteps);
+          secFlowSteps.set(secs[k], stepArr);
         }
-        if (span) {
-          const a = (targetDist - span.d0) / (span.d1 - span.d0);
-          active.push({
-            lon: span.lon0 + a * (span.lon1 - span.lon0),
-            lat: span.lat0 + a * (span.lat1 - span.lat0),
-            heading: Math.atan2(span.lat1 - span.lat0, span.lon1 - span.lon0),
-            cls: pt.cls,
-            code: pt.code,
-            fromStation: pt.fromStation,
-            fromStationEn: pt.fromStationEn,
-            toStation: pt.toStation,
-            toStationEn: pt.toStationEn,
-            depTime: pt.depTime,
-            arrTime: pt.arrTime,
-            durMins: pt.dur,
-            progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
-            isDwelling,
-            dwellStation,
-            dwellStationEn,
-            dwellStatus,
-            dwellDetail,
-            speedFrac,
-            curDist: targetDist,
-            onChord: true,
-          });
+        stepArr[Math.min(numSteps - 1, Math.max(0, Math.ceil(times[k] / stepMins)))]++;
+      }
+    }
+    for (const arr of secFlowSteps.values()) {
+      for (let step = 1; step < numSteps; step++) arr[step] += arr[step - 1];
+    }
+
+    // Max flow across all sections at each 5-min step
+    for (let step = 0; step < numSteps; step++) {
+      let m = 0;
+      for (const arr of secFlowSteps.values()) {
+        if (arr[step] > m) m = arr[step];
+      }
+      maxFlowSteps[step] = m;
+    }
+
+    function getActiveTrains(tMins: number): ActiveTrainVM[] {
+      const active: ActiveTrainVM[] = [];
+      for (let i = 0; i < trains.length; i++) {
+        const pt = trains[i];
+        // 10 min pre-departure boarding dwell at origin
+        const boardStart = Math.max(0, pt.depMins - 10);
+        // 8 min disembarkation dwell at final terminus
+        const termEnd = pt.arrMins + 8;
+        if (
+          tMins < boardStart ||
+          tMins > termEnd ||
+          pt.totalDist <= 0 ||
+          pt.secs.length === 0
+        ) {
           continue;
         }
-      }
 
-      // Find which section in the route
-      let secIdx = 0;
-      while (
-        secIdx < pt.secs.length - 1 &&
-        pt.secStarts[secIdx + 1] <= targetDist
-      ) {
-        secIdx++;
-      }
-      const s = pt.secs[secIdx];
-      const distInSec = targetDist - pt.secStarts[secIdx];
-      const isSecRev = pt.secRevs[secIdx] === 1;
-      const sLen = secLengths[s] || 0;
-      // If traversed in reverse, effective distance along vertices starts from the end
-      const distInSecEffective = isSecRev
-        ? Math.max(0, Math.min(sLen, sLen - distInSec))
-        : distInSec;
-
-      // Find which segment within section s
-      const off = secSet.off[s];
-      const cnt = secSet.len[s];
-      if (cnt <= 1) {
-        if (cnt === 1) {
-          active.push({
-            lon: secSet.pts[off],
-            lat: secSet.pts[off + 1],
-            heading: 0,
-            cls: pt.cls,
-            code: pt.code,
-            fromStation: pt.fromStation,
-            fromStationEn: pt.fromStationEn,
-            toStation: pt.toStation,
-            toStationEn: pt.toStationEn,
-            depTime: pt.depTime,
-            arrTime: pt.arrTime,
-            durMins: pt.dur,
-            progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
-            isDwelling,
-            dwellStation,
-            dwellStationEn,
-            dwellStatus,
-            dwellDetail,
-            speedFrac,
-            curDist: targetDist,
-          });
+        trainState(pt, tMins);
+        const targetDist = trainScratch.dist;
+        const speedFrac = trainScratch.speedFrac;
+        const dw = trainScratch.dwell;
+        const isDwelling = dw !== 0;
+        let dwellStation: string | undefined;
+        let dwellStationEn: string | undefined;
+        let dwellStatus: "origin" | "stop" | "dest" | undefined;
+        let dwellDetail: string | undefined;
+        if (dw === 1) {
+          dwellStation = pt.fromStation;
+          dwellStationEn = pt.fromStationEn;
+          dwellStatus = "origin";
+          dwellDetail = `Departs ${pt.depTime}`;
+        } else if (dw === 3) {
+          dwellStation = pt.toStation;
+          dwellStationEn = pt.toStationEn;
+          dwellStatus = "dest";
+          dwellDetail = "Final Destination";
+        } else if (dw === 2 && trainScratch.stop) {
+          const st = trainScratch.stop;
+          dwellStation = st.cityZh;
+          dwellStationEn = st.cityEn;
+          dwellStatus = "stop";
+          dwellDetail = `${fmtClock(st.arrMins)} - ${fmtClock(st.depMins!)}`;
         }
-        continue;
+
+        if (pt.chordSpans) {
+          let span: ChordSpan | undefined;
+          for (const c of pt.chordSpans) {
+            if (targetDist >= c.d0 && targetDist <= c.d1 && c.d1 > c.d0) {
+              span = c;
+              break;
+            }
+          }
+          if (span) {
+            const a = (targetDist - span.d0) / (span.d1 - span.d0);
+            active.push({
+              lon: span.lon0 + a * (span.lon1 - span.lon0),
+              lat: span.lat0 + a * (span.lat1 - span.lat0),
+              heading: Math.atan2(span.lat1 - span.lat0, span.lon1 - span.lon0),
+              cls: pt.cls,
+              code: pt.code,
+              fromStation: pt.fromStation,
+              fromStationEn: pt.fromStationEn,
+              toStation: pt.toStation,
+              toStationEn: pt.toStationEn,
+              depTime: pt.depTime,
+              arrTime: pt.arrTime,
+              durMins: pt.dur,
+              progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
+              isDwelling,
+              dwellStation,
+              dwellStationEn,
+              dwellStatus,
+              dwellDetail,
+              speedFrac,
+              curDist: targetDist,
+              onChord: true,
+            });
+            continue;
+          }
+        }
+
+        // Find which section in the route
+        let secIdx = 0;
+        while (
+          secIdx < pt.secs.length - 1 &&
+          pt.secStarts[secIdx + 1] <= targetDist
+        ) {
+          secIdx++;
+        }
+        const s = pt.secs[secIdx];
+        const distInSec = targetDist - pt.secStarts[secIdx];
+        const isSecRev = pt.secRevs[secIdx] === 1;
+        const sLen = secLengths[s] || 0;
+        // If traversed in reverse, effective distance along vertices starts from the end
+        const distInSecEffective = isSecRev
+          ? Math.max(0, Math.min(sLen, sLen - distInSec))
+          : distInSec;
+
+        // Find which segment within section s
+        const off = secSet.off[s];
+        const cnt = secSet.len[s];
+        if (cnt <= 1) {
+          if (cnt === 1) {
+            active.push({
+              lon: secSet.pts[off],
+              lat: secSet.pts[off + 1],
+              heading: 0,
+              cls: pt.cls,
+              code: pt.code,
+              fromStation: pt.fromStation,
+              fromStationEn: pt.fromStationEn,
+              toStation: pt.toStation,
+              toStationEn: pt.toStationEn,
+              depTime: pt.depTime,
+              arrTime: pt.arrTime,
+              durMins: pt.dur,
+              progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
+              isDwelling,
+              dwellStation,
+              dwellStationEn,
+              dwellStatus,
+              dwellDetail,
+              speedFrac,
+              curDist: targetDist,
+            });
+          }
+          continue;
+        }
+
+        const cum = secCumLens[s];
+        let k = 0;
+        while (k < cnt - 2 && cum[k + 1] < distInSecEffective) {
+          k++;
+        }
+        const segLen = cum[k + 1] - cum[k];
+        const segAlpha =
+          segLen > 0
+            ? Math.max(0, Math.min(1, (distInSecEffective - cum[k]) / segLen))
+            : 0;
+        const lon0 = secSet.pts[off + k * 2];
+        const lat0 = secSet.pts[off + k * 2 + 1];
+        const lon1 = secSet.pts[off + (k + 1) * 2];
+        const lat1 = secSet.pts[off + (k + 1) * 2 + 1];
+        const lon = lon0 + segAlpha * (lon1 - lon0);
+        const lat = lat0 + segAlpha * (lat1 - lat0);
+
+        // Traversal heading: if reversed, movement vector is (lon0 - lon1, lat0 - lat1)
+        const dLon = isSecRev ? lon0 - lon1 : lon1 - lon0;
+        const dLat = isSecRev ? lat0 - lat1 : lat1 - lat0;
+        const heading = Math.atan2(dLat, dLon);
+
+        active.push({
+          lon,
+          lat,
+          heading,
+          cls: pt.cls,
+          code: pt.code,
+          fromStation: pt.fromStation,
+          fromStationEn: pt.fromStationEn,
+          toStation: pt.toStation,
+          toStationEn: pt.toStationEn,
+          depTime: pt.depTime,
+          arrTime: pt.arrTime,
+          durMins: pt.dur,
+          progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
+          isDwelling,
+          dwellStation,
+          dwellStationEn,
+          dwellStatus,
+          dwellDetail,
+          speedFrac,
+          curDist: targetDist,
+        });
       }
-
-      const cum = secCumLens[s];
-      let k = 0;
-      while (k < cnt - 2 && cum[k + 1] < distInSecEffective) {
-        k++;
-      }
-      const segLen = cum[k + 1] - cum[k];
-      const segAlpha =
-        segLen > 0
-          ? Math.max(0, Math.min(1, (distInSecEffective - cum[k]) / segLen))
-          : 0;
-      const lon0 = secSet.pts[off + k * 2];
-      const lat0 = secSet.pts[off + k * 2 + 1];
-      const lon1 = secSet.pts[off + (k + 1) * 2];
-      const lat1 = secSet.pts[off + (k + 1) * 2 + 1];
-      const lon = lon0 + segAlpha * (lon1 - lon0);
-      const lat = lat0 + segAlpha * (lat1 - lat0);
-
-      // Traversal heading: if reversed, movement vector is (lon0 - lon1, lat0 - lat1)
-      const dLon = isSecRev ? lon0 - lon1 : lon1 - lon0;
-      const dLat = isSecRev ? lat0 - lat1 : lat1 - lat0;
-      const heading = Math.atan2(dLat, dLon);
-
-      active.push({
-        lon,
-        lat,
-        heading,
-        cls: pt.cls,
-        code: pt.code,
-        fromStation: pt.fromStation,
-        fromStationEn: pt.fromStationEn,
-        toStation: pt.toStation,
-        toStationEn: pt.toStationEn,
-        depTime: pt.depTime,
-        arrTime: pt.arrTime,
-        durMins: pt.dur,
-        progressPct: Math.round((Math.max(0, Math.min(pt.totalDist, targetDist)) / Math.max(1, pt.totalDist)) * 100),
-        isDwelling,
-        dwellStation,
-        dwellStationEn,
-        dwellStatus,
-        dwellDetail,
-        speedFrac,
-        curDist: targetDist,
-      });
+      return active;
     }
-    return active;
-  }
 
-  function getDepartedCount(tMins: number): number {
-    let count = 0;
-    for (let i = 0; i < prepTrains.length; i++) {
-      if (prepTrains[i].depMins <= tMins) {
-        count++;
+    function getDepartedCount(tMins: number): number {
+      let count = 0;
+      for (let i = 0; i < trains.length; i++) {
+        if (trains[i].depMins <= tMins) {
+          count++;
+        }
       }
+      return count;
     }
-    return count;
-  }
 
-  function getArrivedCount(tMins: number): number {
-    let count = 0;
-    for (let i = 0; i < prepTrains.length; i++) {
-      if (prepTrains[i].arrMins <= tMins) {
-        count++;
+    function getArrivedCount(tMins: number): number {
+      let count = 0;
+      for (let i = 0; i < trains.length; i++) {
+        if (trains[i].arrMins <= tMins) {
+          count++;
+        }
       }
+      return count;
     }
-    return count;
-  }
 
-  const prepMap = new Map<string, PrepTrain>();
-  for (let i = 0; i < prepTrains.length; i++) {
-    prepMap.set(prepTrains[i].code, prepTrains[i]);
-  }
+    const prepMap = new Map<string, PrepTrain>();
+    for (let i = 0; i < trains.length; i++) {
+      prepMap.set(trains[i].code, trains[i]);
+    }
 
-  return {
-    stepMins,
-    numSteps,
-    totalMins,
-    totalDays,
-    secFlowSteps,
-    maxFlowSteps,
-    getActiveTrains,
-    getPrepTrain: (code: string) => prepMap.get(code),
-    totalTrains,
-    getDepartedCount,
-    getArrivedCount,
-  };
+    return {
+      stepMins,
+      numSteps,
+      totalMins,
+      totalDays,
+      secFlowSteps,
+      maxFlowSteps,
+      getActiveTrains,
+      getPrepTrain: (code: string) => prepMap.get(code),
+      totalTrains: trains.length,
+      getDepartedCount,
+      getArrivedCount,
+      subset: (codes: Set<string>) => {
+        const subTrains: PrepTrain[] = [];
+        const subEntries: TrainEntries[] = [];
+        for (let i = 0; i < trains.length; i++) {
+          if (!codes.has(trains[i].code)) continue;
+          subTrains.push(trains[i]);
+          subEntries.push(entries[i]);
+        }
+        return assembleTimeline(subTrains, subEntries, []);
+      },
+    };
+  }
 }
 
 /** Return a derived OriginVM filtered to the selected train classes,
@@ -1497,18 +1528,48 @@ export function filterOrigin(
   const {
     classes = [],
     hour = null,
+    hours = null,
     distBin = null,
+    distBins = null,
     durBin = null,
+    durBins = null,
+    trainCodes = null,
     unit = "km",
   } = criteria;
 
+  const activeHours: number[] =
+    hours && hours.length > 0
+      ? hours
+      : hour !== null && hour !== undefined
+        ? [hour]
+        : [];
+  const activeDistBins: DistBinFilter[] =
+    distBins && distBins.length > 0
+      ? distBins
+      : distBin
+        ? [distBin]
+        : [];
+  const activeDurBins: DurBinFilter[] =
+    durBins && durBins.length > 0
+      ? durBins
+      : durBin
+        ? [durBin]
+        : [];
+  const activeTrainCodes: string[] =
+    trainCodes && trainCodes.length > 0 ? trainCodes : [];
+
   const hasClassFilter = classes.length > 0;
-  const hasHourFilter = hour !== null && hour !== undefined;
-  const hasDistFilter = distBin !== null && distBin !== undefined;
-  const hasDurFilter = durBin !== null && durBin !== undefined;
+  const hasHourFilter = activeHours.length > 0;
+  const hasDistFilter = activeDistBins.length > 0;
+  const hasDurFilter = activeDurBins.length > 0;
+  const hasTrainFilter = activeTrainCodes.length > 0;
 
   const hasAnyFilter =
-    hasClassFilter || hasHourFilter || hasDistFilter || hasDurFilter;
+    hasClassFilter ||
+    hasHourFilter ||
+    hasDistFilter ||
+    hasDurFilter ||
+    hasTrainFilter;
   if (!hasAnyFilter) return cur;
 
   const clsIndices = Array.from(new Set(classes.map(classIndex)));
@@ -1517,50 +1578,67 @@ export function filterOrigin(
     classes.includes(cls) ||
     (classes.includes("plain") && classIndex(cls) === 7);
 
+  const trainCodeSet = hasTrainFilter ? new Set(activeTrainCodes) : null;
+  const hourSet = hasHourFilter ? new Set(activeHours) : null;
+
   const matchesDep = (d: DepVM) => {
+    if (trainCodeSet && !trainCodeSet.has(d.code)) return false;
     if (!hasClass(d.cls)) return false;
-    if (hasHourFilter) {
+    if (hourSet) {
       const h = parseInt(d.dep.slice(0, 2), 10);
-      if (h !== hour) return false;
+      if (!hourSet.has(h)) return false;
     }
     if (hasDistFilter) {
       const v = unit === "km" ? d.distKm : d.distKm * 0.621371;
-      const b = Math.min(
-        distBin.nb - 1,
-        Math.max(0, Math.floor(v / distBin.size)),
-      );
-      if (b !== distBin.bin) return false;
+      const matched = activeDistBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(v / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     if (hasDurFilter) {
-      const b = Math.min(
-        durBin.nb - 1,
-        Math.max(0, Math.floor(d.dur / durBin.size)),
-      );
-      if (b !== durBin.bin) return false;
+      const matched = activeDurBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(d.dur / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     return true;
   };
 
   const matchesArr = (a: ArrVM) => {
+    if (trainCodeSet && !trainCodeSet.has(a.code)) return false;
     if (!hasClass(a.cls)) return false;
-    if (hasHourFilter) {
+    if (hourSet) {
       const h = parseInt(a.arr.slice(0, 2), 10);
-      if (h !== hour) return false;
+      if (!hourSet.has(h)) return false;
     }
     if (hasDistFilter) {
       const v = unit === "km" ? a.distKm : a.distKm * 0.621371;
-      const b = Math.min(
-        distBin.nb - 1,
-        Math.max(0, Math.floor(v / distBin.size)),
-      );
-      if (b !== distBin.bin) return false;
+      const matched = activeDistBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(v / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     if (hasDurFilter) {
-      const b = Math.min(
-        durBin.nb - 1,
-        Math.max(0, Math.floor(a.dur / durBin.size)),
-      );
-      if (b !== durBin.bin) return false;
+      const matched = activeDurBins.some((bin) => {
+        const b = Math.min(
+          bin.nb - 1,
+          Math.max(0, Math.floor(a.dur / bin.size)),
+        );
+        return b === bin.bin;
+      });
+      if (!matched) return false;
     }
     return true;
   };
@@ -1569,7 +1647,10 @@ export function filterOrigin(
   const arrs = cur.arrs.filter(matchesArr);
 
   let flows: FlowVM[];
-  if (cur.deps.length > 0 && (hasHourFilter || hasDistFilter || hasDurFilter)) {
+  if (
+    cur.deps.length > 0 &&
+    (hasHourFilter || hasDistFilter || hasDurFilter || hasTrainFilter)
+  ) {
     const secMap = new Map<number, { n: number; byClass: number[] }>();
     for (const d of deps) {
       const ci = classIndex(d.cls);
@@ -1601,7 +1682,10 @@ export function filterOrigin(
   }
 
   let inFlows: FlowVM[];
-  if (cur.arrs.length > 0 && (hasHourFilter || hasDistFilter || hasDurFilter)) {
+  if (
+    cur.arrs.length > 0 &&
+    (hasHourFilter || hasDistFilter || hasDurFilter || hasTrainFilter)
+  ) {
     const secMap = new Map<number, { n: number; byClass: number[] }>();
     for (const a of arrs) {
       const ci = classIndex(a.cls);
@@ -1655,6 +1739,10 @@ export function filterOrigin(
         terminating,
         fastest: times.length ? times[0] : d.fastest,
         median: times.length ? times[Math.floor(times.length / 2)] : d.median,
+        arrTimes: calls
+          .map((c) => (c.arrMins !== undefined ? c.arrMins : -1))
+          .filter((t) => t >= 0)
+          .sort((a, b) => a - b),
         calls,
       });
     }
@@ -1690,7 +1778,7 @@ export function filterOrigin(
     srcs.sort((a, b) => b.trains - a.trains);
   }
 
-  return {
+  const res: OriginVM = {
     o: cur.o,
     en: cur.en,
     flows,
@@ -1702,8 +1790,23 @@ export function filterOrigin(
     srcs,
     arrs,
     maxInFlow: inFlows.length ? inFlows[0].n : 0,
-    timeline: cur.timeline,
   };
+
+  // The animation of a filtered view runs only the matching trains: built on
+  // first use from the full origin's timeline, without re-deriving geometry.
+  let timelineCache: DayTimelineVM | undefined;
+  Object.defineProperty(res, "timeline", {
+    get() {
+      if (!timelineCache && deps.length > 0) {
+        timelineCache = cur.timeline?.subset(new Set(deps.map((d) => d.code)));
+      }
+      return timelineCache;
+    },
+    configurable: true,
+    enumerable: true,
+  });
+
+  return res;
 }
 
 export function filterOriginByClasses(

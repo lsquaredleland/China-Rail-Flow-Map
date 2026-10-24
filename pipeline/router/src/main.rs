@@ -290,11 +290,11 @@ fn min_gap_bridge(g: &Graph, p: &PairInfo, sa: &Snap, sb: &Snap) -> Option<Cand>
     };
     let mut best: Option<(f64, f64, u32, u32)> = None; // (gap, total, a-node, b-node)
     let scan = |from: &HashMap<u32, (f64, u32)>,
-                    other: &HashMap<u32, (f64, u32)>,
-                    grid: &HashMap<(i32, i32), Vec<u32>>,
-                    a_side: bool,
-                    dangling_only: bool,
-                    best: &mut Option<(f64, f64, u32, u32)>| {
+                other: &HashMap<u32, (f64, u32)>,
+                grid: &HashMap<(i32, i32), Vec<u32>>,
+                a_side: bool,
+                dangling_only: bool,
+                best: &mut Option<(f64, f64, u32, u32)>| {
         for (&u, &(du, _)) in from {
             if dangling_only && g.degree[u as usize] != 1 {
                 continue;
@@ -811,7 +811,9 @@ fn main() {
                                         || (pc[i].gap_km == 0.0 && bg > 0.0))
                             })
                             .min_by(|&a, &b| {
-                                pc[a].gap_km.total_cmp(&pc[b].gap_km)
+                                pc[a]
+                                    .gap_km
+                                    .total_cmp(&pc[b].gap_km)
                                     .then_with(|| post[b].total_cmp(&post[a]))
                             })
                     });
@@ -909,9 +911,7 @@ fn main() {
             .into_par_iter()
             .map_init(
                 || Buffers::new(g.coords.len()),
-                |buf, pi| {
-                    best_for_canon(pi).map(|b| redraw(&g, &fine, buf, b, &usage))
-                },
+                |buf, pi| best_for_canon(pi).map(|b| redraw(&g, &fine, buf, b, &usage)),
             )
             .collect();
         usage = edge_usage(

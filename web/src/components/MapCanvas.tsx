@@ -81,6 +81,7 @@ interface Props {
   atlas: DecodedAtlas | null;
   outline?: DecodedOutline | null;
   showOutline?: boolean;
+  baseCur?: OriginVM | null;
   cur: OriginVM | null;
   direction: Direction;
   dark: boolean;
@@ -211,6 +212,19 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const activeTimeline = (): DayTimelineVM | undefined => {
     const cur = P.current.cur;
     return cur && P.current.direction === "out" ? cur.timeline : undefined;
+  };
+  /* A filtered view (class, histogram or train filter) is a subset of the
+     full origin `baseCur`; selecting a city alone is not a filter. */
+  const isFilteredView = (): boolean => {
+    const cur = P.current.cur;
+    const baseCur = P.current.baseCur;
+    if (!cur || !baseCur || cur === baseCur) return false;
+    return (
+      cur.deps.length !== baseCur.deps.length ||
+      cur.arrs.length !== baseCur.arrs.length ||
+      cur.flows.length !== baseCur.flows.length ||
+      cur.maxFlow !== baseCur.maxFlow
+    );
   };
   const flowsSet = (): DecodedSet | null => {
     const atlas = P.current.atlas;
@@ -705,8 +719,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!atlas || !cur || !set) return;
     const { pts, off, len, bb } = set;
     const flows = flowsList();
+    const baseCur = P.current.baseCur || cur;
+    const baseFlows =
+      P.current.direction === "out" ? baseCur.flows : baseCur.inFlows;
+    const baseMaxN =
+      P.current.direction === "out" ? baseCur.maxFlow : baseCur.maxInFlow;
     const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
-
+    const filtered = isFilteredView();
     const timeline = activeTimeline();
     const isAnimated = S.current.animEnabled && !!timeline;
     const step = isAnimated && timeline
@@ -715,8 +734,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           Math.max(0, Math.floor(S.current.animTime / timeline.stepMins)),
         )
       : 0;
-    const curMaxN =
-      isAnimated && timeline ? timeline.maxFlowSteps[step] || maxN : maxN;
+    // A filtered view keeps the full origin's scale, so its bands stay
+    // proportional to the faded full-origin context drawn underneath.
+    const curMaxN = filtered
+      ? baseMaxN
+      : isAnimated && timeline
+        ? timeline.maxFlowSteps[step] || maxN
+        : maxN;
     const effectiveMaxN = Math.max(1, curMaxN);
 
     const isFerry = (s: number) =>
@@ -919,8 +943,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         }
       }
     } else if (destSecCounts) {
-      // Pass 1: faded background of ALL flows at current trunk width
-      strokeFlowList(activeFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
+      // Pass 1: faded background: the full origin (static) in a filtered
+      // view, else all flows at their current trunk width
+      strokeFlowList(
+        filtered ? baseFlows : activeFlows,
+        P.current.dark ? 0.16 : 0.18,
+        effectiveMaxN,
+      );
       // Pass 2: exact city-pair flow on top at widthOf(subN) and flowColor(subN, effectiveMaxN, pal)
       if (destSecCounts.size > 0) {
         const subFlows: { s: number; n: number }[] = [];
@@ -943,6 +972,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         subFlows.sort((a, b) => b.n - a.n);
         strokeFlowList(subFlows, 1.0, effectiveMaxN);
       }
+      ctx.globalAlpha = 1.0;
+    } else if (filtered) {
+      // Pass 1: faded background of ALL base flows at full trunk width
+      strokeFlowList(baseFlows, P.current.dark ? 0.16 : 0.18, effectiveMaxN);
+      // Pass 2: exact filtered flows on top at widthOf(f.n) and flowColor(f.n, effectiveMaxN, pal)
+      strokeFlowList(activeFlows, 1.0, effectiveMaxN);
       ctx.globalAlpha = 1.0;
     } else {
       strokeFlowList(activeFlows, 1.0, effectiveMaxN);
@@ -1062,13 +1097,15 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const cur = P.current.cur;
     if (!cur) return;
     const isIsolated = Boolean(P.current.isolatedTrainCode);
+    // In a filtered view every chord is faded context (as on main), not gated by time.
+    const filtered = isFilteredView();
     if (isIsolated) {
       ctx.globalAlpha = P.current.dark ? 0.05 : 0.08;
-    } else if (hasSelectedDest) {
+    } else if (hasSelectedDest || filtered) {
       ctx.globalAlpha = P.current.dark ? 0.16 : 0.18;
     }
     const st = S.current;
-    const isAnimated = st.animEnabled && !P.current.showInfra;
+    const isAnimated = st.animEnabled && !P.current.showInfra && !filtered;
     const timeline = activeTimeline();
     for (let i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
@@ -1181,11 +1218,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     ctx.setLineDash([]);
   }
   function computeAllowedTrainCodes(): Set<string> | null {
-    if (P.current.isolatedTrainCode) {
-      return new Set([P.current.isolatedTrainCode]);
+    const iso = P.current.isolatedTrainCode;
+    const cur = P.current.cur;
+    if (iso) {
+      // Intersected with the active filter: a filtered-out train stays hidden.
+      const rows = !cur ? [] : P.current.direction === "out" ? cur.deps : cur.arrs;
+      return new Set(rows.some((t) => t.code === iso) ? [iso] : []);
     }
     const pd = P.current.panelDest;
-    const cur = P.current.cur;
     if (!pd || !cur) return null;
 
     const allowed = new Set<string>();
@@ -2655,6 +2695,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!props.cur || props.cur === curRef.current) return;
     if (curRef.current && props.cur.o === curRef.current.o) {
       curRef.current = props.cur;
+      // A filter change can shorten the timeline (the filtered trains' span).
+      const tl = activeTimeline();
+      if (tl && S.current.animTime > tl.totalMins) S.current.animTime = tl.totalMins;
       draw();
       notifyAnimListeners();
       return;

@@ -1001,11 +1001,12 @@ static LEG_PATHS: std::sync::OnceLock<LegPathMap> = std::sync::OnceLock::new();
 /// (codes are reused across physical trains).
 fn load_leg_paths(map: &mut OverrideMap, data_dir: &Path) {
     let mut paths: LegPathMap = HashMap::new();
-    let p_path = env::var("ATLAS_LEG_PATHS").map(PathBuf::from).unwrap_or_else(|_| {
-        data_dir.join("derived/corridor-v3/leg_paths.json")
-    });
+    let p_path = env::var("ATLAS_LEG_PATHS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| data_dir.join("derived/corridor-v3/leg_paths.json"));
     if p_path.exists() {
-        let recs: Vec<LegPath> = serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
+        let recs: Vec<LegPath> =
+            serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
         println!("leg paths loaded: {} from {}", recs.len(), p_path.display());
         for r in recs {
             let key_id = if r.train_no.is_empty() {
@@ -1265,7 +1266,14 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     // outbound rows with a > 35 km jump, inside chord legs only / outside
     let (mut jump_in, mut jump_out) = (0i64, 0i64);
     for (label, tables, secs_key, chords_key, rows_key, ends) in [
-        ("out", &out_t, "dep_secs", "dep_chord_legs", "deps", &out_ends),
+        (
+            "out",
+            &out_t,
+            "dep_secs",
+            "dep_chord_legs",
+            "deps",
+            &out_ends,
+        ),
         ("in", &in_t, "arr_secs", "arr_chord_legs", "arrs", &in_ends),
     ] {
         for (oi, o) in arr(&tables["origins"]).iter().enumerate() {
@@ -1308,7 +1316,10 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                         }
                         bad_trains.insert((oi, label, ri));
                         let code = &codes[int(&rows[ri][0]) as usize];
-                        worst.push((gap, format!("{} {label} {code} at {k}/{}", zh[oi], path.len())));
+                        worst.push((
+                            gap,
+                            format!("{} {label} {code} at {k}/{}", zh[oi], path.len()),
+                        ));
                     }
                 }
                 if label == "out" {
@@ -1329,7 +1340,11 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                     if cnt > len {
                         sec_cnt_over += 1;
                     }
-                    let key = if label == "out" { off * 1440 + t1 } else { off * 1440 + t2 - t1 };
+                    let key = if label == "out" {
+                        off * 1440 + t1
+                    } else {
+                        off * 1440 + t2 - t1
+                    };
                     per.entry(idx).or_default().push((key, cnt));
                 }
             }
@@ -1377,14 +1392,16 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     for o in arr(&out_t["origins"]).iter() {
         for d in arr(&o["deps"]).iter() {
             rows_n += 1;
-            let s = scheds.get(int(&d[0]) as usize).map(&arr).unwrap_or_default();
+            let s = scheds.get(int(&d[0]) as usize).map(arr).unwrap_or_default();
             if s.is_empty() {
                 missing += 1;
                 continue;
             }
             // [t, fs, dep, ts, tc, arr, dur, stops, km]: boarding call at fs/dep,
             // `stops` calls after it, ending at ts
-            let p = s.iter().position(|r| int(&r[0]) == int(&d[1]) && int(&r[2]) == int(&d[2]));
+            let p = s
+                .iter()
+                .position(|r| int(&r[0]) == int(&d[1]) && int(&r[2]) == int(&d[2]));
             let fine = p.is_some_and(|p| (s.len() - 1 - p) as i64 == int(&d[7]))
                 && int(&s.last().unwrap()[0]) == int(&d[3]);
             if !fine {
@@ -1395,7 +1412,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     for o in arr(&in_t["origins"]).iter() {
         for a in arr(&o["arrs"]).iter() {
             rows_n += 1;
-            let s = scheds.get(int(&a[0]) as usize).map(&arr).unwrap_or_default();
+            let s = scheds.get(int(&a[0]) as usize).map(arr).unwrap_or_default();
             if s.is_empty() {
                 missing += 1;
                 continue;
@@ -1405,7 +1422,8 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
             let k = int(&a[7]) as usize;
             let fine = int(&s[0][0]) == int(&a[1])
                 && int(&s[0][2]) == int(&a[3])
-                && s.get(k).is_some_and(|r| int(&r[0]) == int(&a[4]) && int(&r[1]) == int(&a[5]));
+                && s.get(k)
+                    .is_some_and(|r| int(&r[0]) == int(&a[4]) && int(&r[1]) == int(&a[5]));
             if !fine {
                 mismatch += 1;
             }
@@ -1463,7 +1481,10 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
             g.insert(format!("chengdu_{k}"), v);
         }
     }
-    println!("AUDIT pack hard checks: {}", if ok { "PASS" } else { "FAIL" });
+    println!(
+        "AUDIT pack hard checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
     (ok, g)
 }
 
@@ -1479,7 +1500,11 @@ fn gate_goldens(path: &Path, cur: &BTreeMap<String, i64>, update: bool, partial:
     if update {
         let mut out = old.clone();
         for (k, v) in cur {
-            let class = if old["exact"].get(k).is_some() { "exact" } else { "max" };
+            let class = if old["exact"].get(k).is_some() {
+                "exact"
+            } else {
+                "max"
+            };
             out[class][k] = serde_json::json!(v);
         }
         fs::write(path, serde_json::to_string_pretty(&out).unwrap() + "\n").unwrap();
@@ -1500,9 +1525,15 @@ fn gate_goldens(path: &Path, cur: &BTreeMap<String, i64>, update: bool, partial:
             };
             if breach {
                 ok = false;
-                println!("AUDIT goldens BREACH {class} {k}: golden {want}, now {:?}", cur.get(k));
+                println!(
+                    "AUDIT goldens BREACH {class} {k}: golden {want}, now {:?}",
+                    cur.get(k)
+                );
             } else if cur[k] != want {
-                println!("AUDIT goldens improved {k}: {want} -> {} (rebase with --update-goldens)", cur[k]);
+                println!(
+                    "AUDIT goldens improved {k}: {want} -> {} (rebase with --update-goldens)",
+                    cur[k]
+                );
             }
         }
     }
@@ -1520,7 +1551,12 @@ fn run_goldens_gate(counters: &BTreeMap<String, i64>, partial: bool) -> bool {
         .find(|w| w[0] == "--goldens")
         .map(|w| PathBuf::from(&w[1]))
         .unwrap_or_else(|| PathBuf::from("goldens.json"));
-    gate_goldens(&goldens, counters, args.iter().any(|a| a == "--update-goldens"), partial)
+    gate_goldens(
+        &goldens,
+        counters,
+        args.iter().any(|a| a == "--update-goldens"),
+        partial,
+    )
 }
 
 fn main() {

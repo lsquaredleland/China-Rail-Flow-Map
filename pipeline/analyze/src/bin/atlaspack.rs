@@ -528,9 +528,15 @@ fn main() {
     by_name.push(("atlas-v2-out.json", json!({ "origins": out_origins })));
     by_name.push(("atlas-v2-in.json", json!({ "origins": in_origins })));
     by_name.push(("atlas-v2-out-map.json", json!({ "origins": out_map })));
-    by_name.push(("atlas-v2-out-tables.json", json!({ "fmt": 3, "origins": out_tables })));
+    by_name.push((
+        "atlas-v2-out-tables.json",
+        json!({ "fmt": 3, "origins": out_tables }),
+    ));
     by_name.push(("atlas-v2-in-map.json", json!({ "origins": in_map })));
-    by_name.push(("atlas-v2-in-tables.json", json!({ "fmt": 3, "origins": in_tables })));
+    by_name.push((
+        "atlas-v2-in-tables.json",
+        json!({ "fmt": 3, "origins": in_tables }),
+    ));
     by_name.push((
         "atlas-v2-schedules.json",
         json!({ "extra_stations": [], "schedules": get(&v1, "schedules") }),

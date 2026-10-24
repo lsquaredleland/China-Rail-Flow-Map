@@ -429,6 +429,8 @@ export interface DayTimelineVM {
   totalTrains: number;
   getDepartedCount: (tMins: number) => number;
   getArrivedCount: (tMins: number) => number;
+  /** The same timeline restricted to the trains in `codes` (a filtered view). */
+  subset: (codes: Set<string>) => DayTimelineVM;
 }
 
 export interface DistBinFilter {
@@ -448,8 +450,12 @@ export interface DurBinFilter {
 export interface OriginFilterCriteria {
   classes?: string[];
   hour?: number | null;
+  hours?: number[] | null;
   distBin?: DistBinFilter | null;
+  distBins?: DistBinFilter[] | null;
   durBin?: DurBinFilter | null;
+  durBins?: DurBinFilter[] | null;
+  trainCodes?: string[] | null;
   unit?: DistUnit;
 }
 

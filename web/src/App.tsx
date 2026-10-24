@@ -7,7 +7,9 @@ import type {
   DecodedOutline,
   DestVM,
   Direction,
+  DistBinFilter,
   DistUnit,
+  DurBinFilter,
   InMapData,
   InTablesData,
   OriginVM,
@@ -22,7 +24,7 @@ import {
   buildOrigin,
   classIndex,
   enName,
-  filterOriginByClasses,
+  filterOrigin,
   FLOW_CLASSES,
   prepAtlas,
   prepOutline,
@@ -250,6 +252,16 @@ export default function App() {
   // as long as the panel does.
   const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [selectedHours, setSelectedHours] = useState<number[]>([]);
+  const [selectedDistBin, setSelectedDistBin] =
+    useState<DistBinFilter | null>(null);
+  const [selectedDistBins, setSelectedDistBins] = useState<DistBinFilter[]>([]);
+  const [selectedDurBin, setSelectedDurBin] = useState<DurBinFilter | null>(
+    null,
+  );
+  const [selectedDurBins, setSelectedDurBins] = useState<DurBinFilter[]>([]);
+  const [selectedTrainCodes, setSelectedTrainCodes] = useState<string[]>([]);
   const [dark, setDarkState] = useState<boolean>(initialDark);
   const [showTimeline] = useState<boolean>(true);
   const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
@@ -479,8 +491,44 @@ export default function App() {
   );
 
   const viewCur: OriginVM | null = useMemo(
-    () => (cur ? filterOriginByClasses(cur, selectedClasses) : null),
-    [cur, selectedClasses],
+    () =>
+      cur
+        ? filterOrigin(cur, {
+            classes: selectedClasses,
+            hours:
+              selectedHours.length > 0
+                ? selectedHours
+                : selectedHour !== null
+                  ? [selectedHour]
+                  : [],
+            distBins:
+              selectedDistBins.length > 0
+                ? selectedDistBins
+                : selectedDistBin
+                  ? [selectedDistBin]
+                  : [],
+            durBins:
+              selectedDurBins.length > 0
+                ? selectedDurBins
+                : selectedDurBin
+                  ? [selectedDurBin]
+                  : [],
+            trainCodes: selectedTrainCodes,
+            unit: distUnit,
+          })
+        : null,
+    [
+      cur,
+      selectedClasses,
+      selectedHour,
+      selectedHours,
+      selectedDistBin,
+      selectedDistBins,
+      selectedDurBin,
+      selectedDurBins,
+      selectedTrainCodes,
+      distUnit,
+    ],
   );
 
   const selectedTrainVM = useMemo(() => {
@@ -624,8 +672,20 @@ export default function App() {
     w.__setDark = setDark;
   });
 
+  const clearFilters = () => {
+    setSelectedClasses([]);
+    setSelectedHour(null);
+    setSelectedHours([]);
+    setSelectedDistBin(null);
+    setSelectedDistBins([]);
+    setSelectedDurBin(null);
+    setSelectedDurBins([]);
+    setSelectedTrainCodes([]);
+  };
+
   const selectOrigin = (idx: number) => {
     setPanelCity(null);
+    clearFilters();
     setOriginIdx(idx);
     syncUrl(idx);
   };
@@ -691,6 +751,7 @@ export default function App() {
       ensureOutTables();
     }
     setPanelCity(null);
+    clearFilters();
     setDirectionState(d);
     try {
       if (window.localStorage) localStorage.setItem("crfa-direction", d);
@@ -794,65 +855,88 @@ export default function App() {
           <div className="stats" id="stats">
             {cur &&
               viewCur &&
-              (direction === "out" ? (
-                <>
-                  <div>
-                    <b>
-                      {(selectedClasses.length > 0 && outTablesReady
-                        ? viewCur.deps.length
-                        : cur.o.outbound
-                      ).toLocaleString("en-US")}
-                    </b>{" "}
-                    <span>
-                      {selectedClasses.length > 0
-                        ? selectedClasses
-                            .map((c) => (c === "plain" ? "普" : c))
-                            .join("/") +
-                          " trains Depart " +
-                          cur.en +
-                          " daily"
-                        : "trains Depart " + cur.en + " daily"}
-                    </span>
-                  </div>
-                  <div>
-                    <b>{viewCur.dests.length}</b>{" "}
-                    <span>cities with a direct connection</span>
-                  </div>
-                  <div>
-                    <b>{viewCur.maxFlow}</b>{" "}
-                    <span>trains/day on the busiest corridors</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <b>
-                      {(selectedClasses.length > 0 && inTablesReady
-                        ? viewCur.arrs.length
-                        : cur.o.inbound
-                      ).toLocaleString("en-US")}
-                    </b>{" "}
-                    <span>
-                      {selectedClasses.length > 0
-                        ? selectedClasses
-                            .map((c) => (c === "plain" ? "普" : c))
-                            .join("/") +
-                          " trains Arrive in " +
-                          cur.en +
-                          " daily"
-                        : "trains Arrive in " + cur.en + " daily"}
-                    </span>
-                  </div>
-                  <div>
-                    <b>{viewCur.srcs.length}</b>{" "}
-                    <span>cities with a direct connection</span>
-                  </div>
-                  <div>
-                    <b>{viewCur.maxInFlow}</b>{" "}
-                    <span>trains/day on the busiest corridors</span>
-                  </div>
-                </>
-              ))}
+              (() => {
+                const hasHistFilter =
+                  selectedHour !== null ||
+                  selectedHours.length > 0 ||
+                  selectedDistBin !== null ||
+                  selectedDistBins.length > 0 ||
+                  selectedDurBin !== null ||
+                  selectedDurBins.length > 0 ||
+                  selectedTrainCodes.length > 0;
+                const hasAnyFilter =
+                  selectedClasses.length > 0 || hasHistFilter;
+                const filterLabel =
+                  selectedTrainCodes.length > 0
+                    ? selectedTrainCodes.length === 1
+                      ? "train selected"
+                      : "trains selected"
+                    : "trains matching filter";
+
+                return direction === "out" ? (
+                  <>
+                    <div>
+                      <b>
+                        {(hasAnyFilter && outTablesReady
+                          ? viewCur.deps.length
+                          : cur.o.outbound
+                        ).toLocaleString("en-US")}
+                      </b>{" "}
+                      <span>
+                        {hasHistFilter
+                          ? filterLabel
+                          : selectedClasses.length > 0
+                            ? selectedClasses
+                                .map((c) => (c === "plain" ? "普" : c))
+                                .join("/") +
+                              " trains Depart " +
+                              cur.en +
+                              " daily"
+                            : "trains Depart " + cur.en + " daily"}
+                      </span>
+                    </div>
+                    <div>
+                      <b>{viewCur.dests.length}</b>{" "}
+                      <span>cities with a direct connection</span>
+                    </div>
+                    <div>
+                      <b>{viewCur.maxFlow}</b>{" "}
+                      <span>trains/day on the busiest corridors</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <b>
+                        {(hasAnyFilter && inTablesReady
+                          ? viewCur.arrs.length
+                          : cur.o.inbound
+                        ).toLocaleString("en-US")}
+                      </b>{" "}
+                      <span>
+                        {hasHistFilter
+                          ? filterLabel
+                          : selectedClasses.length > 0
+                            ? selectedClasses
+                                .map((c) => (c === "plain" ? "普" : c))
+                                .join("/") +
+                              " trains Arrive in " +
+                              cur.en +
+                              " daily"
+                            : "trains Arrive in " + cur.en + " daily"}
+                      </span>
+                    </div>
+                    <div>
+                      <b>{viewCur.srcs.length}</b>{" "}
+                      <span>cities with a direct connection</span>
+                    </div>
+                    <div>
+                      <b>{viewCur.maxInFlow}</b>{" "}
+                      <span>trains/day on the busiest corridors</span>
+                    </div>
+                  </>
+                );
+              })()}
           </div>
         </header>
 
@@ -1035,6 +1119,7 @@ export default function App() {
           atlas={atlas}
           outline={outline}
           showOutline={showOutline}
+          baseCur={cur}
           cur={viewCur}
           direction={direction}
           dark={dark}
@@ -1129,6 +1214,48 @@ export default function App() {
               </button>
             </div>
           )}
+          <ActiveFilterBar
+            classes={selectedClasses}
+            hours={
+              selectedHours.length > 0
+                ? selectedHours
+                : selectedHour !== null
+                  ? [selectedHour]
+                  : []
+            }
+            distBins={
+              selectedDistBins.length > 0
+                ? selectedDistBins
+                : selectedDistBin
+                  ? [selectedDistBin]
+                  : []
+            }
+            durBins={
+              selectedDurBins.length > 0
+                ? selectedDurBins
+                : selectedDurBin
+                  ? [selectedDurBin]
+                  : []
+            }
+            trainCodes={selectedTrainCodes}
+            onClearClass={(cls) =>
+              setSelectedClasses((prev) => prev.filter((c) => c !== cls))
+            }
+            onClearHours={() => {
+              setSelectedHours([]);
+              setSelectedHour(null);
+            }}
+            onClearDist={() => {
+              setSelectedDistBins([]);
+              setSelectedDistBin(null);
+            }}
+            onClearDur={() => {
+              setSelectedDurBins([]);
+              setSelectedDurBin(null);
+            }}
+            onClearTrains={() => setSelectedTrainCodes([])}
+            onClearAll={clearFilters}
+          />
           <DestinationPanel
             point={panelCity}
             direction={direction}
@@ -1227,11 +1354,28 @@ export default function App() {
         onSelectClasses={setSelectedClasses}
         outTablesReady={outTablesReady}
         inTablesReady={inTablesReady}
-        onClearFilter={closePanel}
+        onClearFilter={() => {
+          closePanel();
+          setSelectedTrainCodes([]);
+        }}
         onSelectTrain={setSelectedTrainCode}
         isolatedTrainCode={isolatedTrainCode}
         onClearTrainIsolation={() => setIsolatedTrainCode(null)}
         onSelectCity={(c) => handleSelectDest(c)}
+        selectedHour={selectedHour}
+        selectedHours={selectedHours}
+        onSelectHour={setSelectedHour}
+        onSelectHours={setSelectedHours}
+        selectedDistBin={selectedDistBin}
+        selectedDistBins={selectedDistBins}
+        onSelectDistBin={setSelectedDistBin}
+        onSelectDistBins={setSelectedDistBins}
+        selectedDurBin={selectedDurBin}
+        selectedDurBins={selectedDurBins}
+        onSelectDurBin={setSelectedDurBin}
+        onSelectDurBins={setSelectedDurBins}
+        selectedTrainCodes={selectedTrainCodes}
+        onSelectTrainCodes={setSelectedTrainCodes}
       />
 
       <footer id="pageFooter">
@@ -1262,5 +1406,139 @@ export default function App() {
         direction={direction}
       />
     </>
+  );
+}
+
+function pad2(n: number): string {
+  return n < 10 ? "0" + n : String(n);
+}
+
+function formatHoursLabel(hours: number[]): string {
+  if (hours.length === 0) return "";
+  if (hours.length === 1) {
+    const h = hours[0];
+    return `${pad2(h)}:00–${pad2(h + 1)}:00`;
+  }
+  const sorted = [...hours].sort((a, b) => a - b);
+  const isConsecutive = sorted.every(
+    (h, i) => i === 0 || h === sorted[i - 1] + 1,
+  );
+  if (isConsecutive) {
+    return `${pad2(sorted[0])}:00–${pad2(sorted[sorted.length - 1] + 1)}:00`;
+  }
+  return sorted.map((h) => `${pad2(h)}:00`).join(", ");
+}
+
+function ActiveFilterBar({
+  classes,
+  hours,
+  distBins,
+  durBins,
+  trainCodes,
+  onClearClass,
+  onClearHours,
+  onClearDist,
+  onClearDur,
+  onClearTrains,
+  onClearAll,
+}: {
+  classes: string[];
+  hours: number[];
+  distBins: DistBinFilter[];
+  durBins: DurBinFilter[];
+  trainCodes: string[];
+  onClearClass: (cls: string) => void;
+  onClearHours: () => void;
+  onClearDist: () => void;
+  onClearDur: () => void;
+  onClearTrains: () => void;
+  onClearAll: () => void;
+}) {
+  const hasAny =
+    classes.length > 0 ||
+    hours.length > 0 ||
+    distBins.length > 0 ||
+    durBins.length > 0 ||
+    trainCodes.length > 0;
+  if (!hasAny) return null;
+
+  return (
+    <div
+      className="active-filter-bar"
+      role="status"
+      aria-label="Active map and table filters"
+    >
+      <span className="filter-pill-label">Filtered:</span>
+      {classes.map((cls) => (
+        <span key={cls} className="filter-pill">
+          Class: {cls === "plain" ? "普" : cls}
+          <button
+            type="button"
+            aria-label={`Remove class ${cls} filter`}
+            onClick={() => onClearClass(cls)}
+          >
+            &times;
+          </button>
+        </span>
+      ))}
+      {trainCodes.length > 0 && (
+        <span className="filter-pill">
+          {trainCodes.length === 1
+            ? `Train: ${trainCodes[0]}`
+            : `Trains: ${trainCodes.length} selected`}
+          <button
+            type="button"
+            aria-label="Remove train selection"
+            onClick={onClearTrains}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      {hours.length > 0 && (
+        <span className="filter-pill">
+          {hours.length === 1 ? "Hour" : "Hours"}: {formatHoursLabel(hours)}
+          <button
+            type="button"
+            aria-label="Remove hour filter"
+            onClick={onClearHours}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      {distBins.length > 0 && (
+        <span className="filter-pill">
+          Dist: {distBins.map((b) => b.label).join(", ")}
+          <button
+            type="button"
+            aria-label="Remove distance filter"
+            onClick={onClearDist}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      {durBins.length > 0 && (
+        <span className="filter-pill">
+          Time: {durBins.map((b) => b.label).join(", ")}
+          <button
+            type="button"
+            aria-label="Remove duration filter"
+            onClick={onClearDur}
+          >
+            &times;
+          </button>
+        </span>
+      )}
+      <button
+        type="button"
+        className="filter-clear-all"
+        onClick={onClearAll}
+        title="Reset all filters"
+      >
+        Reset
+      </button>
+    </div>
   );
 }
