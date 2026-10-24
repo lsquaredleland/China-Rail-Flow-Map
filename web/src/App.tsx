@@ -1391,6 +1391,8 @@ export default function App() {
         onSelectClasses={setSelectedClasses}
         outTablesReady={outTablesReady}
         inTablesReady={inTablesReady}
+        atlas={atlas}
+        onSelectOrigin={selectOrigin}
         onClearFilter={() => {
           closePanel();
           setSelectedTrainCodes([]);

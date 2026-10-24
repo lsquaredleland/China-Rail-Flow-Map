@@ -49,6 +49,41 @@ export function enName(en: string): string {
   return EN_FIX[en] || en;
 }
 
+/** Train-table index of a raw dep/arr row. The one place that knows the
+    row layout, so a row-format change only touches this. */
+export function rowTrainIdx(row: readonly unknown[]): number {
+  return row[0] as number;
+}
+
+const trainOriginIndex = new WeakMap<object, Map<string, number[]>>();
+
+/** Train code (lowercased) -> origin indices whose dep rows (outbound) or
+    arr rows (inbound) include it. Built once per atlas and direction; call
+    only after that direction's tables have loaded. */
+export function trainOrigins(
+  atlas: DecodedAtlas,
+  dir: "out" | "in",
+): Map<string, number[]> {
+  const key = dir === "out" ? atlas.data.origins : atlas.data.train_table;
+  const cached = trainOriginIndex.get(key);
+  if (cached) return cached;
+  const m = new Map<string, number[]>();
+  atlas.data.origins.forEach((o, oi) => {
+    const seen = new Set<number>();
+    for (const row of (dir === "out" ? o.deps : o.arrs) || []) {
+      const t = rowTrainIdx(row);
+      if (seen.has(t)) continue;
+      seen.add(t);
+      const code = atlas.data.train_table[t].code.toLowerCase();
+      const l = m.get(code);
+      if (l) l.push(oi);
+      else m.set(code, [oi]);
+    }
+  });
+  trainOriginIndex.set(key, m);
+  return m;
+}
+
 export function esc(s: string): string {
   return String(s)
     .replace(/&/g, "&amp;")
