@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   ArrVM,
+  DecodedAtlas,
   CityPointVM,
   DepVM,
   DestVM,
@@ -9,7 +10,14 @@ import type {
   OriginVM,
   SrcVM,
 } from "../types";
-import { classIndex, FLOW_CLASSES, fmtDist, fmtTime } from "../lib";
+import {
+  classIndex,
+  enName,
+  FLOW_CLASSES,
+  fmtDist,
+  fmtTime,
+  trainOrigins,
+} from "../lib";
 import Histograms, {
   type DistBinFilter,
   type DurBinFilter,
@@ -30,6 +38,10 @@ interface Props {
   outTablesReady: boolean;
   inTablesReady: boolean;
   onClearFilter: () => void;
+  /** Loaded atlas and the origin picker's callback; used only to point a
+      train-code search at the origins that train actually serves. */
+  atlas?: DecodedAtlas | null;
+  onSelectOrigin?: (idx: number) => void;
   onSelectTrain?: (code: string) => void;
   isolatedTrainCode?: string | null;
   onClearTrainIsolation?: () => void;
@@ -215,6 +227,8 @@ export default function DeparturesTable({
   outTablesReady,
   inTablesReady,
   onClearFilter,
+  atlas,
+  onSelectOrigin,
   onSelectTrain,
   isolatedTrainCode,
   onClearTrainIsolation,
@@ -562,6 +576,56 @@ export default function DeparturesTable({
       </section>
     );
   }
+
+  /* Empty-state text. A train-code search with no rows here points at the
+     origins that train does serve; picking one keeps the query. */
+  const emptyMsg = (): ReactNode => {
+    const plain = "No trains match that filter.";
+    const tablesLoaded = direction === "out" ? outTablesReady : inTablesReady;
+    const code = query.trim().toLowerCase();
+    if (!atlas || !cur || !tablesLoaded || !/^[gdcsztk]?\d{1,5}$/.test(code)) {
+      return plain;
+    }
+    const idx = trainOrigins(atlas, direction);
+    const origins = atlas.data.origins;
+    const here = enName(cur.o.en) + " · " + cur.o.zh;
+    const cities = (list: number[]) =>
+      list.map((oi, i) => (
+        <span key={oi}>
+          {i > 0 ? " · " : ""}
+          <button
+            type="button"
+            className="linklike"
+            onClick={() => onSelectOrigin?.(oi)}
+          >
+            {enName(origins[oi].en)} &middot; {origins[oi].zh}
+          </button>
+        </span>
+      ));
+    const exact = idx.get(code);
+    if (exact) {
+      const label = code.toUpperCase();
+      return (
+        <>
+          {label} doesn&rsquo;t {direction === "out" ? "depart from" : "arrive in"}{" "}
+          {here} &mdash; it {direction === "out" ? "departs from" : "arrives in"}:{" "}
+          {cities(exact)}
+        </>
+      );
+    }
+    const near = [...idx.keys()].filter((c) => c.startsWith(code)).sort().slice(0, 8);
+    if (near.length === 0) return plain;
+    return (
+      <>
+        {plain} Similar codes:
+        {near.map((c) => (
+          <div key={c}>
+            {c.toUpperCase()}: {cities(idx.get(c)!.slice(0, 8))}
+          </div>
+        ))}
+      </>
+    );
+  };
 
   let heading: ReactNode;
   let depNote: ReactNode;
@@ -1156,7 +1220,7 @@ export default function DeparturesTable({
           {list.length === 0 ? (
             <tr>
               <td colSpan={7} className="dep-empty">
-                No trains match that filter.
+                {emptyMsg()}
               </td>
             </tr>
           ) : (
@@ -1324,7 +1388,7 @@ export default function DeparturesTable({
           {!cur ? null : list.length === 0 ? (
             <tr>
               <td colSpan={8} className="dep-empty">
-                No trains match that filter.
+                {emptyMsg()}
               </td>
             </tr>
           ) : (
