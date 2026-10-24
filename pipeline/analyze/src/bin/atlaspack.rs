@@ -10,7 +10,7 @@
 //! - All polyline geometry is re-encoded at 1e4 precision (~11 m) instead of
 //!   1e5; the sections were already simplified/rounded near that scale.
 //!
-//! Per-train paths (`fmt: 3`, on out-tables / in-tables):
+//! Per-train paths (`fmt: 4`, on out-tables / in-tables; 4 = 3 + `dep_stop_pos`):
 //! - `dep_secs` / `arr_secs` list each train's sections in TRAVEL order
 //!   (outbound: from this origin onward; inbound: from the train's first
 //!   stop to its arrival here); a section repeats when the train runs back
@@ -32,6 +32,12 @@
 //!   entries k-1 and k), so entry s0-1 and entry s1 are the neighbours on
 //!   either side; s0 == s1 means the leg produced no entries and the gap is
 //!   the single join s0 (between entries s0-1 and s0).
+//! - `dep_stop_pos`: per dep row, one entry per stop after boarding, in
+//!   stop order: the number of dep_secs entries before that stop (the stop
+//!   sits at the start of entry `pos`; the terminus has pos == path length).
+//!   Station level, unlike the city calls (first station per city only).
+//!   The stops are `schedules[t][len - stops ..]` (`stops` = the dep row's
+//!   stop count), which give their stations and times.
 //!
 //! Schedules (`atlas-v2-schedules.json`, generated, not hand-committed):
 //! `schedules[t]` (t = train_table index) is the train's full stop list,
@@ -213,6 +219,7 @@ fn pack_origin(o: &Value) -> Value {
         "arrs": arr(get(o, "arrs")).iter().map(pack_arr).collect::<Vec<_>>(),
         "dep_secs": get(o, "dep_secs"),
         "dep_chord_legs": get(o, "dep_chord_legs"),
+        "dep_stop_pos": get(o, "dep_stop_pos"),
         "arr_secs": get(o, "arr_secs"),
         "arr_chord_legs": get(o, "arr_chord_legs"),
     })
@@ -337,6 +344,7 @@ fn verify(v1: &Value, v2: &Value) -> Result<(), String> {
             "in_flows",
             "dep_secs",
             "dep_chord_legs",
+            "dep_stop_pos",
             "arr_secs",
             "arr_chord_legs",
         ] {
@@ -495,7 +503,18 @@ fn main() {
         .collect();
     let out_tables: Vec<Value> = origins
         .iter()
-        .map(|o| pick(o, &["deps", "calls", "dep_secs", "dep_chord_legs"]))
+        .map(|o| {
+            pick(
+                o,
+                &[
+                    "deps",
+                    "calls",
+                    "dep_secs",
+                    "dep_chord_legs",
+                    "dep_stop_pos",
+                ],
+            )
+        })
         .collect();
     let in_map: Vec<Value> = origins
         .iter()
@@ -530,12 +549,12 @@ fn main() {
     by_name.push(("atlas-v2-out-map.json", json!({ "origins": out_map })));
     by_name.push((
         "atlas-v2-out-tables.json",
-        json!({ "fmt": 3, "origins": out_tables }),
+        json!({ "fmt": 4, "origins": out_tables }),
     ));
     by_name.push(("atlas-v2-in-map.json", json!({ "origins": in_map })));
     by_name.push((
         "atlas-v2-in-tables.json",
-        json!({ "fmt": 3, "origins": in_tables }),
+        json!({ "fmt": 4, "origins": in_tables }),
     ));
     by_name.push((
         "atlas-v2-schedules.json",

@@ -98,6 +98,7 @@ export interface RawOrigin {
   deps?: RawDep[];
   dep_secs?: number[][]; // travel order; ~s = section walked in reverse
   dep_chord_legs?: ChordLeg[][];
+  dep_stop_pos?: number[][]; // per dep row: path position of each stop after boarding
   inbound: number;
   srcs?: RawSrc[];
   in_calls?: RawInCall[][]; // parallel to srcs: in_calls[i] = trains arriving from srcs[i]'s city
@@ -132,6 +133,8 @@ export interface OutTablesOrigin {
   calls: RawCall[][];
   dep_secs: number[][];
   dep_chord_legs: ChordLeg[][];
+  /** Per dep row: path position of every stop after boarding (fmt 4). */
+  dep_stop_pos: number[][];
 }
 
 /** atlas-v2-out-tables.json: origins parallel by index. */
@@ -202,6 +205,8 @@ export interface DecodedAtlas {
   inSec: DecodedSet;
   net: DecodedSet;
   extent: Extent;
+  /** schedules[t] once the schedules asset has loaded (station-level dwells). */
+  schedules?: SchedulesData["schedules"];
 }
 
 export type AtlasVM = DecodedAtlas;
@@ -280,6 +285,7 @@ export interface DepVM {
   secRevs: Uint8Array; // 1 where the section is walked end to start
   t: number; // train_table index (keys the schedules file)
   chordLegs: ChordLeg[];
+  stopPos: number[]; // path position of each stop after boarding (dep_stop_pos)
 }
 
 /** One train calling at a destination city, joined to its departure row. */

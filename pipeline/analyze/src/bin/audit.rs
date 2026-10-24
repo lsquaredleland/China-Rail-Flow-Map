@@ -1236,7 +1236,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     for (name, t) in [("out-tables", &out_t), ("in-tables", &in_t)] {
         let fmt = t.get("fmt").and_then(Value::as_i64);
         println!("AUDIT pack {name} fmt: {fmt:?}");
-        ok &= fmt == Some(3);
+        ok &= fmt == Some(4);
     }
     let ends = |key: &str| -> Vec<([f64; 2], [f64; 2])> {
         arr(&shared[key])
@@ -1434,7 +1434,87 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         scheds.len()
     );
     ok &= extra == 0 && bad_idx == 0 && missing == 0 && mismatch == 0;
+    // ---- station-level stops (dep_stop_pos): one position per schedule
+    // stop after boarding, monotone, ending at the path end; and every city
+    // call is one of those stops (same arrival minute, same position) ----
+    let (mut st_total, mut st_bad, mut st_time_back, mut st_rows_extra) = (0i64, 0i64, 0i64, 0i64);
+    let mut call_miss = 0i64;
+    for o in arr(&out_t["origins"]).iter() {
+        let pos_all = arr(&o["dep_stop_pos"]);
+        // per dep row: (arrival minute in the calls' frame, path position)
+        let mut stops_of: Vec<Vec<(i64, i64)>> = Vec::new();
+        for (di, d) in arr(&o["deps"]).iter().enumerate() {
+            let pos: Vec<i64> = arr(&pos_all[di]).iter().map(int).collect();
+            let len = arr(&o["dep_secs"][di]).len() as i64;
+            let sch: Vec<Vec<i64>> = scheds
+                .get(int(&d[0]) as usize)
+                .map(arr)
+                .unwrap_or_default()
+                .iter()
+                .map(|r| arr(r).iter().take(4).map(int).collect())
+                .collect();
+            st_total += pos.len() as i64;
+            let b = sch.len() as i64 - 1 - int(&d[7]);
+            let fine = b >= 0
+                && pos.len() as i64 == int(&d[7])
+                && pos.windows(2).all(|w| w[0] <= w[1])
+                && pos.last() == Some(&len);
+            if !fine {
+                st_bad += 1;
+                stops_of.push(Vec::new());
+                continue;
+            }
+            // schedule minutes (origin-day frame) -> the calls' frame
+            let rb = &sch[b as usize];
+            let mut dep_b = rb[3] * 1440 + rb[2];
+            if rb[1] >= 0 && rb[2] < rb[1] {
+                dep_b += 1440;
+            }
+            let rel = |day: i64, m: i64| day * 1440 + m - dep_b + int(&d[2]);
+            let mut times: Vec<i64> = Vec::new();
+            let mut row: Vec<(i64, i64)> = Vec::new();
+            for (i, p) in pos.iter().enumerate() {
+                let r = &sch[b as usize + 1 + i];
+                let a = rel(r[3], r[1]);
+                times.push(a);
+                if r[2] >= 0 && i + 1 < pos.len() {
+                    times.push(rel(r[3] + i64::from(r[2] < r[1]), r[2]));
+                }
+                row.push((a, *p));
+            }
+            if times.windows(2).any(|w| w[1] < w[0]) {
+                st_time_back += 1;
+            }
+            stops_of.push(row);
+        }
+        let mut n_calls: HashMap<usize, usize> = HashMap::new();
+        for cell in arr(&o["calls"]).iter() {
+            for r in arr(cell).iter() {
+                let di = int(&r[0]) as usize;
+                *n_calls.entry(di).or_default() += 1;
+                let arr_t = int(&r[3]) * 1440 + int(&r[1]);
+                if !stops_of[di]
+                    .iter()
+                    .any(|&(a, p)| a == arr_t && p == int(&r[5]))
+                {
+                    call_miss += 1;
+                }
+            }
+        }
+        for (di, s) in stops_of.iter().enumerate() {
+            if s.len() > n_calls.get(&di).copied().unwrap_or(0) {
+                st_rows_extra += 1;
+            }
+        }
+    }
+    println!(
+        "AUDIT pack dep_stop_pos: {st_total} station stops; {st_bad} rows inconsistent (count/order/path end), {st_time_back} with times going back, {call_miss} city calls not matching a stop; {st_rows_extra} dep rows have stations without a city call"
+    );
+    ok &= st_bad == 0 && call_miss == 0;
     let mut g: BTreeMap<String, i64> = BTreeMap::new();
+    g.insert("dep_stops_total".into(), st_total);
+    g.insert("dep_rows_with_uncalled_stations".into(), st_rows_extra);
+    g.insert("dep_stops_time_regressions".into(), st_time_back);
     let n = |v: &Value| arr(v).len() as i64;
     g.insert("origins".into(), n(&out_map["origins"]));
     g.insert("sections".into(), n(&shared["sections"]));
