@@ -82,14 +82,14 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
   // Un-rendered transient state kept in refs for 60fps direct-DOM execution
   const currentPlayingRef = useRef(false);
-  const currentTimeRef = useRef(0);
-  const currentSpeedRef = useRef(15);
+  const currentTimeRef = useRef(360);
+  const currentSpeedRef = useRef(30);
   const totalMinsRef = useRef(1440);
   const totalDaysRef = useRef(1);
 
   // Minimal React state — only toggled on user interactions or discrete state flips
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(15);
+  const [speed, setSpeed] = useState(30);
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   // Subscribe to MapCanvas animation ticks with direct DOM updates (0% React re-render overhead)
@@ -315,9 +315,10 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
   const handleExpand = () => {
     setIsCollapsed(false);
-    currentTimeRef.current = 0;
+    currentTimeRef.current = 360;
     mapRef.current?.setAnimEnabled?.(true);
-    mapRef.current?.setTime?.(0);
+    mapRef.current?.setSpeed?.(30);
+    mapRef.current?.setTime?.(360);
     mapRef.current?.setPlaying?.(true);
   };
 

@@ -163,7 +163,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       dir: Direction;
       counts: Map<number, number> | null;
     } | null,
-    animTime: 1440,
+    animTime: 360,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: false,

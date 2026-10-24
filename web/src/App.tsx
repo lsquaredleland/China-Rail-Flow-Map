@@ -1139,7 +1139,8 @@ export default function App() {
                 onClick={() => {
                   setIsTimelineCollapsed(false);
                   mapRef.current?.setAnimEnabled?.(true);
-                  mapRef.current?.setTime?.(0);
+                  mapRef.current?.setSpeed?.(30);
+                  mapRef.current?.setTime?.(360);
                   mapRef.current?.setPlaying?.(true);
                 }}
                 style={{
