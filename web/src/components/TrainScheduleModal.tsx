@@ -5,6 +5,7 @@ import { formatScheduleStops } from "../lib";
 
 interface Props {
   code: string | null;
+  trainT: number | null; // train_table index; keys the schedules file
   onClose: () => void;
   schedulesData: SchedulesData | null;
   stationTable: { zh: string; en: string }[];
@@ -35,6 +36,7 @@ function fmtStName(zh: string, en?: string): string {
 
 export default function TrainScheduleModal({
   code,
+  trainT,
   onClose,
   schedulesData,
   stationTable,
@@ -48,6 +50,7 @@ export default function TrainScheduleModal({
   mapRef,
   originCityZh,
   originCityEn,
+  direction,
 }: Props) {
   const [minimized, setMinimized] = useState(false);
   const [liveTime, setLiveTime] = useState<number>(() => currentTime ?? 360);
@@ -70,9 +73,9 @@ export default function TrainScheduleModal({
   }, [onClose]);
 
   const stops = useMemo(() => {
-    if (!code || !schedulesData) return null;
-    return formatScheduleStops(schedulesData, stationTable, code);
-  }, [code, schedulesData, stationTable]);
+    if (!code || trainT === null || !schedulesData) return null;
+    return formatScheduleStops(schedulesData, stationTable, trainT);
+  }, [code, trainT, schedulesData, stationTable]);
 
   // Identify the station corresponding to the currently selected city (e.g. Guangzhou, Wuhan, Beijing)
   const originStationZh = trainVM
@@ -151,8 +154,7 @@ export default function TrainScheduleModal({
     let timeShift = 0;
     if (anchorIdx >= 0 && trainVM) {
       const anchor = unrolled[anchorIdx];
-      const isArrVM =
-        (trainVM as any).depMins === undefined && (trainVM as any).arrMins !== undefined;
+      const isArrVM = "fcIdx" in trainVM;
       if (isArrVM && anchor.unrolledArr >= 0) {
         timeShift = (trainVM as any).arrMins - anchor.unrolledArr;
       } else if (anchor.unrolledDep >= 0) {
@@ -470,7 +472,7 @@ export default function TrainScheduleModal({
           }}
         >
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            {onToggleIsolate && (
+            {direction !== "in" && onToggleIsolate && (
               <button
                 type="button"
                 onClick={() => onToggleIsolate(code)}
@@ -492,7 +494,7 @@ export default function TrainScheduleModal({
               </button>
             )}
 
-            {trainVM && onJumpToTime && (
+            {direction !== "in" && trainVM && onJumpToTime && (
               <button
                 type="button"
                 onClick={() => onJumpToTime(trainVM.depMins)}
@@ -551,7 +553,7 @@ export default function TrainScheduleModal({
         </div>
 
         {/* Live Journey Progress Track */}
-        {alignedStops && alignedStops.length > 0 && (
+        {direction !== "in" && alignedStops && alignedStops.length > 0 && (
           <div
             style={{
               padding: "10px 20px 12px 20px",

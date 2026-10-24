@@ -57,6 +57,15 @@ const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
 const OUTLINE_URL = "assets/china-outline.json";
+// Tables carry travel-ordered, oriented section paths (fmt 3); older packs
+// would draw wrong, so refuse them outright.
+function requireFmt3(fmt: unknown, url: string) {
+  if (fmt === 3) return;
+  const msg = `${url}: unsupported tables format ${String(fmt)} (need fmt 3); rebuild the data pack`;
+  console.error(msg);
+  throw new Error(msg);
+}
+
 const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
 
 // The v2 files carry no `about` blurb (v1 embedded one in the data);
@@ -330,12 +339,14 @@ export default function App() {
     flightsRef.current.outTables = true;
     fetchData<OutTablesData>(OUT_TABLES_URL)
       .then((d) => {
+        requireFmt3(d.fmt, OUT_TABLES_URL);
         outTablesRef.current = d;
         flightsRef.current.outTables = false;
         applyOutTables();
       })
-      .catch(() => {
+      .catch((err: Error) => {
         flightsRef.current.outTables = false;
+        setLoadError(err.message);
       });
   };
   const ensureInTables = () => {
@@ -347,12 +358,14 @@ export default function App() {
     flightsRef.current.inTables = true;
     fetchData<InTablesData>(IN_TABLES_URL)
       .then((d) => {
+        requireFmt3(d.fmt, IN_TABLES_URL);
         inTablesRef.current = d;
         flightsRef.current.inTables = false;
         applyInTables();
       })
-      .catch(() => {
+      .catch((err: Error) => {
         flightsRef.current.inTables = false;
+        setLoadError(err.message);
       });
   };
   // Phase 3 for inbound: the map file first (paint), and only once it
@@ -674,10 +687,6 @@ export default function App() {
     if (d === direction) return;
     if (d === "in") {
       ensureInMap();
-      setIsTimelineCollapsed(true);
-      setIsolatedTrainCode(null);
-      mapRef.current?.setPlaying?.(false);
-      mapRef.current?.setAnimEnabled?.(false);
     } else {
       ensureOutTables();
     }
@@ -1233,6 +1242,7 @@ export default function App() {
 
       <TrainScheduleModal
         code={selectedTrainCode}
+        trainT={selectedTrainVM ? selectedTrainVM.t : null}
         onClose={() => setSelectedTrainCode(null)}
         schedulesData={schedulesData}
         stationTable={atlas ? atlas.data.station_table : []}

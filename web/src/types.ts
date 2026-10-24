@@ -96,13 +96,15 @@ export interface RawOrigin {
   flows: RawFlow[];
   chords: RawChord[];
   deps?: RawDep[];
-  dep_secs?: number[][];
+  dep_secs?: number[][]; // travel order; ~s = section walked in reverse
+  dep_chord_legs?: ChordLeg[][];
   inbound: number;
   srcs?: RawSrc[];
   in_calls?: RawInCall[][]; // parallel to srcs: in_calls[i] = trains arriving from srcs[i]'s city
   in_flows?: RawFlow[]; // [index into in_sections, trains/day]
   arrs?: RawArr[];
   arr_secs?: number[][];
+  arr_chord_legs?: ChordLeg[][];
 }
 
 /** atlas-v2-shared.json: the tables and geometry every origin shares. */
@@ -121,15 +123,20 @@ export interface OutMapData {
   origins: RawOrigin[];
 }
 
+/** A leg with no track geometry: [stop index, first section, last section]. */
+export type ChordLeg = [number, number, number];
+
 /** One origin's entry in atlas-v2-out-tables.json. */
 export interface OutTablesOrigin {
   deps: RawDep[];
   calls: RawCall[][];
   dep_secs: number[][];
+  dep_chord_legs: ChordLeg[][];
 }
 
 /** atlas-v2-out-tables.json: origins parallel by index. */
 export interface OutTablesData {
+  fmt: number;
   origins: OutTablesOrigin[];
 }
 
@@ -149,10 +156,12 @@ export interface InTablesOrigin {
   arrs: RawArr[];
   in_calls: RawInCall[][];
   arr_secs: number[][];
+  arr_chord_legs: ChordLeg[][];
 }
 
 /** atlas-v2-in-tables.json: origins parallel by index. */
 export interface InTablesData {
+  fmt: number;
   origins: InTablesOrigin[];
 }
 
@@ -267,11 +276,10 @@ export interface DepVM {
   km: number; // rail journey distance to the final stop, -1 when unrouted
   distKm: number; // journey distance for binning: km when routed, else crow-flies origin → terminus city
   hay: string; // lowercase search haystack
-  secs: number[]; // section indices traversed by this train
-  rawSecs?: number[];
-  secStarts?: Float64Array;
-  secRevs?: Uint8Array;
-  totalDist?: number;
+  secs: number[]; // section ids traversed by this train, in travel order
+  secRevs: Uint8Array; // 1 where the section is walked end to start
+  t: number; // train_table index (keys the schedules file)
+  chordLegs: ChordLeg[];
 }
 
 /** One train calling at a destination city, joined to its departure row. */
@@ -307,10 +315,10 @@ export interface ArrVM {
   km: number; // rail journey km from the origin; -1 when unknown
   distKm: number; // journey distance for binning: km when known, else crow-flies source city → selected city
   hay: string; // lowercase search haystack
-  secs: number[]; // section indices traversed by this train (in reverse: arrival to origin)
-  secStarts?: Float64Array;
-  secRevs?: Uint8Array;
-  totalDist?: number;
+  secs: number[]; // section ids traversed by this train, in travel order
+  secRevs: Uint8Array; // 1 where the section is walked end to start
+  t: number; // train_table index (keys the schedules file)
+  chordLegs: ChordLeg[];
 }
 
 /** One train arriving from a source city, joined to its arrival row. */
@@ -349,6 +357,7 @@ export interface ActiveTrainVM {
   dwellDetail?: string;
   speedFrac?: number;
   curDist?: number;
+  onChord?: boolean; // on a leg with no track geometry (straight-line stand-in)
 }
 
 export interface ScheduleStop {
@@ -366,7 +375,7 @@ export interface ScheduleStop {
 
 export interface SchedulesData {
   extra_stations: string[];
-  schedules: Record<string, [number, number, number, number, number?][]>;
+  schedules: [number, number, number, number, number?][][]; // indexed by train_table index
 }
 
 export interface PrepTrainStop {
@@ -376,6 +385,16 @@ export interface PrepTrainStop {
   depMins: number | null;
   dist: number;
   isTerm: boolean;
+}
+
+/** A stretch of a train's route with no track geometry, drawn as a straight line. */
+export interface ChordSpan {
+  d0: number; // route distance where the span starts
+  d1: number; // route distance where it ends
+  lon0: number;
+  lat0: number;
+  lon1: number;
+  lat1: number;
 }
 
 export interface PrepTrain {
@@ -395,6 +414,7 @@ export interface PrepTrain {
   secStarts: Float64Array;
   secRevs: Uint8Array;
   stops?: PrepTrainStop[];
+  chordSpans?: ChordSpan[];
 }
 
 export interface DayTimelineVM {
@@ -446,7 +466,6 @@ export interface OriginVM {
   arrs: ArrVM[];
   maxInFlow: number;
   timeline?: DayTimelineVM;
-  inTimeline?: DayTimelineVM;
 }
 
 export type DistUnit = "km" | "mi";

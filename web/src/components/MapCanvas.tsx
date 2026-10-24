@@ -14,6 +14,7 @@ import type {
   DecodedAtlas,
   DecodedOutline,
   DecodedSet,
+  DayTimelineVM,
   DestVM,
   Direction,
   DistUnit,
@@ -21,6 +22,7 @@ import type {
   Hit,
   OriginVM,
   Palette,
+  PrepTrain,
   SrcVM,
 } from "../types";
 import {
@@ -33,6 +35,7 @@ import {
   stationLabel,
   stationR,
   stationRowsHtml,
+  trainDistAt,
 } from "../lib";
 import type { LegendHandle } from "./Legend";
 
@@ -163,6 +166,19 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       dir: Direction;
       counts: Map<number, number> | null;
     } | null,
+    activeDestCache: null as {
+      cur: OriginVM;
+      dest: CityPointVM;
+      items: { pt: PrepTrain; entries: { sec: number; pos: number }[] }[];
+    } | null,
+    selCache: null as {
+      cur: OriginVM;
+      panelDest: CityPointVM | null;
+      iso: string | null;
+      dir: Direction;
+      allowedCodes: Set<string> | null;
+      cityTimes: Map<number, number[]>;
+    } | null,
     animTime: 360,
     animPlaying: false,
     animSpeed: 30,
@@ -190,6 +206,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const cur = P.current.cur;
     if (!cur) return [];
     return P.current.direction === "out" ? cur.flows : cur.inFlows;
+  };
+  // Inbound has no timeline: the animation is outbound-only.
+  const activeTimeline = (): DayTimelineVM | undefined => {
+    const cur = P.current.cur;
+    return cur && P.current.direction === "out" ? cur.timeline : undefined;
   };
   const flowsSet = (): DecodedSet | null => {
     const atlas = P.current.atlas;
@@ -592,7 +613,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           if (!c.dep || !c.dep.secs) continue;
           const secs = c.dep.secs;
           const lim = Math.min(secs.length, c.secCnt);
+          const seen = new Set<number>();
           for (let k = 0; k < lim; k++) {
+            if (seen.has(secs[k])) continue;
+            seen.add(secs[k]);
             secCounts.set(secs[k], (secCounts.get(secs[k]) || 0) + 1);
           }
         }
@@ -609,7 +633,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           if (!c.arr || !c.arr.secs) continue;
           const secs = c.arr.secs;
           const startK = Math.max(0, secs.length - c.secCnt);
+          const seen = new Set<number>();
           for (let k = startK; k < secs.length; k++) {
+            if (seen.has(secs[k])) continue;
+            seen.add(secs[k]);
             secCounts.set(secs[k], (secCounts.get(secs[k]) || 0) + 1);
           }
         }
@@ -625,53 +652,39 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const counts = new Map<number, number>();
     const cur = P.current.cur;
     const dest = P.current.panelDest;
-    if (!dest || !cur) return counts;
+    const tl = activeTimeline();
+    if (!dest || !cur || !tl || P.current.direction !== "out") return counts;
 
-    if (P.current.direction === "out") {
-      const d = dest as DestVM;
-      const calls = d.calls || [];
+    // Per-selection: each call's sections (once each, first entry) with their
+    // route position on the train's PrepTrain, so the frame loop only calls
+    // trainDistAt and compares distances.
+    const st = S.current;
+    if (!st.activeDestCache || st.activeDestCache.cur !== cur || st.activeDestCache.dest !== dest) {
+      const items: NonNullable<typeof st.activeDestCache>["items"] = [];
+      const calls = (dest as DestVM).calls || [];
       for (let i = 0; i < calls.length; i++) {
         const c = calls[i];
         const dep = c.dep;
-        if (!dep || !dep.secs) continue;
-        const lim = Math.min(dep.secs.length, c.secCnt);
-        const totalDist = dep.totalDist || 1;
-        const dur = dep.dur > 0 ? dep.dur : 1;
-        const depMins = dep.depMins >= 0 ? dep.depMins : 0;
-        const secStarts = dep.secStarts;
-
+        if (!dep) continue;
+        const pt = tl.getPrepTrain(dep.code);
+        if (!pt) continue;
+        const lim = Math.min(pt.secs.length, c.secCnt);
+        const seen = new Set<number>();
+        const entries: { sec: number; pos: number }[] = [];
         for (let k = 0; k < lim; k++) {
-          const distBefore = secStarts ? secStarts[k] : (k / lim) * totalDist;
-          const frac = distBefore / totalDist;
-          const tEnter = depMins + frac * dur;
-          if (tMins >= tEnter) {
-            const s = dep.secs[k];
-            counts.set(s, (counts.get(s) || 0) + 1);
-          }
+          if (seen.has(pt.secs[k])) continue;
+          seen.add(pt.secs[k]);
+          entries.push({ sec: pt.secs[k], pos: pt.secStarts[k] });
         }
+        items.push({ pt, entries });
       }
-    } else {
-      const s = dest as SrcVM;
-      const inCalls = s.inCalls || [];
-      for (let i = 0; i < inCalls.length; i++) {
-        const c = inCalls[i];
-        const arr = c.arr;
-        if (!arr || !arr.secs) continue;
-        const startK = Math.max(0, arr.secs.length - c.secCnt);
-        const totalDist = arr.totalDist || 1;
-        const dur = arr.dur > 0 ? arr.dur : 1;
-        const depMins = arr.depMins >= 0 ? arr.depMins : 0;
-        const secStarts = arr.secStarts;
-
-        for (let k = startK; k < arr.secs.length; k++) {
-          const distBefore = secStarts ? secStarts[k] : (k / arr.secs.length) * totalDist;
-          const frac = distBefore / totalDist;
-          const tEnter = depMins + frac * dur;
-          if (tMins >= tEnter) {
-            const secId = arr.secs[k];
-            counts.set(secId, (counts.get(secId) || 0) + 1);
-          }
-        }
+      st.activeDestCache = { cur, dest, items };
+    }
+    for (const it of st.activeDestCache.items) {
+      const d = trainDistAt(it.pt, tMins);
+      for (const e of it.entries) {
+        if (e.pos > d) break;
+        counts.set(e.sec, (counts.get(e.sec) || 0) + 1);
       }
     }
     return counts;
@@ -694,8 +707,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const flows = flowsList();
     const maxN = P.current.direction === "out" ? cur.maxFlow : cur.maxInFlow;
 
-    const timeline =
-      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const timeline = activeTimeline();
     const isAnimated = S.current.animEnabled && !!timeline;
     const step = isAnimated && timeline
       ? Math.min(
@@ -814,7 +826,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           (t) => t.code === isolatedCode,
         )
       : null;
-    const isoSecs = isoTrain ? isoTrain.secs : null;
+    const isoPt = isoTrain ? timeline?.getPrepTrain(isoTrain.code) : undefined;
+    const isoSecs = isoTrain ? (isoPt ? isoPt.secs : isoTrain.secs) : null;
 
     if (isoTrain) {
       // Pass 1: faded ambient flows across the network
@@ -837,8 +850,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const isProgressive = isAnimated && timeline && animTime < timeline.totalMins;
 
       if (isoSecs && isoSecs.length > 0) {
-        const pt = timeline?.getPrepTrain ? timeline.getPrepTrain(isoTrain.code) : null;
-        const ptSecRevs = pt?.secRevs ?? isoTrain.secRevs;
+        const ptSecRevs = isoPt?.secRevs;
         if (!isProgressive || animTime >= arrMins) {
           ctx.beginPath();
           for (let i = 0; i < isoSecs.length; i++) {
@@ -850,12 +862,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
           const curTr = timeline.getActiveTrains(animTime).find(
             (t) => t.code === isoTrain.code,
           );
-          const totalDist = isoTrain.totalDist || 1;
+          const totalDist = isoPt?.totalDist || 1;
           const targetDist =
             curTr && curTr.curDist !== undefined
               ? curTr.curDist
               : Math.min(1.0, Math.max(0.0, (animTime - depMins) / dur)) * totalDist;
-          const secStarts = isoTrain.secStarts;
+          const secStarts = isoPt?.secStarts;
           let curSecIdx = 0;
           if (secStarts) {
             while (
@@ -1057,8 +1069,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
     const st = S.current;
     const isAnimated = st.animEnabled && !P.current.showInfra;
-    const timeline =
-      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const timeline = activeTimeline();
     for (let i = 0; i < cur.chords.length; i++) {
       const ch = cur.chords[i];
       if (highlight === ch) continue;
@@ -1106,8 +1117,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!cur) return;
     const st = S.current;
     const isAnimated = st.animEnabled && !P.current.showInfra;
-    const timeline =
-      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const timeline = activeTimeline();
     if (isAnimated && timeline && st.animTime < timeline.totalMins) {
       const step = Math.min(
         timeline.numSteps - 1,
@@ -1170,7 +1180,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     ctx.lineCap = "round";
     ctx.setLineDash([]);
   }
-  function getAllowedTrainCodes(): Set<string> | null {
+  function computeAllowedTrainCodes(): Set<string> | null {
     if (P.current.isolatedTrainCode) {
       return new Set([P.current.isolatedTrainCode]);
     }
@@ -1203,16 +1213,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     return allowed;
   }
 
-  function getCityAllowedArrivalTimes(
+  function computeCityAllowedArrivalTimes(
     c: CityPointVM,
-    allowedCodes: Set<string> | null,
-  ): number[] | null {
-    if (!allowedCodes) return c.arrTimes || null;
-    const cur = P.current.cur;
-    if (!cur) return null;
-
+    allowedCodes: Set<string>,
+  ): number[] {
     if (P.current.direction === "out") {
-      const dest = cur.dests.find((d) => d.idx === c.idx) || (c as DestVM);
+      const dest = c as DestVM;
       const calls = dest?.calls;
       if (!calls || calls.length === 0) return [];
       const times: number[] = [];
@@ -1233,19 +1239,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       times.sort((a, b) => a - b);
       return times;
     } else {
-      const src = cur.srcs.find((s) => s.idx === c.idx) || (c as SrcVM);
+      const src = c as SrcVM;
       const inCalls = src?.inCalls;
       if (!inCalls || inCalls.length === 0) return [];
       const times: number[] = [];
-      const prepMap = cur.inTimeline?.getPrepTrain;
       for (let i = 0; i < inCalls.length; i++) {
         const call = inCalls[i];
         if (call.arr && allowedCodes.has(call.arr.code)) {
-          const pt = prepMap ? prepMap(call.arr.code) : null;
-          const st = pt?.stops?.find((s) => s.cityZh === src.zh);
-          if (st) {
-            times.push(st.arrMins);
-          } else if (call.boardMins !== undefined && call.boardMins >= 0) {
+          if (call.boardMins !== undefined && call.boardMins >= 0) {
             const tDep = call.arr.depMins >= 0 ? call.arr.depMins : 0;
             const tArr = tDep + (call.arr.dur > 0 ? call.arr.dur : 1);
             let unrolled: number = call.boardMins;
@@ -1265,11 +1266,37 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
   }
 
+  /* Per-selection cache: the allowed train set and each city's sorted arrival
+     times, rebuilt only when the origin, panel city, isolated train or
+     direction changes (not per frame, not per dot). */
+  function getSelCache(): NonNullable<typeof S.current.selCache> | null {
+    const cur = P.current.cur;
+    if (!cur) return null;
+    const panelDest = P.current.panelDest ?? null;
+    const iso = P.current.isolatedTrainCode ?? null;
+    const dir = P.current.direction;
+    const c = S.current.selCache;
+    if (c && c.cur === cur && c.panelDest === panelDest && c.iso === iso && c.dir === dir) {
+      return c;
+    }
+    const allowedCodes = computeAllowedTrainCodes();
+    const cityTimes = new Map<number, number[]>();
+    if (allowedCodes) {
+      const pts = points();
+      for (let i = 0; i < pts.length; i++) {
+        cityTimes.set(pts[i].idx, computeCityAllowedArrivalTimes(pts[i], allowedCodes));
+      }
+    }
+    const next = { cur, panelDest, iso, dir, allowedCodes, cityTimes };
+    S.current.selCache = next;
+    return next;
+  }
+  const getAllowedTrainCodes = () => getSelCache()?.allowedCodes ?? null;
+
   function drawTrains(ctx: CanvasRenderingContext2D, _pal: Palette) {
     const cur = P.current.cur;
     if (!cur) return;
-    const timeline =
-      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const timeline = activeTimeline();
     if (!timeline) return;
 
     const activeTrains = timeline.getActiveTrains(S.current.animTime);
@@ -1289,7 +1316,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       if (isolatedCode && !isIsolated) {
         continue;
       }
-      ctx.globalAlpha = 1.0;
+      ctx.globalAlpha = tr.onChord ? 0.45 : 1.0;
 
       const px = X(tr.lon);
       const py = Y(tr.lat);
@@ -1313,7 +1340,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const speedFrac =
         tr.speedFrac !== undefined ? tr.speedFrac : isDwelling ? 0 : 1;
       const baseTailLen = isIsolated ? 22 : tailLen;
-      const actualTailLen = isDwelling
+      const actualTailLen = isDwelling || tr.onChord
         ? 0
         : Math.round(baseTailLen * speedFrac);
       if (actualTailLen > 0) {
@@ -1402,10 +1429,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const { W, H, hover } = S.current;
     const pts = points();
 
-    const timeline =
-      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const timeline = activeTimeline();
     const isAnimated = S.current.animEnabled && !!timeline;
 
+    const sel = getSelCache();
     function drawDot(c: CityPointVM) {
       if (
         c.pt[0] < toLon(-30) ||
@@ -1416,7 +1443,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         return;
 
       const allowedCodes = getAllowedTrainCodes();
-      const cityArrTimes = getCityAllowedArrivalTimes(c, allowedCodes);
+      const cityArrTimes = allowedCodes
+        ? sel?.cityTimes.get(c.idx) ?? null
+        : c.arrTimes || null;
       const totalCityTrains = allowedCodes
         ? cityArrTimes
           ? cityArrTimes.length
@@ -1946,8 +1975,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   function getAnimState(): AnimState {
     const st = S.current;
     const cur = P.current.cur;
-    const tl =
-      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const tl = activeTimeline();
     let total = tl ? tl.totalTrains : 0;
     let departed = tl ? tl.getDepartedCount(st.animTime) : 0;
     let arrived = tl ? tl.getArrivedCount(st.animTime) : 0;
@@ -1955,17 +1983,15 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const totalDays = tl ? tl.totalDays : 1;
 
     const allowedCodes = getAllowedTrainCodes();
-    if (allowedCodes && cur) {
+    if (allowedCodes && cur && tl) {
       total = allowedCodes.size;
       let depCount = 0;
       let arrCount = 0;
-      const trains = P.current.direction === "out" ? cur.deps : cur.arrs;
-      for (let i = 0; i < trains.length; i++) {
-        const t = trains[i];
-        if (allowedCodes.has(t.code)) {
-          if (t.depMins <= st.animTime) depCount++;
-          if (t.arrMins <= st.animTime) arrCount++;
-        }
+      for (const code of allowedCodes) {
+        const pt = tl.getPrepTrain(code);
+        if (!pt) continue;
+        if (pt.depMins <= st.animTime) depCount++;
+        if (pt.arrMins <= st.animTime) arrCount++;
       }
       departed = depCount;
       arrived = arrCount;
@@ -2003,8 +2029,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       return;
     }
     const cur = P.current.cur;
-    const tl =
-      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const tl = activeTimeline();
     const totalMins = tl ? tl.totalMins : 1440;
 
     if (st.lastRafTimestamp !== null) {
@@ -2030,8 +2055,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (st.animPlaying === playing) return;
     st.animPlaying = playing;
     const cur = P.current.cur;
-    const tl =
-      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const tl = activeTimeline();
     const totalMins = tl ? tl.totalMins : 1440;
 
     if (playing) {
@@ -2063,8 +2087,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   function setTime(tMins: number) {
     const st = S.current;
     const cur = P.current.cur;
-    const tl =
-      P.current.direction === "out" ? cur?.timeline : cur?.inTimeline;
+    const tl = activeTimeline();
     const totalMins = tl ? tl.totalMins : 1440;
     st.animTime = Math.max(0, Math.min(totalMins, tMins));
     draw();
@@ -2154,8 +2177,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const destSecCounts = getDestSectionCounts();
     const st = S.current;
     const isAnimated = st.animEnabled && !P.current.showInfra;
-    const timeline =
-      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const timeline = activeTimeline();
     const step =
       isAnimated && timeline
         ? Math.min(
@@ -2175,29 +2197,23 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       const isoTrain = (P.current.direction === "out" ? cur.deps : cur.arrs).find(
         (t) => t.code === P.current.isolatedTrainCode,
       );
-      if (isoTrain && isoTrain.secs && st.animTime >= isoTrain.depMins) {
+      const isoPt = isoTrain ? timeline.getPrepTrain(isoTrain.code) : undefined;
+      if (isoTrain && isoPt && st.animTime >= isoTrain.depMins) {
         const depMins = isoTrain.depMins >= 0 ? isoTrain.depMins : 0;
         const dur = isoTrain.dur > 0 ? isoTrain.dur : 1;
-        const totalDist = isoTrain.totalDist || 1;
+        const totalDist = isoPt.totalDist || 1;
         const alpha = Math.min(1.0, (st.animTime - depMins) / dur);
         const targetDist = alpha * totalDist;
-        const secStarts = isoTrain.secStarts;
+        const secStarts = isoPt.secStarts;
         let curSecIdx = 0;
-        if (secStarts) {
-          while (
-            curSecIdx < isoTrain.secs.length - 1 &&
-            secStarts[curSecIdx + 1] <= targetDist
-          ) {
-            curSecIdx++;
-          }
-        } else {
-          curSecIdx = Math.min(
-            isoTrain.secs.length - 1,
-            Math.floor(alpha * isoTrain.secs.length),
-          );
+        while (
+          curSecIdx < isoPt.secs.length - 1 &&
+          secStarts[curSecIdx + 1] <= targetDist
+        ) {
+          curSecIdx++;
         }
         for (let j = 0; j <= curSecIdx; j++) {
-          activeIsoSecs.add(isoTrain.secs[j]);
+          activeIsoSecs.add(isoPt.secs[j]);
         }
       }
     }
@@ -2305,8 +2321,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!st.animEnabled || st.animPlaying) return null;
     const cur = P.current.cur;
     if (!cur) return null;
-    const timeline =
-      P.current.direction === "out" ? cur.timeline : cur.inTimeline;
+    const timeline = activeTimeline();
     if (!timeline) return null;
     const activeTrains = timeline.getActiveTrains(st.animTime);
     if (!activeTrains || activeTrains.length === 0) return null;
@@ -2466,6 +2481,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
             : tr.dwellStatus === "dest"
               ? `<div style='font-size:12px;color:#10B981;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${dwellName} &middot; Final Stop</div>`
               : `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
+          : "") +
+        (tr.onChord
+          ? "<div style='font-size:12px;color:#9CA3AF;margin-bottom:6px;'>No track geometry on this leg (straight-line stand-in)</div>"
           : "") +
         "<table style='width:100%;margin-bottom:4px;'>" +
         `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +
@@ -2812,9 +2830,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         onPointerCancel={endPointer}
         onPointerLeave={onPointerLeave}
       />
-      {(!cur || inLoading) && (
+      {(!cur || inLoading || loadError) && (
         <div id="loading" style={cur ? { pointerEvents: "none" } : undefined}>
-          {loadError && !cur
+          {loadError
             ? "The timetable data could not be loaded (" + loadError + ")."
             : "Unfolding the timetable…"}
         </div>
