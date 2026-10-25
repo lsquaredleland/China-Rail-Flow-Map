@@ -98,6 +98,14 @@
 //! (-1 = no time / unknown km). `extra_stations` stays empty (kept for
 //! the client's type); every stop resolves into station_table.
 //!
+//! Train calendar (train-export builds only, `CRFM_SCHEDULE`; absent
+//! otherwise, so a 12306 build's bytes are unchanged): shared carries
+//! `calendar`, the export's dates, and each `train_table` row adds `days`
+//! (one char per calendar date, '1' = runs), `pattern` (the export's
+//! running pattern) and `suspended: true` when listed as suspended on every
+//! run date. The pack holds every train that runs on any calendar date,
+//! once; the client does not read these fields yet.
+//!
 //! Outputs, each also written Brotli-compressed (quality 11) with a `.br`
 //! suffix:
 //! - china-flow-atlas-data-v2.json (original section numbering)
@@ -1020,6 +1028,13 @@ fn main() {
             .as_object_mut()
             .unwrap()
             .insert("build".into(), b.clone());
+    }
+    // Train-export builds: the dates `train_table[t].days` indexes.
+    if let Some(c) = v1.get("calendar") {
+        shared5
+            .as_object_mut()
+            .unwrap()
+            .insert("calendar".into(), c.clone());
     }
     let (op, osp, och, ooff) = pack_paths(&origins, &OUT, n_trains, &perm_out);
     let national_trains = v1.get("national_trains").map(|nt| {

@@ -85,10 +85,10 @@ type CallList = Vec<(usize, String, String, i64, u8, usize)>;
 /// One call row in a destination's inbound calls list:
 /// (arr row idx, board time, arrival time, day off, started-here, board station idx, sec_cnt).
 type InCallList = Vec<(usize, String, String, i64, u8, i64, usize)>;
-/// Join key for a train's departure row: (code, origin station, depart time).
-type DepKey = (String, String, String);
-/// Join key for a train's arrival row: (code, origin station, depart time, dataset index).
-type ArrKey = (String, String, String, u8);
+/// Join key for a train's departure row: (train index, origin station, depart time).
+type DepKey = (usize, String, String);
+/// Join key for a train's arrival row: (train index, origin station, depart time, dataset index).
+type ArrKey = (usize, String, String, u8);
 #[derive(serde::Serialize)]
 struct AtlasDep {
     t: usize,
@@ -170,6 +170,10 @@ struct AtlasOut {
     /// P2.2 national trains (A): every national train's whole run, after
     /// `national` for the same reason.
     national_trains: NationalTrains,
+    /// Train-export builds only: the export's dates, which each train_table
+    /// row's `days` indexes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    calendar: Option<Vec<String>>,
 }
 
 /// Every national train's whole path (see atlaspack's header for the
@@ -195,7 +199,8 @@ struct NationalTrains {
 /// One train's call at one destination city (first stop in that city).
 #[derive(Clone)]
 struct CallRaw {
-    code: String,
+    /// The train's index into `trains`.
+    ti: usize,
     from_station: String,
     depart: String,
     arr: String,
@@ -209,7 +214,8 @@ struct CallRaw {
 /// city it later arrives at (first stop in the source city).
 #[derive(Clone)]
 struct InCallRaw {
-    code: String,
+    /// The train's index into `trains`.
+    ti: usize,
     from_station: String,
     depart: String,
     arr: String,
@@ -785,12 +791,13 @@ fn main() {
     let mut station_table: Vec<AtlasStation> = Vec::new();
     let mut station_idx: HashMap<String, i64> = HashMap::new();
     let mut train_table: Vec<AtlasTrainRef> = Vec::new();
-    let mut train_idx: HashMap<(String, String), usize> = HashMap::new();
+    // train_table t -> index into `trains` (train_ti[t]), and back
+    let mut train_ti: Vec<usize> = Vec::new();
+    let mut train_idx: HashMap<usize, usize> = HashMap::new();
 
     // ---- per-city work ----
     struct DepRaw {
         code: String,
-        class: String,
         from_station: String,
         depart: String,
         to_station: String,
@@ -865,7 +872,6 @@ fn main() {
             }
             deps.push(DepRaw {
                 code: t.code.clone(),
-                class: t.train_class.clone(),
                 from_station: names[cd_idx].clone(),
                 depart: t.stops[cd_idx].depart.clone(),
                 to_station: names.last().unwrap().clone(),
@@ -946,7 +952,7 @@ fn main() {
                     _ => 0,
                 };
                 e.calls.push(CallRaw {
-                    code: t.code.clone(),
+                    ti,
                     from_station: names[cd_idx].clone(),
                     depart: t.stops[cd_idx].depart.clone(),
                     arr: t.stops[j].arrive.clone(),
@@ -1030,7 +1036,6 @@ fn main() {
     // srcs[X][P].total == dests[P][X].total exact (checked at assembly).
     struct InArrRaw {
         code: String,
-        class: String,
         from_station: String,
         from_city: String,
         depart: String,
@@ -1045,6 +1050,8 @@ fn main() {
         leg_fwd: Vec<bool>,
         /// Per leg: index of its departing stop in the train's stop list.
         leg_stop: Vec<usize>,
+        /// The train's index into `trains`.
+        ti: usize,
     }
     struct InCityWork {
         zh: String,
@@ -1104,7 +1111,6 @@ fn main() {
             }
             arrs.push(InArrRaw {
                 code: t.code.clone(),
-                class: t.train_class.clone(),
                 from_station: names[0].clone(),
                 from_city: cities[0].clone(),
                 depart: t.stops[0].depart.clone(),
@@ -1117,6 +1123,7 @@ fn main() {
                 leg_keys: legs.clone(),
                 leg_fwd,
                 leg_stop,
+                ti,
             });
             // sources: distinct cities (first index each), home city excluded
             let mut seen_src: HashSet<String> = HashSet::new();
@@ -1169,7 +1176,7 @@ fn main() {
                     _ => 0,
                 };
                 e.calls.push(InCallRaw {
-                    code: t.code.clone(),
+                    ti,
                     from_station: names[p_idx].clone(),
                     depart: t.stops[p_idx].depart.clone(),
                     arr: t.stops[arr_j].arrive.clone(),
@@ -1627,12 +1634,7 @@ fn main() {
             .deps
             .iter()
             .enumerate()
-            .map(|(i, d)| {
-                (
-                    (d.code.clone(), d.from_station.clone(), d.depart.clone()),
-                    i,
-                )
-            })
+            .map(|(i, d)| ((d.ti, d.from_station.clone(), d.depart.clone()), i))
             .collect();
         let mut dests: Vec<[i64; 8]> = Vec::new();
         let mut calls_out: Vec<CallList> = Vec::new();
@@ -1672,8 +1674,7 @@ fn main() {
             ]);
             let mut cl: Vec<(usize, String, String, i64, u8, usize)> = Vec::new();
             for c in st.calls.iter() {
-                if let Some(di) =
-                    dep_lookup.get(&(c.code.clone(), c.from_station.clone(), c.depart.clone()))
+                if let Some(di) = dep_lookup.get(&(c.ti, c.from_station.clone(), c.depart.clone()))
                 {
                     let sec_cnt = dep_leg_sec_cnt[*di]
                         .get(c.leg_cnt)
@@ -1720,7 +1721,7 @@ fn main() {
         }
         let mut deps: Vec<AtlasDep> = Vec::new();
         for d in w.deps.iter() {
-            let t_i = intern_train(&mut train_table, &mut train_idx, &d.code, &d.class);
+            let t_i = intern_train(&mut train_table, &mut train_ti, &mut train_idx, &inp, d.ti);
             let fs_i = intern_station(
                 &mut station_table,
                 &mut station_idx,
@@ -1780,17 +1781,7 @@ fn main() {
             .arrs
             .iter()
             .enumerate()
-            .map(|(i, a)| {
-                (
-                    (
-                        a.code.clone(),
-                        a.from_station.clone(),
-                        a.depart.clone(),
-                        a.set,
-                    ),
-                    i,
-                )
-            })
+            .map(|(i, a)| ((a.ti, a.from_station.clone(), a.depart.clone(), a.set), i))
             .collect();
         let mut srcs: Vec<[i64; 8]> = Vec::new();
         let mut in_calls_out: Vec<InCallList> = Vec::new();
@@ -1828,12 +1819,9 @@ fn main() {
             ]);
             let mut cl: Vec<(usize, String, String, i64, u8, i64, usize)> = Vec::new();
             for c in st.calls.iter() {
-                if let Some(ai) = arr_lookup.get(&(
-                    c.code.clone(),
-                    c.okey_station.clone(),
-                    c.okey_depart.clone(),
-                    c.set,
-                )) {
+                if let Some(ai) =
+                    arr_lookup.get(&(c.ti, c.okey_station.clone(), c.okey_depart.clone(), c.set))
+                {
                     let bfs_i = intern_station(
                         &mut station_table,
                         &mut station_idx,
@@ -1887,7 +1875,7 @@ fn main() {
         }
         let mut arrs_out: Vec<AtlasArr> = Vec::new();
         for a in iw.arrs.iter() {
-            let t_i = intern_train(&mut train_table, &mut train_idx, &a.code, &a.class);
+            let t_i = intern_train(&mut train_table, &mut train_ti, &mut train_idx, &inp, a.ti);
             let fs_i = intern_station(
                 &mut station_table,
                 &mut station_idx,
@@ -1981,11 +1969,6 @@ fn main() {
     for &(s, rev) in edge_dir_to_sec.values() {
         sec_edges[s] += !rev as usize;
     }
-    let ti_of: HashMap<(&str, &str), usize> = trains
-        .iter()
-        .enumerate()
-        .map(|(ti, t)| ((t.code.as_str(), t.train_class.as_str()), ti))
-        .collect();
     // ti -> (boarding stop, origin, dep row) of its earliest outbound row
     let mut first_dep: HashMap<usize, (usize, usize, usize)> = HashMap::new();
     for (ci, w) in works.iter().enumerate() {
@@ -2011,7 +1994,7 @@ fn main() {
     let mut nt_partial = 0usize;
     let mut nt_rev_examples: Vec<String> = Vec::new();
     for (t, tr) in train_table.iter().enumerate() {
-        let ti = ti_of[&(tr.code.as_str(), tr.class.as_str())];
+        let ti = train_ti[t];
         let Some((_, _, nat_keys)) = nat_legs.get(&ti) else {
             national_trains.paths.push(Vec::new());
             national_trains.stop_pos.push(Vec::new());
@@ -2197,30 +2180,37 @@ fn main() {
     // ---- per-train schedules, indexed by train_table t, from data/raw ----
     // Names are clean()ed before interning, so every stop resolves into
     // station_table (appended after the atlas's own stations).
+    // A train export's stop lists are its schedules; otherwise the 12306
+    // stop-list dumps, keyed (dataset, train_no).
     let mut raw_stops: HashMap<(u8, String), Vec<RawStop>> = HashMap::new();
-    for (set, file) in [(0u8, "raw/stops.jsonl"), (1, "raw/stops_cs.jsonl")] {
-        for line in fs::read_to_string(data_dir.join(file)).unwrap().lines() {
-            let r: RawTrain = serde_json::from_str(line).unwrap();
-            raw_stops.insert((set, r.train_no), r.stops);
+    if inp.calendar.is_none() {
+        for (set, file) in [(0u8, "raw/stops.jsonl"), (1, "raw/stops_cs.jsonl")] {
+            for line in fs::read_to_string(data_dir.join(file)).unwrap().lines() {
+                let r: RawTrain = serde_json::from_str(line).unwrap();
+                raw_stops.insert((set, r.train_no), r.stops);
+            }
         }
-    }
-    let mut train_of: HashMap<(String, String), usize> = HashMap::new();
-    for (ti, t) in trains.iter().enumerate() {
-        let prev = train_of.insert((t.code.clone(), t.train_class.clone()), ti);
-        assert!(
-            prev.is_none(),
-            "train_table key collision: {} {}",
-            t.code,
-            t.train_class
-        );
     }
     let mut schedules: Vec<Vec<ScheduleRow>> = Vec::with_capacity(train_table.len());
     let (mut sched_name_mismatch, mut sched_km_unknown) = (0usize, 0usize);
-    for tr in &train_table {
-        let ti = train_of[&(tr.code.clone(), tr.class.clone())];
+    for &ti in &train_ti {
         let t = &trains[ti];
         let set = if ti < d1_len { 0u8 } else { 1 };
-        let stops = &raw_stops[&(set, t.train_no.clone())];
+        let own: Vec<RawStop>;
+        let stops = if inp.calendar.is_some() {
+            own = t
+                .stops
+                .iter()
+                .map(|s| RawStop {
+                    station_name: s.name.clone(),
+                    arrive_time: s.arrive.clone(),
+                    start_time: s.depart.clone(),
+                })
+                .collect();
+            &own
+        } else {
+            &raw_stops[&(set, t.train_no.clone())]
+        };
         let names: Vec<String> = stops.iter().map(|s| clean(&s.station_name)).collect();
         if names != train_names[ti] {
             sched_name_mismatch += 1;
@@ -2356,11 +2346,35 @@ fn main() {
     stats.insert("train_table".into(), train_table.len() as i64);
     stats.insert("network_polylines".into(), network.len() as i64);
     stats.insert("throats".into(), throat_geo.len() as i64);
+    let mut about = "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e5 precision, [lat, lon] order.".to_string();
+    let calendar = inp.calendar.as_ref().map(|(_, window)| window.clone());
+    if let Some(w) = &calendar {
+        about = about.replace(
+            "Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day",
+            &format!(
+                "Timetables: train export, every train that runs on any date of {} .. {} counted once ({} trains). Flow width = trains",
+                w.first().map_or("?", |d| d.as_str()),
+                w.last().map_or("?", |d| d.as_str()),
+                trains.len()
+            ),
+        );
+    }
     let out = AtlasOut {
         build: provenance::build_block(&inp),
-        about: "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e5 precision, [lat, lon] order.".into(),
-        origins, sections, in_sections, throats: throat_geo, city_table, station_table, train_table,
-        network, stats, schedules, national, national_trains,
+        about,
+        origins,
+        sections,
+        in_sections,
+        throats: throat_geo,
+        city_table,
+        station_table,
+        train_table,
+        network,
+        stats,
+        schedules,
+        national,
+        national_trains,
+        calendar,
     };
     let txt = serde_json::to_string(&out).unwrap();
     fs::write(&out_path, &txt).unwrap();
@@ -2410,22 +2424,30 @@ fn intern_station(
     i
 }
 
+/// The train_table row of train `ti` (an index into `inp.trains`): one row
+/// per train, so two trains sharing a code stay apart.
 fn intern_train(
     table: &mut Vec<AtlasTrainRef>,
-    idx: &mut HashMap<(String, String), usize>,
-    code: &str,
-    class: &str,
+    table_ti: &mut Vec<usize>,
+    idx: &mut HashMap<usize, usize>,
+    inp: &inputs::Inputs,
+    ti: usize,
 ) -> usize {
-    let k = (code.to_string(), class.to_string());
-    if let Some(i) = idx.get(&k) {
+    if let Some(i) = idx.get(&ti) {
         return *i;
     }
     let i = table.len();
+    let t = &inp.trains[ti];
+    let cal = inp.calendar.as_ref().map(|(c, _)| &c[ti]);
     table.push(AtlasTrainRef {
-        code: code.to_string(),
-        class: class.to_string(),
+        code: t.code.clone(),
+        class: t.train_class.clone(),
+        days: cal.map(|c| c.days.clone()),
+        pattern: cal.and_then(|c| c.pattern.clone()),
+        suspended: cal.and_then(|c| c.listed_suspended.then_some(true)),
     });
-    idx.insert(k, i);
+    table_ti.push(ti);
+    idx.insert(ti, i);
     i
 }
 

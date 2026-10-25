@@ -15,3 +15,12 @@ min_legs = 1
 # production: switched / filled / bridge-fix onto a non-production candidate,
 # or ambiguous-keep whose best guess is not production's.
 require_router_agreement = true
+
+# The schedule source (pipeline/router/README.md, "Plugging in a new
+# schedule"). "timetables" reads the two timetable deliverables in --files;
+# "export" reads one train export with an operating calendar from --files:
+#   source = "export"
+#   export = "trains-all.json"
+#   supplements = ["train-operating-days.json"]
+[schedule]
+source = "timetables"

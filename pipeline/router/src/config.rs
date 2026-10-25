@@ -26,6 +26,32 @@ pub struct Config {
     pub evidence: EvidenceConfig,
     pub decide: DecideConfig,
     pub canon: CanonConfig,
+    pub schedule: ScheduleConfig,
+}
+
+/// Which `ScheduleSource` the run reads (an input choice, not a
+/// threshold; here so the recipe file names it).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScheduleKind {
+    /// The timetable deliverables in `--files` (`china::TimetableJson`).
+    #[default]
+    Timetables,
+    /// One train export with an operating calendar (`export::TrainExport`).
+    Export,
+}
+
+/// The schedule input.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ScheduleConfig {
+    /// "timetables" | "export".                             [timetables]
+    pub source: ScheduleKind,
+    /// Export: the train file, relative to `--files`.
+    pub export: String,
+    /// Export: stop-list supplements for its placeholder stop lists,
+    /// relative to `--files`, first match wins.             [none]
+    pub supplements: Vec<String>,
 }
 
 /// OSM extract -> rail graph. Defaults: China's `railway=rail` /
@@ -414,5 +440,18 @@ mod tests {
         assert_eq!(p.canon.margin_rel, 0.2);
         assert_eq!(p.canon.rounds, 4);
         assert!(toml::from_str::<Config>("[canon]\nmode = \"longest\"\n").is_err());
+    }
+
+    #[test]
+    fn schedule_defaults_to_the_timetables() {
+        assert_eq!(Config::default().schedule.source, ScheduleKind::Timetables);
+        let p: Config = toml::from_str(
+            "[schedule]\nsource = \"export\"\nexport = \"t.json\"\nsupplements = [\"s.json\"]\n",
+        )
+        .unwrap();
+        assert_eq!(p.schedule.source, ScheduleKind::Export);
+        assert_eq!(p.schedule.export, "t.json");
+        assert_eq!(p.schedule.supplements, ["s.json"]);
+        assert!(toml::from_str::<Config>("[schedule]\nsource = \"gtfs\"\n").is_err());
     }
 }
