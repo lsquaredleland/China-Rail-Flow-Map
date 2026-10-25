@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { local as localStore, session as sessionStore } from "./storage";
 import type {
   AtlasData,
   CityPointVM,
@@ -178,33 +179,15 @@ async function fetchData<T>(jsonUrl: string): Promise<T> {
   return (await r.json()) as T;
 }
 function initialDistUnit(): DistUnit {
-  try {
-    if (window.localStorage && localStorage.getItem("crfa-dist-unit") === "mi")
-      return "mi";
-  } catch {
-    /* storage unavailable: stay on km */
-  }
-  return "km";
+  return localStore.get("crfa-dist-unit") === "mi" ? "mi" : "km";
 }
 
 function initialInfra(): boolean {
-  try {
-    if (window.localStorage && localStorage.getItem("crfa-infra") === "1")
-      return true;
-  } catch {
-    /* storage unavailable: stay in flow-width mode */
-  }
-  return false;
+  return localStore.get("crfa-infra") === "1";
 }
 
 function initialDirection(): Direction {
-  try {
-    if (window.localStorage && localStorage.getItem("crfa-direction") === "in")
-      return "in";
-  } catch {
-    /* storage unavailable: stay outbound */
-  }
-  return "out";
+  return localStore.get("crfa-direction") === "in" ? "in" : "out";
 }
 
 function initialDark(): boolean {
@@ -213,11 +196,11 @@ function initialDark(): boolean {
     const p = params.get("theme");
     if (p === "dark" || p === "night") return true;
     if (p === "light" || p === "day") return false;
-    const saved = window.sessionStorage && sessionStorage.getItem("crfa-theme");
+    const saved = sessionStore.get("crfa-theme");
     if (saved === "dark") return true;
     if (saved === "light") return false;
   } catch {
-    /* storage unavailable */
+    /* unparseable URL */
   }
   return !!(
     typeof window !== "undefined" &&
@@ -715,19 +698,11 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
-    try {
-      localStorage.removeItem("crfa-theme");
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.remove("crfa-theme");
     if (!window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (e: MediaQueryListEvent) => {
-      try {
-        if (sessionStorage.getItem("crfa-theme")) return;
-      } catch {
-        /* storage unavailable */
-      }
+      if (sessionStore.get("crfa-theme")) return;
       setDarkState(e.matches);
     };
     if (mq.addEventListener) mq.addEventListener("change", onChange);
@@ -830,11 +805,7 @@ export default function App() {
     setPanelCity(null);
     clearFilters();
     setDirectionState(d);
-    try {
-      if (window.localStorage) localStorage.setItem("crfa-direction", d);
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.set("crfa-direction", d);
   };
 
   useEffect(() => {
@@ -864,22 +835,13 @@ export default function App() {
   const toggleInfra = () => {
     const v = !showInfra;
     setShowInfraState(v);
-    try {
-      if (window.localStorage)
-        localStorage.setItem("crfa-infra", v ? "1" : "0");
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.set("crfa-infra", v ? "1" : "0");
   };
 
   const setDistUnit = (u: DistUnit) => {
     if (u === distUnit) return;
     setDistUnitState(u);
-    try {
-      if (window.localStorage) localStorage.setItem("crfa-dist-unit", u);
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.set("crfa-dist-unit", u);
     // The open panel re-renders from state; refresh a visible tooltip too.
     if (mapRef.current) mapRef.current.refreshTooltip();
   };
@@ -887,13 +849,8 @@ export default function App() {
   const setDark = (d: boolean) => {
     if (d === dark) return;
     setDarkState(d);
-    try {
-      if (window.sessionStorage)
-        sessionStorage.setItem("crfa-theme", d ? "dark" : "light");
-      if (window.localStorage) localStorage.removeItem("crfa-theme");
-    } catch {
-      /* storage unavailable */
-    }
+    sessionStore.set("crfa-theme", d ? "dark" : "light");
+    localStore.remove("crfa-theme");
   };
 
   const origins = atlas ? atlas.data.origins : [];
