@@ -59,6 +59,7 @@ interface DeckInternals {
   finalize(): void;
   pickObjects(o: PickRectOptions & { maxObjects?: number | null }): PickingInfo[];
   _updateCanvasSize?: () => void;
+  getViewports(): { width: number; height: number }[];
 }
 
 const NOTICE_TEXT = "Map paused — tap to resume";
@@ -300,7 +301,14 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       sigStreak = 0;
       stats.settled = false;
     }
-    deck.setProps({ viewState: viewToViewState(st.view, st.W, st.H), layers });
+    // The Canvas renderer lays the world out in S.W x S.H (the #mapwrap rect, fractional, border
+    // included) on a rounded bitmap that the browser stretches into the CSS box; deck's viewport is
+    // the rounded drawing buffer. A per-axis zoom of viewport/(S.W, S.H) reproduces that mapping
+    // exactly (P1b.5: removes the up to 0.5 px vertical offset). target is unchanged.
+    const vs = viewToViewState(st.view, st.W, st.H);
+    const vp = deck.getViewports()[0];
+    const zoom: number | [number, number] = vp ? [vs.zoom + Math.log2(vp.width / st.W), vs.zoom + Math.log2(vp.height / st.H)] : vs.zoom;
+    deck.setProps({ viewState: { ...vs, zoom }, layers });
     deck.redraw("render"); // synchronous, like draw(M) on Canvas (C22)
     drawLabelsOverlay(M);
     M.frameTail();
