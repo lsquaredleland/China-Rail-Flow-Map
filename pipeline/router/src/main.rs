@@ -27,12 +27,14 @@
 //
 // This file only wires the stages together; see README.md for modules.
 use corridor_router::baseline::Baseline;
-use corridor_router::config::{self, Config};
+use corridor_router::config::{self, Config, ScheduleKind};
 use corridor_router::graph::{self, Buffers, FineIndex, SnapIndex};
 use corridor_router::model::{Calibration, Cand, Shape, CLASS_NAMES, NCLASS};
 use corridor_router::schedule::{ScheduleSource, Train};
 use corridor_router::stations::{normalize_name, Stations};
-use corridor_router::{bridge, candidates, canon, china, evidence, infer, legs, output, validate};
+use corridor_router::{
+    bridge, candidates, canon, china, evidence, export, infer, legs, output, validate,
+};
 use rayon::prelude::*;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -99,19 +101,47 @@ fn main() {
             .unwrap();
     }
 
-    // ---- inputs: schedule, baseline, stations (the China datasets) ----
-    let trains: Vec<Train> = china::TimetableJson::in_dir(&files).load();
+    // ---- inputs: schedule (`[schedule]`), baseline, stations ----
+    let trains: Vec<Train> = match cfg.schedule.source {
+        ScheduleKind::Timetables => china::TimetableJson::in_dir(&files).load(),
+        ScheduleKind::Export => {
+            assert!(
+                !cfg.schedule.export.is_empty(),
+                "[schedule] source = \"export\" needs `export`"
+            );
+            let src = export::TrainExport {
+                path: files.join(&cfg.schedule.export),
+                supplements: cfg
+                    .schedule
+                    .supplements
+                    .iter()
+                    .map(|p| files.join(p))
+                    .collect(),
+            };
+            let (trains, n) = src.load_counted();
+            println!("schedule export {}: {n:?}", src.path.display());
+            trains
+        }
+    };
     let baseline: Baseline = china::load_baseline(&data);
     // --station-fixes (station_resolution format) is applied last, so it
     // replaces the analyzer's chosen clusters for the names it lists.
     let stations: Stations =
         china::load_stations(&data, argval("--station-fixes").map(PathBuf::from));
+    let mut unknown: Vec<&str> = trains
+        .iter()
+        .flat_map(|t| t.stops.iter().map(|s| s.name.as_str()))
+        .filter(|n| stations.get(n).is_none())
+        .collect();
+    unknown.sort_unstable();
+    unknown.dedup();
     timer.mark(&format!(
-        "inputs: {} trains, {} production pairs, {} base paths, {} station names",
+        "inputs: {} trains, {} production pairs, {} base paths, {} station names ({} stop names unknown: {unknown:?})",
         trains.len(),
         baseline.pairs.len(),
         baseline.paths.len(),
-        stations.len()
+        stations.len(),
+        unknown.len()
     ));
 
     // ---- network ----

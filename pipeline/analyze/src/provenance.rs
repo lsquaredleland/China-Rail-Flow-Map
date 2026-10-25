@@ -11,6 +11,8 @@
 //!
 //! `pair_paths_sha256` hashes the pair-path files concatenated in priority
 //! order (`ATLAS_PAIR_PATHS`). A hash is `null` when its input is absent.
+//! A build from a train export (`CRFM_SCHEDULE`) adds `schedule_sha256`:
+//! the export, then its supplements, concatenated.
 //!
 //! `pipeline_tree` is `HEAD:pipeline`'s tree hash, so it changes only when
 //! pipeline code does (a docs-only commit leaves the pack bytes alone).
@@ -73,6 +75,13 @@ pub fn build_block(inp: &Inputs) -> Value {
         "pair_paths_sha256": sha256_files(&pair),
         "overrides_sha256": sha256_files(std::slice::from_ref(&inp.paths.overrides_path)),
     });
+    if let Ok(p) = std::env::var("CRFM_SCHEDULE") {
+        let mut files = vec![PathBuf::from(p)];
+        if let Ok(v) = std::env::var("CRFM_SCHEDULE_SUPPLEMENTS") {
+            files.extend(v.split(',').map(PathBuf::from));
+        }
+        b["schedule_sha256"] = json!(sha256_files(&files));
+    }
     if pipeline_dirty() {
         b["dirty"] = json!(true);
     }

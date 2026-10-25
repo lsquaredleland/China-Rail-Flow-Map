@@ -25,6 +25,7 @@ library (`src/lib.rs`), which `src/bin/cordcheck.rs` uses too.
 | | `baseline.rs` | Optional production geometry: `Baseline { pairs, paths }` |
 | | `graph.rs` | The network: OSM XML to graph (way filter, speeds, line names, stitching), snapping, A*, Dijkstra, reach |
 | | `china.rs` | Today's datasets: `TimetableJson` (a `ScheduleSource`), `load_stations`, `load_baseline`, the `--data` / `--files` / `--osm` layout |
+| | `export.rs` | `TrainExport` (a second `ScheduleSource`): one train export with an operating calendar, placeholder stop lists filled from supplements, the window's union |
 | **Policy** | `config.rs` | `Config`: every threshold and penalty, with documented defaults, TOML loading, `CV3_*` env overrides |
 | | `classes.rs` | The service-class table (G/D/C/S/Z/T/K: speed caps, HSR access, routing groups) |
 | **Routing + model** | `legs.rs` | Trains to legs, legs grouped by unordered pair, `PairInfo` per pair |
@@ -69,8 +70,8 @@ Where the code was before this split:
 corridor-v3-o17 run byte for byte. To change it:
 
 - `--config router.toml` overrides any subset. Sections are `network`,
-  `candidates`, `bridge`, `calibration`, `model`, `evidence`, `decide`
-  and `canon`. Unknown keys are an error.
+  `candidates`, `bridge`, `calibration`, `model`, `evidence`, `decide`,
+  `canon` and `schedule`. Unknown keys are an error.
 - The `CV3_*` environment variables still win over the file:
   `CV3_ACCEL`, `CV3_OVERHEAD`, `CV3_TAIL_TAU`, `CV3_LENGTH_PRIOR`,
   `CV3_SWITCH_POST`, `CV3_BASE_MAX`, `CV3_FILL_POST` and
@@ -184,9 +185,37 @@ The source must meet these rules:
   maps. Unknown classes become the conventional K class.
 - **Order:** trains come in a stable order, because outputs follow it.
 
-Then replace the `china::TimetableJson::in_dir(&files).load()` line in
-`main.rs`. If the new data still uses China's station names, keep
-`china::load_stations` and `china::load_baseline`.
+Then add it to `config::ScheduleKind` and the `match cfg.schedule.source`
+in `main.rs`, so the recipe file selects it. If the new data still uses
+China's station names, keep `china::load_stations` and
+`china::load_baseline`.
+
+The two sources today, chosen by `[schedule] source` (paths relative to
+`--files`):
+
+| `source` | Reads |
+|---|---|
+| `timetables` (default) | `china::TimetableJson`: the two timetable deliverables. The committed recipe. |
+| `export` | `export::TrainExport`: `export = "<file>"`, plus `supplements = [...]` |
+
+A train export is the deliverable shape plus optional `run_dates`. Its
+rules (`export.rs` header):
+
+- A stop list whose names are all empty is a placeholder. It is filled
+  from the first supplement that lists the same `train_no` with a
+  complete stop list of the same length.
+- A train is kept when it has a stop list and runs on at least one of
+  its `run_dates`. This is the window's union: every such train once.
+
+The analyzer reads the same file with the same rules (`CRFM_SCHEDULE`,
+`pipeline/analyze/src/export.rs`).
+
+```toml
+[schedule]
+source = "export"
+export = "trains-all.json"
+supplements = ["train-operating-days.json"]
+```
 
 ## Plugging in a different OSM network
 

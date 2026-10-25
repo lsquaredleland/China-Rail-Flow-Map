@@ -3,6 +3,8 @@
 //! Layout, generic first:
 //! - `names`, `geo`, `polyline`: text, geometry and codec helpers.
 //! - `timetable`: the timetable schema and clock arithmetic.
+//! - `export`: a train export with an operating calendar (a second timetable
+//!   source, `CRFM_SCHEDULE`).
 //! - `legs`: pair paths / router leg paths / overrides -> leg geometry.
 //! - `osm`: reading node coordinates and way classes from an OSM XML extract.
 //! - `inputs`: the recipe's input files (env-driven paths) loaded in one place.
@@ -20,6 +22,7 @@
 pub mod chains;
 pub mod cn;
 pub mod entries;
+pub mod export;
 pub mod flows;
 pub mod geo;
 pub mod inputs;

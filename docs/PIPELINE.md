@@ -236,6 +236,43 @@ are byte-identical to `web/public/assets`). Always set `CRFM_OUTPUT_DIR` /
 `ATLAS_OUT` / `--out-dir` so a build never overwrites `output/` or
 `web/public/assets`.
 
+**Second schedule source: a train export (staged, 2026-10-25; not the
+committed pack).** The owner's merged export (`trains-all.json`, 11,589
+trains, window 2026-10-23 → 2026-11-06) feeds the same recipe through a
+second source; the 12306 deliverables stay the default, and a timetables
+build is unchanged byte for byte.
+- **Router:** `[schedule] source = "export"` in the `--config` file, with
+  `export = "trains-all.json"` and
+  `supplements = ["train-operating-days.json"]`, relative to `--files` (the
+  export's directory). `recipe.toml` keeps `source = "timetables"`.
+  Implementation: `pipeline/router/src/export.rs` (`TrainExport`, a
+  `ScheduleSource`).
+- **Atlas / audit:** `CRFM_SCHEDULE=<dir>/trains-all.json` and
+  `CRFM_SCHEDULE_SUPPLEMENTS=<dir>/train-operating-days.json`
+  (`pipeline/analyze/src/export.rs`). The export's own stop lists become the
+  schedules, so `data/raw/stops*.jsonl` is not read. GTFS stop points
+  (`CRFM_OUTPUT_DIR`) and `osm_stations.json` still place the stations.
+- **Rules (the same in both crates):**
+  - A stop list whose names are all empty is a placeholder. In this export,
+    the 4,303 `discovered` / `phase2-discovery` trains carry only
+    placeholders. They are filled by `train_no` from the supplement
+    (`train-operating-days.json`), which holds those trains' czxx stop lists
+    with the same stop count.
+  - A train is kept when it has a stop list and runs on at least one date
+    of its `run_dates`. This is the window's union, with each `train_no`
+    counted once: 11,540 trains. Left out: 33 with no stop list and 16
+    with stops but no run date.
+- **Calendar in the pack:** only when `CRFM_SCHEDULE` is set. Shared then
+  gains `calendar` (the window's dates), and every `train_table` row gains
+  `days` (one '0'/'1' per date), `pattern` and `suspended: true` (listed
+  suspended). `shared.build` gains `schedule_sha256`.
+- **Train identity:** train_table rows are keyed by train (an index into the
+  timetable), not by `(code, class)`. The export has 79 codes shared by two
+  or more `train_no`s, which are date variants of one service.
+- **Goldens:** the export pack's baseline is `pipeline/goldens-11k.proposed.json`.
+  It is not gated in CI. Move it over `goldens.json` in the commit that
+  swaps the pack, never before, because CI audits the committed pack.
+
 **Pack format `fmt: 6`** (every one of shared / out-map / in-map /
 out-tables / in-tables carries `fmt: 6`; the client refuses anything else.
 Documented in the `atlaspack.rs` header; 5 = 4 plus renumbered sections, delta
