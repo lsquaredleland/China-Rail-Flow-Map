@@ -24,6 +24,8 @@ jobs:
 
   # O12: audit the committed pack. CI cannot rebuild it (needs the OSM
   # extract), but --pack-only needs only the pack files and goldens.json.
+  # dropped_chains / flow_lost are not gated here: they need the OSM extract
+  # (see audit_pack in audit.rs).
   pack-audit:
     runs-on: ubuntu-latest
     steps:
@@ -35,20 +37,89 @@ jobs:
         with:
           workspaces: pipeline
 
-      - name: Brotli-decode the committed pack
-        run: |
-          mkdir -p "$RUNNER_TEMP/pack"
-          for f in web/public/assets/atlas-v2-*.json.br; do
-            b=$(basename "$f" .br)
-            node -e 'const z=require("zlib"),fs=require("fs");fs.writeFileSync(process.argv[2],z.brotliDecompressSync(fs.readFileSync(process.argv[1])))' "$f" "$RUNNER_TEMP/pack/$b"
-          done
-          ls -l "$RUNNER_TEMP/pack"
-
       - name: audit --pack-only against goldens.json
         working-directory: pipeline
         env:
-          AUDIT_PACK_DIR: ${{ runner.temp }}/pack
+          # audit reads the committed .json.br files directly
+          AUDIT_PACK_DIR: ${{ github.workspace }}/web/public/assets
         run: cargo run --release -p analyze-rs --bin audit -- --pack-only --goldens goldens.json
+
+  # O12: on a PR that changes the committed pack, diff it against the base
+  # branch's and post a summary comment (updated in place). Skipped when the
+  # pack files are unchanged. Fork PRs get a read-only token: the summary goes
+  # to the job summary only.
+  pack-diff:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Did the committed pack change?
+        id: changed
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          if git diff --quiet "origin/$BASE" HEAD -- 'web/public/assets/atlas-v2-*.json.br'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "pack unchanged vs $BASE; nothing to post"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out the base branch's pack
+        if: steps.changed.outputs.changed == 'true'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: git worktree add "$RUNNER_TEMP/base" "origin/$BASE"
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.changed.outputs.changed == 'true'
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.changed.outputs.changed == 'true'
+        with:
+          workspaces: pipeline
+
+      - name: secdiff --packs
+        if: steps.changed.outputs.changed == 'true'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          {
+            echo '<!-- pack-diff -->'
+            echo "## Pack diff vs \`$BASE\`"
+            echo
+            cargo run --release --manifest-path pipeline/Cargo.toml -p analyze-rs --bin secdiff -- \
+              --packs "$RUNNER_TEMP/base/web/public/assets" web/public/assets
+          } > "$RUNNER_TEMP/pack-diff.md"
+          cat "$RUNNER_TEMP/pack-diff.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update the PR comment
+        if: >-
+          steps.changed.outputs.changed == 'true' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync(`${process.env.RUNNER_TEMP}/pack-diff.md`, 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            const mine = comments.find((c) => c.body && c.body.startsWith('<!-- pack-diff -->'));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
 
   pipeline:
     runs-on: ubuntu-latest

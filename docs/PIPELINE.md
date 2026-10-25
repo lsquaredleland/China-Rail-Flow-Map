@@ -154,7 +154,8 @@ strip 12306's space-typeset names) are documented in origin project notes.
 go-ahead; `docs/corridor-v3-report.md`): per-train corridor
 routing + double track merged into one corridor. The router's two outputs
 live in `data/derived/corridor-v3/` (or regenerate with `pipeline/router`,
-~20 s). The live pack is built WITH `data/leg_overrides.json` (see "Actual
+~20 s; modules, `--config` TOML thresholds and how to plug in another
+schedule or OSM network: `pipeline/router/README.md`). The live pack is built WITH `data/leg_overrides.json` (see "Actual
 live recipe" below); an empty-overrides build does not reproduce it. A bare
 `atlas` run loads `leg_overrides.json` (§4) by default.
 Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
@@ -211,6 +212,11 @@ O=$PWD/../staging/corridor-v3-ordered
 ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
 AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
+# audit reads <name>.json.br when present, else <name>.json, so this audits the
+# committed pack too (what the CI `pack-audit` job does):
+#   AUDIT_PACK_DIR=../web/public/assets ./target/release/audit --pack-only --goldens goldens.json
+# --pack-only cannot gate dropped_chains / flow_lost: they need the OSM extract
+# (a dropped chain never reaches the pack), so only the full run enforces them.
 ./target/release/secdiff --old ../staging/determinism/o17/final-atlas/china-flow-atlas-data.json \
     --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
 ./target/release/secdiff --old ... --new ... --classes   # per-edge class columns (8 classes)
@@ -274,6 +280,41 @@ rebuild, and what `audit` expands to):
 - `atlas-v2-schedules.json` is generated from `data/raw/stops*.jsonl`,
   indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm]`
   and station names normalized.
+
+**Provenance (`shared.build`).** `atlas` records, and `atlaspack` copies into
+`atlas-v2-shared.json`, `build = { pipeline_tree, osm_sha256, leg_paths_sha256,
+pair_paths_sha256, overrides_sha256 }` (plus `dirty: true`, only when
+`pipeline/` has uncommitted changes); `audit` prints it. `pipeline_tree` is the
+tree hash of `pipeline/` at HEAD (`CRFM_PIPELINE_TREE` overrides it), so it
+changes only when pipeline code does: a docs-only commit leaves every pack
+byte unchanged and the rebuild still `cmp`s against `web/public/assets`.
+The hashes are SHA-256 of the input files as read (`pair_paths_sha256`: the
+`ATLAS_PAIR_PATHS` files concatenated in priority order); `null` when an input
+is absent. The client ignores it. Two clean rebuilds give a byte-identical
+`shared`. To
+compare two packs use `secdiff --packs <old_dir> <new_dir>`, which ignores
+`build`: it takes two directories of `.json.br` (or `.json`) pack files and
+prints a Markdown summary (per-file sizes and whether the content changed, the
+provenance fields that differ, shared-geometry counts, per-direction flow-row
+changes matched by section polyline since ids are renumbered per pack, with the
+largest changes, changed per-train paths and schedules). The CI `pack-diff` job
+runs it on PRs that change `web/public/assets/atlas-v2-*.json.br` and posts the
+result as a PR comment (updated in place; skipped when the pack is unchanged).
+
+**`analyze` crate layout.** `atlas` (builder), `atlaspack` (packer) and
+`audit` share the library in `pipeline/analyze/src/`: `inputs` (env-driven
+recipe paths, loaded once), `legs` (pair paths, router leg paths, overrides,
+leg resolution, `dijkstra_chain`), `osm` (node coordinates, way classes),
+`timetable`, `geo`, `polyline`, `names`, `model`, `chains`. Everything China-
+or 12306-specific is under `cn/`: the city gazetteer and its corrections
+(`cn::gazetteer`), English names (`cn::station_en`), train-class letters
+(`cn::classes`) and the dated input file names (`cn::files`). `audit` shares
+only parsing and helpers with the build (plus `chains`, as before); it still
+recounts independently, in its own copy of the per-edge / per-city train
+counting: dropped chains and flow lost, the per-chain dedup recount, the
+junction-flag check and the variant-leg tally, and, on the pack, its own
+fmt-6 decode with the path / stop / chord / schedule invariants and the
+goldens gate. None of that reads the build's final aggregation.
 
 **Verify against the goldens (§7) before trusting any rebuild.** The country outline comes from the
 `outline` crate (`pipeline/outline`) → `china-outline.json`. (The old `flowmap` / `flowstations`

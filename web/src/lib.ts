@@ -453,20 +453,6 @@ export function flatBB(f: number[]): BBox {
 
 /** Decode the shared geometry once: sections, backdrop network, data extent. */
 export function prepAtlas(data: AtlasData): DecodedAtlas {
-  // Calibrate known city centroid coordinates where historical data used distant sub-stations or geocoding homonyms
-  const CITY_COORD_CORRECTIONS: Record<string, [number, number]> = {
-    铜仁: [109.1995, 27.7306], // Tongren Railway Station & downtown (was Tongren South 50km away in Yuping)
-    兰溪: [119.5074, 29.2152], // Lanxi East Station, Jinhua, Zhejiang (was misgeocoded to Shandong)
-    溆浦: [110.594, 27.908],   // Xupu Station downtown (was Xupu South)
-  };
-  for (let i = 0; i < data.city_table.length; i++) {
-    const c = data.city_table[i];
-    const fix = CITY_COORD_CORRECTIONS[c.zh];
-    if (fix) {
-      c.pt = [fix[0], fix[1]];
-    }
-  }
-
   const sec = decodeSet(
     data.sections.map((s) => s.g),
     data.sections.map((s) => (s.h ? 1 : 0)),
