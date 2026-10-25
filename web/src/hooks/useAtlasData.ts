@@ -10,6 +10,7 @@ import type {
   OutMapData,
   OutTablesData,
   OutTablesPack,
+  OutTablesRaw,
   OutlineData,
   SchedulesData,
   SharedData,
@@ -49,6 +50,9 @@ export function useAtlasData({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [outline, setOutline] = useState<DecodedOutline | null>(null);
   const [outTablesReady, setOutTablesReady] = useState(false);
+  // The path tables as shipped, kept for the national timelines (the
+  // per-origin parts are expanded and merged, then dropped).
+  const [outTablesRaw, setOutTablesRaw] = useState<OutTablesRaw | null>(null);
   const [inMapReady, setInMapReady] = useState(false);
   const [inTablesReady, setInTablesReady] = useState(false);
   const [inMapLoading, setInMapLoading] = useState(false);
@@ -128,6 +132,7 @@ export function useAtlasData({
           schedData = sched;
           if (sched) setSchedulesData(sched);
           outTablesRef.current = expandOutTables(d);
+          setOutTablesRaw({ paths: d.paths, stop_pos: d.stop_pos, chords: d.chords });
           flights.outTables = false;
           setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
           applyOutTables();
@@ -286,6 +291,7 @@ export function useAtlasData({
     outline,
     loadError,
     outTablesReady,
+    outTablesRaw,
     inMapReady,
     inTablesReady,
     inMapLoading,
