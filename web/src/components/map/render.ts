@@ -10,9 +10,12 @@ import { drawLabels, drawStations } from "./stations";
 import { drawTrains } from "./trains";
 
 
-/* Debug query ?layers=backdrop: draw only the backdrop and labels, in both
-   renderers (parity runs of P1b.1). Removed in P1c.2. */
-const BACKDROP_ONLY = new URLSearchParams(location.search).get("layers") === "backdrop";
+/* Debug query ?layers=, in both renderers (parity runs of P1b.1 / P1b.2),
+   removed in P1c.2: "backdrop" draws only the backdrop and labels; "flows"
+   also chords, flows, infra and the hover highlight, but no trains or stations. */
+const LAYERS = new URLSearchParams(location.search).get("layers");
+const BACKDROP_ONLY = LAYERS === "backdrop";
+const FLOWS_ONLY = LAYERS === "flows";
 
 export function draw(M: MapCtx) {
   const { S, P, canvasRef } = M;
@@ -48,7 +51,7 @@ export function draw(M: MapCtx) {
   // The Infrastructure overlay is superimposed on the flows (below
   // the hover highlight, dots and labels).
   if (P.current.showInfra) drawInfra(M, ctx, pal, destSecCounts);
-  if (st.animEnabled) drawTrains(M, ctx, pal);
+  if (st.animEnabled && !FLOWS_ONLY) drawTrains(M, ctx, pal);
   if (st.hover && st.hover.kind === "seg")
     drawHighlightSeg(
       M,
@@ -57,7 +60,7 @@ export function draw(M: MapCtx) {
       st.hover.s,
       st.hover.subN !== undefined ? st.hover.subN : st.hover.n,
     );
-  drawStations(M, ctx, pal);
+  if (!FLOWS_ONLY) drawStations(M, ctx, pal);
   drawLabels(M, ctx, pal);
   frameTail(M);
 }

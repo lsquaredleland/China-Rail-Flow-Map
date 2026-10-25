@@ -561,6 +561,8 @@ the origin is gone); `perf/origin.mjs` at DPR 2: `cpuTimePerFrame` ≤ 4 ms, dra
 whole-set flow passes; the ordered subsets are smaller).
 (Context-loss re-check) with flows drawn on 广州 initial: > 100,000 non-empty px at DPR 1 after restore.
 
+*As built (P1b.2):* `?layers=flows` (both renderers, removed in P1c.2) draws backdrop + chords + flows + infra + highlight + labels, no stations/trains, so parity is measurable before P1b.3. Infra uses per-pass binary data from the `infraPasses` sections (conventional, ferry dashes, high-speed) instead of whole-set `DataFilterExtension` categories. `flowPasses` allocates new item arrays per call while animating, so `memoFlowPasses` keys it on (origin, filter, direction, selection, isolation, theme, 5-min step; the continuous clock only when a destination is selected and running). **Context-loss absolute:** the deck canvas holds 35,910 non-transparent px with backdrop only and 48,555 with flows on 广州 initial at DPR 1 (the flows are hairlines at that scale), so "> 100,000" is not attainable at DPR 1; the check that holds is equality before and after each restore (48,555 each time, `recreated` 1 then 2). Diff masks (1x): `docs/deckgl-spike/p1b2/`.
+
 **P1b.3 Station / origin / train layers** — *after P1b.2, P1a.3 (merged).* Files: new
 `deck/layers/stations.ts` (dots from `stationStates`: `getRadius = r` with the stroke centred on
 `r`, `getLineWidth` 1.5/3.0, ripples `filled: false`, selection/hover/origin rings at their

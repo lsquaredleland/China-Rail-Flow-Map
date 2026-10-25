@@ -23,7 +23,7 @@ const stat = (a) => {
 
 /** cfg: { argv, defaults: {start, end, frames}, views: {name: "origin"|"fit"|"city"|null}, origin?: zh } */
 export async function runPerf(cfg) {
-const { pos, opt } = parseArgs(cfg.argv, ["frames", "dpr", "throttle", "start", "end", "out", "query"]);
+const { pos, opt } = parseArgs(cfg.argv, ["frames", "dpr", "throttle", "start", "end", "out", "query", "select", "infra"]);
 const FR = +(opt.frames || cfg.defaults.frames), thr = +(opt.throttle || 1);
 const START = +(opt.start ?? cfg.defaults.start), END = +(opt.end ?? cfg.defaults.end);
 const STEP = (END - START) / FR;
@@ -59,6 +59,9 @@ try {
       await pg.evaluate((zh) => window.__selectOrigin(zh), cfg.origin);
       await sleep(3000);
     }
+    // --select 深圳 selects that destination; --infra 1 turns the infrastructure overlay on.
+    if (opt.select) { await pg.evaluate((zh) => window.__mapApi.selectDestByZh(zh), opt.select); await sleep(1500); }
+    if (opt.infra) { await pg.evaluate(() => { const e = document.querySelector("#tglInfra"); e && e.click(); }); await sleep(800); }
     await pg.evaluate(() => { window.__mapApi.setAnimEnabled(true); window.__mapApi.setPlaying(false); });
     for (const [name, kind] of Object.entries(cfg.views)) {
       if (kind === "fit") await pg.evaluate(() => window.__mapApi.fitCountry());
