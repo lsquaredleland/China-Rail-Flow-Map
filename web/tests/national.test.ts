@@ -12,7 +12,7 @@ const { atlas, tablesRaw } = pack();
 const NT = nationalTrains();
 const nt: NationalTrainsPack = NT.data;
 // Expected counts per source: the full file, or the committed sample.
-const EXPECT = NT.source === "full" ? { trains: 7157, at1095: 2893, at30: 992 } : { trains: 783, at1095: 347, at30: 148 };
+const EXPECT = NT.source === "full" ? { trains: 11248, at1095: 3694, at30: 1214 } : { trains: 1226, at1095: 428, at30: 156 };
 
 const heap = () => {
   Bun.gc(true);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, NatLayer, OriginVM } from "./types";
-import { buildOrigin } from "./lib";
+import { buildOrigin, fmtCalendarSpan } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
   initialNatLayer,
@@ -224,6 +224,8 @@ export default function App() {
   };
 
   const origins = atlas ? atlas.data.origins : [];
+  // The schedule window ("23 Oct – 6 Nov") of a train-export pack.
+  const calendarSpan = atlas ? fmtCalendarSpan(atlas.data.calendar) : undefined;
 
   return (
     <>
@@ -238,6 +240,8 @@ export default function App() {
           selectedTrainCodes={filters.selectedTrainCodes}
           outTablesReady={outTablesReady}
           inTablesReady={inTablesReady}
+          trainCount={atlas ? atlas.data.train_table.length : 0}
+          calendarSpan={calendarSpan}
         />
 
         <Toolbar
@@ -340,6 +344,7 @@ export default function App() {
           {national && (
             <NationalNote
               trains={nationalTrainCount}
+              span={calendarSpan}
               failed={nationalTrainsFailed}
               layer={natLayer}
               onLayer={chooseNatLayer}

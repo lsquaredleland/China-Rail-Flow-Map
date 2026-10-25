@@ -1,5 +1,4 @@
 /* Floating controls drawn over the map canvas. */
-import { NATIONAL_DAILY_SERVICES_REF } from "../data";
 import type { NatLayer } from "../types";
 
 /** "Isolated: K9217 [Timetable] [x]" pill while one train is isolated. */
@@ -43,17 +42,19 @@ const NAT_LAYERS: { v: NatLayer; label: string; title: string }[] = [
   { v: "both", label: "Trains + flows", title: "Dots over the flows, built up to the clock's time" },
 ];
 
-/** National mode's coverage note: the trains drawn against the reference
-    size of the daily timetable (NATIONAL_DAILY_SERVICES_REF), and what the
-    map draws (trains, flows, or both: P3.2 / P3.3). */
+/** National mode's coverage note: the trains drawn and the schedule window
+    they run in (`span`, from the pack's calendar), and what the map draws
+    (trains, flows, or both: P3.2 / P3.3). */
 export function NationalNote({
   trains,
+  span,
   failed,
   layer,
   onLayer,
   flowsFailed,
 }: {
   trains: number;
+  span: string | undefined;
   failed: boolean;
   layer: NatLayer;
   onLayer: (v: NatLayer) => void;
@@ -66,7 +67,7 @@ export function NationalNote({
         {failed
           ? "The national train data could not be loaded."
           : trains
-          ? `${trains.toLocaleString("en-US")} of ~${NATIONAL_DAILY_SERVICES_REF.toLocaleString("en-US")} daily services`
+          ? `${trains.toLocaleString("en-US")} trains running${span ? " " + span : ""}`
           : "Loading national trains…"}
       </span>
       {flowsFailed && <span>The national flow data could not be loaded.</span>}

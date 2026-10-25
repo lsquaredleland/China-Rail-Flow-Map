@@ -120,6 +120,8 @@ export interface SharedData {
   /** fmt 6 (O1): station-throat pieces, geometry only. Path entry `n + j`
       (n = that direction's section count) is throat j; never a flow. */
   throats: string[];
+  /** Train-export packs only: the schedule window's dates (ISO, in order). */
+  calendar?: string[];
 }
 
 /** atlas-v2-out-map.json: every origin's identity + outbound map

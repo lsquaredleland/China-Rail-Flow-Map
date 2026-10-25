@@ -188,7 +188,7 @@ describe("national flows by minute (A+B)", () => {
   const F: NationalFlowsPack = pair.flows;
   const E: NationalEntriesPack = pair.entries;
   // Expected per source, counted independently (a linear scan of every tick).
-  const EXPECT = pair.source === "full" ? { sections: 7922, total: 462064, at1095: 345530 } : { sections: 407, total: 26343, at1095: 19634 };
+  const EXPECT = pair.source === "full" ? { sections: 9106, total: 609273, at1095: 450766 } : { sections: 466, total: 34895, at1095: 25670 };
   const sum = (a: Uint32Array) => a.reduce((x, y) => x + y, 0);
 
   test(`${pair.source} files: the pair matches and 24:00 equals B`, () => {

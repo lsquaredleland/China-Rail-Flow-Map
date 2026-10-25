@@ -169,8 +169,10 @@ Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
 ```
 
 **Asset swap (deploying a rebuilt pack).** `web/public/assets/` carries only
-the `.json.br` files the web app fetches: `atlas-v2-{shared,out-map,out-tables,in-map,in-tables,schedules}.json.br`
-and `china-outline.json.br`. Copy just those. The combined `atlas-v2-{out,in}.json.br`
+the `.json.br` files the web app fetches: `atlas-v2-{shared,out-map,out-tables,in-map,in-tables,schedules}.json.br`,
+the national files `atlas-v2-{national,national-trains,national-entries}.json.br`
+(fetched only in national mode; shipped since 2026-10-25) and
+`china-outline.json.br`. Copy just those. The combined `atlas-v2-{out,in}.json.br`
 and the plain `.json` copies (`atlas-v2-schedules.json`, `china-outline.json`)
 are not fetched by the app (it loads `<url>.br`, with a plain `.json` fallback
 that is not deployed) and only add to the deploy size.
@@ -179,44 +181,50 @@ array rows, integer-minute times, geometry at 1e4. Top-100 cut: #1 广州 1,201/
 #100 麻城 137/day.
 - **Infrastructure (`atlas-v2-shared.json`)**: `sections` (4,274 HSR / 3,257 conv) and `in_sections` (4,146 HSR / 3,116 conv) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h.
 - **8-Class Flow Breakdown (`out-map` / `in-map`)**: `flows` and `in_flows` rows pack `[sec_idx, total, g, d, c, s, z, t, k, plain]` (trailing zero counts stripped).
-- **National table (`atlas-v2-national.json`, P3.1; staged, not yet in `web/public/assets`)**: `{fmt, trains, total, by_class}`, arrays parallel to `sections`: distinct trains/day per section, every train counted once nationally, split into the same 8 classes. Format and rule: `atlaspack.rs` header and `docs/DECKGL_MIGRATION.md` (P3.1 as built).
+- **National table (`atlas-v2-national.json`, P3.1; shipped since 2026-10-25)**: `{fmt, trains, total, by_class}`, arrays parallel to `sections`: distinct trains/day per section, every train counted once nationally, split into the same 8 classes. Format and rule: `atlaspack.rs` header and `docs/DECKGL_MIGRATION.md` (P3.1 as built).
 - **Per-Train Section Indices (`out-tables` / `in-tables`)**: packs ordered section index lists (`dep_secs` / `arr_secs`) and per-call section cutoff counts (`sec_cnt`), allowing the client to highlight exact city-pair train corridors at 100% opacity over ~18% ghosted trunks.
-**Actual live recipe (verified 2026-10-24).** The live pack reproduces only
-WITH `data/leg_overrides.json` (44 variant legs); an
-empty-overrides build matches Chengdu's goldens but differs on 93,072
-edges elsewhere. In this repo, rebuild staged:
+**Actual live recipe (verified 2026-10-25: the train-export pack).** The
+committed pack is built from the train export (`data/raw/train-exports-2026-10-25`,
+see "Train export" below) with PR #55's atlas and router fixes, and
+WITH `data/leg_overrides.json` (44 variant legs). Build it from a clean
+export of the committed tree (`git archive HEAD | tar -x` into a scratch dir,
+then `cargo build --release` there), so `shared.build.pipeline_tree` is the
+committed `pipeline/` tree and there is no `dirty` key; outside a git checkout
+pass `CRFM_PIPELINE_TREE=$(git rev-parse HEAD:pipeline)`. Make every
+`pipeline/` commit (goldens included) before the build that ships, because
+any of them changes the tree hash. Rebuild staged:
 ```bash
 source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp -c clones of
                            # handoff-v3 inputs), ATLAS_PAIR_PATHS, ATLAS_LEG_PATHS,
                            # ATLAS_OVERRIDES=staging/inputs/data/leg_overrides.json
+X=$PWD/../data/raw/train-exports-2026-10-25
+export CRFM_SCHEDULE=$X/trains-all.json
+export CRFM_SCHEDULE_SUPPLEMENTS=$X/train-operating-days.json
 # Router inputs (since O17, 2026-10-24): one full, deterministic corridor-router
-# run; no splice. The build reads exactly these files:
-#   ATLAS_LEG_PATHS  = staging/inputs/data/derived/corridor-v3-hybrid/leg_paths.json
-#   ATLAS_PAIR_PATHS = data/pair_path_fixes.json,
-#                      staging/inputs/data/derived/corridor-v3-hybrid/pair_paths_canonical.json
-# Regenerate corridor-v3-hybrid/ (~25 s; byte-identical run to run and across
-# --threads, apart from timings in summary.json):
-#   ../pipeline/target/release/corridor-router --data ../data \
-#       --files ../staging/inputs/output \
-#       --out ../staging/inputs/data/derived/corridor-v3-hybrid \
-#       --station-fixes ../data/station_fixes.json \
-#       --config ../pipeline/router/recipe.toml
+# run; no splice. recipe.toml selects `[schedule] source = "export"` (paths
+# relative to --files). ~25 s; byte-identical run to run and across --threads,
+# apart from timings in summary.json:
+R=$PWD/../staging/swap-11k/run1/router
+../pipeline/target/release/corridor-router --data ../data --files $X --out $R \
+    --station-fixes ../data/station_fixes.json --config ../pipeline/router/recipe.toml
 # recipe.toml sets the canonical pair geometry to `[canon] mode = "hybrid"`
 # (production's path unless the pair's timetable favours another one; the
-# rule and its margins are in pipeline/router/README.md, PR #23).
-# The committed pack is this hybrid build (swapped 2026-10-24, PR #23). The
-# previous default-config build (canonical = shortest) came from
-# corridor-v3-o17 without --config; it differs by ~1.01M fine edges.
+# rule and its margins are in pipeline/router/README.md, PR #23) and
+# `[model] inner_reversal_penalty = 2.0` (PR #55).
+# The 12306 pack (the committed pack until 2026-10-25): a copy of recipe.toml
+# with `[schedule] source = "timetables"` (drop `export` / `supplements`),
+# `--files ../staging/inputs/output`, and CRFM_SCHEDULE /
+# CRFM_SCHEDULE_SUPPLEMENTS unset; its goldens are
+# pipeline/goldens-12306fix.proposed.json.
 # pair_path_fixes.json goes FIRST (first record per pair wins): pairs whose
 # station snapped to a homonym (禹州, 郏县; 恩平/江门–阳江, which the router
 # leaves bridged). Regenerate with scripts/o9_fix_paths.py (header has the
 # inputs). 聊城西–菏泽东 stays a chord (京港高速线 is unjoined at 菏泽东 in OSM;
 # owner: no synthetic connector). The pre-O17 corridor-v3-o9/ splice
 # (scripts/o9_splice_router.py, removed in PR #15; in git history) is retired.
-C=$PWD/../staging/inputs/data/derived/corridor-v3-hybrid
-export ATLAS_LEG_PATHS=$C/leg_paths.json
-export ATLAS_PAIR_PATHS=$PWD/../data/pair_path_fixes.json,$C/pair_paths_canonical.json
-O=$PWD/../staging/corridor-v3-ordered
+export ATLAS_LEG_PATHS=$R/leg_paths.json
+export ATLAS_PAIR_PATHS=$PWD/../data/pair_path_fixes.json,$R/pair_paths_canonical.json
+O=$PWD/../staging/swap-11k/run1
 ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
 AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
@@ -225,7 +233,7 @@ AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + go
 #   AUDIT_PACK_DIR=../web/public/assets ./target/release/audit --pack-only --goldens goldens.json
 # --pack-only cannot gate dropped_chains / flow_lost: they need the OSM extract
 # (a dropped chain never reaches the pack), so only the full run enforces them.
-./target/release/secdiff --old ../staging/swap-hybrid/china-flow-atlas-data.json \
+./target/release/secdiff --old ../staging/swap-11k/run2/china-flow-atlas-data.json \
     --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
 ./target/release/secdiff --old ... --new ... --classes   # per-edge class columns (8 classes)
 # router, atlas and atlaspack are deterministic: identical inputs give a
@@ -236,15 +244,15 @@ are byte-identical to `web/public/assets`). Always set `CRFM_OUTPUT_DIR` /
 `ATLAS_OUT` / `--out-dir` so a build never overwrites `output/` or
 `web/public/assets`.
 
-**Second schedule source: a train export (staged, 2026-10-25; not the
-committed pack).** The owner's merged export (`trains-all.json`, 11,589
-trains, window 2026-10-23 → 2026-11-06) feeds the same recipe through a
-second source; the 12306 deliverables stay the default, and a timetables
-build is unchanged byte for byte.
+**Train export (the committed pack since 2026-10-25).** The owner's merged
+export (`trains-all.json`, 11,589 trains, window 2026-10-23 → 2026-11-06)
+feeds the same recipe through a second schedule source. The 12306
+deliverables are still the code default (`Config::default()`, CRFM_SCHEDULE
+unset), and a timetables build is unchanged byte for byte.
 - **Router:** `[schedule] source = "export"` in the `--config` file, with
   `export = "trains-all.json"` and
   `supplements = ["train-operating-days.json"]`, relative to `--files` (the
-  export's directory). `recipe.toml` keeps `source = "timetables"`.
+  export's directory). `recipe.toml` selects it (the 12306 recipe: above).
   Implementation: `pipeline/router/src/export.rs` (`TrainExport`, a
   `ScheduleSource`).
 - **Atlas / audit:** `CRFM_SCHEDULE=<dir>/trains-all.json` and
@@ -269,9 +277,10 @@ build is unchanged byte for byte.
 - **Train identity:** train_table rows are keyed by train (an index into the
   timetable), not by `(code, class)`. The export has 79 codes shared by two
   or more `train_no`s, which are date variants of one service.
-- **Goldens:** the export pack's baseline is `pipeline/goldens-11k.proposed.json`.
-  It is not gated in CI. Move it over `goldens.json` in the commit that
-  swaps the pack, never before, because CI audits the committed pack.
+- **Goldens:** `pipeline/goldens.json` is the export pack's baseline since
+  the swap (regenerated with `audit --update-goldens` from the shipped
+  build). The 12306 pack's baseline is kept as a reference in
+  `pipeline/goldens-12306fix.proposed.json` (not gated in CI).
 
 **Pack format `fmt: 6`** (every one of shared / out-map / in-map /
 out-tables / in-tables carries `fmt: 6`; the client refuses anything else.
@@ -510,21 +519,23 @@ their own frame; the join is deliberately unchanged.
 **Since 2026-10-24 the machine-checked baseline is `pipeline/goldens.json`.**
 `audit` fails on any `exact` counter that changes or `max` counter that rises.
 Rebase deliberately with `audit --update-goldens`. Dropped chains / flow lost
-are enforced only in the full audit, not `--pack-only`. Current key values:
-- 102 origins (incl. 香港); Chengdu outbound 564 trains / widest 144 /
-  564 fully tracked; Chengdu inbound widest 105
-- chord-leg rows 1,850 (1,587 inbound-only legs, 263 real geometry gaps;
-  the 13,420 router-coordinate rows were fixed by O4)
-- 49 trains with non-monotone `sec_cnt` (gated as the `max` counter
+are enforced only in the full audit, not `--pack-only`. Current key values
+(the 11k train-export pack, since 2026-10-25; the 12306 pack's are in
+`pipeline/goldens-12306fix.proposed.json`):
+- 102 origins (incl. 香港); 11,248 national trains over 9,106 sections
+  (in_sections 9,055); Chengdu outbound 801 trains / widest 176 / 801
+  fully tracked; Chengdu inbound 784 / widest 148
+- chord-leg rows 46 (`max`; unmatched Laos / 阿瓦提 stations and new chord legs)
+- 76 trains with non-monotone `sec_cnt` (gated as the `max` counter
   `nonmonotone_sec_cnt_trains`)
 - rows with a >35 km jump: 0 inside or outside chord legs (old client
-  chainer: 5,804)
+  chainer: 5,804); 0 over 20 km since PR #55
 - continuity gaps (joins outside chord legs, throats included since O1):
-  43 in (3, 6] km and 149 over 6 km (before O1: 64,852 and 391), 103,390
-  over 0.1 km (gated as `continuity_gaps_gt100m`). Most of the rest are
-  0.1–1 km hops at a stop where the arriving and departing legs' geometry end
-  on different station nodes.
-- station-level stops (O14): 235,264 `dep_stop_pos` entries; 11,951 dep
+  44 in (3, 6] km and 0 over 6 km, 85,765 over 0.1 km (gated as
+  `continuity_gaps_gt100m`). Most of the rest are 0.1–1 km hops at a stop
+  where the arriving and departing legs' geometry end on different station
+  nodes.
+- station-level stops (O14): 267,428 `dep_stop_pos` entries; 14,570 dep
   rows have stations without a city call of their own
 - known gaps: inbound-only legs stay unresolved; flows still trim 1.3 km
   around stations (paths bridge them with throats, O1; see
