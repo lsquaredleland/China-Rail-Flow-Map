@@ -132,11 +132,14 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     const built = nationalTimeline(atlas, P.current.nationalTrains);
     if (!built) {
       st.natN = st.natRunning = stats.natDots = 0;
+      st.natPick = null;
       return layers;
     }
     const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale);
     st.natN = built.tl.n;
-    st.natRunning = stats.natDots = f.count;
+    st.natRunning = f.running;
+    stats.natDots = f.count;
+    st.natPick = { tl: built.tl, count: f.count, buf: f.buf, qOf: f.qOf, m: ((st.animTime % 1440) + 1440) % 1440 };
     stats.natBuildMs = built.ms;
     layers.push(...nationalLayers(f, !st.animPlaying));
     return layers;

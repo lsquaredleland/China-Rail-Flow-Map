@@ -1,7 +1,7 @@
 // National-mode deck layers (P2.2): the frame buffers from natPositions, the
 // layer props, and the ?natSynth load. No GPU.
 import { describe, expect, test } from "bun:test";
-import { natPositions } from "../src/lib";
+import { natPositions, natTrainVM, tooltipHtml } from "../src/lib";
 import type { NationalTrainsData } from "../src/types";
 import { maxDots, nationalFrame, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
 import { glowOf } from "../src/components/map/deck/layers/trains";
@@ -62,5 +62,31 @@ describe("national layers", () => {
     expect(ca).toBeGreaterThan(cb);
     expect([...a.subarray(0, cb * 6)]).toEqual([...b.subarray(0, cb * 6)]);
     expect(synthNational(tl, tl.n)).toBe(tl);
+  });
+  test("running counts distinct trains: a run over 24 h shows two dots but is one train", () => {
+    const f = nationalFrame(tl, atlas, 1095, 100);
+    expect(f.running).toBe(new Set(f.qOf.subarray(0, f.count)).size);
+    expect(f.running).toBeLessThanOrEqual(f.count);
+    const long = { ...tl, end: Float32Array.from(tl.end, (e) => e + 1500) };
+    const g = nationalFrame(long, atlas, 600, 100);
+    expect(g.count).toBeGreaterThan(g.running);
+    expect(g.running).toBe(new Set(g.qOf.subarray(0, g.count)).size);
+  });
+
+  test("natTrainVM: the tooltip view-model of a dot", () => {
+    const f = nationalFrame(tl, atlas, 1095, 100);
+    for (let i = 0; i < f.count; i += 7) {
+      const q = f.qOf[i];
+      const k = Math.ceil((tl.start[q] - 1095) / 1440);
+      let first = i;
+      while (first > 0 && f.qOf[first - 1] === q) first--;
+      const vm = natTrainVM(tl, atlas.data, data.schedules, q, 1095 + 1440 * (k + i - first), f.buf[i * 6], f.buf[i * 6 + 1], f.buf[i * 6 + 2], f.buf[i * 6 + 3]);
+      expect(vm.code).toBe(atlas.data.train_table[tl.tIdx[q]].code);
+      expect(vm.progressPct).toBeGreaterThanOrEqual(0);
+      expect(vm.progressPct).toBeLessThanOrEqual(100);
+      expect(vm.fromStation).not.toBe("");
+      expect(!!vm.isDwelling).toBe((f.buf[i * 6 + 5] & 16) !== 0);
+      expect(tooltipHtml({ kind: "train", train: vm }, { data: atlas.data, cur: null as never, direction: "out", distUnit: "km", panelDest: null, dark: false, ferry: false })).toContain(vm.code);
+    }
   });
 });

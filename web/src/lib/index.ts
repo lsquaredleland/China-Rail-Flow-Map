@@ -62,6 +62,7 @@ export {
   trainSpeedFrac,
 } from "./timeline";
 export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
+export { natTrainVM } from "./natTrain";
 export {
   nationalCounts,
   nationalFlowPasses,
@@ -132,5 +133,5 @@ export {
 export type { SelCache, SelInput, StationInput, StationState } from "./mapModel";
 export { placeLabels } from "./labels";
 export type { LabelOptions, LabelStyle, Measure, PlacedLabel } from "./labels";
-export { SEG_TIE_PX, distToLine, distToSeg, pickPriority } from "./pick";
+export { SEG_TIE_PX, TRAIN_RADIUS, distToLine, distToSeg, pickPriority } from "./pick";
 export type { PickCandidate, PickKind, PickLine, PickOptions, PickView } from "./pick";
