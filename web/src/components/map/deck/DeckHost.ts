@@ -20,14 +20,6 @@ import { PICK_PREFIX, flowLayers } from "./layers/flows";
 import { stationLayers } from "./layers/stations";
 import { shownTrains, trainLayers } from "./layers/trains";
 
-export interface PickOptions {
-  x: number;
-  y: number;
-  radius?: number;
-  layerIds?: string[];
-  depth?: number;
-}
-
 export interface PickRectOptions {
   /** Left / top of the box, CSS px. */
   x: number;
@@ -40,10 +32,8 @@ export interface PickRectOptions {
 export interface DeckHandle {
   /** setProps(viewState, layers) + a synchronous redraw, then labels + frame tail. */
   render(): void;
-  pick(opts: PickOptions): PickingInfo | null;
-  pickMultiple(opts: PickOptions): PickingInfo[];
   /** Every distinct object with a visible pixel in the box, from ONE picking pass
-      (pickMultiple peels one object per pass: far too slow for hover). */
+      (deck's pickMultipleObjects peels one object per pass: far too slow for hover). */
   pickRect(opts: PickRectOptions): PickingInfo[];
   /** Re-measures the deck canvas after S.W / S.H / S.DPR changed. */
   resize(): void;
@@ -67,8 +57,6 @@ interface DeckInternals {
   setProps(p: object): void;
   redraw(reason?: string): void;
   finalize(): void;
-  pickObject(o: PickOptions): PickingInfo | null;
-  pickMultipleObjects(o: PickOptions): PickingInfo[];
   pickObjects(o: PickRectOptions & { maxObjects?: number | null }): PickingInfo[];
   _updateCanvasSize?: () => void;
 }
@@ -132,7 +120,6 @@ function buildLayers(M: MapCtx): Layer[] {
           isolatedCode: iso,
           selectedCode: P.current.selectedTrainCode,
           hoveredCode: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
-          pickable: !st.animPlaying,
           animTime: st.animTime,
         }),
       );
@@ -320,19 +307,9 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
     if (!stats.settled) settleLoop(60);
   }
 
-  /* The drawing buffer is floor(CSS size · dpr) px, so a cursor in the fractional last
-     row/column of the canvas is outside it: pull it onto the last pixel. */
-  const inBuffer = (o: PickOptions): PickOptions => {
-    const kx = canvas.width / (canvas.clientWidth || canvas.width);
-    const ky = canvas.height / (canvas.clientHeight || canvas.height);
-    return { ...o, x: Math.min(o.x, (canvas.width - 1) / kx), y: Math.min(o.y, (canvas.height - 1) / ky) };
-  };
-
   create();
   const handle: DeckHandle = {
     render,
-    pick: (opts) => (lost || destroyed || !deck.isInitialized ? null : deck.pickObject(inBuffer(opts))),
-    pickMultiple: (opts) => (lost || destroyed || !deck.isInitialized ? [] : deck.pickMultipleObjects(inBuffer(opts))),
     pickRect: (opts) => (lost || destroyed || !deck.isInitialized ? [] : deck.pickObjects(opts)),
     resize() {
       if (destroyed || lost) return;

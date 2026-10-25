@@ -177,21 +177,20 @@ export function pickTrain(M: MapCtx, px: number, py: number): Hit | null {
 }
 
 /* Deck mode (D6): GPU candidates from the deck handle, then the same priority
-   and distances as above, recomputed exactly in lib/pick.ts. Two single-pass
-   rectangle queries on hairline proxy layers (trains, paused only; sections +
-   chords) plus an exact scan for stations. Layer data is read back through the
+   and distances as above, recomputed exactly in lib/pick.ts. One single-pass
+   rectangle query on hairline proxy layers (sections + chords) plus exact scans
+   for stations and, while paused, trains. Layer data is read back through the
    layers' own fields: chords by `info.object`, flow paths through the pass's
-   `idxToSec` prop (C19), train dots through the `shown` prop.
-   GPU query radii: the hit radius plus 2 px, because the nearest drawn pixel of
+   `idxToSec` prop (C19).
+   GPU query radius: the hit radius plus 2 px, because the nearest drawn pixel of
    a 1 px proxy can be that much farther than its centre; lib/pick.ts applies
    the exact radii. */
-const TRAIN_RADIUS = 16;
 const SEC_RADIUS = 12;
 
-/* Stations and the origin are not picked on the GPU: they are at most a few hundred
-   dots, a one-pass query shows only the top dot of any pixel (two stations closer than about
-   1 px hide each other, e.g. 东莞 / 望牛墩), and the exact scan costs microseconds. The
-   candidates go through the same pickPriority. */
+/* Stations, the origin and trains are not picked on the GPU: they are at most a few thousand
+   dots, a one-pass query shows only the top dot of any pixel (dots closer than about 1 px
+   hide each other, e.g. 东莞 / 望牛墩, or trains 0.05 px apart), and the exact scan costs
+   microseconds. The candidates go through the same pickPriority. */
 function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandidate[], hits: Hit[]) {
   const { S, P, X, Y } = M;
   const cur = P.current.cur;
@@ -215,7 +214,23 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
   hits.push({ kind: "origin" });
 }
 
-type LayerProps = { idxToSec?: Int32Array; shown?: ActiveTrainVM[] };
+/* Paused only, as pickTrain: same list, same shown filter (no isolation filter, as Canvas). */
+function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
+  const { S, activeTimeline, activeTrainsAt } = M;
+  const st = S.current;
+  if (!st.animEnabled || st.animPlaying) return;
+  const timeline = activeTimeline();
+  if (!timeline) return;
+  const trains = activeTrainsAt(timeline, st.animTime);
+  for (let i = 0; i < trains.length; i++) {
+    const tr = trains[i];
+    if (!isTrainShown(M, tr.code)) continue;
+    cands.push({ kind: "train", index: i, pos: [tr.lon, tr.lat] });
+    hits.push({ kind: "train", train: tr });
+  }
+}
+
+type LayerProps = { idxToSec?: Int32Array };
 
 export function pickDeck(M: MapCtx, px: number, py: number): Hit | null {
   const deck = M.deck;
@@ -228,14 +243,12 @@ export function pickDeck(M: MapCtx, px: number, py: number): Hit | null {
   const paused = st.animEnabled && !st.animPlaying;
   const q = (radius: number, layerIds: string[]) =>
     deck.pickRect({ x: px - radius, y: py - radius, width: 2 * radius + 1, height: 2 * radius + 1, layerIds });
-  const infos = [
-    ...(paused ? q(TRAIN_RADIUS, ["pick-trains"]) : []),
-    ...q(SEC_RADIUS, ["pick-chords", "pick-flows-all", "pick-flows-focus"]),
-  ];
+  const infos = q(SEC_RADIUS, ["pick-chords", "pick-flows-all", "pick-flows-focus"]);
 
   const cands: PickCandidate[] = [];
   const hits: Hit[] = [];
   stationCandidates(M, px, py, cands, hits);
+  trainCandidates(M, cands, hits);
   const direction = P.current.direction;
   const destSecCounts = getDestSectionCounts(M);
   let flowIdx: Map<number, number> | null = null;
@@ -248,12 +261,7 @@ export function pickDeck(M: MapCtx, px: number, py: number): Hit | null {
     if (!layer || info.index < 0) continue;
     const props = layer.props as unknown as LayerProps;
     const id = layer.id;
-    if (id === "pick-trains") {
-      const tr = props.shown?.[info.index];
-      if (!tr) continue;
-      cands.push({ kind: "train", index: info.index, pos: [tr.lon, tr.lat] });
-      hits.push({ kind: "train", train: tr });
-    } else if (id === "pick-chords") {
+    if (id === "pick-chords") {
       if (direction !== "out" || destSecCounts) continue;
       const ch = (info.object as { ch?: ChordVM } | null)?.ch;
       if (!ch) continue;

@@ -172,7 +172,7 @@ describe("train layers", () => {
   test("train dot getRadius 3 + ring width 2 (outer edge 4 px); isolated 4.15 / 2.7", () => {
     const act = tl.getActiveTrains(600).slice(0, 20);
     const mk = (iso: string | null) =>
-      trainLayers({ trains: act, scale: 100, isolatedCode: iso, selectedCode: null, hoveredCode: null, pickable: false, animTime: 600 });
+      trainLayers({ trains: act, scale: 100, isolatedCode: iso, selectedCode: null, hoveredCode: null, animTime: 600 });
     const dot = mk(null).find((l) => l.id === "trains")!;
     expect(dot.props.getRadius).toBe(3);
     expect(dot.props.getLineWidth).toBe(2);
@@ -180,14 +180,9 @@ describe("train layers", () => {
     const isoDot = mk(act[0].code).find((l) => l.id === "trains")!;
     expect(isoDot.props.getRadius).toBe(4.15);
     expect(isoDot.props.getLineWidth).toBe(2.7);
-    expect(mk(null).map((l) => l.id)).toEqual(["tails", "trains", "pick-trains", "dwell", "trainring"]);
-    // Picking: the drawn dots never are; the 1 px proxy is, while paused, and maps index -> train through `shown`.
-    const px = (pickable: boolean) =>
-      trainLayers({ trains: act, scale: 100, isolatedCode: null, selectedCode: null, hoveredCode: null, pickable, animTime: 600 });
+    expect(mk(null).map((l) => l.id)).toEqual(["tails", "trains", "dwell", "trainring"]);
+    // Trains are picked on the CPU: no picking proxy, nothing pickable.
     expect(dot.props.pickable).toBe(false);
-    expect(px(true).find((l) => l.id === "pick-trains")!.props.pickable).toBe(true);
-    expect(px(false).find((l) => l.id === "pick-trains")!.props.pickable).toBe(false);
-    expect((px(true).find((l) => l.id === "pick-trains")!.props as any).shown).toBe(act);
   });
 
   test("tails: 12 px x speedFrac (22 isolated), none dwelling / on chord; source = pos - heading*len/scale", () => {
