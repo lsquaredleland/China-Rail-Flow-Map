@@ -275,6 +275,21 @@ rebuild, and what `audit` expands to):
   indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm]`
   and station names normalized.
 
+**`analyze` crate layout.** `atlas` (builder), `atlaspack` (packer) and
+`audit` share the library in `pipeline/analyze/src/`: `inputs` (env-driven
+recipe paths, loaded once), `legs` (pair paths, router leg paths, overrides,
+leg resolution, `dijkstra_chain`), `osm` (node coordinates, way classes),
+`timetable`, `geo`, `polyline`, `names`, `model`, `chains`. Everything China-
+or 12306-specific is under `cn/`: the city gazetteer and its corrections
+(`cn::gazetteer`), English names (`cn::station_en`), train-class letters
+(`cn::classes`) and the dated input file names (`cn::files`). `audit` shares
+only parsing and helpers with the build (plus `chains`, as before); it still
+recounts independently, in its own copy of the per-edge / per-city train
+counting: dropped chains and flow lost, the per-chain dedup recount, the
+junction-flag check and the variant-leg tally, and, on the pack, its own
+fmt-6 decode with the path / stop / chord / schedule invariants and the
+goldens gate. None of that reads the build's final aggregation.
+
 **Verify against the goldens (§7) before trusting any rebuild.** The country outline comes from the
 `outline` crate (`pipeline/outline`) → `china-outline.json`. (The old `flowmap` / `flowstations`
 binaries no longer exist in this repo.)
