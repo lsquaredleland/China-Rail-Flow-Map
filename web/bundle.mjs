@@ -1,5 +1,5 @@
 /* Bundle the React + TSX sources into the single classic script that
-   dist/index.html carries. Run with: bun bundle.mjs
+   dist/index.html carries, and inline src/styles/*.css into its <style>. Run with: bun bundle.mjs
    Produces dist/index.html from index.template.html (head + CSS verbatim)
    and copies public/assets into dist/assets. */
 import { createHash } from "node:crypto";
@@ -59,10 +59,33 @@ if (js.includes("</script")) {
 }
 
 const tpl = readFileSync("index.template.html", "utf8");
-if (!tpl.includes("/*__BUNDLE__*/")) {
-  console.error("template is missing the /*__BUNDLE__*/ placeholder");
+for (const ph of ["/*__BUNDLE__*/", "/*__CSS__*/"]) {
+  if (!tpl.includes(ph)) {
+    console.error(`template is missing the ${ph} placeholder`);
+    process.exit(1);
+  }
+}
+
+// The stylesheet is src/styles/*.css, inlined into the template's <style>
+// in this order (later files win ties, so the mobile overrides come last).
+const CSS_ORDER = [
+  "theme.css",
+  "base.css",
+  "controls.css",
+  "map.css",
+  "panels.css",
+  "departures.css",
+  "responsive.css",
+];
+const cssOnDisk = readdirSync("src/styles").filter((f) => f.endsWith(".css"));
+const unlisted = cssOnDisk.filter((f) => !CSS_ORDER.includes(f));
+if (unlisted.length) {
+  console.error("src/styles has files missing from CSS_ORDER in bundle.mjs:", unlisted.join(", "));
   process.exit(1);
 }
+const css = CSS_ORDER.map((f) => readFileSync(`src/styles/${f}`, "utf8").trimEnd())
+  .join("\n")
+  .replace(/\n/g, "\n      ");
 
 // Start from an empty dist/ so stale hashed files never accumulate.
 rmSync("dist", { recursive: true, force: true });
@@ -77,6 +100,6 @@ for (const [f, hashed, bytes] of hashedAssets) {
 }
 writeFileSync(
   "dist/index.html",
-  tpl.replace("/*__BUNDLE__*/", () => js),
+  tpl.replace("/*__CSS__*/", () => css).replace("/*__BUNDLE__*/", () => js),
 );
 console.log("dist/index.html written, bundle bytes:", js.length);
