@@ -8,6 +8,7 @@ import { scheduleViewReport, stationT, updateScaleBar } from "./camera";
 import { drawChords, drawFlows, drawHighlightSeg, drawInfra, getDestSectionCounts } from "./flows";
 import { drawLabels, drawStations } from "./stations";
 import { drawTrains } from "./trains";
+import { NAT, drawNational } from "./national";
 
 
 export function draw(M: MapCtx) {
@@ -22,6 +23,13 @@ export function draw(M: MapCtx) {
   const pal = makePalette(P.current.dark);
   ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
   drawBackdrop(M, ctx, canvas, pal);
+  if (NAT) {
+    (window as any).__M = M;
+    (window as any).__draw = () => draw(M);
+    ctx.globalAlpha = 1;
+    drawNational(M, ctx);
+    return;
+  }
   const destSecCounts = getDestSectionCounts(M);
   // Chords are drawn UNDER the routed flows: a dashed leg shows only
   // where a gap in the flow coverage lets it peek out, and is hidden
