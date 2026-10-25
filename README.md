@@ -13,7 +13,7 @@ An interactive, Minard-style passenger rail flow atlas across China's top 100 ra
 - **8-Class Dynamic Filtering (`G, D, C, S, Z, T, K, 普`)**: Filter both the map and timetables by any combination of train classes; unavailable classes for the active origin or city pair are automatically disabled.
 - **2-Color HSR vs. Conventional Infrastructure Overlay**: Superimposes high-speed rail (`highspeed=yes` / `maxspeed >= 200 km/h`) and conventional rail centrelines over the proportional traffic bands.
 - **Three Interactive Histograms**: Filter the departures/arrivals table by **hour of day**, **journey distance**, or **journey duration**, with hover count readouts and class-filter highlight overlays.
-- **Staged Progressive Brotli Loading**: First paint transfers only the shared track geometry (`495 KB`) and active outbound map aggregates (`988 KB`), streaming per-train tables and inbound flows in the background.
+- **Staged Progressive Brotli Loading**: First paint transfers only the shared track geometry (`599 KB`) and active outbound map aggregates (`545 KB`), streaming per-train tables and inbound flows in the background.
 
 ---
 
@@ -23,7 +23,7 @@ An interactive, Minard-style passenger rail flow atlas across China's top 100 ra
 China-Rail-Flow-Map/
 ├── web/                  # React 19 + TypeScript + Canvas 2D frontend (bundled with Bun)
 │   ├── src/              # Application, Canvas renderer, histograms, and timetable views
-│   ├── public/assets/    # 5 Brotli-compressed v2 dataset splits (atlas-v2-*.json.br)
+│   ├── public/assets/    # 7 Brotli files (~5.6 MB): 6 atlas-v2-*.json.br + china-outline.json.br
 │   └── bundle.mjs        # Produces web/dist/ (index.html + assets/)
 ├── pipeline/             # Unified Rust Cargo workspace for OSM & timetable processing
 │   ├── analyze/          # Core graph router, section decomposition (atlas) & v2 packer (atlaspack)
@@ -32,7 +32,7 @@ China-Rail-Flow-Map/
 │   ├── tiler/            # MVT / PMTiles vector tile encoder
 │   └── outline/          # National boundary polyline generator
 ├── data/                 # Station gazetteers (ZH/EN), OSM station coordinates & corridor overrides
-└── docs/                 # Full pipeline reproduction guide (PIPELINE.md), benchmarks & reports
+└── docs/                 # Full pipeline reproduction guide (PIPELINE.md), features roadmap, benchmarks & reports
 ```
 
 ---
