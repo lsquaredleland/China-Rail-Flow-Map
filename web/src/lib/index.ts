@@ -110,3 +110,14 @@ export type {
   ModelCaches,
   ModelState,
 } from "./mapModel";
+export {
+  computeAllowedTrainCodes,
+  computeCityAllowedArrivalTimes,
+  computeDestWindow,
+  getSelCache,
+  isTrainShown,
+  stationStates,
+} from "./mapModel";
+export type { SelCache, SelInput, StationInput, StationState } from "./mapModel";
+export { placeLabels } from "./labels";
+export type { LabelOptions, LabelStyle, Measure, PlacedLabel } from "./labels";

@@ -1,140 +1,20 @@
 /* Train layer: the moving dots and their selection / isolation filters. */
-import type {
-  CityPointVM,
-  DestVM,
-  Palette,
-  SrcVM,
-} from "../../types";
-import { destWindow, stopArrivalTimes, trainShownAt } from "../../lib";
-import type { DestWindow } from "../../lib";
+import type { Palette } from "../../types";
+import { getSelCache as mmGetSelCache, isTrainShown as mmIsTrainShown } from "../../lib";
+import type { SelCache } from "../../lib";
 import type { MapCtx } from "./context";
 
-/* The outbound destination's per-train window (null: no destination, or
-   inbound, which has no animation). */
-export function computeDestWindow(M: MapCtx): DestWindow | null {
-  const { P } = M;
-  const cur = P.current.cur;
-  const pd = P.current.panelDest;
-  if (!cur || !pd || P.current.direction !== "out") return null;
-  const dest = (cur.dests.find((d) => d.idx === pd.idx) || pd) as DestVM;
-  return dest.calls ? destWindow(dest.calls) : null;
-}
-
-export function computeAllowedTrainCodes(M: MapCtx): Set<string> | null {
-  const { P } = M;
-  const iso = P.current.isolatedTrainCode;
-  const cur = P.current.cur;
-  if (iso) {
-    // Intersected with the active filter: a filtered-out train stays hidden.
-    const rows = !cur ? [] : P.current.direction === "out" ? cur.deps : cur.arrs;
-    return new Set(rows.some((t) => t.code === iso) ? [iso] : []);
-  }
-  const pd = P.current.panelDest;
-  if (!pd || !cur) return null;
-
-  const allowed = new Set<string>();
-  if (P.current.direction === "out") {
-    const dest = cur.dests.find((d) => d.idx === pd.idx) || (pd as DestVM);
-    if (dest && dest.calls) {
-      for (let i = 0; i < dest.calls.length; i++) {
-        const c = dest.calls[i];
-        if (c.dep && c.dep.code) {
-          allowed.add(c.dep.code);
-        }
-      }
-    }
-  } else {
-    const src = cur.srcs.find((s) => s.idx === pd.idx) || (pd as SrcVM);
-    if (src && src.inCalls) {
-      for (let i = 0; i < src.inCalls.length; i++) {
-        const c = src.inCalls[i];
-        if (c.arr && c.arr.code) {
-          allowed.add(c.arr.code);
-        }
-      }
-    }
-  }
-  return allowed;
-}
-
-
-export function computeCityAllowedArrivalTimes(
-  M: MapCtx,
-  c: CityPointVM,
-  allowedCodes: Set<string>,
-  win: DestWindow | null,
-): number[] {
-  const { P } = M;
-  if (P.current.direction === "out") {
-    const calls = (c as DestVM)?.calls;
-    if (!calls || calls.length === 0) return [];
-    return stopArrivalTimes(calls, allowedCodes, win);
-  } else {
-    const src = c as SrcVM;
-    const inCalls = src?.inCalls;
-    if (!inCalls || inCalls.length === 0) return [];
-    const times: number[] = [];
-    for (let i = 0; i < inCalls.length; i++) {
-      const call = inCalls[i];
-      if (call.arr && allowedCodes.has(call.arr.code)) {
-        if (call.boardMins !== undefined && call.boardMins >= 0) {
-          const tDep = call.arr.depMins >= 0 ? call.arr.depMins : 0;
-          const tArr = tDep + (call.arr.dur > 0 ? call.arr.dur : 1);
-          let unrolled: number = call.boardMins;
-          for (let d = 0; d <= 4; d++) {
-            const testT = d * 1440 + call.boardMins;
-            if (testT >= tDep - 1 && testT <= tArr + 1) {
-              unrolled = testT;
-              break;
-            }
-          }
-          times.push(unrolled);
-        }
-      }
-    }
-    times.sort((a, b) => a - b);
-    return times;
-  }
-}
-
-
-/* Per-selection cache: the allowed train set and each city's sorted arrival
-   times, rebuilt only when the origin, panel city, isolated train or
-   direction changes (not per frame, not per dot). */
-export function getSelCache(M: MapCtx): NonNullable<typeof S.current.selCache> | null {
-  const { S, P, points } = M;
-  const cur = P.current.cur;
-  if (!cur) return null;
-  const panelDest = P.current.panelDest ?? null;
-  const iso = P.current.isolatedTrainCode ?? null;
-  const dir = P.current.direction;
-  const c = S.current.selCache;
-  if (c && c.cur === cur && c.panelDest === panelDest && c.iso === iso && c.dir === dir) {
-    return c;
-  }
-  const allowedCodes = computeAllowedTrainCodes(M);
-  const win = computeDestWindow(M);
-  const cityTimes = new Map<number, number[]>();
-  if (allowedCodes) {
-    const pts = points();
-    for (let i = 0; i < pts.length; i++) {
-      cityTimes.set(pts[i].idx, computeCityAllowedArrivalTimes(M, pts[i], allowedCodes, win));
-    }
-  }
-  const next = { cur, panelDest, iso, dir, allowedCodes, win, cityTimes };
-  S.current.selCache = next;
-  return next;
+/* Selection rules live in lib/mapModel; these bind them to the map state. */
+export function getSelCache(M: MapCtx): SelCache | null {
+  return mmGetSelCache(M.P.current, M.S.current);
 }
 
 export function getAllowedTrainCodes(M: MapCtx) {
   return getSelCache(M)?.allowedCodes ?? null;
 }
 
-/* The single visible-train rule: dots, hit-testing and counters ask this;
-   stop effects derive from the same set (lib/stopEffects). */
 export function isTrainShown(M: MapCtx, code: string): boolean {
-  const sel = getSelCache(M);
-  return trainShownAt(code, M.S.current.animTime, sel?.allowedCodes ?? null, sel?.win ?? null);
+  return mmIsTrainShown(M.P.current, M.S.current, M.S.current.animTime, code);
 }
 
 

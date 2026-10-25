@@ -18,6 +18,9 @@ import type {
   PrepTrain,
   SrcVM,
 } from "../types";
+import { stationR, stationZoomK } from "./palette";
+import type { DestWindow } from "./stopEffects";
+import { destWindow, stopArrivalTimes, trainShownAt } from "./stopEffects";
 import { trainDistAt } from "./timeline";
 
 /** The slice of app state every model function reads. */
@@ -572,4 +575,254 @@ export function highlightSegN(
   const destSecCounts = getDestSectionCounts(s, caches);
   const subN = destSecCounts ? destSecCounts.get(sIdx) : undefined;
   return subN !== undefined && subN > 0 ? subN : n;
+}
+
+// --- stations ---------------------------------------------------------------
+
+/** The selection inputs every station / train rule reads. */
+export interface SelInput {
+  cur: OriginVM | null;
+  panelDest: CityPointVM | null;
+  isolatedTrainCode?: string | null;
+  direction: Direction;
+}
+
+/** Per-selection cache: the allowed train set and each city's sorted arrival
+    times, rebuilt only when the origin, panel city, isolated train or
+    direction changes (not per frame, not per dot). */
+export interface SelCache {
+  cur: OriginVM;
+  panelDest: CityPointVM | null;
+  iso: string | null;
+  dir: Direction;
+  allowedCodes: Set<string> | null;
+  win: DestWindow | null;
+  cityTimes: Map<number, number[]>;
+}
+
+const pointsOf = (s: SelInput): CityPointVM[] =>
+  !s.cur ? [] : s.direction === "out" ? s.cur.dests : s.cur.srcs;
+
+/* The outbound destination's per-train window (null: no destination, or
+   inbound, which has no animation). */
+export function computeDestWindow(s: SelInput): DestWindow | null {
+  const { cur, panelDest: pd } = s;
+  if (!cur || !pd || s.direction !== "out") return null;
+  const dest = (cur.dests.find((d) => d.idx === pd.idx) || pd) as DestVM;
+  return dest.calls ? destWindow(dest.calls) : null;
+}
+
+export function computeAllowedTrainCodes(s: SelInput): Set<string> | null {
+  const { cur } = s;
+  const iso = s.isolatedTrainCode;
+  if (iso) {
+    // Intersected with the active filter: a filtered-out train stays hidden.
+    const rows = !cur ? [] : s.direction === "out" ? cur.deps : cur.arrs;
+    return new Set(rows.some((t) => t.code === iso) ? [iso] : []);
+  }
+  const pd = s.panelDest;
+  if (!pd || !cur) return null;
+
+  const allowed = new Set<string>();
+  if (s.direction === "out") {
+    const dest = cur.dests.find((d) => d.idx === pd.idx) || (pd as DestVM);
+    if (dest && dest.calls) {
+      for (let i = 0; i < dest.calls.length; i++) {
+        const c = dest.calls[i];
+        if (c.dep && c.dep.code) {
+          allowed.add(c.dep.code);
+        }
+      }
+    }
+  } else {
+    const src = cur.srcs.find((x) => x.idx === pd.idx) || (pd as SrcVM);
+    if (src && src.inCalls) {
+      for (let i = 0; i < src.inCalls.length; i++) {
+        const c = src.inCalls[i];
+        if (c.arr && c.arr.code) {
+          allowed.add(c.arr.code);
+        }
+      }
+    }
+  }
+  return allowed;
+}
+
+export function computeCityAllowedArrivalTimes(
+  direction: Direction,
+  c: CityPointVM,
+  allowedCodes: Set<string>,
+  win: DestWindow | null,
+): number[] {
+  if (direction === "out") {
+    const calls = (c as DestVM)?.calls;
+    if (!calls || calls.length === 0) return [];
+    return stopArrivalTimes(calls, allowedCodes, win);
+  } else {
+    const src = c as SrcVM;
+    const inCalls = src?.inCalls;
+    if (!inCalls || inCalls.length === 0) return [];
+    const times: number[] = [];
+    for (let i = 0; i < inCalls.length; i++) {
+      const call = inCalls[i];
+      if (call.arr && allowedCodes.has(call.arr.code)) {
+        if (call.boardMins !== undefined && call.boardMins >= 0) {
+          const tDep = call.arr.depMins >= 0 ? call.arr.depMins : 0;
+          const tArr = tDep + (call.arr.dur > 0 ? call.arr.dur : 1);
+          let unrolled: number = call.boardMins;
+          for (let d = 0; d <= 4; d++) {
+            const testT = d * 1440 + call.boardMins;
+            if (testT >= tDep - 1 && testT <= tArr + 1) {
+              unrolled = testT;
+              break;
+            }
+          }
+          times.push(unrolled);
+        }
+      }
+    }
+    times.sort((a, b) => a - b);
+    return times;
+  }
+}
+
+/** The selection cache for `s`. `memo.selCache` is the caller-owned slot:
+    returned as is while the selection is unchanged, replaced otherwise. */
+export function getSelCache(
+  s: SelInput,
+  memo: { selCache: SelCache | null },
+): SelCache | null {
+  const cur = s.cur;
+  if (!cur) return null;
+  const panelDest = s.panelDest ?? null;
+  const iso = s.isolatedTrainCode ?? null;
+  const dir = s.direction;
+  const c = memo.selCache;
+  if (c && c.cur === cur && c.panelDest === panelDest && c.iso === iso && c.dir === dir) {
+    return c;
+  }
+  const allowedCodes = computeAllowedTrainCodes(s);
+  const win = computeDestWindow(s);
+  const cityTimes = new Map<number, number[]>();
+  if (allowedCodes) {
+    const pts = pointsOf(s);
+    for (let i = 0; i < pts.length; i++) {
+      cityTimes.set(pts[i].idx, computeCityAllowedArrivalTimes(dir, pts[i], allowedCodes, win));
+    }
+  }
+  const next: SelCache = { cur, panelDest, iso, dir, allowedCodes, win, cityTimes };
+  memo.selCache = next;
+  return next;
+}
+
+/** The single visible-train rule: dots, hit-testing and counters ask this;
+    stop effects derive from the same set (lib/stopEffects). */
+export function isTrainShown(
+  s: SelInput,
+  memo: { selCache: SelCache | null },
+  animTime: number,
+  code: string,
+): boolean {
+  const sel = getSelCache(s, memo);
+  return trainShownAt(code, animTime, sel?.allowedCodes ?? null, sel?.win ?? null);
+}
+
+export interface StationInput {
+  points: CityPointVM[];
+  panelDest: CityPointVM | null;
+  /** idx of the hovered station, -1 when none. */
+  hoverIdx: number;
+  dark: boolean;
+  animEnabled: boolean;
+  animTime: number;
+  /** Total minutes of the active timeline; undefined when there is none. */
+  totalMins: number | undefined;
+  /** stationT of the current zoom. */
+  sk: number;
+}
+
+export interface StationState {
+  c: CityPointVM;
+  idx: number;
+  /** Base radius (grows with arrivals while animating). */
+  r0: number;
+  /** Zoom factor on the radius; the drawn radius is r0 * kd. */
+  kd: number;
+  /** 1, or 0.16 / 0.18 (dark / light) for non-selected cities when a
+      destination is selected. */
+  alpha: number;
+  /** Golden arrival ripple (frac 0..1 of its 20-minute life). */
+  ripple?: { frac: number };
+}
+
+/** One entry per city, in draw order of `points` (the selected destination is
+    appended when it is not one of them). */
+export function stationStates(s: StationInput, sel: SelCache | null): StationState[] {
+  const { panelDest: pd } = s;
+  const timeline = s.totalMins !== undefined;
+  const isAnimated = s.animEnabled && timeline;
+  const allowedCodes = sel?.allowedCodes ?? null;
+  const dim = s.dark ? 0.16 : 0.18;
+
+  function one(c: CityPointVM): StationState {
+    const cityArrTimes = allowedCodes
+      ? sel?.cityTimes.get(c.idx) ?? null
+      : c.arrTimes || null;
+    const totalCityTrains = allowedCodes
+      ? cityArrTimes
+        ? cityArrTimes.length
+        : 0
+      : c.trains;
+
+    // Dynamic city circle sizing: circle grows only when an allowed train arrives at this city
+    let effectiveTrains = totalCityTrains;
+    let recentArrival = false;
+    let pulseDt = 0;
+    if (isAnimated) {
+      const t = s.animTime;
+      if (t >= (s.totalMins as number)) {
+        // Finished: all trips completed
+        effectiveTrains = totalCityTrains;
+      } else if (cityArrTimes && cityArrTimes.length > 0) {
+        let count = 0;
+        for (let k = 0; k < cityArrTimes.length; k++) {
+          if (cityArrTimes[k] <= t) count++;
+          else break;
+        }
+        effectiveTrains = count;
+        if (count > 0) {
+          const lastArr = cityArrTimes[count - 1];
+          const dt = t - lastArr;
+          if (dt >= 0 && dt <= 20) {
+            recentArrival = true;
+            pulseDt = dt;
+          }
+        }
+      } else {
+        effectiveTrains = 0;
+      }
+    }
+    const r0 = stationR(effectiveTrains);
+    const st: StationState = {
+      c,
+      idx: c.idx,
+      r0,
+      kd: stationZoomK(r0, s.sk),
+      alpha: pd && c.idx !== pd.idx && c.idx !== s.hoverIdx ? dim : 1,
+    };
+    // Ripple only for an allowed train's arrival (never outside allowed trains).
+    if (recentArrival && isAnimated && (!allowedCodes || totalCityTrains > 0)) {
+      st.ripple = { frac: pulseDt / 20 };
+    }
+    return st;
+  }
+
+  const out: StationState[] = [];
+  let hasPd = false;
+  for (let i = 0; i < s.points.length; i++) {
+    if (pd && s.points[i].idx === pd.idx) hasPd = true;
+    out.push(one(s.points[i]));
+  }
+  if (pd && !hasPd) out.push(one(pd));
+  return out;
 }

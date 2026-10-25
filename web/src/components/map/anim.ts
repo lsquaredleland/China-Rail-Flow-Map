@@ -1,6 +1,6 @@
 /* The 24h animation clock: play / pause / seek / speed and listeners. */
 import type { MapCtx, AnimState, AnimListener } from "./context";
-import { getSelCache } from "./trains";
+import { getSelCache } from "../../lib";
 
 
 /* ---------- 24h timeline animation controls ---------- */
@@ -15,7 +15,7 @@ export function getAnimState(M: MapCtx): AnimState {
   const totalMins = tl ? tl.totalMins : 1440;
   const totalDays = tl ? tl.totalDays : 1;
 
-  const sel = getSelCache(M);
+  const sel = getSelCache(P.current, st);
   const allowedCodes = sel?.allowedCodes ?? null;
   if (allowedCodes && cur && tl) {
     total = allowedCodes.size;
