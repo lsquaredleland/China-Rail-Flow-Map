@@ -112,7 +112,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       .then((m) => {
         const wrap = wrapRef.current;
         if (cancelled || !wrap) return;
-        h = m.mountDeck(M, wrap);
+        h = m.mountDeck(M, wrap, () => {
+          if (!cancelled) setDeckState("error");
+        });
         deckRef.current = h;
         setDeckState("ready");
         M.render();

@@ -139,15 +139,23 @@ export function scheduleViewReport(M: MapCtx) {
 }
 
 
+/** Padding-box extent: the border-box size less two border widths (CSS lengths such as "1.5px"). */
+export function paddingBoxSize(borderBox: number, borderA: string, borderB: string): number {
+  return borderBox - (parseFloat(borderA) || 0) - (parseFloat(borderB) || 0);
+}
+
 export function resize(M: MapCtx) {
   const { S, P, toLon, toLat, canvasRef, wrapRef } = M;
   const wrap = wrapRef.current;
   const canvas = canvasRef.current;
   if (!wrap) return;
   const st = S.current;
+  // The canvases fill the padding box, so the world is laid out in it: the border-inclusive rect
+  // minus the borders (clientWidth / clientHeight would round to whole pixels). P1c.3.
   const r = wrap.getBoundingClientRect();
-  const newW = Math.max(50, r.width);
-  const newH = Math.max(50, r.height);
+  const cs = getComputedStyle(wrap);
+  const newW = Math.max(50, paddingBoxSize(r.width, cs.borderLeftWidth, cs.borderRightWidth));
+  const newH = Math.max(50, paddingBoxSize(r.height, cs.borderTopWidth, cs.borderBottomWidth));
   // When the user has taken the camera, keep the same geographic
   // centre at the same zoom across the resize (fold / unfold,
   // rotation): remember the centre in lon/lat before the size

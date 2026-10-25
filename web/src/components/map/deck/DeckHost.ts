@@ -271,7 +271,7 @@ function pipelinesReady(deck: DeckInternals): boolean {
   return true;
 }
 
-export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
+export function mountDeck(M: MapCtx, host: HTMLDivElement, onFatal?: () => void): DeckHandle {
   const w = window as unknown as { __deckStats?: DeckStats; __deck?: Deck; __deckHost?: DeckHandle };
   const stats: DeckStats = (w.__deckStats = { afterRenders: 0, settled: false, recreated: 0, errors: [], natDots: 0, natBuildMs: 0, natFirstFrameAt: 0, natFlows: 0, natFlowsMs: 0, natFlowsUpdates: 0 });
 
@@ -284,6 +284,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
   let settleRaf = 0;
   let dpr = devicePixels(M); // useDevicePixels of the current Deck
   let notice: HTMLDivElement | null = null;
+  let loaded = false; // the first onLoad has fired
 
   const showNotice = () => {
     if (!notice) {
@@ -339,16 +340,19 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       layerFilter: ({ layer, isPicking }: { layer: Layer; isPicking: boolean }) => isPicking || !layer.id.startsWith(PICK_PREFIX),
       layers: [],
       onLoad: () => {
+        loaded = true;
         dropDepthPickBuffer(deck.deckPicker);
         if (cv === canvas) render(); // the device initialises asynchronously; draw once it is up
       },
       // luma re-measures the canvas from a ResizeObserver, later than resize(M) runs; redraw when
-      // deck's viewport actually changes so the per-axis zoom in render() uses the new size.
+      // deck's viewport actually changes so render() projects with the new size.
       onResize: () => {
         if (cv === canvas) render();
       },
       onError: (err: Error) => {
         stats.errors.push(String(err && err.message));
+        // The getContext probe passed but device creation failed: no frame will ever come.
+        if (!loaded && !destroyed) onFatal?.();
       },
       onAfterRender: () => {
         stats.afterRenders++;
@@ -402,19 +406,15 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       sigStreak = 0;
       stats.settled = false;
     }
-    // The world is laid out in S.W x S.H (the #mapwrap rect, fractional, border
-    // included) on a rounded bitmap that the browser stretches into the CSS box; deck's viewport is
-    // the rounded drawing buffer. A per-axis zoom of viewport/(S.W, S.H) reproduces that mapping
-    // exactly (P1b.5: removes the up to 0.5 px vertical offset). target is unchanged.
+    // S.W x S.H is the #mapwrap padding box (the canvas CSS box), so the viewport is square-pixel
+    // by construction: one scalar zoom, no per-axis correction (P1c.3).
     const vs = viewToViewState(st.view, st.W, st.H);
-    const vp = deck.getViewports()[0];
-    const zoom: number | [number, number] = vp ? [vs.zoom + Math.log2(vp.width / st.W), vs.zoom + Math.log2(vp.height / st.H)] : vs.zoom;
     const dp = devicePixels(M);
     if (dp !== dpr) {
       dpr = dp; // D8: entering / leaving national mode on a weak device
       deck.setProps({ useDevicePixels: dp });
     }
-    deck.setProps({ viewState: { ...vs, zoom }, layers });
+    deck.setProps({ viewState: vs, layers });
     deck.redraw("render"); // synchronous (C22)
     drawLabelsOverlay(M);
     M.frameTail();

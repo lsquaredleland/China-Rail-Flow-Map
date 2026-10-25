@@ -3,6 +3,7 @@
 // OrthographicViewport (flipY: false), the contract the deck renderer relies on.
 import { expect, test } from "bun:test";
 import { OrthographicView } from "@deck.gl/core";
+import { paddingBoxSize, resize } from "../src/components/map/camera";
 import {
   fitCountryView,
   fitExtentView,
@@ -125,4 +126,44 @@ test("fit puts the extent centre at the canvas centre", () => {
   const v = fitExtentView(1000, 600, 100, 20, 120, 40, 0.97);
   expect(v.scale * 110 + v.tx).toBeCloseTo(500, 9);
   expect(-v.scale * 30 + v.ty).toBeCloseTo(300, 9);
+});
+
+// P1c.3: the world is laid out in the wrapper's padding box (the canvas CSS box).
+test("paddingBoxSize subtracts the borders from the border-box extent", () => {
+  expect(paddingBoxSize(509.375, "0px", "1px")).toBe(508.375);
+  expect(paddingBoxSize(1280, "0px", "0px")).toBe(1280);
+  expect(paddingBoxSize(100, "", "bogus")).toBe(100);
+});
+
+test("resize() sizes S.W / S.H to the padding box and the bitmap from it, at every DPR", () => {
+  const g = globalThis as unknown as { getComputedStyle?: unknown; window?: unknown };
+  const saved = { gcs: g.getComputedStyle, win: g.window };
+  try {
+    for (const dpr of [1, 2, 3]) {
+      g.getComputedStyle = () => ({ borderLeftWidth: "0px", borderRightWidth: "0px", borderTopWidth: "0px", borderBottomWidth: "1px" });
+      g.window = { devicePixelRatio: dpr };
+      const canvas = { width: 0, height: 0 };
+      const S = { current: { W: 0, H: 0, DPR: 1, interacted: false, view: { scale: 1, tx: 0, ty: 0 } } };
+      let rendered = 0;
+      const M = {
+        S,
+        P: { current: { atlas: null, cur: null } },
+        toLon: () => 0,
+        toLat: () => 0,
+        canvasRef: { current: canvas },
+        wrapRef: { current: { getBoundingClientRect: () => ({ width: 1280, height: 509.375 }) } },
+        syncRendererSize: () => {},
+        render: () => rendered++,
+      } as unknown as Parameters<typeof resize>[0];
+      resize(M);
+      expect(S.current.W).toBe(1280);
+      expect(S.current.H).toBe(508.375);
+      expect(canvas.width).toBe(Math.round(1280 * dpr));
+      expect(canvas.height).toBe(Math.round(508.375 * dpr));
+      expect(rendered).toBe(1);
+    }
+  } finally {
+    g.getComputedStyle = saved.gcs;
+    g.window = saved.win;
+  }
 });
