@@ -68,3 +68,18 @@ export {
   filterOrigin,
   filterOriginByClasses,
 } from "./filter";
+export {
+  fitCountryView,
+  fitExtentView,
+  fitGuangzhouInitialView,
+  fitHomeView,
+  stationT,
+  viewStateToView,
+  viewToViewState,
+  zoomBounds,
+} from "./camera";
+export type { Extent, View, ViewState } from "./camera";
+export { isFerrySection, isWaterCross, splitFerry } from "./ferry";
+export type { FerryPiece } from "./ferry";
+export { tooltipHtml } from "./tooltip";
+export type { TooltipInput } from "./tooltip";
