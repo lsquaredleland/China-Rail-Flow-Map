@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use analyze_rs::chains;
 use analyze_rs::cn::*;
+use analyze_rs::flows;
 use analyze_rs::geo::*;
 use analyze_rs::inputs;
 use analyze_rs::legs::*;
@@ -161,6 +162,10 @@ struct AtlasOut {
     stats: std::collections::BTreeMap<String, i64>,
     /// Indexed by train_table index t: the train's full stop list.
     schedules: Vec<Vec<ScheduleRow>>,
+    /// P3.1 national per-section table over `sections` (this file's
+    /// numbering; atlaspack renumbers it with the sections). Last, so the
+    /// fields before it serialize exactly as before it existed.
+    national: flows::National,
 }
 
 /// One train's call at one destination city (first stop in that city).
@@ -749,7 +754,8 @@ fn main() {
         /// Index of the boarding stop in the train's stop list.
         board: usize,
     }
-    type TrainLegs = (usize, Vec<(String, String, String)>);
+    /// (class bucket, train index into `trains`, leg keys)
+    type TrainLegs = (usize, usize, Vec<(String, String, String)>);
     struct CityWork {
         zh: String,
         outbound: u64,
@@ -905,7 +911,7 @@ fn main() {
                 skipped_rows[3] += 1;
                 skipped_trains.insert(t.code.clone());
             }
-            train_legs.push((class_idx(&t.train_class), legs));
+            train_legs.push((class_idx(&t.train_class), ti, legs));
         }
         let mut legs_vec: Vec<((String, String, String), u64)> = Vec::new();
         let mut resolved_flags: HashMap<(String, String, String), bool> = HashMap::new();
@@ -927,7 +933,7 @@ fn main() {
             throat_stations.insert(k.1.clone());
         }
         let mut fully = 0u64;
-        for (_, legs) in train_legs.iter() {
+        for (_, _, legs) in train_legs.iter() {
             if legs
                 .iter()
                 .all(|k| resolved_flags.get(k).copied().unwrap_or(false))
@@ -1118,7 +1124,7 @@ fn main() {
                     leg_start: leg_prefix[p_idx.min(cd_in)],
                 });
             }
-            train_leg_keys_in.push((class_idx(&t.train_class), legs));
+            train_leg_keys_in.push((class_idx(&t.train_class), ti, legs));
         }
         arrs.sort_by(|x, y| x.arrive.cmp(&y.arrive).then(x.code.cmp(&y.code)));
         let mut sources: Vec<(String, InSrcStats)> = src_stats.into_iter().collect();
@@ -1147,7 +1153,7 @@ fn main() {
     for key in in_works
         .iter()
         .flat_map(|w| w.train_leg_keys.iter())
-        .flat_map(|(_, legs)| legs.iter())
+        .flat_map(|(_, _, legs)| legs.iter())
     {
         in_throat_stations.insert(key.0.clone());
         in_throat_stations.insert(key.1.clone());
@@ -1198,35 +1204,15 @@ fn main() {
     // atomic edge -> per-city DISTINCT train counts: each train counts at
     // most once per edge, no matter how many of its legs' paths overlap
     // there (adjacent-leg path overlap near stations otherwise inflates
-    // short sections between close stations).
+    // short sections between close stations). The rule lives in
+    // flows::train_edges, shared with the inbound and national counts.
+    let seqs_of = |k: &(String, String, String)| leg_seqs(k, &leg_cache, &variant_cache);
     let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
     for (ci, w) in works.iter().enumerate() {
-        for (cidx, legs) in w.train_leg_keys.iter() {
-            let mut eset: HashSet<(i64, i64)> = HashSet::new();
-            for key in legs.iter() {
-                let seqs = match leg_seqs(key, &leg_cache, &variant_cache) {
-                    Some(s) => s,
-                    None => continue,
-                };
-                for s in seqs.iter() {
-                    for win in s.windows(2) {
-                        let (c1, c2) = match (coords.get(&win[0]), coords.get(&win[1])) {
-                            (Some(x), Some(y)) => (*x, *y),
-                            _ => continue,
-                        };
-                        let mid = [(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0];
-                        if near_station(&station_grid, &mid) {
-                            continue;
-                        }
-                        eset.insert(if win[0] < win[1] {
-                            (win[0], win[1])
-                        } else {
-                            (win[1], win[0])
-                        });
-                    }
-                }
-            }
+        for (cidx, _, legs) in w.train_leg_keys.iter() {
+            let eset =
+                flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
             for e in eset {
                 *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
                 edge_class_counts
@@ -1314,35 +1300,54 @@ fn main() {
     }
     println!("sections: {} points: {}", sections.len(), total_sec_pts);
 
+    // ---- P3.1 national table over `sections`: every train once ----
+    // A train's legs are the union of its outbound rows (from its first
+    // selected city on) and inbound rows (from its first stop to a selected
+    // city), so it covers its whole run whenever it calls at a selected city.
+    // Edges go through the same rule as the per-city counts (one count per
+    // edge, outbound near_station grid); a train counts once on a section
+    // when it covers any of its edges (flows::national_table).
+    let mut nat_legs: std::collections::BTreeMap<usize, TrainLegs> = Default::default();
+    let all_legs = works
+        .iter()
+        .flat_map(|w| w.train_leg_keys.iter())
+        .chain(in_works.iter().flat_map(|w| w.train_leg_keys.iter()));
+    for (cidx, ti, legs) in all_legs {
+        nat_legs
+            .entry(*ti)
+            .or_insert_with(|| (*cidx, *ti, Vec::new()))
+            .2
+            .extend(legs.iter().cloned());
+    }
+    let nat_trains = nat_legs.into_values().map(|(cidx, ti, mut legs)| {
+        legs.sort();
+        legs.dedup();
+        let eset = flows::train_edges(&legs, seqs_of, coords, |p| near_station(&station_grid, p));
+        (ti, cidx, eset)
+    });
+    let (national, nat_u) = flows::national_table(
+        nat_trains,
+        |e| edge_dir_to_sec.get(e).map(|&(s, _)| s),
+        sections.len(),
+    );
+    println!(
+        "national: {} trains; widest section {}; sum over sections {}",
+        national.trains,
+        national.total.iter().max().copied().unwrap_or(0),
+        national.total.iter().map(|&n| n as u64).sum::<u64>()
+    );
+    println!(
+        "national uniformity: {} sections with unequal per-edge counts (max spread {}); {} sections whose distinct trains exceed their busiest edge (max +{})",
+        nat_u.nonuniform, nat_u.max_spread, nat_u.union_above_max, nat_u.max_union_gain
+    );
+
     // ---- inbound atomic sections: same machinery, indexed by dest city ----
     let mut in_edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut in_edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
     for (ci, w) in in_works.iter().enumerate() {
-        for (cidx, legs) in w.train_leg_keys.iter() {
-            let mut eset: HashSet<(i64, i64)> = HashSet::new();
-            for key in legs.iter() {
-                let seqs = match leg_seqs(key, &leg_cache, &variant_cache) {
-                    Some(s) => s,
-                    None => continue,
-                };
-                for s in seqs.iter() {
-                    for win in s.windows(2) {
-                        let (c1, c2) = match (coords.get(&win[0]), coords.get(&win[1])) {
-                            (Some(x), Some(y)) => (*x, *y),
-                            _ => continue,
-                        };
-                        let mid = [(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0];
-                        if near_station(&in_station_grid, &mid) {
-                            continue;
-                        }
-                        eset.insert(if win[0] < win[1] {
-                            (win[0], win[1])
-                        } else {
-                            (win[1], win[0])
-                        });
-                    }
-                }
-            }
+        for (cidx, _, legs) in w.train_leg_keys.iter() {
+            let eset =
+                flows::train_edges(legs, seqs_of, coords, |p| near_station(&in_station_grid, p));
             for e in eset {
                 *in_edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
                 in_edge_class_counts
@@ -2046,7 +2051,7 @@ fn main() {
         build: provenance::build_block(&inp),
         about: "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e5 precision, [lat, lon] order.".into(),
         origins, sections, in_sections, throats: throat_geo, city_table, station_table, train_table,
-        network, stats, schedules,
+        network, stats, schedules, national,
     };
     let txt = serde_json::to_string(&out).unwrap();
     fs::write(&out_path, &txt).unwrap();
