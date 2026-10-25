@@ -3,7 +3,7 @@
 // and the Canvas-vs-deck pixelmatch % of a screenshot taken after the step.
 //   pan, wheel, pinch (touch), fit + zoom buttons, URL camera restore, scale bar km/mi,
 //   selection, isolation, class filter, histogram filter, inbound, play / seek, night,
-//   DPR 1/2/3, backdrop toggles (showNetwork, showOutline).
+//   DPR 1/2/3, backdrop toggles (showNetwork, showOutline), live window resize (centre kept).
 // usage: node tools/g1-checklist.mjs [base=dist] [--out DIR]   (local macOS GPU only)
 import fs from "node:fs";
 import path from "node:path";
@@ -33,7 +33,7 @@ async function open(renderer, dpr, search = "", hasTouch = false) {
   pg.on("pageerror", (e) => errs.push(e.message));
   await pg.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }, { name: "prefers-reduced-motion", value: "no-preference" }]);
   await pg.setViewport({ width: 1280, height: 800, deviceScaleFactor: dpr, hasTouch });
-  const q = `?theme=light${renderer === "deck" ? "&renderer=deck" : ""}${search}`;
+  const q = `?theme=light&renderer=${renderer}${search}`;
   await pg.goto(`${url}/${q}`, { waitUntil: "networkidle0" });
   await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
   await sleep(3000);
@@ -54,10 +54,11 @@ async function snap(h, steps, name) {
       scale: +v.scale.toFixed(6), tx: +v.tx.toFixed(3), ty: +v.ty.toFixed(3),
       dest: P.panelDest ? P.panelDest.zh : null, iso: P.isolatedTrainCode || null, dark: P.dark, dir: P.direction,
       net: P.showNetwork, infra: P.showInfra, outline: P.showOutline, dist: P.distUnit,
+      cenLon: +M.toLon(M.S.current.W / 2).toFixed(6), cenLat: +M.toLat(M.S.current.H / 2).toFixed(6),
       scaleLabel: (document.querySelector(".sb-label") || {}).textContent || "",
       url: location.search, dpr: M.S.current.DPR,
       anim: window.__mapApi.getAnimState ? Math.round(window.__mapApi.getAnimState().time ?? -1) : -1,
-      cls: [...document.querySelectorAll(".cls-filter .cls-btn")].filter((e) => e.getAttribute("aria-pressed") === "true" || /active|\\bon\\b|selected/.test(e.className)).map((e) => e.textContent.trim()).join(""),
+      cls: [...document.querySelectorAll(".cls-filter .cls-btn")].filter((e) => e.getAttribute("aria-pressed") === "true" || /active|\bon\b|selected/.test(e.className)).map((e) => e.textContent.trim()).join(""),
       histSel: document.querySelectorAll(".hist-col.is-selected").length,
     };
   });
@@ -109,6 +110,17 @@ const GROUPS = {
     await S("pinch-out");
     await pinch(200, 80);
     await S("pinch-in");
+  },
+  /* Live window resize (P1c.1): with the camera taken, the geographic centre must survive a
+     shrink and a grow, the state must match across renderers, and no pageerror may appear. */
+  resize: async (h, S) => {
+    const { pg } = h;
+    await click(pg, "#btnIn"); await sleep(400);
+    await S("before");
+    await pg.setViewport({ width: 1000, height: 700, deviceScaleFactor: 2 }); await sleep(600);
+    await S("shrunk");
+    await pg.setViewport({ width: 1280, height: 800, deviceScaleFactor: 2 }); await sleep(600);
+    await S("restored");
   },
   scalebar: async (h, S) => {
     await S("km");
@@ -175,11 +187,18 @@ for (const renderer of ["canvas", "deck"]) {
   }
   // URL camera restore: panned + zoomed URL of the camera group, reopened.
   const cam = results[renderer][0].list.find((s) => s.name === "wheel-out");
-  const search = cam.state.url.replace(/&?theme=light/, "").replace(/&?renderer=deck/, "").replace(/^\?/, "&");
+  const search = cam.state.url.replace(/&?theme=light/, "").replace(/&?renderer=(deck|canvas)/, "").replace(/^\?/, "&");
   results[renderer].push(await run("url", renderer, 2, async (h, S) => { await S("restored"); }, search));
   results[renderer].url = cam.state;
 }
 
+// Resize group: the centre must be kept across the shrink and the grow, on each renderer.
+const centreKept = {};
+for (const r of ["canvas", "deck"]) {
+  const g = results[r].find((x) => x.tag === "resize").list;
+  centreKept[r] = g.every((s) => Math.abs(s.state.cenLon - g[0].state.cenLon) < 1e-4 && Math.abs(s.state.cenLat - g[0].state.cenLat) < 1e-4);
+  console.log(`resize centre kept [${r}]: ${centreKept[r]}  (${g.map((s) => `${s.name} ${s.state.cenLon},${s.state.cenLat}`).join(" | ")})`);
+}
 const near = (a, b, t) => (typeof a === "number" && typeof b === "number" ? Math.abs(a - b) <= t : a === b);
 const rows = [];
 let bad = 0;
@@ -197,6 +216,7 @@ for (let gi = 0; gi < results.canvas.length; gi++) {
     rows.push(row);
     console.log(`${gc.tag.padEnd(10)} ${c.name.padEnd(24)} state ${diff.length ? "DIFF " + diff.join(",") : "equal"}  pixelmatch ${row.pmPct}%  scale-bar "${d.state.scaleLabel}"  [scale ${d.state.scale} dest ${d.state.dest} iso ${d.state.iso} cls "${d.state.cls}" hist ${d.state.histSel} dir ${d.state.dir} dark ${d.state.dark} net ${d.state.net} outline ${d.state.outline} dpr ${d.state.dpr}]`);
   }
+  if (gc.errs.length || gd.errs.length) bad++;
   console.log(`  pageerrors canvas ${gc.errs.length} deck ${gd.errs.length}`, [...gc.errs, ...gd.errs].join(" | "));
 }
 // URL restore: restored camera vs the camera that produced the URL (both renderers).
@@ -207,4 +227,4 @@ for (const r of ["canvas", "deck"]) {
 fs.writeFileSync(path.join(outDir, "checklist.json"), JSON.stringify(rows, null, 1));
 await browser.close();
 await close();
-process.exit(bad || rows.some((r) => r.pmPct > 2.5) ? 1 : 0);
+process.exit(bad || !centreKept.canvas || !centreKept.deck || rows.some((r) => r.pmPct > 2.5) ? 1 : 0);

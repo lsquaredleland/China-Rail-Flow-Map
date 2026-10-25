@@ -76,7 +76,7 @@ export interface Props {
   isolatedTrainCode?: string | null;
   onSelectIsolatedTrain?: (code: string | null) => void;
   legendRef: RefObject<LegendHandle | null>;
-  /** Which renderer draws the map (App: ?renderer=, default canvas). */
+  /** Which renderer draws the map (App: ?renderer=, default deck). */
   renderer?: "canvas" | "deck";
   initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
   onViewChange?: (view: {

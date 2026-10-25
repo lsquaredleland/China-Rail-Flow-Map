@@ -29,11 +29,13 @@ for (const playing of [false, true]) {
   await sleep(3000);
   await pg.evaluate(() => document.querySelector('button[title^="Expand 24h"]')?.click());
   await sleep(600);
-  await pg.evaluate((p) => { window.__mapApi.setTime(1095); window.__mapApi.setPlaying(p); }, playing);
+  // Count on a paused, settled frame in both cases: a playing animation advances between two reads.
+  await pg.evaluate(() => { window.__mapApi.setTime(1095); window.__mapApi.setPlaying(false); });
   await sleep(1000);
-  if (!playing) await pg.waitForFunction("window.__deckStats.settled", { timeout: 20000 });
+  await pg.waitForFunction("window.__deckStats.settled", { timeout: 20000 });
   const pre = await pg.evaluate(nonEmpty);
   const rec0 = await pg.evaluate(() => window.__deckStats.recreated);
+  if (playing) await pg.evaluate(() => window.__mapApi.setPlaying(true)); // the loss hits a running animation
   await pg.evaluate(() => {
     const gl = window.__deck.device.handle;
     window.__lose = gl.getExtension("WEBGL_lose_context");
@@ -43,7 +45,9 @@ for (const playing of [false, true]) {
   const noticeShown = await pg.evaluate(() => { const n = document.querySelector(".deck-notice"); return !!n && n.style.display !== "none"; });
   await pg.evaluate(() => window.__lose.restoreContext());
   await sleep(2500);
-  if (!playing) await pg.waitForFunction("window.__deckStats.settled", { timeout: 20000 });
+  await pg.evaluate(() => { window.__mapApi.setPlaying(false); window.__mapApi.setTime(1095); });
+  await sleep(600);
+  await pg.waitForFunction("window.__deckStats.settled", { timeout: 20000 });
   const post = await pg.evaluate(nonEmpty);
   const rec1 = await pg.evaluate(() => window.__deckStats.recreated);
   const ratio = post / pre;

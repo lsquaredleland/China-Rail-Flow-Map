@@ -60,6 +60,33 @@ interface DeckInternals {
   pickObjects(o: PickRectOptions & { maxObjects?: number | null }): PickingInfo[];
   _updateCanvasSize?: () => void;
   getViewports(): { width: number; height: number }[];
+  deckPicker?: PickerInternals | null;
+}
+
+/* The slice of DeckPicker used by dropDepthPickBuffer. */
+interface PickerInternals {
+  device: { isTextureFormatRenderable(format: string): boolean };
+  _resizeBuffer(canvasContext?: unknown): void;
+}
+
+/* deck 9.4.0's DeckPicker allocates, besides the rgba8unorm picking framebuffer, an rgba32float
+   "depth" framebuffer the size of the drawing buffer. It only serves pickZ, which this app never
+   uses, and costs 16 B per device pixel (42 MB at DPR 2 and 95 MB at DPR 3, 1280x800). deck has
+   no option to skip it, so its creation is declined by reporting rgba32float as non-renderable
+   for the one call that would make it (deck guards every use with `if (this.depthFBO)`). */
+function dropDepthPickBuffer(picker: PickerInternals | null | undefined): void {
+  if (!picker) return;
+  const { device } = picker;
+  const resize = picker._resizeBuffer.bind(picker);
+  picker._resizeBuffer = (canvasContext) => {
+    const real = device.isTextureFormatRenderable;
+    device.isTextureFormatRenderable = (f) => f !== "rgba32float" && real.call(device, f);
+    try {
+      resize(canvasContext);
+    } finally {
+      device.isTextureFormatRenderable = real;
+    }
+  };
 }
 
 const NOTICE_TEXT = "Map paused — tap to resume";
@@ -245,7 +272,13 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       layerFilter: ({ layer, isPicking }: { layer: Layer; isPicking: boolean }) => isPicking || !layer.id.startsWith(PICK_PREFIX),
       layers: [],
       onLoad: () => {
+        dropDepthPickBuffer(deck.deckPicker);
         if (cv === canvas) render(); // the device initialises asynchronously; draw once it is up
+      },
+      // luma re-measures the canvas from a ResizeObserver, later than resize(M) runs; redraw when
+      // deck's viewport actually changes so the per-axis zoom in render() uses the new size.
+      onResize: () => {
+        if (cv === canvas) render();
       },
       onError: (err: Error) => {
         stats.errors.push(String(err && err.message));
