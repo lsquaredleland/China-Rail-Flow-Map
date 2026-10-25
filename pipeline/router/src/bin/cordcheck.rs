@@ -4,14 +4,8 @@
 // geometries (production pair_paths, router leg paths) feed it.
 // Usage: cordcheck --atlas <v1.json> --origin <zh> --at <lon,lat>
 //                  [--radius <km>] [--project <dir>] [--legs <leg_paths.json>]
-#[path = "../graph.rs"]
-#[allow(dead_code)]
-mod graph;
-#[path = "../inputs.rs"]
-#[allow(dead_code)]
-mod inputs;
-
-use graph::{hav, FineIndex, Graph};
+use corridor_router::graph::{self, hav, FineIndex, Graph};
+use corridor_router::{china, config};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
@@ -174,7 +168,7 @@ fn main() {
             project.join("china-rail.osm")
         }
     });
-    let g: Graph = graph::build(&osm_path);
+    let g: Graph = graph::build(&osm_path, &config::get().network);
     let fine = FineIndex::new(&g);
     let mut node_sets: Vec<HashSet<u32>> = Vec::new();
     for (si, n, pts) in &near {
@@ -217,7 +211,7 @@ fn main() {
     }
 
     // ---- which station-pair geometries feed each section ----
-    let base = inputs::load_base_paths(&[
+    let base = china::load_base_paths(&[
         &data.join("derived/pair_paths.json"),
         &data.join("derived/cs_out/pair_paths.json"),
     ]);

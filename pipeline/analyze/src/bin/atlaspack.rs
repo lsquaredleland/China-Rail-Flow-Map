@@ -810,7 +810,15 @@ fn main() {
         "in_sections".into(),
         reorder(get(&shared, "in_sections"), &perm_in),
     );
-    let shared5 = with_fmt(shared5);
+    let mut shared5 = with_fmt(shared5);
+    // Provenance rides along in shared (the client ignores it); v1 files
+    // from before the block have none.
+    if let Some(b) = v1.get("build") {
+        shared5
+            .as_object_mut()
+            .unwrap()
+            .insert("build".into(), b.clone());
+    }
     let (op, osp, och, ooff) = pack_paths(&origins, &OUT, n_trains, &perm_out);
     let (ip, _, ich, ilen) = pack_paths(&origins, &IN, n_trains, &perm_in);
     let map5 = |maps: &[Value], key: &str, perm: &[usize]| -> Vec<Value> {
@@ -890,5 +898,77 @@ fn main() {
 
     for (name, raw, br) in results {
         println!("{name}: raw {} bytes, brotli {}", raw, br);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn secs(n: usize) -> Vec<Value> {
+        // "g" decreasing with the id, so the polyline tie-break is visible
+        (0..n)
+            .map(|i| json!({ "g": format!("{}", 9 - i) }))
+            .collect()
+    }
+
+    fn origin(rows: &[i64], paths: &[Vec<i64>]) -> Value {
+        json!({
+            "deps": rows.iter().map(|t| json!([t])).collect::<Vec<_>>(),
+            "dep_secs": paths,
+        })
+    }
+
+    #[test]
+    fn renumber_puts_the_longest_paths_first() {
+        // train 0: [3, ~1] (2 long); train 1: [0, 2, 3] (3 long); section 4 on no path
+        let o = origin(&[0, 1], &[vec![3, !1], vec![0, 2, 3]]);
+        let perm = renumber(&[o], &OUT, &secs(5));
+        // order: 0, 2, 3 (train 1), then 1 (train 0; 3 seen), then the unused 4
+        assert_eq!(perm, vec![0, 3, 1, 2, 4]);
+    }
+
+    #[test]
+    fn renumber_takes_a_trains_longest_row_across_origins() {
+        let a = origin(&[7], &[vec![2]]);
+        let b = origin(&[7], &[vec![1, 2, 0]]);
+        let perm = renumber(&[a, b], &OUT, &secs(3));
+        assert_eq!(perm, vec![2, 0, 1]);
+    }
+
+    #[test]
+    fn renumber_is_a_permutation_and_orders_unused_sections_by_polyline() {
+        let o = origin(&[0], &[vec![1]]);
+        let perm = renumber(&[o], &OUT, &secs(4));
+        // section 1 first; 0, 2, 3 on no path -> by "g" ascending = id descending
+        assert_eq!(perm, vec![3, 0, 2, 1]);
+        let mut sorted = perm.clone();
+        sorted.sort();
+        assert_eq!(sorted, vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn remap_keeps_throat_ids_and_signs() {
+        let perm = vec![2, 0, 1];
+        assert_eq!(remap(0, &perm), 2);
+        assert_eq!(remap(!0, &perm), !2);
+        assert_eq!(remap(3, &perm), 3, "3 is a throat, not a section");
+        assert_eq!(remap(!4, &perm), !4);
+    }
+
+    #[test]
+    fn pack_flows_sorts_by_new_id_and_delta_encodes() {
+        let rows = json!([[2, 10], [0, 5, 3], [1, 7]]);
+        // old 0 -> 1, old 1 -> 0, old 2 -> 2
+        let packed = pack_flows(&rows, &[1, 0, 2]);
+        // new ids 0 (7), 1 (5, 3), 2 (10) -> deltas 0, 1, 1
+        assert_eq!(packed, json!([[0, 7], [1, 5, 3], [1, 10]]));
+    }
+
+    #[test]
+    fn pack_flows_keeps_gaps_as_deltas() {
+        let rows = json!([[4, 9], [1, 2]]);
+        let packed = pack_flows(&rows, &[0, 1, 2, 3, 4]);
+        assert_eq!(packed, json!([[1, 2], [3, 9]]));
     }
 }
