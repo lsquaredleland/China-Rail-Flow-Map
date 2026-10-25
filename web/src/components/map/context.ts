@@ -14,6 +14,7 @@ import type {
   PrepTrain,
 } from "../../types";
 import { flowWidth } from "../../lib";
+import type { DestWindow } from "../../lib";
 import type { LegendHandle } from "../Legend";
 
 export interface AnimState {
@@ -132,6 +133,7 @@ function createMapState() {
       iso: string | null;
       dir: Direction;
       allowedCodes: Set<string> | null;
+      win: DestWindow | null;
       cityTimes: Map<number, number[]>;
     } | null,
     activeTrainsMemo: null as {

@@ -20,7 +20,7 @@ import {
 import type { MapCtx } from "./context";
 import { stationT } from "./camera";
 import { getActiveDestSectionCounts, getDestSectionCounts } from "./flows";
-import { getAllowedTrainCodes } from "./trains";
+import { isTrainShown } from "./trains";
 
 
 /* ---------- hit testing & tooltip ---------- */
@@ -239,12 +239,11 @@ export function pickTrain(M: MapCtx, px: number, py: number): Hit | null {
   const activeTrains = activeTrainsAt(timeline, st.animTime);
   if (!activeTrains || activeTrains.length === 0) return null;
 
-  const allowedCodes = getAllowedTrainCodes(M);
   let bestDist = 14;
   let bestTrain: ActiveTrainVM | null = null;
   for (let i = 0; i < activeTrains.length; i++) {
     const tr = activeTrains[i];
-    if (allowedCodes && !allowedCodes.has(tr.code)) {
+    if (!isTrainShown(M, tr.code)) {
       continue;
     }
     const tx = X(tr.lon);

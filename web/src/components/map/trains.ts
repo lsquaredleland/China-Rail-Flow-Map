@@ -5,7 +5,20 @@ import type {
   Palette,
   SrcVM,
 } from "../../types";
+import { destWindow, stopArrivalTimes, trainShownAt } from "../../lib";
+import type { DestWindow } from "../../lib";
 import type { MapCtx } from "./context";
+
+/* The outbound destination's per-train window (null: no destination, or
+   inbound, which has no animation). */
+export function computeDestWindow(M: MapCtx): DestWindow | null {
+  const { P } = M;
+  const cur = P.current.cur;
+  const pd = P.current.panelDest;
+  if (!cur || !pd || P.current.direction !== "out") return null;
+  const dest = (cur.dests.find((d) => d.idx === pd.idx) || pd) as DestVM;
+  return dest.calls ? destWindow(dest.calls) : null;
+}
 
 export function computeAllowedTrainCodes(M: MapCtx): Set<string> | null {
   const { P } = M;
@@ -49,29 +62,13 @@ export function computeCityAllowedArrivalTimes(
   M: MapCtx,
   c: CityPointVM,
   allowedCodes: Set<string>,
+  win: DestWindow | null,
 ): number[] {
   const { P } = M;
   if (P.current.direction === "out") {
-    const dest = c as DestVM;
-    const calls = dest?.calls;
+    const calls = (c as DestVM)?.calls;
     if (!calls || calls.length === 0) return [];
-    const times: number[] = [];
-    for (let i = 0; i < calls.length; i++) {
-      const call = calls[i];
-      if (call.dep && allowedCodes.has(call.dep.code)) {
-        const m =
-          call.arrMins !== undefined
-            ? call.arrMins
-            : call.dayOff * 1440 +
-              parseInt(call.arr.slice(0, 2), 10) * 60 +
-              parseInt(call.arr.slice(3, 5), 10);
-        if (typeof m === "number" && !isNaN(m) && m >= 0) {
-          times.push(m);
-        }
-      }
-    }
-    times.sort((a, b) => a - b);
-    return times;
+    return stopArrivalTimes(calls, allowedCodes, win);
   } else {
     const src = c as SrcVM;
     const inCalls = src?.inCalls;
@@ -116,20 +113,28 @@ export function getSelCache(M: MapCtx): NonNullable<typeof S.current.selCache> |
     return c;
   }
   const allowedCodes = computeAllowedTrainCodes(M);
+  const win = computeDestWindow(M);
   const cityTimes = new Map<number, number[]>();
   if (allowedCodes) {
     const pts = points();
     for (let i = 0; i < pts.length; i++) {
-      cityTimes.set(pts[i].idx, computeCityAllowedArrivalTimes(M, pts[i], allowedCodes));
+      cityTimes.set(pts[i].idx, computeCityAllowedArrivalTimes(M, pts[i], allowedCodes, win));
     }
   }
-  const next = { cur, panelDest, iso, dir, allowedCodes, cityTimes };
+  const next = { cur, panelDest, iso, dir, allowedCodes, win, cityTimes };
   S.current.selCache = next;
   return next;
 }
 
 export function getAllowedTrainCodes(M: MapCtx) {
   return getSelCache(M)?.allowedCodes ?? null;
+}
+
+/* The single visible-train rule: dots, hit-testing and counters ask this;
+   stop effects derive from the same set (lib/stopEffects). */
+export function isTrainShown(M: MapCtx, code: string): boolean {
+  const sel = getSelCache(M);
+  return trainShownAt(code, M.S.current.animTime, sel?.allowedCodes ?? null, sel?.win ?? null);
 }
 
 
@@ -144,13 +149,12 @@ export function drawTrains(M: MapCtx, ctx: CanvasRenderingContext2D, _pal: Palet
   const isolatedCode = P.current.isolatedTrainCode;
   if (!activeTrains || activeTrains.length === 0) return;
 
-  const allowedCodes = getAllowedTrainCodes(M);
   const { W, H } = S.current;
   const tailLen = 12;
 
   for (let i = 0; i < activeTrains.length; i++) {
     const tr = activeTrains[i];
-    if (allowedCodes && !allowedCodes.has(tr.code)) {
+    if (!isTrainShown(M, tr.code)) {
       continue;
     }
     const isIsolated = isolatedCode === tr.code;

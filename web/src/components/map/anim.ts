@@ -1,7 +1,7 @@
 /* The 24h animation clock: play / pause / seek / speed and listeners. */
 import type { MapCtx, AnimState, AnimListener } from "./context";
 import { draw } from "./render";
-import { getAllowedTrainCodes } from "./trains";
+import { getSelCache } from "./trains";
 
 
 /* ---------- 24h timeline animation controls ---------- */
@@ -16,7 +16,8 @@ export function getAnimState(M: MapCtx): AnimState {
   const totalMins = tl ? tl.totalMins : 1440;
   const totalDays = tl ? tl.totalDays : 1;
 
-  const allowedCodes = getAllowedTrainCodes(M);
+  const sel = getSelCache(M);
+  const allowedCodes = sel?.allowedCodes ?? null;
   if (allowedCodes && cur && tl) {
     total = allowedCodes.size;
     let depCount = 0;
@@ -25,7 +26,9 @@ export function getAnimState(M: MapCtx): AnimState {
       const pt = tl.getPrepTrain(code);
       if (!pt) continue;
       if (pt.depMins <= st.animTime) depCount++;
-      if (pt.arrMins <= st.animTime) arrCount++;
+      // With a destination chosen a train's journey ends there.
+      const endMins = sel?.win?.get(code)?.arrMins ?? pt.arrMins;
+      if (endMins <= st.animTime) arrCount++;
     }
     departed = depCount;
     arrived = arrCount;

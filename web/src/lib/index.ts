@@ -58,6 +58,13 @@ export {
   trainSpeedFrac,
 } from "./timeline";
 export {
+  callArrMins,
+  destWindow,
+  stopArrivalTimes,
+  trainShownAt,
+} from "./stopEffects";
+export type { DestWindow } from "./stopEffects";
+export {
   filterOrigin,
   filterOriginByClasses,
 } from "./filter";
