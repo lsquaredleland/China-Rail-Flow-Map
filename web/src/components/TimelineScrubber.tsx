@@ -321,226 +321,32 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   // If user collapsed the timeline in-place without parent controlling collapse
   if (isCollapsed && !onCollapse) {
     return (
-      <div
-        className="timeline-collapsed-bar"
-        style={{
-          width: "100%",
-          padding: "6px 16px",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          background: dark ? "#18181B" : "#F4F4F0",
-          borderTop: dark ? "1px solid rgba(255,255,255,0.12)" : "1.5px solid #111111",
-          borderBottom: dark ? "1px solid rgba(255,255,255,0.12)" : "1.5px solid #111111",
-          userSelect: "none",
-          boxSizing: "border-box",
-        }}
-      >
+      <div className="timeline-collapsed-bar">
         <button
           type="button"
+          className="tl-expand-btn"
           onClick={handleExpand}
-          style={{
-            background: dark ? "#27272A" : "#FFFFFF",
-            color: dark ? "#EDEDEA" : "#111111",
-            border: dark ? "1.5px solid rgba(255, 255, 255, 0.25)" : "1.5px solid #111111",
-            borderRadius: "20px",
-            padding: "5px 18px",
-            fontSize: "12px",
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-            transition: "transform 0.12s ease, background 0.15s ease",
-          }}
           title="Expand 24h train flow animation controls"
         >
-          <span
-            style={{
-              width: "7px",
-              height: "7px",
-              borderRadius: "50%",
-              background: "#C8302A",
-              boxShadow: "0 0 6px #C8302A",
-            }}
-          />
+          <span className="tl-expand-dot" />
           <span>24h Flow Animation · Expand ▴</span>
         </button>
       </div>
     );
   }
 
-  const redAccent = dark ? "#E54035" : "#C8302A";
-
   return (
-    <div
-      className="timeline-bar-dock"
-      style={{
-        position: "relative",
-        width: "100%",
-        background: dark ? "#18181B" : "#FFFFFF",
-        color: dark ? "#EDEDEA" : "#111111",
-        borderTop: dark ? "1px solid rgba(255,255,255,0.18)" : "1.5px solid #111111",
-        borderBottom: dark ? "1px solid rgba(255,255,255,0.18)" : "1.5px solid #111111",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.06)",
-        padding: "8px 24px 6px 24px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px",
-        zIndex: 10,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        userSelect: "none",
-        boxSizing: "border-box",
-      }}
-    >
-      <style>{`
-        .tb-day-label {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.8px;
-          color: ${dark ? "#A1A1AA" : "#71717A"};
-          text-transform: uppercase;
-        }
-        .tb-clock {
-          font-size: 24px;
-          font-weight: 800;
-          line-height: 1;
-          color: ${dark ? "#EDEDEA" : "#111111"};
-          font-variant-numeric: tabular-nums;
-          letter-spacing: -0.5px;
-        }
-        .tb-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          border: 1.5px solid ${redAccent};
-          color: ${redAccent};
-          padding: 3px 8px;
-          font-size: 9px;
-          font-weight: 800;
-          letter-spacing: 0.6px;
-          text-transform: uppercase;
-        }
-        .tb-badge-icon {
-          font-size: 7px;
-          line-height: 1;
-        }
-        .tb-metric-col {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        .tb-metric-val {
-          font-size: 20px;
-          font-weight: 800;
-          line-height: 1;
-          font-variant-numeric: tabular-nums;
-          letter-spacing: -0.5px;
-        }
-        .tb-metric-lbl {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.6px;
-          color: ${dark ? "#A1A1AA" : "#71717A"};
-          text-transform: uppercase;
-          margin-top: 2px;
-        }
-        .tb-speed-caption {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.8px;
-          color: ${dark ? "#A1A1AA" : "#71717A"};
-          text-transform: uppercase;
-        }
-        .tb-speed-btn {
-          height: 28px;
-          padding: 0 10px;
-          border: none;
-          background: transparent;
-          color: ${dark ? "#EDEDEA" : "#111111"};
-          font-size: 11px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: background 0.12s ease, color 0.12s ease;
-        }
-        .tb-speed-btn:not(:last-child) {
-          border-right: 1.5px solid ${dark ? "rgba(255,255,255,0.25)" : "#111111"};
-        }
-        .tb-speed-btn.active {
-          background: ${dark ? "#EDEDEA" : "#111111"};
-          color: ${dark ? "#111111" : "#FFFFFF"};
-        }
-        .tb-btn-action {
-          height: 28px;
-          padding: 0;
-          box-sizing: border-box;
-          border: 1.5px solid ${dark ? "rgba(255,255,255,0.25)" : "#111111"};
-          background: transparent;
-          color: ${dark ? "#EDEDEA" : "#111111"};
-          font-size: 11px;
-          font-weight: 700;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          transition: background 0.12s ease;
-          flex-shrink: 0;
-        }
-        .tb-btn-action:hover {
-          background: ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)"};
-        }
-        .tb-tick-item {
-          position: absolute;
-          cursor: pointer;
-          white-space: nowrap;
-          font-size: 9px;
-          font-weight: 700;
-          color: ${dark ? "#EDEDEA" : "#111111"};
-          transition: color 0.15s ease;
-        }
-        .tb-tick-item:hover {
-          color: ${redAccent};
-        }
-        @media (max-width: 900px) {
-          .tb-metrics-group {
-            display: none !important;
-          }
-          .tb-speed-caption {
-            display: none !important;
-          }
-        }
-      `}</style>
-
+    <div className="timeline-bar-dock">
       {/* Top Row: Play / Clock / Rush Badge / Stats / Speed / Finish / Collapse */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
-        }}
-      >
+      <div className="tb-row">
         {/* Left: Play button + Clock + Rush Badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="tb-left">
           <button
             type="button"
+            className="tb-play"
             onClick={handleTogglePlay}
             aria-label={isPlaying ? "Pause timeline" : "Play timeline"}
             title={isPlaying ? "Pause (Space)" : "Play (Space)"}
-            style={{
-              width: "36px",
-              height: "36px",
-              background: dark ? "#EDEDEA" : "#111111",
-              color: dark ? "#111111" : "#FFFFFF",
-              border: "none",
-              borderRadius: "0",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
           >
             {isPlaying ? (
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -554,7 +360,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             )}
           </button>
 
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div className="tb-time">
             <span ref={timeDayRef} className="tb-day-label">
               DAY 1
             </span>
@@ -570,20 +376,9 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         </div>
 
         {/* Center: Departed / Arrived / Total columnar stats */}
-        <div
-          className="tb-metrics-group"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "24px",
-          }}
-        >
+        <div className="tb-metrics-group">
           <div className="tb-metric-col">
-            <span
-              ref={departedValRef}
-              className="tb-metric-val"
-              style={{ color: redAccent }}
-            >
+            <span ref={departedValRef} className="tb-metric-val is-accent">
               0
             </span>
             <span className="tb-metric-lbl">
@@ -592,22 +387,14 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           </div>
 
           <div className="tb-metric-col">
-            <span
-              ref={arrivedValRef}
-              className="tb-metric-val"
-              style={{ color: dark ? "#EDEDEA" : "#111111" }}
-            >
+            <span ref={arrivedValRef} className="tb-metric-val is-ink">
               0
             </span>
             <span className="tb-metric-lbl">ARRIVED</span>
           </div>
 
           <div className="tb-metric-col">
-            <span
-              ref={totalValRef}
-              className="tb-metric-val"
-              style={{ color: dark ? "#9CA3AF" : "#4B5563" }}
-            >
+            <span ref={totalValRef} className="tb-metric-val is-total">
               0
             </span>
             <span className="tb-metric-lbl">TOTAL</span>
@@ -615,22 +402,10 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         </div>
 
         {/* Right: A DAY IN / 15s 30s 60s / Finish / Collapse */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-          <span className="tb-speed-caption" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
-            A DAY IN
-          </span>
+        <div className="tb-right">
+          <span className="tb-speed-caption">A DAY IN</span>
 
-          <div
-            style={{
-              display: "flex",
-              border: dark
-                ? "1.5px solid rgba(255,255,255,0.25)"
-                : "1.5px solid #111111",
-              borderRadius: "0",
-              overflow: "hidden",
-              flexShrink: 0,
-            }}
-          >
+          <div className="tb-speed-group">
             <button
               type="button"
               className={`tb-speed-btn ${speed === 15 ? "active" : ""}`}
@@ -659,9 +434,8 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
           <button
             type="button"
-            className="tb-btn-action"
+            className="tb-btn-action is-text"
             onClick={handleJumpToFinish}
-            style={{ padding: "0 12px" }}
             title="Jump simulation to finish when all trains have arrived"
           >
             Finish
@@ -669,32 +443,15 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
           <button
             type="button"
-            className="tb-btn-action"
+            className="tb-btn-action is-icon"
             onClick={handleCollapse}
-            style={{
-              width: "28px",
-              height: "28px",
-              padding: 0,
-              flexShrink: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
             title="Collapse animation bar"
           >
-            <svg
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              style={{
-                display: "block",
-                pointerEvents: "none",
-              }}
-            >
+            <svg viewBox="0 0 24 24" width="16" height="16">
               <polyline
                 points="6 9 12 15 18 9"
                 fill="none"
-                stroke={dark ? "#EDEDEA" : "#111111"}
+                stroke="currentColor"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -705,193 +462,51 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       </div>
 
       {/* Bottom Scrubber: Zones Header + Track with Hatched Tail + Tick Labels */}
-      <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
+      <div className="tb-scrub">
         {/* Zones row (Morning Rush, Evening Rush, Arrivals Only) */}
-        <div style={{ position: "relative", width: "100%", height: "14px", marginBottom: "2px" }}>
-          {/* Morning Rush (07:00–09:30): 07:00 / 24 * 75% = 21.875%, width 7.8125% */}
-          <div
-            style={{
-              position: "absolute",
-              left: "21.875%",
-              width: "7.8125%",
-              height: "100%",
-              background: dark ? "rgba(229, 64, 53, 0.16)" : "rgba(200, 48, 42, 0.12)",
-              display: "flex",
-              alignItems: "center",
-              padding: "0 4px",
-              boxSizing: "border-box",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "8px",
-                fontWeight: 800,
-                color: redAccent,
-                letterSpacing: "0.5px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              MORNING RUSH
-            </span>
+        <div className="tb-zones">
+          <div className="tb-zone is-rush is-morning">
+            <span className="tb-zone-label">MORNING RUSH</span>
           </div>
-
-          {/* Evening Rush (17:30–20:30): 17.5 / 24 * 75% = 54.6875%, width 9.375% */}
-          <div
-            style={{
-              position: "absolute",
-              left: "54.6875%",
-              width: "9.375%",
-              height: "100%",
-              background: dark ? "rgba(229, 64, 53, 0.16)" : "rgba(200, 48, 42, 0.12)",
-              display: "flex",
-              alignItems: "center",
-              padding: "0 4px",
-              boxSizing: "border-box",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "8px",
-                fontWeight: 800,
-                color: redAccent,
-                letterSpacing: "0.5px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              EVENING RUSH
-            </span>
+          <div className="tb-zone is-rush is-evening">
+            <span className="tb-zone-label">EVENING RUSH</span>
           </div>
-
-          {/* Arrivals Only (24:00+ extended tail) */}
-          <div
-            style={{
-              position: "absolute",
-              left: "76%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "8px",
-                fontWeight: 800,
-                color: dark ? "#A1A1AA" : "#71717A",
-                letterSpacing: "0.6px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              ARRIVALS ONLY
-            </span>
+          <div className="tb-zone is-tail">
+            <span className="tb-zone-label">ARRIVALS ONLY</span>
           </div>
         </div>
 
         {/* Track Bar */}
-        <div style={{ position: "relative", width: "100%", height: "8px" }}>
+        <div className="tb-track">
           {/* Track Background: Day 1 (0-75%) + Diagonally Hatched Tail (75-100%) */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: dark ? "#2E3035" : "#E5E3DC",
-              borderRadius: "0",
-              overflow: "hidden",
-            }}
-          >
-            {/* Extended Hatched Tail from 75% to 100% */}
-            <div
-              style={{
-                position: "absolute",
-                left: "75%",
-                right: 0,
-                top: 0,
-                bottom: 0,
-                background: dark
-                  ? "repeating-linear-gradient(45deg, #3A3D44, #3A3D44 2px, #26282D 2px, #26282D 6px)"
-                  : "repeating-linear-gradient(45deg, #D4D2CA, #D4D2CA 2px, #E5E3DC 2px, #E5E3DC 6px)",
-              }}
-            />
-
+          <div className="tb-track-bg">
+            <div className="tb-track-tail" />
             {/* Red Filled Progress */}
             <div
               ref={fillTrackRef}
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: "0%",
-                background: redAccent,
-                transition: "width 0.05s linear",
-              }}
+              className="tb-track-fill"
+              style={{ width: "0%" }}
             />
           </div>
 
           {/* Vertical Divider Line at 75% (24:00 Day 1 ends) */}
-          <div
-            style={{
-              position: "absolute",
-              left: "75%",
-              top: "-2px",
-              width: "2px",
-              height: "12px",
-              background: dark ? "#EDEDEA" : "#111111",
-              zIndex: 3,
-            }}
-          />
+          <div className="tb-day-end" />
 
           {/* Needle & Square Thumb Handle */}
-          <div
-            ref={needleRef}
-            style={{
-              position: "absolute",
-              left: "0%",
-              top: "-6px",
-              transform: "translateX(-50%)",
-              pointerEvents: "none",
-              zIndex: 5,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              transition: "left 0.05s linear",
-            }}
-          >
-            <div
-              style={{
-                width: "10px",
-                height: "10px",
-                background: dark ? "#EDEDEA" : "#111111",
-                borderRadius: "1px",
-              }}
-            />
-            <div
-              style={{
-                width: "2px",
-                height: "12px",
-                background: dark ? "#EDEDEA" : "#111111",
-              }}
-            />
+          <div ref={needleRef} className="tb-needle" style={{ left: "0%" }}>
+            <div className="tb-needle-head" />
+            <div className="tb-needle-stem" />
           </div>
 
           {/* Interactive Range Input on top */}
           <input
             ref={sliderRef}
+            className="tb-slider"
             type="range"
             min="0"
             max="1000"
             step="1"
             defaultValue="0"
-            style={{
-              position: "absolute",
-              left: 0,
-              top: "-6px",
-              width: "100%",
-              height: "20px",
-              opacity: 0,
-              cursor: "pointer",
-              zIndex: 10,
-              margin: 0,
-            }}
             aria-label="Timeline scrubber"
             onInput={(e) => handleSliderInput(Number(e.currentTarget.value))}
             onChange={(e) => handleSliderInput(Number(e.currentTarget.value))}
@@ -899,49 +514,37 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         </div>
 
         {/* Ticks & Labels Row */}
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            height: "14px",
-            marginTop: "4px",
-          }}
-        >
+        <div className="tb-ticks">
           <span
-            className="tb-tick-item"
-            style={{ left: "0%" }}
+            className="tb-tick-item at-0"
             onClick={() => handleSliderInput(0)}
             title="Day 1 00:00"
           >
             00:00
           </span>
           <span
-            className="tb-tick-item"
-            style={{ left: "18.75%", transform: "translateX(-50%)" }}
+            className="tb-tick-item at-6"
             onClick={() => handleSliderInput(188)}
             title="Day 1 06:00"
           >
             06:00
           </span>
           <span
-            className="tb-tick-item"
-            style={{ left: "37.5%", transform: "translateX(-50%)" }}
+            className="tb-tick-item at-12"
             onClick={() => handleSliderInput(375)}
             title="Day 1 12:00"
           >
             12:00
           </span>
           <span
-            className="tb-tick-item"
-            style={{ left: "56.25%", transform: "translateX(-50%)" }}
+            className="tb-tick-item at-18"
             onClick={() => handleSliderInput(562)}
             title="Day 1 18:00"
           >
             18:00
           </span>
           <span
-            className="tb-tick-item"
-            style={{ left: "75%", transform: "translateX(-50%)", fontWeight: 800 }}
+            className="tb-tick-item at-24"
             onClick={() => handleSliderInput(750)}
             title="Day 1 24:00 (Day 1 departures complete)"
           >
@@ -949,8 +552,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           </span>
           <span
             ref={finishTickRef}
-            className="tb-tick-item"
-            style={{ right: 0 }}
+            className="tb-tick-item at-end"
             onClick={handleJumpToFinish}
             title="All trains arrived"
           >
