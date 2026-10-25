@@ -60,6 +60,28 @@ export function nationalTrains(): { source: "full" | "sample"; path: string; dat
   return { source: full ? "full" : "sample", path, data };
 }
 
+const NATIONAL_ENTRIES = "atlas-v2-national-entries.json.br";
+
+/** The pipeline's national entries file (P3.3) when it can be found: in
+    public/assets after the swap, else `staging/national-entries/run3` in this
+    checkout or a parent of it; undefined otherwise (CI), where the committed
+    sample is the only input. CRFM_NATIONAL_SAMPLE=1 forces the sample. The
+    trains file is the one next to it when there is one (the entries are
+    built from it), else the usual national trains file. */
+export function nationalEntries(): { path: string; data: any; trains: any } | undefined {
+  if (process.env.CRFM_NATIONAL_SAMPLE === "1") return undefined;
+  const cands = [join(ASSETS, NATIONAL_ENTRIES)];
+  for (let dir = join(import.meta.dir, ".."); ; dir = dirname(dir)) {
+    cands.push(join(dir, "staging/national-entries/run3", NATIONAL_ENTRIES));
+    if (dirname(dir) === dir) break;
+  }
+  const path = cands.find((p) => existsSync(p));
+  if (!path) return undefined;
+  const read = (p: string) => JSON.parse(brotliDecompressSync(readFileSync(p)).toString("utf8"));
+  const sibling = join(dirname(path), NATIONAL_TRAINS);
+  return { path, data: read(path), trains: existsSync(sibling) ? read(sibling) : nationalTrains().data };
+}
+
 let cached: ReturnType<typeof build> | undefined;
 export function pack() {
   return (cached ??= build());

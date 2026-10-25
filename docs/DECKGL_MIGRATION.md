@@ -1067,6 +1067,28 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
   trains files, rebuilds byte-identical (`cmp`, `secdiff --packs`, same
   `CRFM_PIPELINE_TREE`). The swap needs owner approval.
 
+*Motion model as built in the client (2026-10-25, `feat/remove-train-ease`): linear plus
+dwell.* `trainEase` and `trainSpeedFrac` are deleted; `timeline.ts trainState` and
+`national.ts natState` set `dist = legStartDist + tau × (legEndDist − legStartDist)` with
+`tau = (t − legStart) / legDur`. Unchanged: dwell between arrival and departure, the 1-min
+stretch of short legs, the boarding-day frame and wrap, the ×2.5 tail speed-up after day 1,
+and the tails (length 12 px × `speedFrac`, now 1 while moving and 0 at a stop; the sin²
+ramp of the speed fraction went with the ease). `timeAtDist` inverts a leg in closed form
+instead of bisecting. Counts at the end of each leg are unchanged (the snapshots' `@24`
+and final-n columns and the national counts at minute 1095 and 00:30 are identical); the
+`@12/@18` columns of `snapshots.test.ts` move by ±1 where a train now crosses a section
+start a little earlier or later than on the eased curve. **Contract:**
+`tests/motionContract.test.ts` checks that the client reaches every section start within
+0.1 min of the shipped entry minute: against the committed sample
+(`tests/fixtures/national-entries-sample.json`, written by `tools/national-entries-fixture.ts`
+from an independent closed-form linear model) always, and against the full
+`atlas-v2-national-entries.json` (public/assets, or `staging/national-entries/run3`) when
+present. Changing the motion again means rebuilding the entries file; this test fails
+until both sides agree. Re-baselined shots (`shots.mjs` vs bd2e6fa, all 28): the static
+scenarios stay at 0 px; `anim-0600` 0.0002 / 0.0006 %, `anim-1815` 0.055 / 0.058 %,
+`anim-2350` 0.018 / 0.020 %, `isolated-train-mid` 0.029 / 0.026 % (1x / 2x), all on train
+dots, tails and ripples (diff masks).
+
 **P3.4 Optional comet mode** — only if D2 is toggled on and M4n (Trips) passed.
 
 ---

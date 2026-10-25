@@ -55,40 +55,6 @@ export function getSecGeometry(secSet: DecodedSet): SecGeometryCache {
   return result;
 }
 
-/** Realistic train velocity ramp profile between stops:
- *  Accelerates smoothly from station stop (sin^2 ramp), cruises at top leg speed,
- *  and decelerates smoothly into the next station platform. */
-export function trainEase(tau: number, durMins: number): number {
-  if (tau <= 0) return 0;
-  if (tau >= 1) return 1;
-  const accelMins = Math.min(3, durMins * 0.25);
-  const a = Math.max(0.01, Math.min(0.35, accelMins / durMins));
-  const denom = 1 - a;
-  if (tau <= a) {
-    return (0.5 * tau - (a / (2 * Math.PI)) * Math.sin((Math.PI * tau) / a)) / denom;
-  }
-  if (tau >= 1 - a) {
-    const tPrime = 1 - tau;
-    const rem = (0.5 * tPrime - (a / (2 * Math.PI)) * Math.sin((Math.PI * tPrime) / a)) / denom;
-    return 1 - rem;
-  }
-  return (0.5 * a + (tau - a)) / denom;
-}
-
-/** Normalized instantaneous speed fraction in [0, 1] (0 at station halt, 1 at full cruise). */
-export function trainSpeedFrac(tau: number, durMins: number): number {
-  if (tau <= 0 || tau >= 1) return 0;
-  const accelMins = Math.min(3, durMins * 0.25);
-  const a = Math.max(0.01, Math.min(0.35, accelMins / durMins));
-  if (tau <= a) {
-    return Math.sin((Math.PI * tau) / (2 * a)) ** 2;
-  }
-  if (tau >= 1 - a) {
-    return Math.sin((Math.PI * (1 - tau)) / (2 * a)) ** 2;
-  }
-  return 1.0;
-}
-
 // Scratch result of trainState (single-threaded; avoids per-call allocation).
 const trainScratch = {
   dist: 0,
@@ -143,8 +109,7 @@ function trainState(pt: PrepTrain, t: number) {
   }
   const legDur = Math.max(1, legEndTime - legStartTime);
   const tau = Math.max(0, Math.min(1, (t - legStartTime) / legDur));
-  r.speedFrac = trainSpeedFrac(tau, legDur);
-  r.dist = legStartDist + trainEase(tau, legDur) * (legEndDist - legStartDist);
+  r.dist = legStartDist + tau * (legEndDist - legStartDist);
 }
 
 /** Distance along the train's route at simulation minute `t`: the single
@@ -155,7 +120,7 @@ export function trainDistAt(pt: PrepTrain, t: number): number {
 }
 
 /** Inverse of trainDistAt: the first minute the train has reached `dist`,
-    found by bisecting the easing curve within the leg that contains it. */
+    found by inverting the linear leg that contains it. */
 function timeAtDist(pt: PrepTrain, dist: number): number {
   let legStartDist = 0;
   let legStartTime = pt.depMins;
@@ -178,14 +143,7 @@ function timeAtDist(pt: PrepTrain, dist: number): number {
   if (span <= 0) return legEndTime;
   const frac = Math.max(0, Math.min(1, (dist - legStartDist) / span));
   const legDur = Math.max(1, legEndTime - legStartTime);
-  let lo = 0;
-  let hi = 1;
-  for (let it = 0; it < 14; it++) {
-    const mid = (lo + hi) / 2;
-    if (trainEase(mid, legDur) < frac) lo = mid;
-    else hi = mid;
-  }
-  return legStartTime + hi * legDur;
+  return legStartTime + frac * legDur;
 }
 
 /** The throat span containing route distance `d` (spans are sorted and disjoint). */

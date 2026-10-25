@@ -58,8 +58,6 @@ export {
   buildDayTimeline,
   prepTrainPath,
   trainDistAt,
-  trainEase,
-  trainSpeedFrac,
 } from "./timeline";
 export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
 export { natTrainVM } from "./natTrain";
