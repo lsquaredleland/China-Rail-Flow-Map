@@ -1,7 +1,6 @@
 /* The imperative handle the toolbar / App drives through a ref. */
 import type { MapApi, MapCtx } from "./context";
 import { fitCountryCalc, fitHomeCalc, zoomAt } from "./camera";
-import { draw } from "./render";
 import { hideTooltip, showTooltip } from "./interaction";
 import {
   getAnimState,
@@ -23,7 +22,7 @@ export function createMapApi(M: MapCtx): MapApi {
       hideTooltip(M);
       st.hover = null;
       fitCountryCalc(M);
-      draw(M);
+      M.render();
     },
     fitHome() {
       const st = S.current;
@@ -32,7 +31,7 @@ export function createMapApi(M: MapCtx): MapApi {
       hideTooltip(M);
       st.hover = null;
       fitHomeCalc(M);
-      draw(M);
+      M.render();
     },
     zoomCenter(factor: number) {
       zoomAt(M, S.current.W / 2, S.current.H / 2, factor);
@@ -47,14 +46,14 @@ export function createMapApi(M: MapCtx): MapApi {
       const st = S.current;
       if (st.hover && st.hover.kind === "station") {
         st.hover = null;
-        draw(M);
+        M.render();
       }
     },
     selectDestByZh(zh: string) {
       const pt = points().find((p) => p.zh === zh);
       if (pt) {
         P.current.onSelectDest(pt);
-        draw(M);
+        M.render();
       }
     },
     panZoomTo(lon: number, lat: number, scale: number) {
@@ -63,7 +62,7 @@ export function createMapApi(M: MapCtx): MapApi {
       st.view.scale = scale;
       st.view.tx = st.W / 2 - lon * scale;
       st.view.ty = st.H / 2 + lat * scale;
-      draw(M);
+      M.render();
     },
     setTime: (t) => setTime(M, t),
     setPlaying: (p) => setPlaying(M, p),

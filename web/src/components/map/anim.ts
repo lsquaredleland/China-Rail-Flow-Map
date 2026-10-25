@@ -1,6 +1,5 @@
 /* The 24h animation clock: play / pause / seek / speed and listeners. */
 import type { MapCtx, AnimState, AnimListener } from "./context";
-import { draw } from "./render";
 import { getSelCache } from "./trains";
 
 
@@ -82,7 +81,7 @@ export function animLoop(M: MapCtx, timestamp: number) {
       if (st.animTime >= totalMins) {
         st.animTime = 0;
       }
-      draw(M);
+      M.render();
       notifyAnimListeners(M);
     }
   }
@@ -134,7 +133,7 @@ export function setTime(M: MapCtx, tMins: number) {
   const tl = activeTimeline();
   const totalMins = tl ? tl.totalMins : 1440;
   st.animTime = Math.max(0, Math.min(totalMins, tMins));
-  draw(M);
+  M.render();
   notifyAnimListeners(M);
 }
 
@@ -150,7 +149,7 @@ export function setAnimEnabled(M: MapCtx, enabled: boolean) {
   const { S } = M;
   const st = S.current;
   st.animEnabled = enabled;
-  draw(M);
+  M.render();
   notifyAnimListeners(M);
 }
 

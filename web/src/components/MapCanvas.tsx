@@ -57,6 +57,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     });
   }
   const M = mRef.current;
+  M.render = () => draw(M);
 
   useImperativeHandle(apiRef, () => createMapApi(M), [M]);
 
@@ -67,7 +68,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   useEffect(() => {
     const w = window as unknown as Record<string, unknown>;
     w.__M = M;
-    w.__draw = () => draw(M);
+    w.__draw = () => M.render();
   }, [M]);
 
   /* ---------- lifecycle ---------- */
@@ -142,7 +143,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (!props.cur || props.cur === curRef.current) return;
     if (curRef.current && props.cur.o === curRef.current.o) {
       curRef.current = props.cur;
-      draw(M);
+      M.render();
       notifyAnimListeners(M);
       return;
     }
@@ -166,7 +167,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
   // Toggle / theme / direction / selected-station changes just need a redraw.
   useEffect(() => {
-    draw(M);
+    M.render();
     notifyAnimListeners(M);
   }, [
     M,
