@@ -1,6 +1,9 @@
 # deck.gl migration plan: from the Canvas 2D renderer to deck.gl
 
 Status: **approved for execution, phase by phase, on the integration branch `deckgl`.**
+**Gate G0: GO with conditions** (independent gate review 2026-10-25, §11.6; the conditions are
+folded into the P1b tasks as C16–C26 below). Phase 1 is in progress: P1.0, P1.1, P1a.1–P1a.3 are
+merged; P1b.1 is the next task.
 Each phase is a set of numbered, PR-sized tasks with files, tests, acceptance numbers and a
 stop/go gate. The owner decisions D1–D16 (§10) are **adopted defaults**: implementers follow
 them unless the owner overrides one in writing.
@@ -47,7 +50,7 @@ What changed and why. Everything below is folded into the sections.
 | # | Finding | Change |
 |---|---|---|
 | C1 | **`LineLayer` has no `getSourceColor`/`getTargetColor`** (only `getColor`) **[docs]**. The gradient-tail plan was wrong. | Tails are a `TailLayer extends LineLayer` (~15 lines: `getShaders()` injects `vColor.a *= positions.x`, fading source→target). Phase 0 M13 verifies; fallback `ArcLayer({getHeight: 0, numSegments: 2})` (has per-end colours **[docs]**), last resort a solid tail at α 0.6 (visible change, owner notified). |
-| C2 | Dot "stroke trick" numbers were inconsistent. `ScatterplotLayer` draws the stroke **inside** the radius **[source]**. | `getRadius: 4`, `getLineWidth: 2`, pixels: ring 2–4 px (class colour), core 0–2 px (white). Isolated: 5.5 / 2.7. |
+| C2 | Dot "stroke trick" numbers were inconsistent. ~~`ScatterplotLayer` draws the stroke **inside** the radius~~ — **wrong, superseded by C17**: the stroke is centred on the radius. | ~~`getRadius: 4`~~ → `getRadius: 3`, `getLineWidth: 2` (C17). |
 | C3 | "A section with `n = 0` gets width 0" would be re-grown to 0.5 px by `widthMinPixels`. | Visibility of `n = 0` sections via `DataFilterExtension` (`getFilterValue = n`, `filterRange [0.5, 1e9]`), never via width. |
 | C4 | `staleReload.ts` matches only hashed `.json.br` 404s; a lazily imported deck chunk that 404s after a deploy is an `import()` TypeError with no status, so an old tab would never self-heal. | New pure `importFailureDecision()` + `maybeReloadForFailedImport()` with the same 60 s cooldown; tests in `staleReload.test.ts`; the deck loader calls it on rejection. |
 | C5 | `"build": "node bundle.mjs"` runs under Node on Vercel and CI, so production already uses the **esbuild** branch; the `Bun.build` branch is dead for prod. | D14: esbuild is the one bundler; the Bun branch is deleted in P1.1. Concrete esbuild split options in §7 R2. |
@@ -61,6 +64,18 @@ What changed and why. Everything below is folded into the sections.
 | C13 | Verified and kept: projection formulas; `flowWidth` ↔ `widthUnits:'common'` + `widthMinPixels 0.5`; 62 tests / 7 files; 3,146 lines; bundle 392,735 B JS, `index.html` 454,611 B / 133,146 B gzip; deck.gl 9.4.0 = npm latest; `dashUnits:'pixels'` **[docs]**; DataFilter `filterSize ≤ 4`, 128 categories **[docs]**; `useDevicePixels` number **[docs]**; 8 MB ref estimate. TripsLayer GPU estimate tightened to ≈ 45–60 B/vertex. | — |
 | C14 | `@deck.gl/react` vs imperative `Deck`: decided. | D15: imperative `Deck` driven from `MapCtx`; no `@deck.gl/react`. |
 | C15 | **Owner feedback (third pass):** all work on the `deckgl` integration branch, never on `main`; origin-view compatibility first, national second; `deckgl` → `main` is an explicit owner gate. | Branch rules above; phases reordered (Phase 0 = origin spike with national numbers secondary; Phase 1 = origin migration incl. flip and Canvas deletion on `deckgl`; Phase 2 = national A; Phase 3 = B/A+B); task IDs and dependency graph rewritten; new D16 (merge timing); §2.5, §9, §11 re-cut to the new order. |
+| **G0 gate review (fourth pass, 2026-10-25; spike `spike/deckgl` @ `f04acf8`, re-measured independently, §11.6)** | | |
+| C16 | **M2's threshold was written as "≤ 33 ms" but means two vsync intervals at 60 Hz (33.3 ms)**; one of three reps landed exactly there and the p95 of a rAF-interval series can only take values near multiples of 16.7 ms. rAF intervals also degrade under machine contention while draw time stays flat (G8). | M2 threshold restated as **p95 rAF ≤ 33.4 ms (2 vsyncs) on the median of 3 reps, and draw+raster p95 ≤ 16.7 ms** (the contention-robust primary). Same restatement for M2n. The spike's M2 is a pass under both readings (median 16.8; draw+raster 11.9–13.9). |
+| C17 | **C2 was wrong: `ScatterplotLayer` strokes are centred on `radius`** (`outerRadiusPixels = radius + lineWidth/2`, `innerUnitRadius = 1 − lineWidth/outer` in `scatterplot-layer-vertex.glsl` 9.4.0 **[source, re-read]**). | Rule: **`getRadius = outerEdge − lineWidth/2`**. Train dots `getRadius 3`, `getLineWidth 2` (ring 2–4 px, white core 0–2 px); isolated `4.15` / `2.7`; station dots `getRadius = r` (Canvas strokes are centred on `r` too), dwell ring `6.5`, rings at their centre-line radius. Rows 15–23 and P1b.3 corrected. |
+| C18 | **`Deck.onError` never receives a context loss in 9.4.0**: `_onContextLost` is defined but has no caller **[source: `lib/deck.js`, grep of `@deck.gl/core/dist`]**; luma registers `webglcontextlost` without `preventDefault` (`create-browser-context.js`), so without our own listener the browser never fires `webglcontextrestored`. The M12 rewording is legitimate: the plan's intent (no crash, notice, map recovers) holds and was demonstrated. | R3 rewritten. **Context-loss recovery is an explicit P1b.1 task item** with acceptance: own `webglcontextlost` listener (`preventDefault`, notice shown, no `pageerror`), `webglcontextrestored` → `finalize()` + new `Deck` on a **fresh canvas element** exactly once, map redraws; if no restore within 5 s the notice offers tap-to-resume which does the same. M12 in the P0.2 table reworded. |
+| C19 | **Flow draw order (G2) resolved: one binary `PathLayer` per pass with the geometry uploaded in `pass.items` order.** A binary PathLayer draws instances in path order and deck's defaults are `depthCompare 'less-equal'`, `depthWriteEnabled true` (`layers-pass.js`), so later paths win: path order **is** paint order. Canvas order is `pass.items` order (`flowPasses` sorts widest first, also per animation step, `mapModel.ts`). Measured: `PathTesselator` with `_pathType:'open'` takes **0.29 ms for the whole `sec` set** (7,922 sections, 75,044 vertices) and **0.25–0.33 ms** to copy + tesselate an origin's flow subset widest-first (广州 4,286 sections / 14,902 vertices; busiest 北京 5,195 / 18,200) **[measured, Bun, median of 9]**. The subset is 4–5× fewer vertices than the whole set, so per-step attribute work shrinks too. Width buckets (5 layers, 7.3 ms CPU, 31 MB) are rejected. | §2.2/§2.6/P1b.2 rewritten: a pass's `data` is a new binary object `{length, startIndices, attributes}` built from its `items` (n > 0 only, in items order) whenever the items identity changes (origin, direction, filter, selection, animation step); geometry for n = 0 is simply absent, so **`DataFilterExtension` is no longer used for flows** (C3 stays for infra categories only). Picking maps `info.index` back through the pass's `idx → s` array. Acceptance numbers in P1b.2. |
+| C20 | **The G1 parity target (≤ 0.5 %) was at or under the anti-aliasing floor.** Reproduced the spike's M14 numbers to three decimals (deterministic). Under the plan's literal rule (pixelmatch threshold 0.1, `includeAA:false`) the AA-only scenarios sit at **0.16–0.56 %** (`infra-on` 0.56, `guangzhou-initial`/`inbound`/`class-filter-G` 0.48); `cmp.mjs --tolerance 25` is a stricter stand-in (0.75–1.9 %) because it counts AA pixels. Cause: 4× MSAA quantises hairline coverage (0.45–1.25 px network/infra, 1.5 px dot rings) to 25 % steps, up to 64/255 per pixel along whole lines, which Canvas's analytic AA does not. **[measured, §11.6]** | **G1 corrected (P1b.5):** `pixelmatch` semantics (threshold 0.1, AA pixels excluded) **≤ 1.0 %** per scenario; D3-affected four **≤ 2.0 %**; `labels-on` **≤ 1.5 %** (C21). `cmp.mjs` gains `--pixelmatch` (devDependency `pixelmatch`, zero deps; same PNG codec) in P1b.5 and keeps `--tolerance` for the old numbers. Structural sign-off stays: diff masks attached, every solid red region ≥ 8×8 px listed with a cause. |
+| C21 | **Labels are placed identically but the glyphs are not pixel-identical**: text on the transparent overlay canvas is rasterised softer (grayscale AA, no opaque-background contrast boost) than on the opaque Canvas map; every label edge pixel differs, including the origin label in every scenario (`labels-on` 1.23 % under pixelmatch, 2.69 % raw). Invisible at 1× (side-by-side crop in §11.6). | §1.2 claim corrected to "identical placement; text AA softer". `labels-on` allowance in C20; the origin label's share (< 0.1 %) is inside the 1.0 %. The owner's M10 eyeball now decides whether the softer text is acceptable or `TextLayer`/DOM labels get a task. |
+| C22 | **A new layer type's first frame may draw nothing** while luma compiles its pipeline asynchronously (G4); `deck.redraw()` and `setProps` are synchronous (G5). | P1b.1: `DeckHost` counts frames and exposes `window.__deckStats.{afterRenders, settled}`; "settled" = two consecutive `onAfterRender` with an unchanged layer-id set and no pending pipeline compiles. Drivers and tests wait for `settled`, never a fixed sleep. `M.render()` = `setProps({viewState, layers})` + `redraw('render')`, Canvas-identical timing. |
+| C23 | **Two-pass bundling (P1.1) means the deck chunk is a separate module graph**: anything it imports from `src/` is duplicated, so module-level state is not shared with the entry, and a JSX `DeckHost` would bundle a second React (hooks from a second copy throw). The current lazy graph is 8 files, 219 KB brotli, no React **[measured, build of `deckgl` @ `b4cc2a1`]**. | `DeckHost.tsx` is an **imperative module**: `mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle` (`render`, `pick`, `pickMultiple`, `resize`, `destroy`); no React, no JSX, no imports of modules with module-level state (`map/camera.ts` timers, `map/render.ts`); everything comes in through `MapCtx`. `MapCanvas.tsx` mounts it from a `useEffect` after `loadDeck()` resolves (not `React.lazy`). `bundle.mjs` asserts **no `node_modules/react` input in the lazy graph** and that the entry references the chunk (already does). |
+| C24 | **Keep our pointer handling; `controller: false`.** deck's wheel curve is logistic, `scale = 2/(1 + exp(−abs(δ·speed)))` with δ = −deltaY (`controller.js`, mjolnir) **[source]**, saturating at 2× per event, while ours is `exp(−deltaY·0.0016)`; a calibrated `speed ≈ 0.0033` matches within 1 % at deltaY = ±100 but 11 % at ±300. The spike kept `pointer.ts` + the existing wheel listener with `controller: false` and the whole interaction stack worked. | New **D17**: `pointer.ts`, the wheel listener and `camera.ts zoomAt` stay for both renderers; the deck canvas has `pointer-events: none` under the existing pointer-capturing element. R8 (feel) disappears; the P1b.1 wheel calibration check is dropped; P1b.4 implements `pick()` on deck's `pickObject`/`pickMultipleObjects` from our handlers (no `onHover`/`onClick`); P1c.2 no longer deletes `pointer.ts`/the wheel code. Rows 27–28 updated. |
+| C25 | M14 methodology checked: `cmp.mjs` counts a pixel as differing when any channel differs by > 25; pixelmatch 0.1 is ≈ 26/255 for achromatic deltas (YIQ metric) **and** skips AA pixels by default, so the stand-in was stricter, not looser. Verified by re-running both on the same shots. | No change to M14's verdict; the comparison rule for G1 is fixed by C20. |
+| C26 | Settled during the review, recorded so nobody re-derives them: `deck.metrics.gpuMemory` agrees with the attribute-buffer sum (G6); `preserveDrawingBuffer` is true by default so `readPixels` after `redraw()` works (used by M9/M12/M13 probes); interleaved `stride/offset` attributes (§2.2) were not exercised (G7) and stay optional. | §2.2 wording. |
 
 ---
 
@@ -115,27 +130,27 @@ infra → trains → hover segment highlight → stations → labels → legend 
 | 5 | Base network | `drawNetwork` | `PathLayer` on `atlas.net` (binary, `startIndices`, `_pathType:'open'`); `common` width 0.008, `widthMinPixels 0.45`, `widthMaxPixels 2.5` | One-to-one clamp mapping |
 | 6 | Qiongzhou ferry (dashed blue, water part only) | `isFerry` bbox test + `traceInto(..., "landOnly"/"waterOnly")` **re-split every frame**; bbox test duplicated 6× | Split once at decode in `lib/ferry.ts`; water pieces → dashed `PathLayer` | — |
 | 7 | Backdrop offscreen cache | `drawBackdrop` + `BackdropCache` | **Deleted** | GPU redraw is cheap |
-| 8 | Routed flows: width ∝ trains, colour ramp | `flows.ts drawFlows / strokeFlowList` (0.25 px buckets) | Binary `PathLayer` on `sec`/`inSec`; `getWidth = n·WIDTH_K/fitScale`, `widthUnits:'common'`, `widthMinPixels 0.5`; `getColor` = `flowColorRGBA` | Equals `flowWidth(n, scale, fitScale) = max(0.5, n·0.08·scale/fitScale)` exactly **[verified]**; pan/zoom cost zero attribute updates. `n = 0` hidden via `DataFilterExtension` (C3) |
+| 8 | Routed flows: width ∝ trains, colour ramp, **widest first** | `flows.ts drawFlows / strokeFlowList` (0.25 px buckets, `pass.items` order) | One binary `PathLayer` per pass, geometry uploaded **in `pass.items` order** (n > 0 only, C19); `getWidth = n·WIDTH_K/fitScale`, `widthUnits:'common'`, `widthMinPixels 0.5`; `getColor` = `flowColorRGBA` | Equals `flowWidth(n, scale, fitScale) = max(0.5, n·0.08·scale/fitScale)` exactly **[verified]**; pan/zoom cost zero attribute updates; path order = paint order (C19). `n = 0` sections are absent from the pass data (no `DataFilterExtension` for flows) |
 | 9 | Flow dimming passes (selected city, filtered view, isolated train) | `drawFlows` branches, faded α 0.06/0.08 (iso) and 0.16/0.18 (dark/light) | Two `PathLayer` instances: `flows-context` (faded, `pickable:false`) and `flows-focus` | D3: context pass pre-blended opaque |
 | 10 | Animated flow growth (`secFlowSteps`) | `drawFlows` (`step = floor(t/stepMins)`) | `updateTriggers: {getWidth: step, getColor: step}` | Once per 5-min step |
 | 11 | Isolated-train corridor (progressive) | `drawFlows` iso branch + `tracePartialSec` | `PathLayer` with one path from `lib/mapModel.ts isolatedCorridor` | Per frame, one path |
 | 12 | Infrastructure overlay | `drawInfra` | `PathLayer` 1.25 px, colour by `hsr[s]`; connected/unconnected via `DataFilterExtension` categories | — |
 | 13 | Chord legs (dashed straight) | `drawChords`, gated by first departure | `PathLayer` + `PathStyleExtension`, `dashUnits:'pixels'` | Gating → `lib/mapModel.ts chordVisibility` |
 | 14 | Hover highlight (seg/chord), width +1.6 | `drawHighlightSeg` | `PathLayer` with 0–1 items | — |
-| 15 | Station dots: `stationR·stationZoomK(t)`, `rampColor(fastest)`, `dotEdge` stroke 1.5/3.0 | `stations.ts drawStations` | `ScatterplotLayer`, `radiusUnits:'pixels'`, `stroked`, `lineWidthUnits:'pixels'` | `updateTriggers.getRadius = round(stationT, 3)` |
+| 15 | Station dots: `stationR·stationZoomK(t)`, `rampColor(fastest)`, `dotEdge` stroke 1.5/3.0 | `stations.ts drawStations` | `ScatterplotLayer`, `radiusUnits:'pixels'`, `stroked`, `lineWidthUnits:'pixels'`, `getRadius = r` (stroke centred on `r` in both renderers, C17) | `updateTriggers.getRadius = round(stationT, 3)` |
 | 16 | Dot growth while animating | `drawDot` (`cityArrTimes ≤ t`) | Same `lib` maths; `getRadius` trigger on `animTime` | ≤ 300 points |
 | 17 | Arrival ripple (gold ring, 20 min) | `drawDot recentArrival` | `ScatterplotLayer filled:false`, per-point radius/alpha | Exact |
 | 18 | Selected / hovered rings, origin hover ring | end of `drawStations` | `ScatterplotLayer` (0–3 points) | — |
 | 19 | Origin marker (disc + diamond) | `drawStations` | Disc: `ScatterplotLayer`; diamond: label overlay canvas | Avoids an `IconLayer` atlas |
-| 20 | Train dots: glow r4 + white core r2, α 0.45 on chords | `trains.ts drawTrains` | One `ScatterplotLayer`: `getRadius 4`, `getFillColor` white, `stroked`, `getLineWidth 2`, `getLineColor` class colour (C2) | One draw call |
+| 20 | Train dots: glow r4 + white core r2, α 0.45 on chords | `trains.ts drawTrains` | One `ScatterplotLayer`: **`getRadius 3`, `getLineWidth 2`** (stroke centred: ring 2–4 px, white core 0–2 px; isolated `4.15`/`2.7`), `getFillColor` white, `stroked`, `getLineColor` class colour (C17) | One draw call |
 | 21 | Gradient tails 12 px × speedFrac (22 isolated), width 2.5 (3.5) | `drawTrains` (save/rotate/stroke per train) | `TailLayer` (C1): source = pos − heading·len/scale, colour fades to α 0 at the source | Length ∝ 1/scale so it stays 12 px |
-| 22 | Dwell ring (r 6.5, α 0.85, 1.3 px) | `drawTrains` | `ScatterplotLayer` stroked-only on dwelling dots | — |
-| 23 | Hover/selected/isolated train ring + code tag | `drawTrains` | Ring: `ScatterplotLayer` (0–2). Tag: label overlay canvas | — |
-| 24 | City labels (collision-aware, tiers by zoom, boxed origin/selected) | `stations.ts drawLabels` (≈ 250 lines) | Placement → pure `lib/labels.ts`; drawing → overlay canvas | §1.2 |
-| 25 | Hover tooltip (HTML) | `interaction.ts showTooltip` (≈ 190 lines) | **Unchanged** DOM `#tooltip`; builders → `lib/tooltip.ts` | Positioned from `info.x/y` |
-| 26 | Hit-testing: train (14 px, paused only) > station (`14·zoomK`) / origin (15 px, wins ties) > segment (10 px, busier wins within ±0.75 px) > chord | `interaction.ts pick*` | `pickMultipleObjects` + pure `lib/pick.ts pickPriority` (D6), P1b.4 | §2.5 |
-| 27 | Tap-select / tap-empty-clears / pinned tooltip | `pointer.ts endPointer` | `Deck.onClick(info, event)` | P1b.4 verifies `onClick` fires with `picked:false` |
-| 28 | Pan / wheel / pinch, clamp `fitScale·[0.55, 60]` | `pointer.ts`, `camera.ts zoomAt`, wheel listener in `MapCanvas.tsx` | `OrthographicController` `{dragPan, scrollZoom:{speed}, touchZoom, inertia:false, dragRotate:false, keyboard:false, doubleClickZoom:false}` **[docs]**; `minZoom/maxZoom` in `viewState` | Wheel calibrated to `exp(−deltaY·0.0016)` in P1b.1 |
+| 22 | Dwell ring (r 6.5, α 0.85, 1.3 px) | `drawTrains` | `ScatterplotLayer` stroked-only on dwelling dots, `getRadius 6.5` (centre line), `getLineWidth 1.3` | — |
+| 23 | Hover/selected/isolated train ring + code tag | `drawTrains` | Ring: `ScatterplotLayer` (0–2) at the Canvas centre-line radius. Tag: label overlay canvas | — |
+| 24 | City labels (collision-aware, tiers by zoom, boxed origin/selected) | `stations.ts drawLabels` (≈ 250 lines) | Placement → pure `lib/labels.ts`; drawing → overlay canvas (placement identical; glyph AA softer on the transparent overlay, C21) | §1.2 |
+| 25 | Hover tooltip (HTML) | `interaction.ts showTooltip` (≈ 190 lines) | **Unchanged** DOM `#tooltip`; builders → `lib/tooltip.ts` | Positioned from the pointer as today |
+| 26 | Hit-testing: train (14 px, paused only) > station (`14·zoomK`) / origin (15 px, wins ties) > segment (10 px, busier wins within ±0.75 px) > chord | `interaction.ts pick*` | `interaction.ts pick()` calls `DeckHandle.pick`/`pickMultiple` (deck GPU picking) + pure `lib/pick.ts pickPriority` (D6), P1b.4 | §2.5 |
+| 27 | Tap-select / tap-empty-clears / pinned tooltip | `pointer.ts endPointer` | **Unchanged** (`pointer.ts` stays, D17/C24); `endPointer` calls the same `pick()` | P1b.4 driver checks tap semantics |
+| 28 | Pan / wheel / pinch, clamp `fitScale·[0.55, 60]` | `pointer.ts`, `camera.ts zoomAt`, wheel listener in `MapCanvas.tsx` | **Unchanged**: `controller: false`; the deck canvas is `pointer-events: none` under the pointer-capturing overlay canvas (D17/C24). The deck `viewState` is derived from `S.current.view` on every `M.render()` | No calibration needed; deck's own wheel curve is logistic and would not match (C24) |
 | 29 | Fit country / home / Guangzhou initial / `panZoomTo` / `initialCamera` / keep centre on resize | `camera.ts fit*`, `resize` | Same maths on `S.current.view`; `lib/camera.ts` converts to/from `viewState` | `MapApi` unchanged |
 | 30 | Scale bar | `camera.ts updateScaleBar` | Unchanged; called from `M.render()` | — |
 | 31 | URL view report (debounced) | `reportViewChange` | Unchanged; URL zoom `log2(scale·360/256)` kept | — |
@@ -166,20 +181,28 @@ web/src/lib/               (pure, bun-testable; no deck imports)
   national.ts    (Phase 2) national per-train timelines on section refs
   (unchanged)    decode, filter, origin, timeline(+prepTrainPath in Phase 2), stopEffects, palette(+RGBA), format, geo
 web/src/components/map/
-  deck/DeckHost.tsx          Deck instance, controller, lifecycle, context loss, onAfterRender → overlay
+  deck/DeckHost.ts           mountDeck(M, host) → DeckHandle: Deck instance (controller: false), lifecycle,
+                             context loss, settled-frame counter, onAfterRender → overlay. Imperative, no React (C23)
   deck/TailLayer.ts          LineLayer subclass with the source→target alpha fade (C1)
   deck/layers/{backdrop,flows,stations,trains}.ts   props builders only (pure given inputs)
   deck/layers/national.ts    (Phase 2)
-  deck/labelsOverlay.ts      thin 2D canvas: labels, origin diamond, train tag
+  deck/labelsOverlay.ts      thin 2D canvas: labels, origin diamond, train tag (also the pointer-capturing element)
   deck/load.ts               lazy import() of the deck chunk + stale-chunk recovery (C4)
-  anim.ts, api.ts, camera.ts, context.ts   kept (camera.ts shrinks to resize/report glue)
+  anim.ts, api.ts, camera.ts, context.ts, pointer.ts   kept (camera.ts shrinks to resize/report glue;
+                             pointer.ts and the wheel listener serve both renderers, D17)
 ```
+
+Everything under `deck/` is bundled as the lazy chunk by a **separate esbuild pass** (P1.1):
+it may import pure `lib/*` and types freely (they are duplicated into the chunk), but it must
+not import a module whose module-level state the entry also uses (`map/camera.ts` timers,
+`map/render.ts`, `map/anim.ts`), must not import React, and gets everything it needs through
+`MapCtx` (C23).
 
 ### 1.2 Why labels stay outside deck (D5 adopted: overlay canvas)
 
 | Option | Pros | Cons |
 |---|---|---|
-| **Overlay 2D canvas (adopted)** | Pixel-identical text (native CJK shaping, system font fallback); keeps today's placement; ≈ 40 lines of drawing | One extra canvas; redraw on every deck frame (≤ ≈ 60 labels, cheap) |
+| **Overlay 2D canvas (adopted)** | Same text engine as today (native CJK shaping, system font fallback); identical placement; ≈ 40 lines of drawing | One extra canvas; redraw on every deck frame (≤ ≈ 60 labels, cheap). **Glyphs are not pixel-identical**: on a transparent canvas Chrome rasterises text with plain grayscale AA, softer than on the opaque map canvas (C21, crop in §11.6); invisible at 1×, but every glyph edge pixel differs |
 | `TextLayer` (`characterSet:'auto'`, `background:true`) **[source]** | All on GPU | SDF text at 10.5–14 px is softer than native, especially thin CJK strokes; atlas rebuilds on new characters; collision still JS |
 | DOM labels | Crisp; screen-reader accessible | ≈ 60 elements repositioned per pan frame; z-order vs tooltip; collision still JS |
 
@@ -210,21 +233,30 @@ it sits above the deck canvas and below `#tooltip`.
 
 ### 2.2 Layer data shapes
 
-- **Static geometry (flows, infra, network, outline).** One binary `PathLayer` data object
+- **Whole-set static geometry (infra, network, outline).** One binary `PathLayer` data object
   per `DecodedSet`: `data: {length: nSec, startIndices, attributes: {getPath: {value: set.pts, size: 2}}}`,
-  `_pathType: 'open'` (skips normalisation **[docs]**). Per-section width and colour via
-  accessors `(_, {index}) => widthArr[index]` with `updateTriggers`; visibility of `n = 0`
-  sections via `DataFilterExtension({filterSize: 1})`, `getFilterValue: (_, {index}) => nArr[index]`,
-  `filterRange: [0.5, 1e9]` (C3). Geometry never re-uploads; width/colour/filter attributes
-  rebuild in O(vertices of the set) per trigger: ≈ 1–4 ms at the 5-min step **[estimate]**.
-  - Focus pass for a selected city (small subset): non-binary `data = subFlows` with
-    `getPath: f => set.pts.subarray(off[f.s], off[f.s] + 2·len[f.s])`.
+  `_pathType: 'open'` (skips normalisation **[docs]**). Per-section colour via accessors
+  `(_, {index}) => colArr[index]` with `updateTriggers`; infra connected/unconnected via
+  `DataFilterExtension` categories (C3). Geometry never re-uploads.
+- **Flow passes (C19).** One binary `PathLayer` per `flowPasses` pass whose `data` is built
+  from `pass.items` **in items order, n > 0 only**: `pts` = the concatenated section vertices
+  (`Float32Array.set` of `set.pts.subarray(off[s], off[s] + 2·len[s])`), `startIndices`,
+  parallel `Float32Array n`, `Uint8Array rgba`, `Int32Array idxToSec`; `_pathType: 'open'`.
+  Path order is paint order, so this reproduces Canvas's widest-first overdraw exactly. A new
+  `data` object is built when the pass's items identity changes (origin, direction, filter,
+  selection, animation step): deck then recomputes that layer's attributes in O(vertices of
+  the subset) (广州: 14,902 vertices; the whole set is 75,044) and re-uploads ≈ 0.4 MB.
+  Tesselation of the subset is 0.25–0.33 ms **[measured]**; the attribute pass is what the
+  spike already paid per step on the whole set (cpuTimePerFrame 2.4–3.5 ms), now 4–5× smaller.
+  `n = 0` sections are simply absent (no `DataFilterExtension`, no `widthMinPixels` re-growth).
 - **Animated dots (origin and national).** CPU writes an interleaved `Float32Array`
   (6 floats per dot: lon, lat, ux, uy, speed, flags). `getPosition: {value: buf, size: 2, stride: 24, offset: 0}`;
   colour from a parallel `Uint8Array(c·4)` filled in the same loop. A **new** `data` object
   `{length: c, attributes}` per frame (deck recalculates that layer's attributes when `data`
   changes **[docs]**; for external typed arrays that is a re-upload of ≈ c × 28 B).
-- **Tails.** `Float32Array(c·4)` (source xy, target xy) in the same loop → `TailLayer`.
+- **Tails.** `Float32Array(c·4)` (source xy, target xy) in the same loop → `TailLayer`. The
+  spike used separate (non-interleaved) arrays; `stride/offset` interleaving is an optional
+  optimisation, not a requirement (C26).
 - **Small per-frame sets** (ripples, dwell rings, highlight rings, isolated corridor): plain
   arrays (≤ a few hundred items).
 
@@ -276,9 +308,9 @@ vertices **[estimate]**, which Phase 0 M4n measures if time allows.
 
 | Target | Phase 1 (origin view) | Phase 2 (national) |
 |---|---|---|
-| Train dots | deck GPU picking on the dots layer (`pickable: !animPlaying`, Deck `pickingRadius: 14`); `info.index` → slot in the frame buffer → train | Same |
-| Stations / origin | Stations layer pickable; radius rule (`14·zoomK`, origin 15 px, origin wins ties) applied in `pickPriority` over `pickMultipleObjects({x, y, radius: 15, depth: 10})` candidates | — (D13: no station dots in national mode) |
-| Sections / chords | D6: candidates from `pickMultipleObjects`; `lib/pick.ts pickPriority` recomputes the exact screen distance (`distToSeg` over the ≤ 10 candidates' polylines via `viewport.project`) and applies today's order and the ±0.75 px "busier section wins" tie-break. `flows-context` is `pickable: false` (today a filtered-out section is not pickable either) | Phase 3 (B) |
+| Train dots | `interaction.ts pick()` (called from our `pointer.ts`/hover handlers as today, D17) → `DeckHandle.pick({x, y, radius: 14, layerIds: ['trains']})` when paused; `info.index` → slot in the frame buffer → train | Same |
+| Stations / origin | `DeckHandle.pickMultiple({x, y, radius: 15, depth: 10, layerIds: ['stations', 'origin']})`; radius rule (`14·zoomK`, origin 15 px, origin wins ties) applied in `pickPriority` | — (D13: no station dots in national mode) |
+| Sections / chords | D6: candidates from `pickMultiple` on the flow/chord layers; `lib/pick.ts pickPriority` recomputes the exact screen distance (`distToSeg` over the ≤ 10 candidates' polylines via `M.X/M.Y`) and applies today's order and the ±0.75 px "busier section wins" tie-break; `info.index` maps to a section through the pass's `idxToSec` (C19). `flows-context` is `pickable: false` (today a filtered-out section is not pickable either) | Phase 3 (B) |
 
 Picking only sees what the layers hold: today's gating ("not pickable unless active at
 `animTime`", destination subset, isolated reached sections) falls away because each layer's
@@ -290,16 +322,17 @@ data **is** the visible set.
 |---|---|---|
 | Pan / zoom | none, or `stations` (radius via `stationT`), overlay, tails (length ∝ 1/scale) | `viewState` only; `updateTriggers.getRadius = round(stationT, 3)` |
 | Animation frame | dots, tails, dwell rings, ripples, station growth, isolated corridor | New binary attributes per frame; everything else memoised |
-| Animation step (5 min) | flows width/colour/filter | `updateTriggers` on `step` |
-| Origin / direction | all but backdrop | `cur` identity is the trigger key |
+| Animation step (5 min) | flow passes (items re-sorted widest first by `flowPasses`) | New ordered pass `data` (C19), keyed on the pass's items identity |
+| Origin / direction | all but backdrop | `cur` identity is the trigger key; flow passes rebuilt (C19) |
 | Class / histogram / train filter (new `cur`) | flows (context + focus), chords, stations, dots | `cur` identity; `isFilteredView` → `mapModel` |
 | Selected city / isolated train | flows-focus, infra, stations, dots | Rebuild focus data; `trainShownAt`/`stopArrivalTimes` (`lib/stopEffects.ts`) remain the single visibility rule |
 | Theme | all colours | `dark` in every colour trigger |
 
 **`DataFilterExtension`** (9.4: `filterSize ≤ 4`, `filterSoftRange`, categories: 128 at
 `categorySize 1`, `countItems`) **[docs]** is used only where geometry is static and only
-visibility changes: `n = 0` sections (C3); infra connected/unconnected; optional national dot
-class toggle; Phase 3 "hide B below threshold". Never for widths (class filters change `n`).
+visibility changes: infra connected/unconnected; optional national dot class toggle; Phase 3
+"hide B below threshold". Not for flows (their pass data already omits `n = 0`, C19) and never
+for widths (class filters change `n`).
 
 ---
 
@@ -309,14 +342,15 @@ class toggle; Phase 3 "hide B below threshold". Never for widths (class filters 
 |---|---|---|---|
 | Faded flow passes (α 0.06–0.18) | Canvas strokes one bucket path at a time (no alpha build-up within a bucket); deck blends each path, so overlaps get darker | Context pass **opaque, pre-blended** against `pal.paper`: `mix(col, paper, 1−α)`. The network no longer shows through faded flows | **D3 adopted** |
 | Joints / caps | `jointRounded: true, capRounded: true` ≈ Canvas round | — | No |
+| Flow overdraw order | Canvas strokes `pass.items` widest first; a binary PathLayer draws in path order | Geometry uploaded per pass in items order (C19); the spike's single index-ordered layer showed 3.35 % on `city-zoom-x10` | No |
 | Width quantisation | Canvas rounds to 0.25 px; deck continuous | None | No |
 | Gradient tails | `TailLayer` fades alpha linearly source→target in the shader; Canvas used a premultiplied gradient to transparent white | Source colour = class colour at α 0 (no whitish fringe); `LineLayer` has no round cap but the cap sits under the head | No (M13 screenshot) |
 | Comet mode | Track-following trail in minutes | Only if D2 toggled on later | D2 |
 | Dots | Crisp antialiased ring vs Canvas arcs: same | — | No |
 | Ripples / dwell rings | Exact | — | No |
 | Dashes | `PathStyleExtension` restarts per path like `setLineDash` per stroke; `dashJustified: false` | `dashUnits: 'pixels'` | No |
-| Labels | Identical (overlay) | — | D5 |
-| Antialiasing | MSAA vs Canvas AA: 0.45–0.5 px floors may shimmer | Raise to 0.6 if the screenshot review shows shimmer | Screenshot review |
+| Labels | Identical placement; glyph AA softer on the transparent overlay (C21) | `labels-on` has its own G1 allowance; owner M10 eyeball decides whether it matters | D5, M10 |
+| Antialiasing | 4× MSAA quantises hairline coverage to 25 % steps (up to 64/255 per pixel along 0.45–1.5 px lines and rings); Canvas AA is analytic. This is the parity floor: 0.16–0.56 % per scenario under pixelmatch (AA pixels excluded), 0.75–1.9 % raw **[measured]**; 0.45–0.5 px floors may shimmer | G1 thresholds set above the floor (C20); raise widths to 0.6 if the screenshot review shows shimmer | Screenshot review |
 
 ---
 
@@ -369,20 +403,20 @@ deleted. Results appended to §11; screenshots attached to PR #24.
 |---|---|---|---|---|
 | **Origin view (primary)** | | | | |
 | M1 | Frame time, origin animation playing on 广州, national fit, DPR 2, 1280×800 | `web/tools/perf/origin.mjs`: `deck.metrics.cpuTimePerFrame`, `gpuTimePerFrame` (`deviceProps: {debugGPUTime: true}`, C8), rAF interval p50/p95 over 300 frames | p95 rAF ≤ 16.7 ms; CPU ≤ 4 ms | agent (gate) |
-| M2 | M1 under CDP `Emulation.setCPUThrottlingRate {rate: 4}` | as M1 | p95 ≤ 33 ms | agent (gate) |
+| M2 | M1 under CDP `Emulation.setCPUThrottlingRate {rate: 4}` | as M1 | p95 rAF ≤ 33.4 ms (2 vsyncs) on the median of 3 reps **and** draw+raster p95 ≤ 16.7 ms (C16) | agent (gate) |
 | M4 | GPU memory, origin layer stack (广州 + selected city + infra on) | `deck.metrics.gpuMemory`/`bufferMemory` | ≤ 64 MB | agent (gate) |
 | M6 | Bundle | `bundle.mjs` deck chunk min / gzip / brotli | ≤ 300 KB brotli | agent (gate) |
 | M7 | Time to first deck frame on `?renderer=deck`, packs cached | `performance.now()` from `atlas` ready to first `onAfterRender` with flows drawn | ≤ 1.0 s on M4 Max; report at 4× throttle | agent (gate) |
 | M8 | Projection exactness | unit test `OrthographicViewport.project` vs `camera.ts X/Y`, 1,000 random points × 5 zooms | ≤ 1e-6 px | agent (gate) |
 | M9 | Headless SwiftShader smoke | `--use-angle=swiftshader --enable-unsafe-swiftshader`: build → serve → `?renderer=deck` | No `pageerror`; `onAfterRender` fired; non-paper pixels | agent (gate) |
-| M12 | Context loss path | puppeteer: `WEBGL_lose_context.loseContext()` then `restoreContext()` | `onError` receives the loss; after re-creating `Deck` the map draws again, no `pageerror` | agent (gate) |
+| M12 | Context loss path | puppeteer: `WEBGL_lose_context.loseContext()` then `restoreContext()` | Our `webglcontextlost` listener fires (`Deck.onError` never does, C18); after re-creating `Deck` on a fresh canvas the map draws again, no `pageerror` | agent (gate) |
 | M13 | `TailLayer` renders a fade | Zoomed moving train: pixel probe alpha at the source end < 10 %, head ≥ 90 % | Pass, or fall back per C1 and record which | agent (gate) |
 | M14 | **Parity feasibility** | `shots.mjs` on the spike's `?renderer=deck` vs baseline shots for `national-fit`, `guangzhou-initial`, `city-zoom-x10`, `selected-city`, `anim-1815`, `night`, `labels-on` (DPR 2) | Each ≤ 5 % differing pixels (pixelmatch tolerance 0.1); any structural difference (missing element, wrong width class) listed with a cause | agent (gate; the real target is P1b.5) |
 | M10 | Label rendering options | Side-by-side PNGs overlay vs `TextLayer` at national fit and city zoom | Eyeball | **[owner]**, informational |
 | M3 | Real devices (origin view, animation playing): one mid-range Android (Snapdragon 7-series, Chrome), one iPhone (A15 class, Safari) | On-page FPS meter from `deck.metrics.fps` behind `?fps=1` | ≥ 30 fps sustained | **[owner]**, not a gate |
 | **National (secondary; feeds the Phase 2 gate)** | | | | |
 | M1n | Frame time at the national peak (18:15 = minute 1095, 2,668 trains; `?natSynth=12000` ≈ 4.6k active) | `web/tools/perf/national.mjs`, time sweep `1095 + i·0.2`, 300 frames | Report; Phase 2 needs p95 ≤ 16.7 ms, CPU ≤ 4 ms | agent (report) |
-| M2n | M1n at 4× CPU throttle | as M1n | Report; Phase 2 needs p95 ≤ 33 ms | agent (report) |
+| M2n | M1n at 4× CPU throttle | as M1n | Report; Phase 2 needs p95 rAF ≤ 33.4 ms (median of 3) and draw+raster p95 ≤ 16.7 ms (C16) | agent (report) |
 | M4n | GPU memory, dots-and-tails; TripsLayer if built (simplified) | `deck.metrics` | Report; Phase 2 needs ≤ 64 MB (dots); Trips ≤ 150 MB to be eligible | agent (report) |
 | M5n | CPU heap of the national build | heap delta | Report (spike ≈ 48 MB expected; P2.1 target ≤ 30 MB) | agent (report) |
 | M7n | Time to first national frame | toggle → first `onAfterRender` with `c > 0` | Report; Phase 2 needs ≤ 1.5 s | agent (report) |
@@ -392,6 +426,9 @@ deleted. Results appended to §11; screenshots attached to PR #24.
 If M1–M2 or M14 fail structurally, stop: write the numbers into §11 and close PR #24 with a
 recommendation (keep Canvas; optionally keep the spike's sprite variant for national). The
 national numbers never block Phase 1.
+**Result: GO with conditions** (§11.6): all ten gates pass on the spike and on an independent
+re-run; the conditions are the P1b task items introduced by C16–C24 (context-loss recovery,
+ordered flow passes, imperative host, settled-frame rule, corrected stroke radii, corrected G1).
 
 ### Phase 1: migrate the origin view on `deckgl` (10–14 days)
 
@@ -476,63 +513,102 @@ rebases on P1a.2 before merge (or P1a.3 starts from P1a.2's branch). Everything 
 
 **Phase 1b: deck origin renderer behind `?renderer=deck`.** Sequential (shared `DeckHost.tsx`).
 
-**P1b.1 Deck host + camera + backdrop** — *after P1.1, P1a.1.* Files: `deck/DeckHost.tsx`
-(imperative `Deck` with `canvas` = our own `<canvas>` inside `div#map`,
-`views: [new OrthographicView({id: 'map', flipY: false})]`, controlled `viewState` from
-`S.current.view`, `onViewStateChange` → `viewStateToView` → `S.current.view` +
-`interacted = true` + `M.render()`, `controller` per row 28, `useDevicePixels`, `onError` →
-context-loss notice + `finalize()` + new `Deck`, `onAfterRender` → overlay + Legend + scale
-bar + view report, `window.__deck` debug handle), new `deck/labelsOverlay.ts` (canvas sizing;
-draws `placeLabels` output, origin diamond, boxed origin/selected), new `deck/layers/backdrop.ts`
-(outline fill/stroke, dashes, graticule, network, ferry water pieces), new `deck/TailLayer.ts`,
-`MapCanvas.tsx` (`renderer` prop: mounts `DeckHost` via `React.lazy(loadDeck)` instead of
-`<canvas id="map">`; loading overlay while the chunk loads), `App.tsx` (`renderer` from
-`?renderer=`, default `canvas`), `lib/palette.ts` (RGBA helpers + test that RGBA equals the
-parsed CSS strings). Acceptance: with `?renderer=deck`, backdrop + labels draw; pan/zoom with
-the same clamps; wheel factor within 5 % of `exp(−deltaY·0.0016)` for deltaY ±100 (driver
-dispatches wheel, reads `S.current.view.scale`); `fitCountry`/`fitHome`/`panZoomTo`/URL
-camera restore move the deck view; renderer switch keeps centre within 1e-6° and scale within
-1e-6 (same `S.current.view`); Canvas path shots vs baseline = 0 differing pixels.
+**P1b.1 Deck host + camera + backdrop + context loss** — *after P1.1, P1a.1 (both merged).
+Reference code: `spike/deckgl` @ `f04acf8` `web/src/components/map/deck/{spike.ts,viewstate.ts,TailLayer.ts}`
+(read, do not merge).*
+Files:
+- **`deck/DeckHost.ts`** (replaces the P1.1 stub `DeckHost.tsx`; no JSX, no React import, C23):
+  `export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle` with
+  `DeckHandle = {render(): void; pick(opts): PickingInfo | null; pickMultiple(opts): PickingInfo[]; resize(): void; destroy(): void}`.
+  It creates `<canvas id="deckcv">` (`position:absolute; inset:0; pointer-events:none`) inside
+  `host` **below** the existing pointer-capturing canvas, and
+  `new Deck({canvas, width: null, height: null, views: [new OrthographicView({id: 'map', flipY: false})], controller: false, useDevicePixels: Math.min(3, devicePixelRatio), pickingRadius: 14, layers: [], onLoad, onAfterRender})`.
+  `render()` = `setProps({viewState: viewToViewState(S.current.view, S.current.W, S.current.H), layers: buildLayers(M)})` then `redraw('render')` (synchronous, C22), then Legend sync, scale bar, debounced view report, overlay draw.
+  `onAfterRender` increments `window.__deckStats.afterRenders` and maintains `window.__deckStats.settled` (two consecutive `onAfterRender` with an unchanged layer-id set, C22). `window.__deck` and `window.__deckHost` debug handles stay.
+  **Context loss (C18):** `canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); showNotice('Map paused — tap to resume'); })`; `webglcontextrestored` → `recreate()`; the notice's tap → `recreate()`; a 5 s timer after loss with no restore → the notice stays tappable. `recreate()` runs **at most once per loss** (guard flag): `deck.finalize()` in a try/catch, remove the old canvas, create a new canvas + `Deck`, `render()`, hide the notice, `window.__deckStats.recreated++`.
+- new `deck/labelsOverlay.ts`: sizes the existing `<canvas id="map">` (the Canvas renderer's element, kept as the transparent overlay and pointer target) to W × H × DPR, clears it, draws `placeLabels` output, the boxed origin/selected labels and the origin diamond with the exact `drawLabels` text code.
+- new `deck/layers/backdrop.ts`: pure props builders for outline fill (`SolidPolygonLayer`) / stroke / open lines (`PathLayer`, `widthUnits:'common'`, `getWidth 0.015`, `widthMinPixels 0.65`, round caps/joints), nine-dash (`PathStyleExtension({dash: true})`, `dashUnits:'pixels'`), graticule (`LineLayer`), network (`PathLayer` on the whole `atlas.net` binary data, `getWidth 0.008`, `widthMinPixels 0.45`, `widthMaxPixels 2.5`), ferry water pieces from `lib/ferry.ts splitFerry` (dashed blue, dash `[max(12, 2.5w), max(9, 1.8w)]`).
+- new `deck/TailLayer.ts` (from the spike: `getShaders()` injecting `vs:#main-end: vColor.a *= positions.x;`).
+- `deck/load.ts`: `DeckHostModule` type follows the new export.
+- `MapCanvas.tsx`: `renderer: 'canvas' | 'deck'` prop. In deck mode: `useEffect(() => { let h; loadDeck().then(m => { h = m.mountDeck(M, wrapRef.current!); M.render = () => h.render(); M.render(); }); return () => h?.destroy(); }, [])`; `M.render` stays `() => draw(M)` in canvas mode; loading overlay while the chunk loads; the chunk-load failure path shows the existing error overlay. The wheel listener, `pointer.ts` handlers and `resize()` are untouched (D17); `resize()` additionally calls `h.resize()` when mounted.
+- `App.tsx`: `renderer` from `?renderer=` (default `canvas`), passed to `MapCanvas`.
+- `lib/palette.ts`: `rgba(css, alpha?)` → `[r, g, b, a]` with a cache, plus `paletteRGBA(dark)`; test `palette.test.ts` that each RGBA tuple equals the parsed CSS string.
+- `web/bundle.mjs`: assert no `node_modules/react` input in the lazy graph (C23); fail the build otherwise.
+- `web/tools/shots/shots.mjs`: `SHOTS_QUERY` env (as in the spike) and, when `window.__deckStats` exists, wait for `settled` instead of the fixed sleep; `web/tools/perf/lib.mjs`: the spike's `--query`, `readPixels` flush and `deck.metrics` capture.
+Tests: `palette.test.ts`; `camera.test.ts` unchanged (M8 already covers `viewToViewState`).
+Acceptance (driver, `?renderer=deck`, 1280×800, DPR 2):
+(a) backdrop + labels + origin diamond draw. Parity of the backdrop alone: a debug query `?layers=backdrop` (honoured by both renderers: Canvas `draw()` returns after the backdrop and labels, deck builds only the backdrop layers; removed in P1c.2) and `shots.mjs --only national-fit,guangzhou-initial,labels-on` with `SHOTS_QUERY='&layers=backdrop'` on both builds: `cmp.mjs --pixelmatch` ≤ 1.0 % (`labels-on` ≤ 1.5 %), `--diff` masks attached;
+(b) pan, wheel, pinch, `fitCountry`, `fitHome`, `zoomCenter`, `panZoomTo`, URL camera restore move the deck view and clamp to `fitScale·[0.55, 60]` exactly as the Canvas path (same code, D17): driver dispatches 5 wheel events and reads identical `S.current.view` in both renderers;
+(c) renderer switch (reload with the other `?renderer=`) keeps centre within 1e-6° and scale within 1e-6;
+(d) context loss: `loseContext()` → notice visible, 0 `pageerror`; `restoreContext()` → `window.__deckStats.recreated === 1`, the map draws (> 100,000 non-empty pixels at DPR 1), notice hidden; a second lose/restore → `recreated === 2`; lose without restore → tap on the notice → `recreated` increments once and the map draws;
+(e) `window.__deckStats.settled` becomes true within 2 s of load and a `shots.mjs` run on the deck build yields byte-identical PNGs across two runs;
+(f) Canvas path shots vs baseline = 0 differing pixels (28 PNGs); the lazy graph has no React input; `bun run typecheck`, `bun test` green; M6 budget holds (print the chunk sizes in the PR).
 
-**P1b.2 Flow / infra / chord / highlight layers** — *after P1b.1, P1a.2.* Files: new
-`deck/layers/flows.ts` (binary `PathLayer` per set, `DataFilterExtension` for `n = 0`,
-context pass pre-blended per D3, focus pass, infra, chords with `PathStyleExtension`,
-highlight, isolated corridor), `DeckHost.tsx` wiring. Tests: new `layers.test.ts`: given a
-`flowPasses` output, the builder returns the expected `data.length`, `updateTriggers` keys,
-`getWidth(index) = n·WIDTH_K/fitScale`, `getFilterValue(index) = n` (no GPU; `@deck.gl/layers`
-constructs under Bun). Acceptance: `shots.mjs` deck vs baseline on `national-fit`,
-`guangzhou-initial`, `city-zoom-x10`, `infra-on`, `night` ≤ 0.5 % differing pixels.
+**P1b.2 Flow / infra / chord / highlight layers** — *after P1b.1, P1a.2 (merged).* Files: new
+`deck/layers/flows.ts`:
+- `buildPassData(set, items, pal, alpha, maxN) → {data: {length, startIndices, attributes: {getPath: {value: pts, size: 2}}}, n: Float32Array, rgba: Uint8Array, idxToSec: Int32Array}` built in **items order, n > 0 only** (C19); cached per `(set, items)` identity in a `WeakMap`, so an unchanged pass costs nothing.
+- `flowPassLayers(passes, …)` → one `PathLayer` per pass (`id: 'flows-<role>'`, `_pathType:'open'`, `widthUnits:'common'`, `widthMinPixels 0.5`, round caps/joints, `getWidth: (_, {index}) => n[index]·WIDTH_K/fitScale`, `getColor` from `rgba`, `updateTriggers: {getWidth: [dataId, fitScale], getColor: [dataId, dark]}`, `pickable: pass.pickable`); the context pass colour is pre-blended opaque per D3. Ferry sections use the land pieces from `lib/ferry.ts`; the water crossing is the dashed layer from P1b.1 widened to the flow width.
+- infra (whole-set binary `PathLayer`, 1.25 px, colour by `hsr`, `DataFilterExtension` category for connected/unconnected), chords (`PathStyleExtension` dashes, gated by `chordVisibility`), hover highlight (`PathLayer` 0–1 items, width +1.6), isolated corridor (`isolatedCorridor` path, progressive as today).
+`DeckHost.ts` wiring (`buildLayers` composes backdrop + flows + infra + chords + highlight + corridor in today's paint order).
+Tests: new `layers.test.ts` (no GPU; `@deck.gl/layers` constructs under Bun): given a `flowPasses` output, `buildPassData` returns `length` = count of `n > 0`, `startIndices` monotone with `startIndices[k+1] − startIndices[k] = len[idxToSec[k]]`, `pts` equal to the section geometry in items order, `n[k]` and `idxToSec[k]` consistent; the layer's `getWidth(index) = n·WIDTH_K/fitScale`; a second call with the same `items` identity returns the same object; the context colour equals `mix(col, paper, 1 − α)`.
+Acceptance: `shots.mjs` deck vs Canvas (`cmp.mjs --pixelmatch`) on `national-fit`,
+`guangzhou-initial`, `city-zoom-x10`, `infra-on`, `night` **≤ 1.0 %** each (C20), and
+`city-zoom-x10` shows no overdraw-order region in its diff mask (the spike's 3.35 % blob near
+the origin is gone); `perf/origin.mjs` at DPR 2: `cpuTimePerFrame` ≤ 4 ms, draw+raster p95 ≤ 16.7 ms,
+`deck.metrics.bufferMemory` ≤ 16 MB on 广州 + 深圳 selected + infra on (spike: 10.4 MB with
+whole-set flow passes; the ordered subsets are smaller).
 
-**P1b.3 Station / origin / train layers** — *after P1b.2, P1a.3.* Files: new
-`deck/layers/stations.ts`, `deck/layers/trains.ts`, `deck/labelsOverlay.ts` (+ train tag),
-`DeckHost.tsx` wiring (animation frames call `M.render()` as today). Tests: `layers.test.ts`
-(+ station radius `stationR(n)·stationZoomK(r0, t)`; ripple radius `r + frac·7·kd`, alpha
-`1 − frac`; dots exclude trains with `isTrainShown === false`). Acceptance: `shots.mjs` deck
-vs baseline on `selected-city`, `selected-city-minimized`, `isolated-train-mid`,
-`class-filter-G`, `inbound`, `anim-0600/1815/2350`, `labels-on` within the P1b.5 thresholds.
+**P1b.3 Station / origin / train layers** — *after P1b.2, P1a.3 (merged).* Files: new
+`deck/layers/stations.ts` (dots from `stationStates`: `getRadius = r` with the stroke centred on
+`r`, `getLineWidth` 1.5/3.0, ripples `filled: false`, selection/hover/origin rings at their
+centre-line radius, origin disc; C17), `deck/layers/trains.ts` (one `ScatterplotLayer` for the
+dots: **`getRadius 3`, `getLineWidth 2`**, isolated `4.15`/`2.7`, `getFillColor` white,
+`getLineColor` class colour, α 0.45 on chords; `TailLayer` 12 px × speedFrac (22 isolated),
+width 2.5 (3.5), source = pos − heading·len/scale; dwell rings `getRadius 6.5`, `getLineWidth 1.3`,
+α 0.85; hover/selected ring 0–2 items), `deck/labelsOverlay.ts` (+ train code tag),
+`DeckHost.ts` wiring (animation frames call `M.render()` as today; the per-frame dot/tail
+buffers are new `data` objects each frame, §2.2). Tests: `layers.test.ts` (+ station radius
+`stationR(n)·stationZoomK(r0, t)`; ripple radius `r + frac·7·kd`, alpha `1 − frac`; dots exclude
+trains with `isTrainShown === false`; train dot `getRadius` 3 and ring width 2 so the outer edge
+is 4 px). Acceptance: `shots.mjs` deck vs Canvas (`--pixelmatch`) on `selected-city`,
+`selected-city-minimized`, `isolated-train-mid`, `class-filter-G`, `inbound`,
+`anim-0600/1815/2350`, `labels-on` within the P1b.5 thresholds (C20); M13 tail probe repeated
+on the real build (source < 10 %, head ≥ 90 %).
 
-**P1b.4 Interaction parity** — *after P1b.3.* Files: new `lib/pick.ts` (`pickPriority`),
-`DeckHost.tsx` (`onHover` only when `event.srcEvent.pointerType === 'mouse'`; `onClick` →
-station select / train select / pinned tooltip / clear; `clearStationHover`,
-`selectDestByZh`, `refreshTooltip` over the deck state), `interaction.ts` (pick maths kept
-for the Canvas path until P1c.2). Tests: new `pick.test.ts`: `[train, station, seg]` → train;
-`[station d=10, origin d=10]` → origin; two segments within 0.75 px → the busier; a segment
-1 px closer than a busier one beyond 0.75 px → the closer; chords only when no segment,
-`direction === 'out'` and no destination; train only when paused. Acceptance (driver):
-`onClick` with nothing under the pointer clears the selection (`info.picked === false`); tap
-on station pins the panel; tap on train opens `TrainScheduleModal`; tap on segment pins the
-tooltip; no hover tooltips from `page.touchscreen`.
+**P1b.4 Interaction parity** — *after P1b.3.* `pointer.ts`, the hover handlers and
+`endPointer` tap semantics stay as they are (D17); only `pick()` changes. Files: new
+`lib/pick.ts` (`pickPriority(candidates, px, py)` over `{kind, distance, n, index}` candidates),
+`interaction.ts` (`pick(M, px, py)`: in deck mode gathers candidates through `M.deck.pick` /
+`M.deck.pickMultiple` — train dots when paused, stations + origin, flow/chord layers — maps
+`info.index` back to trains / cities / sections (`idxToSec`), recomputes exact screen distances
+with `M.X/M.Y`, then `pickPriority`; the Canvas pick maths stay until P1c.2),
+`context.ts` (`deck?: DeckHandle` on `MapCtx`, set by `mountDeck`). Tests: new `pick.test.ts`:
+`[train, station, seg]` → train; `[station d=10, origin d=10]` → origin; two segments within
+0.75 px → the busier; a segment 1 px closer than a busier one beyond 0.75 px → the closer;
+chords only when no segment, `direction === 'out'` and no destination; train only when paused.
+Acceptance (driver, deck mode): hover over a paused train / a station / a segment shows the
+same tooltip text as the Canvas build at the same pointer position (string-equal for 3
+fixtures each); tap on empty map clears the selection; tap on station pins the panel; tap on
+train opens `TrainScheduleModal`; tap on segment pins the tooltip; no hover tooltips from
+`page.touchscreen`; `clearStationHover`, `selectDestByZh`, `refreshTooltip` behave as today
+(called through `window.__mapApi`).
 
 **P1b.5 Parity sign-off (gate G1)** — *after P1b.4.* Files: `web/tools/shots/cmp.mjs`
-thresholds; §11 results. Acceptance: all 28 scenarios Canvas vs deck **≤ 0.5 % differing
-pixels** (pixelmatch tolerance 0.1), except `selected-city`, `selected-city-minimized`,
-`class-filter-G`, `isolated-train-mid` where D3's opaque context pass is allowed **≤ 2 %**;
-any scenario above threshold is listed with a side-by-side PNG and needs an explicit owner
-sign-off line in the PR. Every §6.1 check green. Interaction checklist (pan, wheel, pinch,
-fit buttons, URL camera restore, scale bar km/mi, selection, isolation, class filter,
-histogram filter, inbound, play/seek, night, DPR 1/2/3) recorded. Perf: M1/M2/M4/M7 re-run
-on the real build and recorded. **[owner]**: M3 on two phones and the R8 feel checklist
-(informational; a fail re-opens D8/R8, not the gate).
+(`--pixelmatch`: pixelmatch semantics, threshold 0.1, AA pixels excluded, via the zero-dependency
+`pixelmatch` devDependency fed from the existing PNG codec; `--tolerance` kept; `--diff` masks),
+`web/package.json`, §11 results. Acceptance (C20): all 28 scenarios Canvas vs deck under
+`--pixelmatch` **≤ 1.0 %** differing pixels, except `selected-city`, `selected-city-minimized`,
+`class-filter-G`, `isolated-train-mid` where D3's opaque context pass is allowed **≤ 2.0 %**,
+and `labels-on` **≤ 1.5 %** (overlay text AA, C21). Spike reference values under the same rule
+(before the C17/C19/ferry fixes): 0.16–0.56 % for the AA-only scenarios, `selected-city` 0.84,
+`labels-on` 1.23, `city-zoom-x10` 2.02 (overdraw order, fixed by C19). The `--diff` masks for all
+28 are attached; every solid differing region ≥ 8×8 px is listed with a cause; any scenario
+above threshold needs an explicit owner sign-off line in the PR. Every §6.1 check green.
+Interaction checklist (pan, wheel, pinch, fit buttons, URL camera restore, scale bar km/mi,
+selection, isolation, class filter, histogram filter, inbound, play/seek, night, DPR 1/2/3)
+recorded. Perf: M1/M2 (C16 reading), M4, M7 and M12 re-run on the real build and recorded.
+**[owner]**: M3 on two phones and the R8 feel checklist (informational; a fail re-opens D8,
+not the gate), M10 label eyeball (decides whether the softer overlay text needs a task).
 
 **Phase 1c: flip and delete, on `deckgl` only.**
 
@@ -542,10 +618,11 @@ as an escape hatch until P1c.2. Acceptance: `shots.mjs` default build = the P1b.
 **P1c.2 Delete Canvas** — *after P1c.1; its own PR.* Files deleted: `backdrop.ts` (240),
 `flows.ts` drawing (`traceInto`, `tracePartialSec`, `strokeFlowList`, `drawInfra`,
 `drawChords`, `drawHighlightSeg`), `stations.ts` and `trains.ts` drawing, `render.ts`,
-`pointer.ts`, the `interaction.ts` pick maths, `BackdropCache`/`tailGradRef`/pointer state
-in `context.ts`, the wheel and canvas handlers in `MapCanvas.tsx` (which becomes the thin
-host of `DeckHost`); `?renderer=` removed. Acceptance: no TS errors; tests green;
-`shots.mjs` vs the P1c.1 build = 0 differing pixels.
+the `interaction.ts` Canvas pick maths, `BackdropCache`/`tailGradRef` in `context.ts`, the
+2D-canvas draw path in `MapCanvas.tsx` (which becomes the thin host of `mountDeck`; the
+`<canvas id="map">` element stays as the labels overlay and pointer target); `?renderer=`
+removed. **Kept:** `pointer.ts`, the wheel listener and `camera.ts zoomAt` (D17). Acceptance:
+no TS errors; tests green; `shots.mjs` vs the P1c.1 build = 0 differing pixels.
 
 **G-MAIN (owner, D16).** After P1c.2 the owner decides whether `deckgl` merges to `main` now
 (origin view on deck, no national mode) or after Phase 2. Agents do not open that PR.
@@ -618,7 +695,7 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
 |---|---|
 | **Shape** | Mode switch, not stacking. On `deckgl`, `?renderer=deck` selects the deck origin renderer (P1b); after P1c.1 deck is the default and `?renderer=canvas` the hatch; after P1c.2 only deck exists. Never both on screen |
 | **Camera** | One source of truth for both: `S.current.view {scale, tx, ty}` in `MapCtx`. deck gets a controlled `viewState` from `lib/camera.ts viewToViewState` on every `M.render()`; `onViewStateChange` writes back through `viewStateToView`. No hand-off step, no per-frame mirror; the URL format is unchanged |
-| **Input** | Whichever renderer is mounted owns pointer and wheel (deck controller vs `pointer.ts`); no shared listeners |
+| **Input** | `pointer.ts` and the wheel listener on the overlay canvas serve both renderers (D17); the deck canvas is `pointer-events: none` and `controller: false`. One input stack, no calibration |
 | **Shared state** | `anim.ts` clock, `MapApi`, tooltip DOM, scale-bar DOM, Legend: renderer-agnostic. `M.render()` is the only per-renderer dispatch |
 | **If stacking is ever needed** | deck canvas on top with `pointer-events: none`, `controller: false`, `viewState` pushed from `S.current.view` inside the Canvas `draw()`. Not planned |
 | **Duration** | Phase 1 is ≈ 2–3 weeks of calendar time on `deckgl`; `main` is untouched throughout. The Canvas hatch lives from P1c.1 to P1c.2 only |
@@ -633,9 +710,9 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
 | Data-level (existing) | 62 tests / 7 files (`decode`, `animation`, `snapshots`, `stopEffects`, `headingCount`, `stationBreakdown`, `staleReload`) **[measured: 62 pass]** | `bun test` in CI, unchanged |
 | New pure tests | `camera`, `ferry`, `tooltip`, `mapModel`, `labels`, `pick`, `staleReload` (+ import failure), `national` (Phase 2) | `bun test` |
 | Layer-props tests | `layers.test.ts`: builders return expected `data.length`, trigger keys, accessor values (no GPU; `@deck.gl/*` constructs under Bun **[measured for core]**) | `bun test` |
-| Screenshot diff | `web/tools/shots/` (P0.1), 14 scenarios × DPR 1/2; baseline = Canvas build at the merge-base | Local macOS GPU only (SwiftShader AA differs) |
+| Screenshot diff | `web/tools/shots/` (P0.1), 14 scenarios × DPR 1/2; baseline = Canvas build at the merge-base; `cmp.mjs --pixelmatch` for the G1 thresholds (C20), `--tolerance 0` for zero-diff PRs; drivers wait for `window.__deckStats.settled` (C22) | Local macOS GPU only (SwiftShader AA differs); shots are deterministic (the spike's 14 numbers reproduced to 3 decimals) |
 | Headless WebGL smoke | build → serve → puppeteer `--use-angle=swiftshader --enable-unsafe-swiftshader` → no `pageerror`, `onAfterRender` fired, non-paper pixels | Added to CI in P1b.1 |
-| Context loss | `WEBGL_lose_context` lose/restore → notice, then a working map | Local + CI smoke |
+| Context loss | `WEBGL_lose_context` lose/restore → our listener, notice, exactly one `Deck` re-creation on a fresh canvas, then a working map (P1b.1 acceptance d) | Local + CI smoke |
 | Perf | `web/tools/perf/{origin,national}.mjs`: `deck.metrics` + rAF p50/p95/max, CDP CPU throttle, renderer-string check | Local; numbers in §11 and `docs/benchmarks/` |
 | Build assertions | deck chunk ≤ 300 KB brotli; no `@deck.gl`/`@luma.gl` input in the inlined entry; `--frozen-lockfile` | `bun run build` in CI (P1.1) |
 
@@ -650,7 +727,7 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
 | Backdrop toggles (`showNetwork`, `showOutline`) redraw correctly; no visible cache behaviour to preserve | `shots` `infra-on`, `national-fit`; toggle item in the P1b.5 checklist |
 | Hover priority train > station/origin (origin wins ties) > segment (busier within ±0.75 px) > chord; train hover only when paused; hover only for mouse | `pick.test.ts`; P1b.4 driver checks |
 | Tap on station selects, tap on train opens the modal, tap on segment pins the tooltip, tap on empty clears | P1b.4 driver checks |
-| Camera clamps `fitScale·[0.55, 60]`; URL zoom format; keep centre on resize; Guangzhou initial fit | `camera.test.ts`; `shots` `guangzhou-initial`; P1b.1 wheel check |
+| Camera clamps `fitScale·[0.55, 60]`; URL zoom format; keep centre on resize; Guangzhou initial fit | `camera.test.ts`; `shots` `guangzhou-initial`; P1b.1 (b) same `S.current.view` after identical input in both renderers |
 | Animation: wrap and tail speed-up ×2.5 after day 1 (origin); 1440 wrap (national, Phase 2) | `animation.test.ts` (+ national clock in P2.2) |
 | Isolated train corridor and chip | `mapModel.test.ts` (d); `shots` `isolated-train-mid` |
 | `MapApi` contract (`fitCountry`, `fitHome`, `zoomCenter`, `refreshTooltip`, `clearStationHover`, `selectDestByZh`, `panZoomTo`, clock methods) | `context.ts` interface unchanged (typecheck); P1b.1/P1b.4 driver checks call each through `window.__mapApi` |
@@ -663,12 +740,12 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
 |---|---|---|---|
 | R1 | Version churn in deck.gl 9.x minors / luma.gl | M / M | Pin exact `9.4.0` for all `@deck.gl/*`; `bun.lock` committed; upgrades as deliberate PRs through the screenshot suite |
 | R2 | Build integration: single inlined IIFE today, `index.html` `max-age=0` | H / M | P1.1: esbuild ESM + `splitting` with `chunkNames: 'assets/[name]-[hash]'` (immutable header already covers `/assets/(.*)`); entry inlined as `<script type="module">`; `</script` escaping kept; metafile assertion; stale-chunk recovery (C4) |
-| R3 | WebGL2 unavailable / context loss. deck 9 requires WebGL2; on loss it calls `onError('WebGL context is lost')` and does not restore **[source]** | L / M | `onError` → notice "Map paused — tap to resume", `finalize()`, new `Deck` from retained CPU state. No WebGL2 → notice; panels/tables keep working (D9). M12 gates the path |
+| R3 | WebGL2 unavailable / context loss. deck 9 requires WebGL2; on loss **nothing in deck 9.4.0 is notified** (`_onContextLost` has no caller) and luma only resolves `device.lost` **[source, C18]** | L / M | Own `webglcontextlost` (`preventDefault`) → notice "Map paused — tap to resume"; `webglcontextrestored` or tap → `finalize()`, fresh canvas, new `Deck` from retained CPU state, exactly once per loss. No WebGL2 → notice; panels/tables keep working (D9). M12 gated the path; P1b.1 (d) re-checks it on the real build |
 | R4 | Mobile GPU memory | M / H (Trips), L (dots) | Section-ref dedup; no TripsLayer by default; DPR cap 2 per D8; M3 owner check |
 | R5 | Accessibility | — | DOM surfaces unchanged; live region in P2.4 |
 | R6 | Regression in selection/filter semantics | M / H | 1a extracts into `mapModel` **before** deck code, with zero-diff screenshots; one visibility function for dots, picking, counters and stop effects |
 | R7 | Picking semantics drift | M / L | `pick.test.ts`; exact distances recomputed for the candidates |
-| R8 | Interaction feel (wheel speed, inertia, tap threshold, pinch) | M / M | `scrollZoom.speed` calibrated (P1b.1 numeric check); `inertia: false`; owner feel checklist in P1b.5 |
+| R8 | Interaction feel (wheel speed, inertia, tap threshold, pinch) | L / M | Removed at the source: our `pointer.ts`/wheel code drives both renderers (D17, C24); the deck controller is off. Owner feel checklist in P1b.5 stays as a sanity check |
 | R9 | Hairline shimmer under MSAA | M / L | Raise 0.45–0.5 floors to 0.6 if the screenshot review shows it |
 | R10 | Long-lived `deckgl` drifts from `main` | M / H | Weekly sync PRs with the `components/map` diff check; D10 freeze on `deckgl`; owner's small main-only tweaks (colour/copy) are mirrored by the sync author |
 | R11 | Data growth to ≈ 12k trains | certain / M | Dedup scales with refs; `?natSynth=12000` in every national perf run |
@@ -707,7 +784,7 @@ columns **[estimate]**.
 | `stations.ts` | 432 | 0 (→ ≈ 200 `lib/labels.ts` + ≈ 80 layers + ≈ 50 overlay) | same |
 | `trains.ts` | 278 | 0 (→ ≈ 90 `mapModel`, ≈ 60 layers) | same |
 | `interaction.ts` | 439 | ≈ 80 glue + ≈ 190 `lib/tooltip.ts` + ≈ 60 `lib/pick.ts` | same |
-| `pointer.ts` | 119 | 0 | same |
+| `pointer.ts` | 119 | 119 (kept, D17) | same |
 | `camera.ts` | 187 | ≈ 60 glue + ≈ 110 `lib/camera.ts` | same |
 | `render.ts` | 82 | 0 | same |
 | `context.ts` | 275 | ≈ 150 | ≈ 160 |
@@ -738,12 +815,14 @@ columns **[estimate]**.
 | D14 | Production bundler | **esbuild via `node bundle.mjs`** (already the case on Vercel and CI); the `Bun.build` branch is deleted in P1.1 | New (C5) |
 | D15 | `@deck.gl/react` or imperative `Deck`? | **Imperative `Deck`** owned by `DeckHost.tsx`, one `setProps` per `M.render()` | New (C14) |
 | D16 | When does `deckgl` merge to `main`? | **One owner gate (G-MAIN).** Default timing: after Phase 2 (origin + national together); the owner may pull it forward to after P1c.2 if the origin view alone should ship. Agents never open or merge that PR | New (C15) |
+| D17 | deck controller or our pointer code? | **Our pointer code**: `pointer.ts`, the wheel listener and `zoomAt` stay for both renderers; `controller: false`; the deck canvas is `pointer-events: none`. Exact feel parity, no calibration, no `onHover`/`onClick` semantics to re-derive; `pointer.ts` (119 lines) is not deleted in P1c.2 | New (C24) |
 
 ---
 
 ## 11. Phase 0 results (filled in by P0.2; re-run in P1b.5 / P2.2)
 
-**Verdict for gate G0: GO.** All ten agent gates (M1, M2, M4, M6, M7, M8, M9, M12, M13, M14) pass on the
+**Verdict for gate G0: GO** (spike author); **confirmed as GO with conditions by the independent gate review, §11.6.**
+All ten agent gates (M1, M2, M4, M6, M7, M8, M9, M12, M13, M14) pass on the
 spike, with the caveats and plan corrections listed below. M3 and M10 are owner steps and do not block.
 Spike: branch `spike/deckgl` @ `f04acf8` (forked from `deckgl` @ `feaf69a`, never merged; reference only). Measured
 2026-10-25 on an M4 Max (`ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max)`, real GPU; the driver refuses SwiftShader), headless
@@ -781,7 +860,7 @@ Counts check: 2,668 national trains at minute 1095 on the current pack, as the p
 | # | Finding | Consequence |
 |---|---|---|
 | G1 | **`ScatterplotLayer` strokes are centred on `radius`, not inside it** (`outerRadiusPixels = radius + lineWidth/2`, vertex shader of 9.4.0). C2 and rows 15–23 assumed "inside". | Match the Canvas outer edge with `radius = outer − lineWidth/2`: train dots `getRadius 3`, `getLineWidth 2` (ring 2–4 px, core < 2 px, outer 4); isolated `4.15` / `2.7`; station dots `radius = r` (Canvas strokes are centred at `r` too); rings use their centre-line radius; dwell ring 6.5. Before the fix dots were visibly too big at night (M14 `night` 2.4 %, now 1.0 %). |
-| G2 | **Binary `PathLayer` draws in section-index order; Canvas strokes widest first** (`flows` is sorted by `n` descending, so narrow bands lie on top). | One layer: `city-zoom-x10` 3.35 %, wide bands overlap the wrong way near the origin (§11.3). Width-bucketed layers via `DataFilterExtension` ranges fix it (5 layers, `city-zoom-x10` 1.46 %) **but** attributes are computed per layer: `cpuTimePerFrame` 7.3 ms at 1× (fails the 4 ms CPU gate), buffer memory 31 MB. Two buckets: 3.9 ms, no parity gain. Measured, not guessed. **Phase 1 (P1b.2) decision**: keep one layer and live with ≤ 3.4 %, or upload geometry permuted into width order once per origin (static; the sort key `n` is fixed per `cur`) so one layer keeps the Canvas order. The spike default is 1 bucket (`?buckets=1|2|5`). |
+| G2 | **Binary `PathLayer` draws in section-index order; Canvas strokes widest first** (`flows` is sorted by `n` descending, so narrow bands lie on top). | One layer: `city-zoom-x10` 3.35 %, wide bands overlap the wrong way near the origin (§11.3). Width-bucketed layers via `DataFilterExtension` ranges fix it (5 layers, `city-zoom-x10` 1.46 %) **but** attributes are computed per layer: `cpuTimePerFrame` 7.3 ms at 1× (fails the 4 ms CPU gate), buffer memory 31 MB. Two buckets: 3.9 ms, no parity gain. Measured, not guessed. **Phase 1 (P1b.2) decision**: keep one layer and live with ≤ 3.4 %, or upload geometry permuted into width order once per origin (static; the sort key `n` is fixed per `cur`) so one layer keeps the Canvas order. The spike default is 1 bucket (`?buckets=1\|2\|5`). **Resolved by C19 (gate review): one ordered layer per pass.** |
 | G3 | **`Deck.onError` never receives context loss in 9.4.0**: `_onContextLost` exists but nothing calls it (luma only exposes `onContextLost` on the device creation props, deck does not pass it). M12's "`onError` receives the loss" cannot pass. | Add our own `webglcontextlost` (call `preventDefault`) and `webglcontextrestored` listeners on the canvas; on restore `finalize()` and create a new `Deck` on a **new canvas element**. Reword M12 as "own listener fires; after re-creating `Deck` the map draws, no `pageerror`" (done above). |
 | G4 | **A new layer type's first frame may not draw** (luma compiles pipelines asynchronously); the M13 probe only produced pixels after several `redraw` calls 100 ms apart. | Deterministic screenshots and tests must wait for a settled frame (e.g. two consecutive `onAfterRender` with an unchanged layer set), not a fixed sleep after `setProps`. `shots.mjs` already waits several hundred ms and was stable on all 14 scenarios. |
 | G5 | **`deck.redraw('reason')` draws synchronously**, and `setProps({layers})` updates attributes synchronously. | `M.render()` can be a plain `setProps` + `redraw('x')` with Canvas-identical semantics (this is what the spike does). `deck.metrics` is only refreshed by deck's own loop, so for synchronous drivers read `_getFrameStats()/_getMetrics()` (private) or time `draw` yourself. |
@@ -847,7 +926,56 @@ G2 decision (draw order), G3 (context-loss re-creation on a fresh canvas), the f
 `OrthographicController` wheel/pinch calibration and `onClick` semantics, and the stale-viewState-trigger class of bugs seen in the
 spike (a missing `dark` in an `updateTriggers` key left night mode half light; add the theme to every colour trigger, §2.6 already
 says so). Phase 2 estimate unchanged at 4–6 days; the national numbers (M1n/M2n, 47 MB heap) say the plan's dedup in P2.1 is still needed
-for memory but not for speed.
+for memory but not for speed. *(Gate review: the controller calibration and `onClick` items fell away with D17; the ordered
+flow passes (C19) and the imperative host (C23) are each about half a day; net estimate unchanged.)*
+
+### 11.6 G0 gate review (independent, 2026-10-25)
+
+**Verdict: GO with conditions.** The spike's ten gate results were checked against PR #31, the spike code
+(`spike/deckgl` @ `f04acf8`) and deck.gl/luma.gl 9.4.0 source, and M1, M2, M9, M12 and M14 were re-run from a
+fresh export and build of the spike on the same M4 Max (`ANGLE Metal`, load average 3.5–4.2, other agents active).
+The conditions are not re-measurements but plan corrections that P1b must carry (C16–C24); none is a feasibility risk.
+
+| Gate | Spike (P0.2) | Review re-run | Reading |
+|---|---|---|---|
+| M1 | rAF p95 16.7–16.8; cpuTimePerFrame 2.4–2.9 ms | rAF p95 **16.7–16.8 in 9/9 rows** (3 reps × 3 views, DPR 2); draw+raster p95 9.7–11.4 ms; JS draw p95 1.0–1.1 ms; cpuTimePerFrame **2.2–3.5 ms** | PASS (CPU ≤ 4; the higher upper bound is contention) |
+| M2 (4×) | rAF p95 33.3 / 16.8 / 16.7; cpuTimePerFrame 8.7–11 | rAF p95 **16.7–16.8 in 9/9 rows**; draw+raster p95 12.1–14.1 ms; JS draw p95 3.3–3.9 ms; cpuTimePerFrame 6.1–9.0 ms | PASS. The spike's 33.3 ms rep is one series whose p95 fell on the 2-vsync value, i.e. 30 fps, which is what "≤ 33 ms" was meant to allow; C16 writes the threshold that way (33.4, median of 3) and adds draw+raster p95 ≤ 16.7 as the contention-robust primary. Did not reproduce |
+| M9 | SwiftShader: 0 pageerror, 66,578 px | `SwiftShader Device (LLVM 10.0.0)`: 0 pageerror, `onAfterRender` 3×, **66,578** non-empty px | PASS (identical) |
+| M12 | 0 pageerror; redraw after re-create | loss event caught by our listener; `recreated: 2` because the driver called `__deckRecreate()` after the `webglcontextrestored` listener already had; 245,760 non-empty px; 0 pageerror | PASS; the rewording is legitimate (C18). The double re-creation is why P1b.1 (d) requires exactly one per loss |
+| M14 | 0.75–3.35 % at tol 25 | **identical to three decimals** for all 14 scenarios (0.748 … 3.345) | PASS; shots are deterministic |
+
+M14 under other rules (same PNGs, Canvas vs deck, DPR 2, % of pixels):
+
+| Scenario | cmp tol 25 (spike rule) | pixelmatch 0.1 (AA excluded) | pixelmatch 0.1 incl. AA | cmp tol 64 | cmp tol 96 |
+|---|---:|---:|---:|---:|---:|
+| national-fit | 0.910 | 0.275 | 0.710 | 0.232 | 0.115 |
+| guangzhou-initial | 1.596 | 0.478 | 1.264 | 0.513 | 0.229 |
+| city-zoom-x10 | 3.345 | 2.017 | 2.857 | 0.578 | 0.231 |
+| selected-city (= minimized) | 1.679 | 0.839 | 1.241 | 0.276 | 0.139 |
+| isolated-train-mid | 0.774 | 0.219 | 0.559 | 0.194 | 0.121 |
+| class-filter-G | 1.376 | 0.484 | 1.074 | 0.342 | 0.144 |
+| inbound | 1.645 | 0.479 | 1.317 | 0.526 | 0.230 |
+| infra-on | 1.893 | 0.559 | 1.554 | 0.811 | 0.483 |
+| night | 1.007 | 0.220 | 0.699 | 0.306 | 0.119 |
+| anim-0600 / 1815 / 2350 | 0.748 / 1.266 / 1.133 | 0.157 / 0.330 / 0.260 | 0.522 / 0.818 / 0.790 | 0.142 / 0.316 / 0.259 | 0.064 / 0.138 / 0.099 |
+| labels-on | 2.690 | 1.226 | 2.424 | 1.469 | 0.980 |
+
+What the masks show (`cmp.mjs --diff`): the differences are the 0.45–1.25 px network/infra lines and the 1.5 px dot rings
+along their whole length (MSAA coverage quantisation, not geometry), every label glyph (C21: softer text on the transparent
+overlay, placement identical in a 4× crop of "Wuhan · 武汉"), the overdraw-order blob near the origin on `city-zoom-x10` (G2/C19),
+and the lighter D3 context pass on the selection scenarios. No missing or mis-sized element was found. The original G1 target
+(≤ 0.5 %) sits on the AA floor for four scenarios under the rule it named, hence C20.
+
+Draw order (C19): `PathTesselator` with `_pathType:'open'` takes 0.29 ms for the whole `sec` set (7,922 sections,
+75,044 vertices) and 0.25 ms (广州, 4,286 sections, 14,902 vertices) to 0.33 ms (北京, 5,195 / 18,200) to copy and
+tesselate an origin's flow subset in widest-first order (Bun, median of 9). The per-step cost is the attribute pass over
+the subset, which the spike already paid over the whole set.
+
+Bundling (C23): `deckgl` @ `b4cc2a1` builds the lazy graph as 8 files, 219.4 KB brotli, with no React input; the entry
+is 394,735 B and references the chunk. A JSX `DeckHost` would add a second React to the chunk.
+
+Owner steps still pending (not blockers): **M3** phones, **M10** label eyeball (now also decides C21), **R8** feel checklist
+at P1b.5 (§11.4 instructions unchanged).
 
 
 ## Sources
@@ -856,7 +984,12 @@ for memory but not for speed.
   `@deck.gl/geo-layers/dist/trips-layer/*`, `@deck.gl/core/dist/viewports/orthographic-viewport.js`,
   `@deck.gl/core/dist/lib/deck.js` (metrics, `_onContextLost`, `useDevicePixels`),
   `@deck.gl/core/dist/lib/layer.js` (`use64bitPositions`), `@deck.gl/layers/dist/text-layer/*`,
-  `@deck.gl/layers/dist/scatterplot-layer/*` (stroke inside radius),
+  `@deck.gl/layers/dist/scatterplot-layer/*` (stroke centred on the radius, C17),
+  `@deck.gl/core/dist/passes/layers-pass.js` (default `depthCompare 'less-equal'`),
+  `@deck.gl/core/dist/controllers/controller.js` (`_onWheel` logistic curve),
+  `@deck.gl/layers/dist/path-layer/{path-layer,path-tesselator}.js`,
+  `@luma.gl/webgl/dist/context/helpers/create-browser-context.js` and
+  `@luma.gl/webgl/dist/adapter/webgl-device.js` (context-loss listeners),
   `@deck.gl/extensions/dist/{data-filter,path-style}`.
 - deck.gl docs re-read 2026-10-24: orthographic-view (`flipY` default true), controller
   (`scrollZoom.speed` default 0.01, `inertia` default false), deck (`useDevicePixels` number,
