@@ -501,7 +501,8 @@ fn remap(v: i64, perm: &[usize]) -> i64 {
 }
 
 /// Old section id -> new id, "long paths first" (see the header).
-fn renumber(origins: &[Value], d: &Dir, n_secs: usize) -> Vec<usize> {
+fn renumber(origins: &[Value], d: &Dir, secs: &[Value]) -> Vec<usize> {
+    let n_secs = secs.len();
     let mut best: Vec<(i64, Vec<i64>)> = Vec::new(); // first-seen train order
     let mut at: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
     for o in origins {
@@ -529,7 +530,11 @@ fn renumber(origins: &[Value], d: &Dir, n_secs: usize) -> Vec<usize> {
             }
         }
     }
-    order.extend((0..n_secs).filter(|&s| !seen[s]));
+    // sections on no path (none expected): by polyline, so the order never
+    // depends on the build's section numbering
+    let mut rest: Vec<usize> = (0..n_secs).filter(|&s| !seen[s]).collect();
+    rest.sort_by(|&x, &y| (get(&secs[x], "g").as_str(), x).cmp(&(get(&secs[y], "g").as_str(), y)));
+    order.extend(rest);
     let mut perm = vec![0usize; n_secs];
     for (new, &old) in order.iter().enumerate() {
         perm[old] = new;
@@ -787,8 +792,8 @@ fn main() {
     // fmt 6: renumber sections per direction, dedupe the per-row paths into
     // per-train tables, sort + delta-encode the map flows.
     let n_trains = arr(get(&v1, "train_table")).len();
-    let perm_out = renumber(&origins, &OUT, arr(get(&shared, "sections")).len());
-    let perm_in = renumber(&origins, &IN, arr(get(&shared, "in_sections")).len());
+    let perm_out = renumber(&origins, &OUT, arr(get(&shared, "sections")));
+    let perm_in = renumber(&origins, &IN, arr(get(&shared, "in_sections")));
     let reorder = |secs: &Value, perm: &[usize]| -> Value {
         let mut v = vec![Value::Null; perm.len()];
         for (old, s) in arr(secs).iter().enumerate() {

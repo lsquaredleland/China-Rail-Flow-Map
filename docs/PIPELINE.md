@@ -198,7 +198,9 @@ ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
 AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
 ./target/release/secdiff --old ../staging/o1-build/o1v2/china-flow-atlas-data.json \
-    --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
+    --new $O/china-flow-atlas-data.json --edges   # 0 changed edges, except 8 on the 成都 loop vs the pre-O18 baseline (progress log, O18)
+./target/release/secdiff --old ... --new ... --classes   # per-edge class columns (8 classes)
+# atlas + atlaspack are deterministic: two runs on identical inputs are byte-identical (O18)
 ```
 The `--old` baseline is the build behind the committed pack (its `.br` files
 are md5-identical to `web/public/assets`); `staging/live-v1` predates O4-O1 and

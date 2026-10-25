@@ -1,8 +1,12 @@
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[path = "../chains.rs"]
+mod chains;
 
 const CORE: &[&str] = &[
     "北京",
@@ -913,14 +917,15 @@ fn dijkstra_chain(
     let mut dist: HashMap<String, f64> = HashMap::from([(a.to_string(), 0.0)]);
     let mut prev: HashMap<String, (String, Option<(String, String)>)> = HashMap::new();
     let mut visited: HashSet<String> = HashSet::new();
+    // min-heap on (cost bits, name): exact-cost ties pop in name order
+    let mut heap: BinaryHeap<Reverse<(u64, String)>> =
+        BinaryHeap::from([Reverse((0f64.to_bits(), a.to_string()))]);
     loop {
-        let mut best: Option<(String, f64)> = None;
-        for (k, v) in dist.iter() {
-            if !visited.contains(k) && best.as_ref().is_none_or(|(_, bv)| v < bv) {
-                best = Some((k.clone(), *v));
-            }
+        let Reverse((dbits, u)) = heap.pop()?;
+        if visited.contains(&u) {
+            continue;
         }
-        let (u, du) = best?;
+        let du = f64::from_bits(dbits);
         if u == b {
             break;
         }
@@ -931,6 +936,7 @@ fn dijkstra_chain(
                 if nd < *dist.get(v).unwrap_or(&f64::INFINITY) {
                     dist.insert(v.clone(), nd);
                     prev.insert(v.clone(), (u.clone(), pk.clone()));
+                    heap.push(Reverse((nd.to_bits(), v.clone())));
                 }
             }
         }
@@ -1117,7 +1123,7 @@ struct AtlasOut {
     station_table: Vec<AtlasStation>,
     train_table: Vec<AtlasTrainRef>,
     network: Vec<String>,
-    stats: HashMap<String, i64>,
+    stats: std::collections::BTreeMap<String, i64>,
     /// Indexed by train_table index t: the train's full stop list.
     schedules: Vec<Vec<ScheduleRow>>,
 }
@@ -2202,7 +2208,9 @@ fn main() {
         .collect();
     let mut adj_pure: CorridorAdj = HashMap::new();
     let mut adj: CorridorAdj = HashMap::new();
-    for (k, l) in pair_len.iter() {
+    let mut pair_lens: Vec<(&(String, String), &f64)> = pair_len.iter().collect();
+    pair_lens.sort_by(|a, b| a.0.cmp(b.0));
+    for (k, l) in pair_lens {
         adj_pure
             .entry(k.0.clone())
             .or_default()
@@ -2228,7 +2236,10 @@ fn main() {
         for s in all_stations.iter() {
             by_city.entry(city_of(s)).or_default().push(s.clone());
         }
-        for sts in by_city.values() {
+        let mut by_city: Vec<(String, Vec<String>)> = by_city.into_iter().collect();
+        by_city.sort();
+        for (_, sts) in by_city.iter_mut() {
+            sts.sort();
             if sts.len() < 2 || sts.len() > 12 {
                 continue;
             }
@@ -2773,79 +2784,9 @@ fn main() {
     }
     println!("union atomic edges: {}", edge_counts.len());
     // intern count signatures: a global section has constant per-city counts
-    let mut sig_ids: HashMap<Vec<(usize, u64)>, u32> = HashMap::new();
-    let mut sig_list: Vec<Vec<(usize, u64)>> = Vec::new();
-    let mut edge_sig: HashMap<(i64, i64), u32> = HashMap::new();
-    for (e, m) in edge_counts.iter() {
-        let mut sig: Vec<(usize, u64)> = m.iter().map(|(c, n)| (*c, *n)).collect();
-        sig.sort();
-        let id = match sig_ids.get(&sig) {
-            Some(id) => *id,
-            None => {
-                let id = sig_list.len() as u32;
-                sig_list.push(sig.clone());
-                sig_ids.insert(sig, id);
-                id
-            }
-        };
-        edge_sig.insert(*e, id);
-    }
+    let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
     println!("distinct signatures: {}", sig_list.len());
-    let mut nadj: HashMap<i64, Vec<(i64, u32)>> = HashMap::new();
-    for (e, sid) in edge_sig.iter() {
-        nadj.entry(e.0).or_default().push((e.1, *sid));
-        nadj.entry(e.1).or_default().push((e.0, *sid));
-    }
-    let ekey = |u: i64, v: i64| if u < v { (u, v) } else { (v, u) };
-    let mut used: HashSet<(i64, i64)> = HashSet::new();
-    let mut section_chains: Vec<(u32, Vec<i64>)> = Vec::new();
-    for (e, sid) in edge_sig.iter() {
-        if used.contains(e) {
-            continue;
-        }
-        let sid = *sid;
-        let mut chain: Vec<i64> = vec![e.0, e.1];
-        used.insert(*e);
-        loop {
-            let cur = *chain.last().unwrap();
-            let prev = chain[chain.len() - 2];
-            let cands: Vec<i64> = nadj
-                .get(&cur)
-                .map(|v| {
-                    v.iter()
-                        .filter(|(n, s)| *n != prev && *s == sid)
-                        .map(|(n, _)| *n)
-                        .collect()
-                })
-                .unwrap_or_default();
-            if cands.len() == 1 && !used.contains(&ekey(cur, cands[0])) {
-                used.insert(ekey(cur, cands[0]));
-                chain.push(cands[0]);
-            } else {
-                break;
-            }
-        }
-        loop {
-            let cur = chain[0];
-            let next = chain[1];
-            let cands: Vec<i64> = nadj
-                .get(&cur)
-                .map(|v| {
-                    v.iter()
-                        .filter(|(n, s)| *n != next && *s == sid)
-                        .map(|(n, _)| *n)
-                        .collect()
-                })
-                .unwrap_or_default();
-            if cands.len() == 1 && !used.contains(&ekey(cur, cands[0])) {
-                used.insert(ekey(cur, cands[0]));
-                chain.insert(0, cands[0]);
-            } else {
-                break;
-            }
-        }
-        section_chains.push((sid, chain));
-    }
+    let section_chains = chains::build_section_chains(&edge_sig);
     // section endpoint station names (nearest real station point)
     let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
     for (a, b) in path_map.keys() {
@@ -2859,7 +2800,7 @@ fn main() {
         let mut best: Option<(&String, f64)> = None;
         for (nm, sp) in station_pts_all.iter() {
             let d = hav_km_ll(pt, *sp);
-            if d < 5.0 && best.is_none_or(|(_, bd)| d < bd) {
+            if d < 5.0 && best.is_none_or(|(bn, bd)| d < bd || (d == bd && nm < bn)) {
                 best = Some((nm, d));
             }
         }
@@ -2909,14 +2850,8 @@ fn main() {
             g: polyline_encode(&simp),
             h: chain_hsr(chain),
         });
-        let e0 = ekey(chain[0], chain[1]);
-        for (ci, n) in sig_list[*sid as usize].iter() {
-            let cls_counts = edge_class_counts
-                .get(&e0)
-                .and_then(|m| m.get(ci))
-                .copied()
-                .unwrap_or([0; 8]);
-            flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, &cls_counts));
+        for (ci, n, cls_counts) in sig_list[*sid as usize].iter() {
+            flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
         }
     }
     for f in flows_per_city.iter_mut() {
@@ -2964,77 +2899,8 @@ fn main() {
         }
     }
     println!("union inbound atomic edges: {}", in_edge_counts.len());
-    let mut in_sig_ids: HashMap<Vec<(usize, u64)>, u32> = HashMap::new();
-    let mut in_sig_list: Vec<Vec<(usize, u64)>> = Vec::new();
-    let mut in_edge_sig: HashMap<(i64, i64), u32> = HashMap::new();
-    for (e, m) in in_edge_counts.iter() {
-        let mut sig: Vec<(usize, u64)> = m.iter().map(|(c, n)| (*c, *n)).collect();
-        sig.sort();
-        let id = match in_sig_ids.get(&sig) {
-            Some(id) => *id,
-            None => {
-                let id = in_sig_list.len() as u32;
-                in_sig_list.push(sig.clone());
-                in_sig_ids.insert(sig, id);
-                id
-            }
-        };
-        in_edge_sig.insert(*e, id);
-    }
-    let mut in_nadj: HashMap<i64, Vec<(i64, u32)>> = HashMap::new();
-    for (e, sid) in in_edge_sig.iter() {
-        in_nadj.entry(e.0).or_default().push((e.1, *sid));
-        in_nadj.entry(e.1).or_default().push((e.0, *sid));
-    }
-    let mut in_used: HashSet<(i64, i64)> = HashSet::new();
-    let mut in_section_chains: Vec<(u32, Vec<i64>)> = Vec::new();
-    for (e, sid) in in_edge_sig.iter() {
-        if in_used.contains(e) {
-            continue;
-        }
-        let sid = *sid;
-        let mut chain: Vec<i64> = vec![e.0, e.1];
-        in_used.insert(*e);
-        loop {
-            let cur = *chain.last().unwrap();
-            let prev = chain[chain.len() - 2];
-            let cands: Vec<i64> = in_nadj
-                .get(&cur)
-                .map(|v| {
-                    v.iter()
-                        .filter(|(n, s)| *n != prev && *s == sid)
-                        .map(|(n, _)| *n)
-                        .collect()
-                })
-                .unwrap_or_default();
-            if cands.len() == 1 && !in_used.contains(&ekey(cur, cands[0])) {
-                in_used.insert(ekey(cur, cands[0]));
-                chain.push(cands[0]);
-            } else {
-                break;
-            }
-        }
-        loop {
-            let cur = chain[0];
-            let next = chain[1];
-            let cands: Vec<i64> = in_nadj
-                .get(&cur)
-                .map(|v| {
-                    v.iter()
-                        .filter(|(n, s)| *n != next && *s == sid)
-                        .map(|(n, _)| *n)
-                        .collect()
-                })
-                .unwrap_or_default();
-            if cands.len() == 1 && !in_used.contains(&ekey(cur, cands[0])) {
-                in_used.insert(ekey(cur, cands[0]));
-                chain.insert(0, cands[0]);
-            } else {
-                break;
-            }
-        }
-        in_section_chains.push((sid, chain));
-    }
+    let (in_sig_list, in_edge_sig) = chains::intern_sigs(&in_edge_counts, &in_edge_class_counts);
+    let in_section_chains = chains::build_section_chains(&in_edge_sig);
     let mut in_edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
     let mut in_sections: Vec<AtlasSection> = Vec::new();
     let mut in_flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); in_works.len()];
@@ -3076,14 +2942,8 @@ fn main() {
             g: polyline_encode(&simp),
             h: chain_hsr(chain),
         });
-        let e0 = ekey(chain[0], chain[1]);
-        for (ci, n) in in_sig_list[*sid as usize].iter() {
-            let cls_counts = in_edge_class_counts
-                .get(&e0)
-                .and_then(|m| m.get(ci))
-                .copied()
-                .unwrap_or([0; 8]);
-            in_flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, &cls_counts));
+        for (ci, n, cls_counts) in in_sig_list[*sid as usize].iter() {
+            in_flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
         }
     }
     for f in in_flows_per_city.iter_mut() {
@@ -3669,7 +3529,10 @@ fn main() {
     let mut network: Vec<String> = Vec::new();
     {
         let mut seen: HashSet<(String, String)> = HashSet::new();
-        for (key, (_, segs)) in path_map.iter() {
+        let mut keys: Vec<&(String, String)> = path_map.keys().collect();
+        keys.sort();
+        for key in keys {
+            let segs = &path_map[key].1;
             if !seen.insert(key.clone()) {
                 continue;
             }
@@ -3719,7 +3582,7 @@ fn main() {
         throat_drops[1]
     );
 
-    let mut stats: HashMap<String, i64> = HashMap::new();
+    let mut stats: std::collections::BTreeMap<String, i64> = Default::default();
     stats.insert("origins".into(), origins.len() as i64);
     stats.insert("sections".into(), sections.len() as i64);
     stats.insert("in_sections".into(), in_sections.len() as i64);
