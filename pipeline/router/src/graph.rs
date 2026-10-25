@@ -61,9 +61,40 @@ pub struct Graph {
     /// Distinct track neighbours before stitching; 1 marks a dangling
     /// track end, where unmapped gaps start.
     pub degree: Vec<u8>,
+    /// Per node: within reach of a station point (`mark_stations`); empty
+    /// until marked.
+    pub at_station: Vec<bool>,
 }
 
 impl Graph {
+    /// Mark every node within `km` of one of `points` ([lat, lon]) as
+    /// `at_station`; returns how many nodes were marked.
+    pub fn mark_stations<'p>(
+        &mut self,
+        points: impl Iterator<Item = &'p [f64; 2]>,
+        km: f64,
+    ) -> usize {
+        let cell = |p: &[f64; 2]| ((p[0] * 20.0).floor() as i32, (p[1] * 20.0).floor() as i32);
+        let mut grid: HashMap<(i32, i32), Vec<[f64; 2]>> = HashMap::new();
+        for p in points {
+            grid.entry(cell(p)).or_default().push(*p);
+        }
+        self.at_station = self
+            .coords
+            .iter()
+            .map(|c| {
+                let (cx, cy) = cell(c);
+                (-1..=1).any(|dx| {
+                    (-1..=1).any(|dy| {
+                        grid.get(&(cx + dx, cy + dy))
+                            .is_some_and(|v| v.iter().any(|p| hav(*c, *p) <= km))
+                    })
+                })
+            })
+            .collect();
+        self.at_station.iter().filter(|&&b| b).count()
+    }
+
     /// Flag every edge on the given OSM node-id paths as F_PROD; returns
     /// how many undirected edges were flagged.
     pub fn mark_prod(&mut self, paths: &[&Vec<u64>]) -> usize {
@@ -395,6 +426,7 @@ pub fn build(osm_path: &std::path::Path, cfg: &NetworkConfig) -> Graph {
         adj,
         lines,
         degree,
+        at_station: Vec::new(),
     }
 }
 

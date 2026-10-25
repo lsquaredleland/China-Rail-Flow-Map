@@ -72,6 +72,17 @@ corridor-v3-o17 run byte for byte. To change it:
 - `--config router.toml` overrides any subset. Sections are `network`,
   `candidates`, `bridge`, `calibration`, `model`, `evidence`, `decide`,
   `canon` and `schedule`. Unknown keys are an error.
+- `[model] inner_reversal_penalty` (recipe: 2.0, default 0 = off) is the
+  log-penalty per turn-back inside a candidate path. A train runs a leg
+  without stopping, so it cannot reverse between its two stations (at a
+  junction, say). A turn-back is a heading change above 150 degrees between
+  the path `inner_reversal_km` (1.0) before a node and as far after it. Not
+  counted: one within `inner_reversal_station_km` (1.5) of any station
+  point (a train may reverse at a stop or a technical stop), out-and-back
+  spikes from joining overlapping pieces (two turn-backs less than 4
+  windows apart), and one back over the nodes it came in on. It enters the
+  shape prior of every candidate (`model::shape_priors`); the decision
+  rules are unchanged.
 - The `CV3_*` environment variables still win over the file:
   `CV3_ACCEL`, `CV3_OVERHEAD`, `CV3_TAIL_TAU`, `CV3_LENGTH_PRIOR`,
   `CV3_SWITCH_POST`, `CV3_BASE_MAX`, `CV3_FILL_POST` and

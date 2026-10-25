@@ -117,12 +117,7 @@ pub fn infer(
                         let sp = model::service_logprior(&compat, svc[pi].1[gidx]);
                         let emit = match l.minutes {
                             Some(m) => model::emissions(cal, pc, l.class, m),
-                            None => {
-                                let kmin = pc.iter().map(|k| k.km).fold(f64::INFINITY, f64::min);
-                                pc.iter()
-                                    .map(|k| -model::params().length_prior * (k.km / kmin).ln())
-                                    .collect()
-                            }
+                            None => model::shape_priors(pc),
                         };
                         let emit: Vec<f64> = emit.iter().zip(&sp).map(|(e, p)| e + p).collect();
                         let t = &trains[l.train];
