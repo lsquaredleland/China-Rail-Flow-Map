@@ -3,7 +3,11 @@
   "private": true,
   "scripts": {
     "build": "node bundle.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "shots": "node tools/shots/shots.mjs",
+    "shots:cmp": "node tools/shots/cmp.mjs",
+    "perf": "node tools/perf/national.mjs",
+    "perf:origin": "node tools/perf/origin.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -13,6 +17,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "esbuild": "^0.28.2",
+    "puppeteer-core": "25.16.0",
     "typescript": "^7.0.2"
   }
 }
