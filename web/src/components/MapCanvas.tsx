@@ -60,6 +60,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
 
   useImperativeHandle(apiRef, () => createMapApi(M), [M]);
 
+  // Test/measurement handle for web/tools (screenshots, perf): the engine
+  // context and a synchronous draw. App.tsx cannot expose M (it lives
+  // here), so this sits next to the other window.__* debug handles. It only
+  // exposes objects already reachable from the page; nothing reads it.
+  useEffect(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w.__M = M;
+    w.__draw = () => draw(M);
+  }, [M]);
+
   /* ---------- lifecycle ---------- */
   useEffect(() => {
     return () => {

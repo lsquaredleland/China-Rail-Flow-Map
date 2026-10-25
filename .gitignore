@@ -27,3 +27,4 @@ data/derived
 # Staged pipeline rebuilds (inputs copied read-only from the handoff; outputs never live)
 staging/
 scripts/.build/
+web/shots-out/
