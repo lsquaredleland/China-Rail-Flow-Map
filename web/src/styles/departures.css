@@ -209,11 +209,11 @@
   transition: background 0.08s ease;
 }
 #depTable tbody tr:hover {
-  background: var(--paper-warm) !important;
+  background: var(--row-hover) !important;
 }
 #depTable tbody tr.dep-row-selected {
   background: var(--paper-deep) !important;
-  box-shadow: inset 4px 0 0 var(--crimson);
+  box-shadow: inset 4px 0 0 var(--rust);
 }
 #depTable tbody tr:nth-child(even) { background: var(--row-alt); }
 #depTable td.num, #depTable th.num { text-align: right; }
@@ -257,7 +257,7 @@
 }
 .status-term { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
 .status-mid { background: var(--field); color: var(--ink); border: 1px solid var(--ink); }
-.dep-empty button.linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--accent, inherit); text-decoration: underline; cursor: pointer; }
+.dep-empty button.linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--rust); text-decoration: underline; cursor: pointer; }
 .dep-empty { padding: 18px 10px; color: var(--ink-soft); font-style: italic; }
 
 /* train code button in every table row */

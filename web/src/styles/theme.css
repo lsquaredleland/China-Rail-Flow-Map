@@ -19,6 +19,7 @@
   --btn-on-ink: #FFFFFF;
   --field: #FFFFFF;
   --row-alt: #ECEBE5;
+  --row-hover: #E1DFD6;
   --tooltip-bg: #111111;
   --tooltip-ink: #F6F5F1;
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.08), 0 6px 16px rgba(0, 0, 0, 0.05);
@@ -45,6 +46,7 @@
     --btn-on-ink: #111214;
     --field: #1A1B1E;
     --row-alt: #17181B;
+    --row-hover: #26282D;
     --tooltip-bg: #1A1B1E;
     --tooltip-ink: #EDEDEA;
     --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -71,6 +73,7 @@
   --btn-on-ink: #111214;
   --field: #1A1B1E;
   --row-alt: #17181B;
+  --row-hover: #26282D;
   --tooltip-bg: #1A1B1E;
   --tooltip-ink: #EDEDEA;
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.5);
