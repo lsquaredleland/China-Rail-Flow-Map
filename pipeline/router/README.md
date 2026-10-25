@@ -34,7 +34,7 @@ library (`src/lib.rs`), which `src/bin/cordcheck.rs` uses too.
 | | `model.rs` | `Cand`, `Shape`, run-time model, `Calibration`, `emissions`, forward-backward `posteriors` |
 | | `infer.rs` | Calibration samples, bridge selection, the per-train chains, calls `decide` |
 | | `decide.rs` | `decide(obs, posteriors, cfg) -> Decision`: the pure decision policy, with its tests |
-| | `canon.rs` | Canonical double-track-merged geometry (`best_for_canon`, `redraw`, `canonical`) |
+| | `canon.rs` | Canonical double-track-merged geometry (`best_for_canon` by `[canon] mode`, `redraw`, `canonical`) |
 | | `validate.rs` | The hidden-stop self-check |
 | **Outputs** | `output.rs` | Writers for `leg_routes.jsonl`, `leg_paths.json`, `pair_paths_canonical.json`, `candidates.json`, `bridges.json`, `validation_wrong_switches.jsonl`, `summary.json` |
 
@@ -84,6 +84,49 @@ switch_post = 0.95      # stricter switches; everything else stays default
 [network]
 rail_values = ["rail", "light_rail"]
 name_key = "name:en"
+```
+
+### Canonical geometry: `[canon] mode`
+
+A pair's canonical geometry (`pair_paths_canonical.json`, after the
+double-track redraw) is what the map draws for every leg that does not
+draw its own path: every outcome except `switched`, `filled` and
+`bridge-fix`. It also sets the track usage that those own paths are
+redrawn onto.
+
+| `mode` | Picks |
+|---|---|
+| `shortest` (default) | The shortest gap-free candidate, else production. The shipped corridor-v3-o17 behaviour. |
+| `production` | Production's path when gap-free, else as `shortest`. |
+| `hybrid` | As `production`, unless the pair's timetabled legs favour another gap-free candidate. |
+
+The hybrid rule:
+
+1. Each leg of the pair is scored with its own class's prediction, so
+   the pair's class mix weights the evidence. Legs whose class cannot
+   use production are left out. An alternative that some remaining
+   leg's class cannot use is not eligible.
+2. A candidate's error on a leg is how many minutes the timetable is
+   faster than the candidate allows: `max(0, predict(c) * p5_c - t)`,
+   where `p5_c` is the class's fast-edge scheduled/model ratio from
+   calibration.
+   - It is one-sided because a train can always run slower than its
+     track allows (recovery time, overnight sleepers). A slow timetable
+     is no evidence for a longer path.
+   - It uses the fast edge, not the median, so ordinary spread and
+     speed-tag error are no evidence either.
+3. The best alternative has the lowest mean error, shortest on ties. It
+   replaces production only if it beats production's mean error by
+   at least `margin_min` minutes, AND by at least `margin_rel` of
+   production's error, over at least `min_legs` legs.
+
+The margin defaults (`margin_min = 1.0`, `margin_rel = 0.2`,
+`min_legs = 1`) were picked on a train-hash tune/holdout split. They
+only take effect in `hybrid` mode.
+
+```toml
+[canon]
+mode = "hybrid"
 ```
 
 `main` installs the config once (`config::install`). The run-time model

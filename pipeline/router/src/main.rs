@@ -29,7 +29,7 @@
 use corridor_router::baseline::Baseline;
 use corridor_router::config::{self, Config};
 use corridor_router::graph::{self, Buffers, FineIndex, SnapIndex};
-use corridor_router::model::{Calibration, Cand, Shape, CLASS_NAMES};
+use corridor_router::model::{Calibration, Cand, Shape, CLASS_NAMES, NCLASS};
 use corridor_router::schedule::{ScheduleSource, Train};
 use corridor_router::stations::{normalize_name, Stations};
 use corridor_router::{bridge, candidates, canon, china, evidence, infer, legs, output, validate};
@@ -252,10 +252,35 @@ fn main() {
 
     // ---- double track as one corridor, for the map ----
     let weight = |pi: usize| pair_legs[&pairs[pi].key].len() as u32;
-    let (canon, usage) = canon::canonical(&g, &fine, &cands, &weight, &cfg.canon);
+    let fast_edge: [f64; NCLASS] = std::array::from_fn(|c| cal.q05[c].exp());
+    let canon_picks: Vec<Option<usize>> = (0..pairs.len())
+        .map(|pi| {
+            let times: Vec<canon::LegTime> = pair_legs[&pairs[pi].key]
+                .iter()
+                .filter_map(|&li| {
+                    legs[li].minutes.map(|minutes| canon::LegTime {
+                        class: legs[li].class,
+                        minutes,
+                    })
+                })
+                .collect();
+            let ev = canon::Evidence {
+                legs: &times,
+                ratio: &fast_edge,
+            };
+            canon::best_for_canon(&cands[pi], &ev, &cfg.canon)
+        })
+        .collect();
+    let (canon, usage) = canon::canonical(&g, &fine, &cands, &canon_picks, &weight, &cfg.canon);
+    let not_base = canon_picks
+        .iter()
+        .enumerate()
+        .filter(|&(pi, k)| k.is_some_and(|k| !cands[pi][k].is_base))
+        .count();
     timer.mark(&format!(
-        "canonical production geometry: {} pairs",
-        canon.iter().filter(|c| c.is_some()).count()
+        "canonical production geometry: {} pairs ({:?}; {not_base} not production's path)",
+        canon.iter().filter(|c| c.is_some()).count(),
+        cfg.canon.mode
     ));
     let mut todo: Vec<(usize, usize)> = decisions
         .iter()
