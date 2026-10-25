@@ -206,8 +206,8 @@ The two sources today, chosen by `[schedule] source` (paths relative to
 
 | `source` | Reads |
 |---|---|
-| `timetables` (default) | `china::TimetableJson`: the two timetable deliverables. The committed recipe. |
-| `export` | `export::TrainExport`: `export = "<file>"`, plus `supplements = [...]` |
+| `timetables` (default) | `china::TimetableJson`: the two timetable deliverables (the 12306 pack). |
+| `export` | `export::TrainExport`: `export = "<file>"`, plus `supplements = [...]`. The committed recipe since 2026-10-25 (the shipped pack). |
 
 A train export is the deliverable shape plus optional `run_dates`. Its
 rules (`export.rs` header):
