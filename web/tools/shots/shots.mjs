@@ -5,9 +5,9 @@
 //           that is served with the Vercel headers on a free port
 //   outdir  default "shots-out"; files are <scenario>@<dpr>x.png
 //   env CHROME_PATH overrides the Chrome binary
-//   env SHOTS_QUERY appends to the page URL, e.g. '&renderer=canvas' (deck is the default since
-//       P1c.1) or '&layers=backdrop'. On the deck renderer each shot waits for window.__deckStats.settled
-//       (two identical frames, no pipeline compile pending) before and after the scenario.
+//   env SHOTS_QUERY appends to the page URL, e.g. '&theme=dark'. Each shot waits for
+//       window.__deckStats.settled (two identical frames, no pipeline compile pending) before and
+//       after the scenario.
 //
 // Determinism: every scenario runs in a fresh browser context (empty
 // storage), fixed 1280x800 viewport, light colour scheme, ?theme=light,
@@ -45,10 +45,8 @@ const setMinute = async (pg, m) => {
   await sleep(500);
 };
 
-/* Deck renderer (the default; SHOTS_QUERY '&renderer=canvas' for Canvas): wait until __deckStats.settled. */
-const deckWanted = !/renderer=canvas/.test(process.env.SHOTS_QUERY || ""); // deck is the default (P1c.1)
+/* Wait until the deck renderer has settled (__deckStats.settled). */
 const settled = async (pg) => {
-  if (!deckWanted) return;
   await pg.waitForFunction("window.__deckStats && window.__deckStats.settled", { timeout: 20000 });
 };
 

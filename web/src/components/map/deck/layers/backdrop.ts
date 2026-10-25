@@ -3,7 +3,7 @@
    decoded atlas / outline, the palette and the view scale. The geometry is
    uploaded once per data object (WeakMap caches); only colours and the
    scale-dependent dash/width values change between calls, through
-   updateTriggers. Mirrors map/backdrop.ts (the Canvas path). */
+   updateTriggers. */
 import type { Layer } from "@deck.gl/core";
 import { PathStyleExtension } from "@deck.gl/extensions";
 import { LineLayer, PathLayer, SolidPolygonLayer } from "@deck.gl/layers";

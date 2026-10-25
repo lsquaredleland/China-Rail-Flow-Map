@@ -6,8 +6,8 @@
 // the raster flush) as mean / p50 / p95 / max.
 //
 // It prints UNMASKED_RENDERER_WEBGL and EXITS 1 if that contains
-// "SwiftShader": software-rendered numbers are meaningless. --query '&renderer=deck'
-// is appended to the page URL; on the deck renderer the frame flush is a readPixels
+// "SwiftShader": software-rendered numbers are meaningless. --query '&...'
+// is appended to the page URL; the frame flush is a readPixels on the deck context
 // and each row carries deck.metrics. --headed
 // launches a visible window (use it when headless lands on SwiftShader).
 // env CHROME_PATH overrides the Chrome binary.
@@ -69,10 +69,10 @@ try {
       else if (kind === "city") await pg.evaluate(() => window.__mapApi.panZoomTo(113.26, 23.13, window.__M.S.current.fitScale * 10));
       await sleep(500);
       const r = await pg.evaluate(async (FR, START, STEP) => {
-        const M = window.__M, S = M.S.current, cv = M.canvasRef.current, ctx = cv.getContext("2d");
-        // Deck renderer: flush with a readPixels on the deck context (a 2D getImageData would not wait for WebGL).
-        const DH = window.__deck; const gl = DH && DH.device.handle; const px4 = new Uint8Array(4);
-        const flushFn = () => { if (gl) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px4); else ctx.getImageData(0, 0, 1, 1); };
+        const M = window.__M, S = M.S.current;
+        // Flush with a readPixels on the deck context (a 2D getImageData would not wait for WebGL).
+        const DH = window.__deck; const gl = DH.device.handle; const px4 = new Uint8Array(4);
+        const flushFn = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px4);
         const run = (n, flush) => new Promise((res) => {
           const iv = [], dr = []; let last = 0, i = 0;
           const step = (ts) => {
@@ -91,7 +91,7 @@ try {
         const a = await run(FR, false);
         await new Promise((r) => setTimeout(r, 300));
         const f = await run(FR, true);
-        const metrics = DH ? JSON.parse(JSON.stringify(DH.metrics)) : null;
+        const metrics = JSON.parse(JSON.stringify(DH.metrics));
         return { active: M.activeTimeline() ? 1 : 0, a, f, metrics };
       }, FR, START, STEP);
       const row = {
@@ -100,7 +100,7 @@ try {
         droppedPct: +((100 * r.a.iv.filter((x) => x > 20).length) / r.a.iv.length).toFixed(1),
         drawJsMs: stat(r.a.dr),
         drawPlusRasterMs: stat(r.f.dr),
-        deckMetrics: r.metrics, // null on the Canvas renderer
+        deckMetrics: r.metrics,
       };
       rows.push(row);
     }

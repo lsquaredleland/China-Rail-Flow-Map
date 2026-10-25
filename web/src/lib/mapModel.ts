@@ -1,6 +1,6 @@
 /* Renderer-independent map model. Pure functions of the view-model state
-   (never the canvas, camera or DOM), so the Canvas 2D drawing and the
-   deck.gl layers consume the same decisions: which flow sections are
+   (never the canvas, camera or DOM), so the deck.gl layers and the pick code
+   consume the same decisions: which flow sections are
    shown, at what alpha and scale, which chords and which hover target are
    visible, what the isolated train has lit so far.
 

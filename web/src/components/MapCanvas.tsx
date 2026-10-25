@@ -10,21 +10,31 @@ import { createMapCtx } from "./map/context";
 import type { MapApi, Props } from "./map/context";
 import { createMapApi } from "./map/api";
 import { notifyAnimListeners } from "./map/anim";
-import { resize, updateScaleBar, zoomAt } from "./map/camera";
+import { frameTail, resize, updateScaleBar, zoomAt } from "./map/camera";
 import { hideTooltip } from "./map/interaction";
 import { endPointer, onPointerDown, onPointerLeave, onPointerMove } from "./map/pointer";
-import { draw, frameTail } from "./map/render";
 import { loadDeck } from "./map/deck/load";
 import type { DeckHandle } from "./map/deck/DeckHost";
 import { RELOAD_NOTICE, onStaleReload } from "../staleReload";
 
 export type { AnimListener, AnimState, MapApi } from "./map/context";
 
-/* The map itself: a custom Canvas 2D renderer (no tiles, no libraries).
-   React owns the surrounding UI state; the camera, hover and pointer
-   bookkeeping live in the shared MapCtx (./map/context), and drawing is
-   imperative — one draw() pass per frame request, composed from the layer
-   modules in ./map, exactly as a hand-rolled canvas map wants. */
+/* True when this browser can create a WebGL2 context (the probe context is released at once). */
+function hasWebGL2(): boolean {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    return !!gl;
+  } catch {
+    return false;
+  }
+}
+
+/* The map's React host (no tiles). React owns the surrounding UI state; the
+   camera, hover and pointer bookkeeping live in the shared MapCtx
+   (./map/context), and drawing is imperative: the lazily loaded deck.gl host
+   (./map/deck/DeckHost, mounted below) renders one frame per request.
+   <canvas id="map"> is the labels overlay and the pointer / wheel target. */
 const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -34,10 +44,9 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const scaleBarRef = useRef<HTMLDivElement | null>(null);
   const viewReportTimerRef = useRef<number | null>(null);
   const [switching, setSwitching] = useState(false);
-  // Deck renderer: the lazy chunk is fetched after mount; the handle is its imperative host.
-  const renderer = props.renderer ?? "canvas";
+  // The lazy deck chunk is fetched after mount; the handle is its imperative host.
   const deckRef = useRef<DeckHandle | null>(null);
-  const [deckState, setDeckState] = useState<"loading" | "ready" | "error">("loading");
+  const [deckState, setDeckState] = useState<"loading" | "ready" | "error" | "nowebgl">("loading");
   // A deploy replaced the data files under this tab: the page reloads itself.
   const [reloading, setReloading] = useState(false);
   useEffect(() => {
@@ -63,11 +72,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     });
   }
   const M = mRef.current;
-  // One dispatch per frame request: the deck host once mounted, else the Canvas 2D draw.
-  M.render = () => {
-    if (renderer === "deck") deckRef.current?.render();
-    else draw(M);
-  };
+  // One dispatch per frame request: the deck host once mounted, else nothing.
+  M.render = () => deckRef.current?.render();
   M.frameTail = () => frameTail(M);
   M.syncRendererSize = () => deckRef.current?.resize();
 
@@ -92,9 +98,14 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       }
     };
   }, [M]);
-  // ?renderer=deck: mount the lazily loaded host (imperative, no React in the chunk).
+  // Mount the lazily loaded host (imperative, no React in the chunk). deck.gl 9 needs WebGL2 and
+  // there is no Canvas fallback (D9): without it the chunk is not even fetched, a notice shows
+  // over the map, and the panels and tables keep working.
   useEffect(() => {
-    if (renderer !== "deck") return;
+    if (!hasWebGL2()) {
+      setDeckState("nowebgl");
+      return;
+    }
     let cancelled = false;
     let h: DeckHandle | undefined;
     loadDeck()
@@ -115,7 +126,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       deckRef.current = null;
       h?.destroy();
     };
-  }, [M, renderer]);
+  }, [M]);
   // The deck canvas fades with the overlay canvas on an origin switch.
   useEffect(() => {
     document.getElementById("deckcv")?.classList.toggle("switching", switching);
@@ -240,15 +251,17 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         onPointerCancel={(e) => endPointer(M, e)}
         onPointerLeave={() => onPointerLeave(M)}
       />
-      {(!cur || inLoading || loadError || reloading || (renderer === "deck" && deckState !== "ready")) && (
+      {(!cur || inLoading || loadError || reloading || deckState !== "ready") && (
         <div id="loading" className={cur ? "is-passive" : undefined}>
           {reloading
             ? RELOAD_NOTICE
             : loadError
             ? "The timetable data could not be loaded (" + loadError + ")."
-            : renderer === "deck" && deckState === "error"
+            : deckState === "nowebgl"
+            ? "This map needs WebGL2, which is not available in this browser. The tables and panels still work."
+            : deckState === "error"
             ? "The map renderer could not be loaded. Please reload the page."
-            : renderer === "deck" && deckState === "loading" && cur
+            : deckState === "loading" && cur
             ? "Loading the map renderer…"
             : "Unfolding the timetable…"}
         </div>

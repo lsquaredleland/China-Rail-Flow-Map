@@ -1,6 +1,6 @@
 /* City labels and the origin diamond, drawn with Canvas 2D onto the existing
    transparent `#map` canvas (D5): the same text engine and `placeLabels` as
-   the Canvas renderer (map/stations.ts drawLabels), so placement is identical;
+   the former Canvas renderer, so placement is unchanged;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
 import { isTrainShown, palette, placeLabels, stationT } from "../../../lib";

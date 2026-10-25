@@ -1,183 +1,24 @@
 /* Hit-testing and the floating tooltip. */
-import type {
-  ActiveTrainVM,
-  ChordVM,
-  CityPointVM,
-  DestVM,
-  FlowVM,
-  Hit,
-  SrcVM,
-} from "../../types";
+import type { ChordVM, FlowVM, Hit } from "../../types";
 import {
   isFerrySection,
+  isTrainShown as modelIsTrainShown,
   stationR,
   stationZoomK,
   tooltipHtml,
   pickableChords,
   pickableFlows,
-  distToSeg,
   pickPriority,
 } from "../../lib";
 import type { PickCandidate } from "../../lib";
 import type { MapCtx } from "./context";
 import { stationT } from "./camera";
 import { getDestSectionCounts, modelState } from "./flows";
-import { isTrainShown } from "./trains";
 
 
 /* ---------- hit testing & tooltip ---------- */
-export function pickStation(M: MapCtx, px: number, py: number): Hit | null {
-  const { S, P, X, Y, points } = M;
-  const cur = P.current.cur;
-  if (!cur) return null;
-  const { W, H } = S.current;
-  const pts = points();
-  let best: CityPointVM | null = null;
-  const sk = stationT(M);
-  let bestD2 = Infinity;
-  for (let i = 0; i < pts.length; i++) {
-    const c = pts[i];
-    const x = X(c.pt[0]),
-      y = Y(c.pt[1]);
-    if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
-    const dx = px - x,
-      dy = py - y,
-      d2 = dx * dx + dy * dy;
-    const hitR = 14 * stationZoomK(stationR(c.trains), sk);
-    if (d2 <= hitR * hitR && d2 <= bestD2) {
-      best = c;
-      bestD2 = d2;
-    }
-  }
-  const cx = X(cur.o.pt[0]),
-    cy = Y(cur.o.pt[1]);
-  const odx = px - cx,
-    ody = py - cy,
-    od2 = odx * odx + ody * ody;
-  if (od2 <= 15 * 15 && (best === null || od2 <= bestD2))
-    return { kind: "origin" };
-  return best ? { kind: "station", station: best } : null;
-}
-
-export function pickSegment(M: MapCtx, px: number, py: number): Hit | null {
-  const { S, P, X, Y, toLon, toLat, flowsSet } = M;
-  const atlas = P.current.atlas;
-  const cur = P.current.cur;
-  const set = flowsSet();
-  if (!atlas || !cur || !set) return null;
-  const sec = set;
-  const ms = modelState(M);
-  const flows = pickableFlows(ms, S.current);
-  const lon = toLon(px),
-    lat = toLat(py);
-  const thrDeg = 12 / S.current.view.scale;
-  let segBest: FlowVM | null = null;
-  let bestDist = 10;
-  let i: number, k: number;
-  const destSecCounts = getDestSectionCounts(M);
-
-  for (i = 0; i < flows.length; i++) {
-    const f = flows[i];
-    const s = f.s;
-    if (
-      lon < sec.bb[s * 4] - thrDeg ||
-      lon > sec.bb[s * 4 + 2] + thrDeg ||
-      lat < sec.bb[s * 4 + 1] - thrDeg ||
-      lat > sec.bb[s * 4 + 3] + thrDeg
-    )
-      continue;
-    const off = sec.off[s],
-      cnt = sec.len[s];
-    for (k = 0; k + 1 < cnt; k++) {
-      const d = distToSeg(
-        px,
-        py,
-        X(sec.pts[off + k * 2]),
-        Y(sec.pts[off + k * 2 + 1]),
-        X(sec.pts[off + k * 2 + 2]),
-        Y(sec.pts[off + k * 2 + 3]),
-      );
-      if (
-        d < bestDist - 0.75 ||
-        (d <= bestDist + 0.75 && segBest && f.n > segBest.n)
-      ) {
-        if (d < bestDist || (segBest && f.n > segBest.n)) {
-          segBest = f;
-          bestDist = Math.min(d, bestDist);
-        }
-      }
-    }
-  }
-  if (segBest) {
-    const destSecCounts = getDestSectionCounts(M);
-    const subN =
-      destSecCounts && destSecCounts.has(segBest.s)
-        ? destSecCounts.get(segBest.s)
-        : undefined;
-    return { kind: "seg", s: segBest.s, n: segBest.n, subN };
-  }
-  if (P.current.direction !== "out" || destSecCounts) return null;
-  let chordBest: ChordVM | null = null;
-  const chords = pickableChords(ms, S.current);
-  for (i = 0; i < chords.length; i++) {
-    const ch = chords[i];
-    if (
-      lon < ch.bb.x0 - thrDeg ||
-      lon > ch.bb.x1 + thrDeg ||
-      lat < ch.bb.y0 - thrDeg ||
-      lat > ch.bb.y1 + thrDeg
-    )
-      continue;
-    for (k = 0; k + 1 < ch.count; k++) {
-      const dd = distToSeg(
-        px,
-        py,
-        X(ch.flat[k * 2]),
-        Y(ch.flat[k * 2 + 1]),
-        X(ch.flat[k * 2 + 2]),
-        Y(ch.flat[k * 2 + 3]),
-      );
-      if (dd < bestDist) {
-        chordBest = ch;
-        bestDist = dd;
-      }
-    }
-  }
-  return chordBest ? { kind: "chord", chord: chordBest } : null;
-}
-
-export function pickTrain(M: MapCtx, px: number, py: number): Hit | null {
-  const { S, P, X, Y, activeTimeline, activeTrainsAt } = M;
-  const st = S.current;
-  // Paused only: moving train tooltips are strictly active when visualization is paused
-  if (!st.animEnabled || st.animPlaying) return null;
-  const cur = P.current.cur;
-  if (!cur) return null;
-  const timeline = activeTimeline();
-  if (!timeline) return null;
-  const activeTrains = activeTrainsAt(timeline, st.animTime);
-  if (!activeTrains || activeTrains.length === 0) return null;
-
-  let bestDist = 14;
-  let bestTrain: ActiveTrainVM | null = null;
-  for (let i = 0; i < activeTrains.length; i++) {
-    const tr = activeTrains[i];
-    if (!isTrainShown(M, tr.code)) {
-      continue;
-    }
-    const tx = X(tr.lon);
-    const ty = Y(tr.lat);
-    const d = Math.hypot(px - tx, py - ty);
-    if (d < bestDist) {
-      bestDist = d;
-      bestTrain = tr;
-    }
-  }
-  return bestTrain ? { kind: "train", train: bestTrain } : null;
-}
-
-/* Deck mode (D6): GPU candidates from the deck handle, then the same priority
-   and distances as above, recomputed exactly in lib/pick.ts. One single-pass
+/* Picking (D6): GPU candidates from the deck handle, then the priority and
+   distances recomputed exactly in lib/pick.ts. One single-pass
    rectangle query on hairline proxy layers (sections + chords) plus exact scans
    for stations and, while paused, trains. Layer data is read back through the
    layers' own fields: chords by `info.object`, flow paths through the pass's
@@ -214,7 +55,11 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
   hits.push({ kind: "origin" });
 }
 
-/* Paused only, as pickTrain: same list, same shown filter (no isolation filter, as Canvas). */
+/* Paused only: the active trains, filtered by isTrainShown (no isolation filter). */
+function isTrainShown(M: MapCtx, code: string): boolean {
+  return modelIsTrainShown(M.P.current, M.S.current, M.S.current.animTime, code);
+}
+
 function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
   const { S, activeTimeline, activeTrainsAt } = M;
   const st = S.current;
@@ -232,7 +77,7 @@ function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
 
 type LayerProps = { idxToSec?: Int32Array };
 
-export function pickDeck(M: MapCtx, px: number, py: number): Hit | null {
+export function pick(M: MapCtx, px: number, py: number): Hit | null {
   const deck = M.deck;
   if (!deck) return null;
   const { S, P } = M;
@@ -280,7 +125,7 @@ export function pickDeck(M: MapCtx, px: number, py: number): Hit | null {
         for (let i = 0; i < flows.length; i++) flowIdx.set(flows[i].s, i);
       }
       const index = flowIdx.get(s);
-      if (index === undefined) continue; // drawn but not hoverable (as on Canvas)
+      if (index === undefined) continue; // drawn but not hoverable
       const f = flows[index];
       cands.push({ kind: "section", index, n: f.n, line: { pts: set.pts, off: set.off[s], count: set.len[s] } });
       const subN = destSecCounts && destSecCounts.has(s) ? destSecCounts.get(s) : undefined;
@@ -289,15 +134,6 @@ export function pickDeck(M: MapCtx, px: number, py: number): Hit | null {
   }
   const win = pickPriority(cands, px, py, st.view, { paused, direction, destSelected: !!destSecCounts });
   return win ? hits[cands.indexOf(win)] : null;
-}
-
-export function pick(M: MapCtx, px: number, py: number): Hit | null {
-  if (M.deck) return pickDeck(M, px, py);
-  const tr = pickTrain(M, px, py);
-  if (tr) return tr;
-  const c = pickStation(M, px, py);
-  if (c) return c;
-  return pickSegment(M, px, py);
 }
 
 export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {

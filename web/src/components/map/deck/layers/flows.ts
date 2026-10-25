@@ -1,7 +1,7 @@
 /* Flow layers: routed section flows, the infrastructure overlay, dashed
    chords, the hover highlight and the isolated-train corridor, as deck.gl
-   layers. Mirrors map/flows.ts (the Canvas path); the decisions (which
-   passes, items, alphas) come from lib/mapModel, so both renderers agree.
+   layers. The decisions (which
+   passes, items, alphas) come from lib/mapModel.
 
    Flow passes (C19): one binary PathLayer per pass whose geometry is uploaded
    in `pass.items` order (n > 0 only). Deck draws path instances in path order
