@@ -186,5 +186,6 @@ export function resize(M: MapCtx) {
       st.view.ty = st.H / 2 + keepCentre.lat * st.view.scale;
     }
   }
+  M.syncRendererSize();
   M.render();
 }

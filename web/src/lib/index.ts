@@ -23,10 +23,13 @@ export {
   flowColor,
   flowWidth,
   palette,
+  paletteRGBA,
   rampColor,
+  rgba,
   stationR,
   stationZoomK,
 } from "./palette";
+export type { PaletteRGBA, RGBA } from "./palette";
 export {
   DATA_FMT,
   decodeFlat,
