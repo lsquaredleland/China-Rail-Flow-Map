@@ -27,7 +27,7 @@ const dashExt = new PathStyleExtension({ dash: true });
 /* ---------- static geometry, one upload per data object ---------- */
 
 interface OutlineGeom {
-  polys: Float32Array[];
+  polys: number[][];
   ringStroke: BinaryPaths;
   solid: BinaryPaths;
   dashed: BinaryPaths;
@@ -37,9 +37,9 @@ function outlineGeom(outline: DecodedOutline): OutlineGeom {
   let g = outlineCache.get(outline);
   if (g) return g;
   const { rings, lines } = outline;
-  const polys: Float32Array[] = [];
+  const polys: number[][] = [];
   for (let i = 0; i < rings.len.length; i++) {
-    polys.push(rings.pts.subarray(rings.off[i], rings.off[i] + rings.len[i] * 2));
+    polys.push(Array.from(rings.pts.subarray(rings.off[i], rings.off[i] + rings.len[i] * 2)));
   }
   g = {
     polys,
@@ -113,12 +113,12 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
   if (showOutline && outline) {
     const g = outlineGeom(outline);
     L.push(
-      new SolidPolygonLayer<Float32Array>({
+      // Binary polygons: the closed rings uploaded for the stroke are the fill's boundaries too.
+      new SolidPolygonLayer({
         id: "outline-fill",
         data: g.polys,
-        getPolygon: (d) => d as unknown as number[],
+        getPolygon: (d: number[]) => d,
         positionFormat: "XY",
-        _normalize: false,
         getFillColor: pal.landFill,
         updateTriggers: { getFillColor: themeKey },
       }),
