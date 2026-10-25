@@ -900,7 +900,7 @@ pipeline now emits each national train's whole run, so the client does no stitch
   "Trains", the Arrived column, Finish and the "All arrived" tick hidden. `AnimState` gains
   `national` and `running` (dots on the line at the clock's minute; a > 24 h run counts once
   per dot). Leaving national with the direction inbound collapses the bar as before.
-- **Acceptance.** `bun run typecheck` clean; `bun test` 176 pass / 0 fail (full file and
+- **Acceptance.** `bun run typecheck` clean; `bun test` 182 pass / 0 fail (on 2b844b8; full file and
   sample), no skip / only. Driver (scratch, not committed): toggle on/off, `?national=1`
   restore (playing, dots > 0), seek 18:15 = 2,893 and 00:30 = 992 running, play from 23:59.5
   wraps to 00:01, the view (`S.current.view`) equal before/after both switches, origin panel
