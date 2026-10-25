@@ -20,6 +20,7 @@
   font-style: italic; color: var(--ink-soft); font-size: 15px;
   text-align: center; padding: 20px;
 }
+#loading.is-passive { pointer-events: none; }
 #tooltip {
   position: absolute;
   pointer-events: none;

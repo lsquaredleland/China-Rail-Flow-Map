@@ -118,23 +118,15 @@ export default function FilterToolbar({
   </div>
   {isolatedTrainCode ? (
     <span
-      className="dep-chip"
-      style={{
-        background: "#2563EB",
-        color: "#FFFFFF",
-        borderColor: "#1D4ED8",
-      }}
+      className="dep-chip is-isolated"
     >
       Isolated:{" "}
-      <b style={{ marginLeft: 4, color: "#FFFFFF" }}>
-        {isolatedTrainCode}
-      </b>
+      <b>{isolatedTrainCode}</b>
       {onClearTrainIsolation ? (
         <button
           type="button"
           aria-label="Clear train isolation"
           onClick={onClearTrainIsolation}
-          style={{ color: "#FFFFFF" }}
         >
           &times;
         </button>

@@ -12,6 +12,7 @@ export default function TrainCell({
   return (
     <button
       type="button"
+      className={"train-cell" + (onClick ? " is-link" : "")}
       onClick={
         onClick
           ? (e) => {
@@ -24,33 +25,9 @@ export default function TrainCell({
           : undefined
       }
       title={onClick ? `View full schedule for train ${d.code}` : undefined}
-      style={{
-        background: "none",
-        border: "none",
-        padding: 0,
-        margin: 0,
-        font: "inherit",
-        color: "inherit",
-        cursor: onClick ? "pointer" : "default",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "4px",
-      }}
     >
       <span className={"cls " + (isHs ? "cls-hs" : "cls-conv")}>{chip}</span>
-      <b
-        style={
-          onClick
-            ? {
-                textDecoration: "underline",
-                textDecorationStyle: "dotted",
-                textUnderlineOffset: "3px",
-              }
-            : undefined
-        }
-      >
-        {num || d.code}
-      </b>
+      <b>{num || d.code}</b>
     </button>
   );
 }

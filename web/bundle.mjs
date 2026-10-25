@@ -76,6 +76,8 @@ const CSS_ORDER = [
   "panels.css",
   "departures.css",
   "modal.css",
+  "timeline.css",
+  "overlays.css",
   "responsive.css",
 ];
 const cssOnDisk = readdirSync("src/styles").filter((f) => f.endsWith(".css"));

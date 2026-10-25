@@ -232,7 +232,6 @@ export default function App() {
         >
           {direction === "out" && isolatedTrainCode && (
             <IsolationChip
-              dark={dark}
               code={isolatedTrainCode}
               onTimetable={() => setSelectedTrainCode(isolatedTrainCode)}
               onExit={() => setIsolatedTrainCode(null)}
@@ -282,7 +281,7 @@ export default function App() {
           </div>
 
           {direction === "out" && isTimelineCollapsed && (
-            <TimelineExpandButton dark={dark} onExpand={expandTimeline} />
+            <TimelineExpandButton onExpand={expandTimeline} />
           )}
         </MapCanvas>
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { local as localStore, session as sessionStore } from "../storage";
 import type { DecodedAtlas, Direction, DistUnit } from "../types";
@@ -84,7 +84,9 @@ export function usePrefs() {
   const [direction, setDirectionState] = useState<Direction>(initialDirection);
   const [dark, setDarkState] = useState<boolean>(initialDark);
 
-  useEffect(() => {
+  // Layout effect: the CSS dark theme keys off this attribute, so it must
+  // change in the same frame as the `dark` state the canvas draws with.
+  useLayoutEffect(() => {
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   }, [dark]);
 

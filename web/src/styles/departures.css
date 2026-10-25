@@ -250,3 +250,31 @@
 .status-mid { background: var(--field); color: var(--ink); border: 1px solid var(--ink); }
 .dep-empty button.linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--accent, inherit); text-decoration: underline; cursor: pointer; }
 .dep-empty { padding: 18px 10px; color: var(--ink-soft); font-style: italic; }
+
+/* train code button in every table row */
+.train-cell {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.train-cell.is-link { cursor: pointer; }
+.train-cell.is-link b {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+/* "Isolated: K9217" chip */
+.dep-chip.is-isolated {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #1D4ED8;
+}
+.dep-chip.is-isolated b { margin-left: 4px; color: #FFFFFF; }
+.dep-chip.is-isolated button { color: #FFFFFF; }

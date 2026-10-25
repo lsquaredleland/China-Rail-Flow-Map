@@ -183,7 +183,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         onPointerLeave={() => onPointerLeave(M)}
       />
       {(!cur || inLoading || loadError) && (
-        <div id="loading" style={cur ? { pointerEvents: "none" } : undefined}>
+        <div id="loading" className={cur ? "is-passive" : undefined}>
           {loadError
             ? "The timetable data could not be loaded (" + loadError + ")."
             : "Unfolding the timetable…"}
