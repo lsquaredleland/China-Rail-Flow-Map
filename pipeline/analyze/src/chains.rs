@@ -2,7 +2,8 @@
 //! count signature form one chain through every node where they are the
 //! only two such edges; at a junction (3+ edges) the chain also needs both
 //! edges to carry the same trains, so two branches that only happen to
-//! carry equal counts stay separate sections. Everything
+//! carry equal counts stay separate sections. Chains are also cut at given
+//! nodes (where a train leaves the track mid-way). Everything
 //! here is order-independent (sorted seeds, sorted adjacency, canonical
 //! direction) so section ids and polyline directions do not depend on
 //! `HashMap` iteration order.
@@ -66,10 +67,12 @@ pub fn intern_sigs(
 /// Chains of equal-signature edges, ordered by their smallest edge and
 /// oriented so the lower end node comes first. At a node with 3+ edges a
 /// chain continues only onto an edge with the same `edge_trains`
-/// fingerprint (edges missing from it compare equal).
+/// fingerprint (edges missing from it compare equal), and never through a
+/// node in `cuts`.
 pub fn build_section_chains(
     edge_sig: &HashMap<(i64, i64), u32>,
     edge_trains: &EdgeTrains,
+    cuts: &HashSet<i64>,
 ) -> Vec<(u32, Vec<i64>)> {
     let mut seeds: Vec<((i64, i64), u32)> = edge_sig.iter().map(|(e, s)| (*e, *s)).collect();
     seeds.sort_unstable();
@@ -88,6 +91,9 @@ pub fn build_section_chains(
                    from: i64,
                    sid: u32|
      -> Option<i64> {
+        if cuts.contains(&cur) {
+            return None;
+        }
         let all = nadj.get(&cur).map(|v| v.as_slice()).unwrap_or_default();
         let cands: Vec<i64> = all
             .iter()
@@ -172,6 +178,7 @@ mod tests {
         let c = build_section_chains(
             &sigs(&[((5, 9), 0), ((3, 5), 0), ((3, 4), 1), ((4, 8), 1)]),
             &EdgeTrains::new(),
+            &HashSet::new(),
         );
         // ordered by each chain's smallest edge
         assert_eq!(c, vec![(1, vec![3, 4, 8]), (0, vec![3, 5, 9])]);
@@ -187,7 +194,7 @@ mod tests {
             .into_iter()
             .chain(mark(&[(3, 4), (3, 5)], 9))
             .collect();
-        let c = build_section_chains(&e, &same);
+        let c = build_section_chains(&e, &same, &HashSet::new());
         assert_eq!(c, vec![(1, vec![1, 2, 3]), (0, vec![4, 3, 5])]);
         // other trains on each branch: a V, cut at the junction
         let other: EdgeTrains = mark(&[(1, 2), (2, 3)], 7)
@@ -195,25 +202,40 @@ mod tests {
             .chain(mark(&[(3, 4)], train_mark(0, 0)))
             .chain(mark(&[(3, 5)], train_mark(0, 1)))
             .collect();
-        let c = build_section_chains(&e, &other);
+        let c = build_section_chains(&e, &other, &HashSet::new());
         assert_eq!(
             c,
             vec![(1, vec![1, 2, 3]), (0, vec![3, 4]), (0, vec![3, 5])]
         );
         // a degree-2 node never compares trains
         let line = sigs(&[((1, 2), 0), ((2, 3), 0)]);
-        let c = build_section_chains(&line, &[((1, 2), 1), ((2, 3), 2)].into_iter().collect());
+        let marks: EdgeTrains = [((1, 2), 1), ((2, 3), 2)].into_iter().collect();
+        let c = build_section_chains(&line, &marks, &HashSet::new());
         assert_eq!(c, vec![(0, vec![1, 2, 3])]);
+    }
+
+    #[test]
+    fn cuts_split_a_chain_and_a_ring() {
+        let line = sigs(&[((1, 2), 0), ((2, 3), 0), ((3, 4), 0)]);
+        let cut: HashSet<i64> = [3].into_iter().collect();
+        let c = build_section_chains(&line, &EdgeTrains::new(), &cut);
+        assert_eq!(c, vec![(0, vec![1, 2, 3]), (0, vec![3, 4])]);
+        let ring = sigs(&[((1, 2), 0), ((2, 3), 0), ((3, 4), 0), ((1, 4), 0)]);
+        let c = build_section_chains(&ring, &EdgeTrains::new(), &cut);
+        assert_eq!(c, vec![(0, vec![3, 2, 1, 4, 3])]);
     }
 
     #[test]
     fn ring_is_deterministic() {
         let ring = [((1, 2), 0), ((2, 3), 0), ((3, 4), 0), ((1, 4), 0)];
-        let c = build_section_chains(&sigs(&ring), &EdgeTrains::new());
+        let c = build_section_chains(&sigs(&ring), &EdgeTrains::new(), &HashSet::new());
         assert_eq!(c.len(), 1);
         assert_eq!(c[0].1.first(), c[0].1.last());
         for _ in 0..20 {
-            assert_eq!(build_section_chains(&sigs(&ring), &EdgeTrains::new()), c);
+            assert_eq!(
+                build_section_chains(&sigs(&ring), &EdgeTrains::new(), &HashSet::new()),
+                c
+            );
         }
     }
 
@@ -229,6 +251,9 @@ mod tests {
         }
         let (list, edge_sig) = intern_sigs(&counts, &classes);
         assert_eq!(list.len(), 2);
-        assert_eq!(build_section_chains(&edge_sig, &EdgeTrains::new()).len(), 2);
+        assert_eq!(
+            build_section_chains(&edge_sig, &EdgeTrains::new(), &HashSet::new()).len(),
+            2
+        );
     }
 }
