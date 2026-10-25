@@ -1,5 +1,6 @@
 /* Floating controls drawn over the map canvas. */
 import { NATIONAL_DAILY_SERVICES_REF } from "../data";
+import type { NatLayer } from "../types";
 
 /** "Isolated: K9217 [Timetable] [x]" pill while one train is isolated. */
 export function IsolationChip({
@@ -36,9 +37,28 @@ export function IsolationChip({
   );
 }
 
+const NAT_LAYERS: { v: NatLayer; label: string; title: string }[] = [
+  { v: "trains", label: "Trains", title: "Every train's dot on the 24h clock" },
+  { v: "flows", label: "Flows", title: "Trains per day on each section" },
+  { v: "both", label: "Trains + flows", title: "Dots over the flows, built up to the clock's time" },
+];
+
 /** National mode's coverage note: the trains drawn against the reference
-    size of the daily timetable (NATIONAL_DAILY_SERVICES_REF). */
-export function NationalNote({ trains, failed }: { trains: number; failed: boolean }) {
+    size of the daily timetable (NATIONAL_DAILY_SERVICES_REF), and what the
+    map draws (trains, flows, or both: P3.2 / P3.3). */
+export function NationalNote({
+  trains,
+  failed,
+  layer,
+  onLayer,
+  flowsFailed,
+}: {
+  trains: number;
+  failed: boolean;
+  layer: NatLayer;
+  onLayer: (v: NatLayer) => void;
+  flowsFailed: boolean;
+}) {
   return (
     <div className="nat-note" role="note">
       <span className="nat-note-tag">National · beta</span>
@@ -48,6 +68,21 @@ export function NationalNote({ trains, failed }: { trains: number; failed: boole
           : trains
           ? `${trains.toLocaleString("en-US")} of ~${NATIONAL_DAILY_SERVICES_REF.toLocaleString("en-US")} daily services`
           : "Loading national trains…"}
+      </span>
+      {flowsFailed && <span>The national flow data could not be loaded.</span>}
+      <span className="nat-layers" role="group" aria-label="National map layers">
+        {NAT_LAYERS.map((o) => (
+          <button
+            key={o.v}
+            id={"natLayer-" + o.v}
+            type="button"
+            aria-pressed={layer === o.v ? "true" : "false"}
+            title={o.title}
+            onClick={() => onLayer(o.v)}
+          >
+            {o.label}
+          </button>
+        ))}
       </span>
     </div>
   );

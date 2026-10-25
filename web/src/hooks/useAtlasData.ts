@@ -7,6 +7,7 @@ import type {
   InMapData,
   InTablesData,
   InTablesPack,
+  NationalEntriesPack,
   NationalFlowsPack,
   OutMapData,
   OutTablesData,
@@ -23,6 +24,7 @@ import {
   prepAtlas,
   prepOutline,
   requireFmt,
+  requireNationalEntries,
   requireNationalFlows,
   requireNationalTrains,
 } from "../lib";
@@ -30,6 +32,7 @@ import {
   ABOUT,
   IN_MAP_URL,
   IN_TABLES_URL,
+  NATIONAL_ENTRIES_URL,
   NATIONAL_FLOWS_URL,
   NATIONAL_TRAINS_URL,
   OUTLINE_URL,
@@ -68,6 +71,11 @@ export function useAtlasData({
   const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
   // National per-section flows (P3.2): only national mode asks for them.
   const [nationalFlows, setNationalFlows] = useState<NationalFlowsPack | null>(null);
+  // Their entry ticks (P3.3): only national Trains + flows asks for them.
+  const [nationalEntries, setNationalEntries] = useState<NationalEntriesPack | null>(null);
+  // Either flows file failed to load or to check: national mode says so and
+  // keeps its trains (the origin view never uses these files).
+  const [nationalFlowsFailed, setNationalFlowsFailed] = useState(false);
   // National trains (P2.2) with the schedules they are timed by: national mode only.
   const [nationalTrains, setNationalTrains] = useState<NationalTrainsData | null>(null);
   const [nationalTrainsFailed, setNationalTrainsFailed] = useState(false);
@@ -83,6 +91,7 @@ export function useAtlasData({
     const inMapDataRef: { current: InMapData | null } = { current: null };
     const inTablesRef: { current: InTablesData | null } = { current: null };
     const nationalFlowsRef: { current: NationalFlowsPack | null } = { current: null };
+    const nationalEntriesRef: { current: NationalEntriesPack | null } = { current: null };
     const nationalTrainsRef: { current: NationalTrainsData | null } = { current: null };
     // The schedules asset (O16): not part of first paint. It is fetched once, in
     // parallel with the out tables, which wait for it so every timeline is
@@ -90,7 +99,7 @@ export function useAtlasData({
     // schedule modal also requests it.
     let schedulesPromise: Promise<SchedulesData | null> | null = null;
     let schedData: SchedulesData | null = null;
-    const flights = { outTables: false, inMap: false, inTables: false, nationalFlows: false, nationalTrains: false };
+    const flights = { outTables: false, inMap: false, inTables: false, nationalFlows: false, nationalEntries: false, nationalTrains: false };
 
     const loadSchedules = () => {
       if (!schedulesPromise) {
@@ -179,18 +188,19 @@ export function useAtlasData({
           if (err.name === "FmtError") setLoadError(err.message);
         });
     };
-    // National flows: on request only, never part of the origin view's
-    // loads. The arrays index the shared sections, so they are checked
-    // against the atlas once both exist.
+    // National flows and their entry ticks: on request only, never part of
+    // the origin view's loads. The arrays index the shared sections, so they
+    // are checked against the atlas once both exist. A failed fetch or check
+    // only turns the flows off (nationalFlowsFailed): the trains keep going.
     const applyNationalFlows = () => {
       const d = nationalFlowsRef.current;
       const at = atlasRef.current;
       if (!d || !at) return;
       try {
         requireNationalFlows(d, at.data.sections.length, NATIONAL_FLOWS_URL);
-      } catch (err) {
+      } catch {
         nationalFlowsRef.current = null;
-        setLoadError((err as Error).message);
+        setNationalFlowsFailed(true);
         return;
       }
       setNationalFlows(d);
@@ -207,12 +217,45 @@ export function useAtlasData({
           requireFmt(d.fmt, NATIONAL_FLOWS_URL);
           nationalFlowsRef.current = d;
           flights.nationalFlows = false;
-          setLoadError((e) => (e && e.startsWith(NATIONAL_FLOWS_URL) ? null : e));
           applyNationalFlows();
         })
         .catch((err: Error) => {
           flights.nationalFlows = false;
-          if (err.name === "FmtError") setLoadError(err.message);
+          console.warn("Failed to load national flows:", err);
+          setNationalFlowsFailed(true);
+        });
+    };
+    const applyNationalEntries = () => {
+      const d = nationalEntriesRef.current;
+      const at = atlasRef.current;
+      if (!d || !at) return;
+      try {
+        requireNationalEntries(d, at.data.sections.length, NATIONAL_ENTRIES_URL);
+      } catch {
+        nationalEntriesRef.current = null;
+        setNationalFlowsFailed(true);
+        return;
+      }
+      setNationalEntries(d);
+    };
+    const ensureNationalEntries = () => {
+      if (nationalEntriesRef.current) {
+        applyNationalEntries();
+        return;
+      }
+      if (flights.nationalEntries) return;
+      flights.nationalEntries = true;
+      fetchData<NationalEntriesPack>(NATIONAL_ENTRIES_URL)
+        .then((d) => {
+          requireFmt(d.fmt, NATIONAL_ENTRIES_URL);
+          nationalEntriesRef.current = d;
+          flights.nationalEntries = false;
+          applyNationalEntries();
+        })
+        .catch((err: Error) => {
+          flights.nationalEntries = false;
+          console.warn("Failed to load national flow entries:", err);
+          setNationalFlowsFailed(true);
         });
     };
     // National trains: on entering national mode only. The ids index the
@@ -287,6 +330,7 @@ export function useAtlasData({
       ensureInMap,
       ensureInTables,
       ensureNationalFlows,
+      ensureNationalEntries,
       ensureNationalTrains,
       /** Phase 1 finished: merge any staged file that beat the atlas. */
       mergeEarly(inMap: InMapData | null) {
@@ -297,6 +341,7 @@ export function useAtlasData({
         if (outTablesRef.current) applyOutTables();
         if (inTablesRef.current) applyInTables();
         if (nationalFlowsRef.current) applyNationalFlows();
+        if (nationalEntriesRef.current) applyNationalEntries();
         if (nationalTrainsRef.current) applyNationalTrains();
       },
       hasInMap: () => !!inMapDataRef.current,
@@ -393,11 +438,14 @@ export function useAtlasData({
     inMapLoading,
     schedulesData,
     nationalFlows,
+    nationalEntries,
+    nationalFlowsFailed,
     nationalTrains,
     nationalTrainsFailed,
     ensureOutTables: loader.ensureOutTables,
     ensureInMap: loader.ensureInMap,
     ensureNationalFlows: loader.ensureNationalFlows,
+    ensureNationalEntries: loader.ensureNationalEntries,
     ensureNationalTrains: loader.ensureNationalTrains,
   };
 }

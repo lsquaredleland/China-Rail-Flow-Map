@@ -1,4 +1,5 @@
-/* National-mode train layers (A, P2.2): every national train's dot, tail and
+/* National-mode layers. The flows (B, P3.2; A+B, P3.3) are at the end of
+   this file. Trains (A, P2.2): every national train's dot, tail and
    dwell ring at the clock's minute, wrap-around (lib natPositions). The
    timeline is built once per (atlas, national trains file) on the first
    national frame; each frame then fills pooled buffers:
@@ -17,9 +18,24 @@
    entry bundle (C23): the cache and the pool are private to this chunk. */
 import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
-import type { DecodedAtlas, NationalTimeline, NationalTrainsData } from "../../../../types";
-import { buildNational, natPositions } from "../../../../lib";
+import type {
+  DecodedAtlas,
+  NationalEntriesPack,
+  NationalFlowsPack,
+  NationalTimeline,
+  NationalTrainsData,
+} from "../../../../types";
+import {
+  buildNational,
+  natPositions,
+  nationalCounts,
+  nationalCountsAt,
+  nationalFlowPasses,
+  palette,
+} from "../../../../lib";
 import { TailLayer } from "../TailLayer";
+import type { PassData } from "./flows";
+import { buildPassData, passDataLayers, recountPassData } from "./flows";
 import { glowOf } from "./trains";
 
 /** Glow colour per NationalTimeline class: 0 G/D/C, 1 Z/T/K/S, 2 other. */
@@ -238,4 +254,65 @@ export function nationalLayers(f: NationalFrame, pickable: boolean): Layer[] {
       pickable: false,
     }),
   ];
+}
+
+/* ---------- national flows (B, P3.2; A+B, P3.3) ---------- */
+
+export interface NationalFlowsInput {
+  atlas: DecodedAtlas;
+  nf: NationalFlowsPack;
+  /** The entry ticks; with `minute` the flows are the trains entered by then (A+B). */
+  ne: NationalEntriesPack | null;
+  /** Whole minute of the day, 0..1440 (A+B), or null for the day's totals (B). */
+  minute: number | null;
+  classes: readonly string[];
+  dark: boolean;
+  scale: number;
+  fitScale: number;
+}
+
+export interface NationalFlows {
+  layers: Layer[];
+  /** Sections drawn (count > 0). */
+  sections: number;
+  /** ms of this call's count update (B pass build or A+B recount); 0 when cached. */
+  updateMs: number;
+}
+
+/* B's pass per (file, class filter, theme). Its paint order (widest first by
+   the day's counts) is also A+B's, so A+B keeps the geometry and recounts. */
+let dayMemo: { nf: NationalFlowsPack; cls: string; dark: boolean; pd: PassData; maxN: number; sections: number } | null = null;
+let atMemo: { day: PassData; ne: NationalEntriesPack; minute: number; pd: PassData; sections: number } | null = null;
+
+/** The national flow layers (under the dots): B draws the day's totals; A+B
+    the same paths with each section's trains entered by `minute`, recounted
+    only when the minute, class filter, theme or file changes. */
+export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
+  const { atlas, nf, ne, minute, classes, dark, scale, fitScale } = inp;
+  const pal = palette(dark);
+  const cls = [...new Set(classes)].sort().join(",");
+  let updateMs = 0;
+  if (!dayMemo || dayMemo.nf !== nf || dayMemo.cls !== cls || dayMemo.dark !== dark) {
+    const t0 = performance.now();
+    const pass = nationalFlowPasses(nationalCounts(nf, classes))[0];
+    const pd = buildPassData(atlas.sec, pass.items, pal, 1, pass.maxN);
+    dayMemo = { nf, cls, dark, pd, maxN: pass.maxN, sections: pass.items.length };
+    updateMs = performance.now() - t0;
+  }
+  const day = dayMemo;
+  let pd = day.pd;
+  let sections = day.sections;
+  if (minute !== null && ne) {
+    if (!atMemo || atMemo.day !== day.pd || atMemo.ne !== ne || atMemo.minute !== minute) {
+      const t0 = performance.now();
+      const counts = nationalCountsAt(ne, classes, minute);
+      let drawn = 0;
+      for (let s = 0; s < counts.length; s++) if (counts[s] > 0) drawn++;
+      atMemo = { day: day.pd, ne, minute, pd: recountPassData(day.pd, counts, pal, day.maxN), sections: drawn };
+      updateMs = performance.now() - t0;
+    }
+    pd = atMemo.pd;
+    sections = atMemo.sections;
+  }
+  return { layers: passDataLayers("national", pd, 1, false, pal, dark, scale, fitScale), sections, updateMs };
 }

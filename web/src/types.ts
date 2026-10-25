@@ -560,6 +560,9 @@ export interface OriginVM {
 
 export type DistUnit = "km" | "mi";
 export type Direction = "out" | "in";
+/** What national mode draws: the trains (A), the day's flows (B), or the
+    trains over the flows built up to the clock's minute (A+B). */
+export type NatLayer = "trains" | "flows" | "both";
 
 /** What the pointer is over on the map. */
 export type Hit =
@@ -634,4 +637,18 @@ export interface NationalFlowsPack {
   trains: number;
   total: number[];
   by_class: number[][];
+}
+
+/** atlas-v2-national-entries.json (P3.3), as shipped: when each national
+    train's dot first reaches each section it counts on (the set
+    atlas-v2-national counts). `by_class[c][s]` is the sorted list of entry
+    ticks (1 / ticks_per_min min of the day, rounded up, in [0, 1440 x
+    ticks_per_min)) of class bucket c (FLOW_CLASSES order) on section s, so
+    the trains entered by a minute are an upper bound per class, summed. */
+export interface NationalEntriesPack {
+  fmt: number;
+  n_sec: number;
+  trains: number;
+  ticks_per_min: number;
+  by_class: number[][][];
 }

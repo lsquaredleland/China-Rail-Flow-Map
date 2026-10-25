@@ -82,6 +82,34 @@ export function nationalEntries(): { path: string; data: any; trains: any } | un
   return { path, data: read(path), trains: existsSync(sibling) ? read(sibling) : nationalTrains().data };
 }
 
+const NATIONAL_FLOWS = "atlas-v2-national.json.br";
+const FLOWS_SAMPLE = join(import.meta.dir, "fixtures/national-flows-sample.json.br");
+
+/** The national flows file (P3.1) and its entries file (P3.3), as a pair: the
+    full files when both can be found (the entries file as nationalEntries()
+    finds it, the flows file next to it, else in public/assets or
+    `staging/national-flows/run1` in this checkout or a parent of it),
+    otherwise the committed sample (tools/national-flows-sample.mjs: every
+    20th section plus the 10 busiest, both files cut alike), so CI runs the
+    same tests on the sample (CRFM_NATIONAL_SAMPLE=1 forces it). */
+export function nationalFlowsPair(): { source: "full" | "sample"; flows: any; entries: any } {
+  const ne = nationalEntries();
+  if (ne) {
+    const cands = [join(dirname(ne.path), NATIONAL_FLOWS), join(ASSETS, NATIONAL_FLOWS)];
+    for (let dir = join(import.meta.dir, ".."); ; dir = dirname(dir)) {
+      cands.push(join(dir, "staging/national-flows/run1", NATIONAL_FLOWS));
+      if (dirname(dir) === dir) break;
+    }
+    const path = cands.find((p) => existsSync(p));
+    if (path) {
+      const flows = JSON.parse(brotliDecompressSync(readFileSync(path)).toString("utf8"));
+      return { source: "full", flows, entries: ne.data };
+    }
+  }
+  const s = JSON.parse(brotliDecompressSync(readFileSync(FLOWS_SAMPLE)).toString("utf8"));
+  return { source: "sample", flows: s.flows, entries: s.entries };
+}
+
 let cached: ReturnType<typeof build> | undefined;
 export function pack() {
   return (cached ??= build());

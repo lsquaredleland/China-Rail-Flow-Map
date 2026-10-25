@@ -17,7 +17,7 @@ import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
 import { PICK_PREFIX, flowLayers } from "./layers/flows";
 import { stationLayers } from "./layers/stations";
-import { nationalFrame, nationalLayers, nationalTimeline } from "./layers/national";
+import { nationalFlowLayers, nationalFrame, nationalLayers, nationalTimeline } from "./layers/national";
 import { shownTrains, trainLayers } from "./layers/trains";
 
 export interface PickRectOptions {
@@ -53,6 +53,11 @@ export interface DeckStats {
   natDots: number;
   natBuildMs: number;
   natFirstFrameAt: number;
+  /** National flows: sections drawn in the last frame, the last count
+      update's ms (B pass build or A+B recount) and the number of updates. */
+  natFlows: number;
+  natFlowsMs: number;
+  natFlowsUpdates: number;
 }
 
 /* The slice of Deck used here; layerManager / device are protected in the typings. */
@@ -126,9 +131,32 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     scale: S.current.view.scale,
   });
   if (P.current.national) {
-    // D13 map-only mode: the backdrop and every national train; no origin
-    // flows, stations, selection or isolation.
+    // D13 map-only mode: the backdrop, the national flows (B / A+B) and every
+    // national train; no origin flows, stations, selection or isolation.
     const st = S.current;
+    const mode = P.current.nationalLayer ?? "trains";
+    const nf = P.current.nationalFlows;
+    stats.natFlows = 0;
+    if (mode !== "trains" && nf && (mode === "flows" || P.current.nationalEntries)) {
+      // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
+      const minute = mode === "both" ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
+      const fl = nationalFlowLayers({
+        atlas,
+        nf,
+        ne: P.current.nationalEntries ?? null,
+        minute,
+        classes: P.current.nationalClasses ?? [],
+        dark: P.current.dark,
+        scale: st.view.scale,
+        fitScale: st.fitScale,
+      });
+      layers.push(...fl.layers);
+      stats.natFlows = fl.sections;
+      if (fl.updateMs > 0) {
+        stats.natFlowsMs = fl.updateMs;
+        stats.natFlowsUpdates++;
+      }
+    }
     const built = nationalTimeline(atlas, P.current.nationalTrains);
     if (!built) {
       st.natN = st.natRunning = stats.natDots = 0;
@@ -138,9 +166,15 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale);
     st.natN = built.tl.n;
     st.natRunning = f.running;
+    stats.natBuildMs = built.ms;
+    if (mode === "flows") {
+      // B alone: no dots (the counters still run with the clock).
+      stats.natDots = 0;
+      st.natPick = null;
+      return layers;
+    }
     stats.natDots = f.count;
     st.natPick = { tl: built.tl, count: f.count, buf: f.buf, qOf: f.qOf, m: ((st.animTime % 1440) + 1440) % 1440 };
-    stats.natBuildMs = built.ms;
     layers.push(...nationalLayers(f, !st.animPlaying));
     return layers;
   }
@@ -239,7 +273,7 @@ function pipelinesReady(deck: DeckInternals): boolean {
 
 export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
   const w = window as unknown as { __deckStats?: DeckStats; __deck?: Deck; __deckHost?: DeckHandle };
-  const stats: DeckStats = (w.__deckStats = { afterRenders: 0, settled: false, recreated: 0, errors: [], natDots: 0, natBuildMs: 0, natFirstFrameAt: 0 });
+  const stats: DeckStats = (w.__deckStats = { afterRenders: 0, settled: false, recreated: 0, errors: [], natDots: 0, natBuildMs: 0, natFirstFrameAt: 0, natFlows: 0, natFlowsMs: 0, natFlowsUpdates: 0 });
 
   let canvas: HTMLCanvasElement;
   let deck: DeckInternals;

@@ -48,6 +48,8 @@ type BinaryData = {
 interface DashPiece {
   path: number[];
   n: number;
+  /** Section of a flow pass's ferry piece (not set on infra pieces). */
+  s?: number;
 }
 
 export interface PassData {
@@ -194,12 +196,38 @@ export function buildPassData(
   const ferry: DashPiece[] = [];
   for (let k = 0; k < secs.length; k++) {
     const w = isFerrySection(set.bb, secs[k]) ? fs.water.get(secs[k]) : undefined;
-    if (w) for (const path of w) ferry.push({ path, n: ns[k] });
+    if (w) for (const path of w) ferry.push({ path, n: ns[k], s: secs[k] });
   }
   const pd: PassData = { id: nextId++, set, data: a.data, n, rgba: col, idxToSec: a.idxToSec, ferry };
   if (!perItems) passCache.set(items, (perItems = new Map()));
   perItems.set(key, pd);
   return pd;
+}
+
+/** `pd` (an alpha-1 pass) with new per-section counts (national A+B, P3.3):
+    the same geometry object and path order, so deck only refills the width
+    and colour attributes (no re-tessellation); n and colours from
+    `counts[section]`, a section at 0 fully transparent; the colour ramp
+    stays normalised to `maxN`; ferry dashes of the sections with n > 0. */
+export function recountPassData(pd: PassData, counts: ArrayLike<number>, pal: Palette, maxN: number): PassData {
+  const len = pd.data.length;
+  const n = new Float32Array(len);
+  const col = new Uint8Array(len * 4);
+  const colours = new Map<number, RGBA>();
+  for (let p = 0; p < len; p++) {
+    const v = counts[pd.idxToSec[p]];
+    n[p] = v;
+    if (v <= 0) continue; // rgba 0: transparent
+    let c = colours.get(v);
+    if (!c) colours.set(v, (c = rgba(flowColor(v, maxN, pal))));
+    col.set(c, p * 4);
+  }
+  const ferry: DashPiece[] = [];
+  for (const f of pd.ferry) {
+    const v = counts[f.s ?? -1] ?? 0;
+    if (v > 0) ferry.push({ path: f.path, n: v, s: f.s });
+  }
+  return { id: nextId++, set: pd.set, data: pd.data, n, rgba: col, idxToSec: pd.idxToSec, ferry };
 }
 
 /* ---------- memoised model output ---------- */
@@ -328,6 +356,27 @@ function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: numbe
   } as object);
 }
 
+/** One pass's layers: the flows, the pick proxy when pickable, the ferry dashes. */
+export function passDataLayers(
+  role: string,
+  pd: PassData,
+  alpha: number,
+  pickable: boolean,
+  pal: Palette,
+  dark: boolean,
+  scale: number,
+  fitScale: number,
+): Layer[] {
+  const L: Layer[] = [flowPassLayer(role, pd, fitScale, dark)];
+  if (pickable) L.push(flowPickLayer(role, pd));
+  if (pd.ferry.length) {
+    const blue = ferryBlue(dark);
+    const col = alpha >= 1 ? blue : blendOver(blue, rgba(pal.paper), alpha);
+    L.push(ferryDashLayer(`flows-${role}-ferry`, pd, scale, fitScale, col));
+  }
+  return L;
+}
+
 /** The flow passes in paint order, each followed by its ferry dashes (Canvas order). */
 export function flowPassLayers(
   set: DecodedSet,
@@ -338,16 +387,9 @@ export function flowPassLayers(
   fitScale: number,
 ): Layer[] {
   const L: Layer[] = [];
-  const blue = ferryBlue(dark);
-  const paper = rgba(pal.paper);
   for (const pass of passes) {
     const pd = buildPassData(set, pass.items, pal, pass.alpha, pass.maxN);
-    L.push(flowPassLayer(pass.role, pd, fitScale, dark));
-    if (pass.pickable) L.push(flowPickLayer(pass.role, pd));
-    if (pd.ferry.length) {
-      const col = pass.alpha >= 1 ? blue : blendOver(blue, paper, pass.alpha);
-      L.push(ferryDashLayer(`flows-${pass.role}-ferry`, pd, scale, fitScale, col));
-    }
+    L.push(...passDataLayers(pass.role, pd, pass.alpha, pass.pickable, pal, dark, scale, fitScale));
   }
   return L;
 }

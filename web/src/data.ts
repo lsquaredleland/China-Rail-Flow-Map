@@ -45,6 +45,8 @@ export const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
 // National per-section flows (P3.1/P3.2): fetched only when national flows
 // are requested, never for the origin view.
 export const NATIONAL_FLOWS_URL = "assets/atlas-v2-national.json";
+// National flow entry ticks (P3.3): fetched only for national Trains + flows.
+export const NATIONAL_ENTRIES_URL = "assets/atlas-v2-national-entries.json";
 // National trains (P2.2): every national train's whole run, fetched only on
 // entering national mode, never for the origin view.
 export const NATIONAL_TRAINS_URL = "assets/atlas-v2-national-trains.json";

@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
+import type { DecodedAtlas, Direction, DistUnit, NatLayer, OriginVM } from "./types";
 import { buildOrigin } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
-import { initialNational, usePrefs, useUrlSync, writeNationalParam } from "./hooks/useUrlState";
+import {
+  initialNatLayer,
+  initialNational,
+  usePrefs,
+  useUrlSync,
+  writeNatLayerParam,
+  writeNationalParam,
+} from "./hooks/useUrlState";
 import { useFilters, useCityPanel, useTrainSelection } from "./hooks/useSelection";
 import { useAnimationClock } from "./hooks/useAnimationClock";
 import MapCanvas, { type MapApi } from "./components/MapCanvas";
@@ -29,6 +36,8 @@ export default function App() {
   const [showTimeline] = useState<boolean>(true);
   // National mode (D11 / D13): every national train on one 24h clock, map-only.
   const [national, setNational] = useState<boolean>(initialNational);
+  // What national mode draws (P3.2 / P3.3): trains, flows, or both.
+  const [natLayer, setNatLayer] = useState<NatLayer>(initialNatLayer);
 
   const prefs = usePrefs();
   const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
@@ -59,6 +68,11 @@ export default function App() {
     nationalTrains,
     nationalTrainsFailed,
     ensureNationalTrains,
+    nationalFlows,
+    nationalEntries,
+    nationalFlowsFailed,
+    ensureNationalFlows,
+    ensureNationalEntries,
   } = useAtlasData({
     atlasRef,
     selectedTrainCode,
@@ -101,6 +115,7 @@ export default function App() {
     inTablesReady,
     setSelectedClasses,
     mapRef,
+    national,
   });
 
   const { isTimelineCollapsed, expandTimeline, collapseTimeline } =
@@ -122,6 +137,19 @@ export default function App() {
     setNational(v);
     writeNationalParam(v);
   };
+  // The flows files load only when national mode asks to draw them: the
+  // day's totals for Flows and Trains + flows, the entry ticks for the latter.
+  useEffect(() => {
+    if (!national || natLayer === "trains") return;
+    ensureNationalFlows();
+    if (natLayer === "both") ensureNationalEntries();
+  }, [national, natLayer, ensureNationalFlows, ensureNationalEntries]);
+  const chooseNatLayer = (v: NatLayer) => {
+    setNatLayer(v);
+    writeNatLayerParam(v);
+  };
+  // A flows file that failed leaves the trains drawn (the note says why).
+  const natLayerDrawn: NatLayer = nationalFlowsFailed ? "trains" : natLayer;
   // The coverage note: national trains in the file (a count of shipped rows).
   const nationalTrainCount = useMemo(
     () => (nationalTrains ? nationalTrains.trains.paths.reduce((c, p) => c + (p.length ? 1 : 0), 0) : 0),
@@ -256,6 +284,10 @@ export default function App() {
           inLoading={direction === "in" && inMapLoading && !national}
           national={national}
           nationalTrains={nationalTrains}
+          nationalLayer={natLayerDrawn}
+          nationalFlows={nationalFlows}
+          nationalEntries={nationalEntries}
+          nationalClasses={selectedClasses}
           onSelectDest={handleSelectDest}
           selectedTrainCode={selectedTrainCode}
           onSelectTrain={setSelectedTrainCode}
@@ -305,7 +337,13 @@ export default function App() {
             onClose={closePanel}
           />
           {national && (
-            <NationalNote trains={nationalTrainCount} failed={nationalTrainsFailed} />
+            <NationalNote
+              trains={nationalTrainCount}
+              failed={nationalTrainsFailed}
+              layer={natLayer}
+              onLayer={chooseNatLayer}
+              flowsFailed={nationalFlowsFailed && natLayer !== "trains"}
+            />
           )}
           <div id="legendCol" style={national ? { display: "none" } : undefined}>
             <Legend
