@@ -43,14 +43,17 @@ pub fn node_coords(data: &[u8], needed: &HashSet<i64>) -> HashMap<i64, [f64; 2]>
                 end += 1;
             }
             let tag = &data[i..end];
+            // Attribute value by name. The scan is anchored on the space
+            // before the name (` id="`), so `uid="` or `xlat="` never match.
             let get_f64 = |key: &[u8]| -> Option<f64> {
                 let mut k = 0;
-                while k + key.len() + 2 <= tag.len() {
-                    if &tag[k..k + key.len()] == key
-                        && tag[k + key.len()] == b'='
-                        && tag[k + key.len() + 1] == b'"'
+                while k + key.len() + 3 <= tag.len() {
+                    if tag[k] == b' '
+                        && &tag[k + 1..k + 1 + key.len()] == key
+                        && tag[k + 1 + key.len()] == b'='
+                        && tag[k + 2 + key.len()] == b'"'
                     {
-                        let start = k + key.len() + 2;
+                        let start = k + key.len() + 3;
                         let len = tag[start..].iter().position(|&b| b == b'"')?;
                         return std::str::from_utf8(&tag[start..start + len])
                             .ok()?
@@ -175,7 +178,12 @@ pub fn scan_ways(data: &[u8]) -> WayClasses {
                 }
             }
             Ok(Event::Eof) => break,
-            Err(_) => break,
+            // A parse error must not truncate the scan: every later way would
+            // silently count as conventional.
+            Err(e) => panic!(
+                "OSM XML parse error at byte {}: {e}",
+                reader.buffer_position()
+            ),
             _ => {}
         }
         buf.clear();
@@ -222,6 +230,26 @@ mod tests {
         assert_eq!(c.len(), 2);
         assert_eq!(c[&1], [100.0, 30.0]);
         assert_eq!(c[&3], [102.0, 32.0]);
+    }
+
+    #[test]
+    fn node_coords_does_not_mistake_uid_for_id() {
+        // stock OSM exports carry uid="..." (before id= here, to catch a
+        // substring match on `id="`)
+        let xml = r#"<osm><node uid="9" id="2" lat="31.0" lon="101.0"/>
+<node id="5" uid="7" lat="1.0" lon="2.0"/></osm>"#;
+        let needed: HashSet<i64> = [2, 5, 9, 7].into_iter().collect();
+        let c = node_coords(xml.as_bytes(), &needed);
+        assert_eq!(c.len(), 2, "{c:?}");
+        assert_eq!(c[&2], [101.0, 31.0]);
+        assert_eq!(c[&5], [2.0, 1.0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "OSM XML parse error")]
+    fn scan_ways_panics_on_malformed_xml() {
+        let xml = r#"<osm><way id="1"><nd ref="1"/><nd ref="2"/></node><way id="2"/></osm>"#;
+        scan_ways(xml.as_bytes());
     }
 
     #[test]

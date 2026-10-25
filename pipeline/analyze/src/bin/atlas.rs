@@ -13,6 +13,7 @@ use analyze_rs::model::*;
 use analyze_rs::names::*;
 use analyze_rs::osm;
 use analyze_rs::polyline::*;
+use analyze_rs::provenance;
 use analyze_rs::timetable::*;
 
 /// One train in data/raw/stops*.jsonl (the 12306 stop-list dump).
@@ -145,6 +146,8 @@ struct AtlasOrigin {
 #[derive(serde::Serialize)]
 struct AtlasOut {
     about: String,
+    /// Provenance (code revision, input hashes); atlaspack copies it to `shared.build`.
+    build: serde_json::Value,
     origins: Vec<AtlasOrigin>,
     sections: Vec<AtlasSection>,
     in_sections: Vec<AtlasSection>,
@@ -2037,6 +2040,7 @@ fn main() {
     stats.insert("network_polylines".into(), network.len() as i64);
     stats.insert("throats".into(), throat_geo.len() as i64);
     let out = AtlasOut {
+        build: provenance::build_block(&inp),
         about: "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e5 precision, [lat, lon] order.".into(),
         origins, sections, in_sections, throats: throat_geo, city_table, station_table, train_table,
         network, stats, schedules,

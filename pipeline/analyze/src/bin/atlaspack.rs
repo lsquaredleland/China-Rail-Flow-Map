@@ -810,7 +810,15 @@ fn main() {
         "in_sections".into(),
         reorder(get(&shared, "in_sections"), &perm_in),
     );
-    let shared5 = with_fmt(shared5);
+    let mut shared5 = with_fmt(shared5);
+    // Provenance rides along in shared (the client ignores it); v1 files
+    // from before the block have none.
+    if let Some(b) = v1.get("build") {
+        shared5
+            .as_object_mut()
+            .unwrap()
+            .insert("build".into(), b.clone());
+    }
     let (op, osp, och, ooff) = pack_paths(&origins, &OUT, n_trains, &perm_out);
     let (ip, _, ich, ilen) = pack_paths(&origins, &IN, n_trains, &perm_in);
     let map5 = |maps: &[Value], key: &str, perm: &[usize]| -> Vec<Value> {

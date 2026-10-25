@@ -204,14 +204,19 @@ pub type LegPathMap = HashMap<String, (Vec<Vec<i64>>, f64)>;
 
 pub static LEG_PATHS: std::sync::OnceLock<LegPathMap> = std::sync::OnceLock::new();
 
+/// The router leg-path file: `ATLAS_LEG_PATHS`, else the default corridor-v3 one.
+pub fn leg_paths_file(data_dir: &Path) -> PathBuf {
+    env::var("ATLAS_LEG_PATHS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| data_dir.join("derived/corridor-v3/leg_paths.json"))
+}
+
 /// Load ATLAS_LEG_PATHS (or default corridor-v3 leg_paths) into the override map and LEG_PATHS.
 /// Keyed by train_no; by public code only when train_no is absent
 /// (codes are reused across physical trains).
 pub fn load_leg_paths(map: &mut OverrideMap, data_dir: &Path) {
     let mut paths: LegPathMap = HashMap::new();
-    let p_path = env::var("ATLAS_LEG_PATHS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| data_dir.join("derived/corridor-v3/leg_paths.json"));
+    let p_path = leg_paths_file(data_dir);
     if p_path.exists() {
         let recs: Vec<LegPath> =
             serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
