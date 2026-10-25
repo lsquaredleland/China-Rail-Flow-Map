@@ -513,7 +513,7 @@ export function drawFlows(
         ctx.stroke();
       }
     } else {
-      const destIdx = (isoTrain as any).tcIdx ?? (isoTrain as any).fcIdx;
+      const destIdx = "tcIdx" in isoTrain ? isoTrain.tcIdx : isoTrain.fcIdx;
       const ch = cur.chords.find((c) => c.b === destIdx);
       if (ch) {
         ctx.beginPath();

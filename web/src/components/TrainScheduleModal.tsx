@@ -79,14 +79,14 @@ export default function TrainScheduleModal({
 
   // Identify the station corresponding to the currently selected city (e.g. Guangzhou, Wuhan, Beijing)
   const originStationZh = trainVM
-    ? ((trainVM as any).fsZh || (trainVM as any).tsZh || "")
+    ? (trainVM.fsZh || trainVM.tsZh || "")
     : "";
 
   const originStDisplay = trainVM
-    ? fmtStName((trainVM as any).fsZh || "", (trainVM as any).fsEn)
+    ? fmtStName(trainVM.fsZh || "", trainVM.fsEn)
     : "";
   const destStDisplay = trainVM
-    ? fmtStName((trainVM as any).tsZh || "", (trainVM as any).tsEn)
+    ? fmtStName(trainVM.tsZh || "", trainVM.tsEn)
     : "";
 
   const originStop = useMemo(() => {
@@ -156,7 +156,7 @@ export default function TrainScheduleModal({
       const anchor = unrolled[anchorIdx];
       const isArrVM = "fcIdx" in trainVM;
       if (isArrVM && anchor.unrolledArr >= 0) {
-        timeShift = (trainVM as any).arrMins - anchor.unrolledArr;
+        timeShift = trainVM.arrMins - anchor.unrolledArr;
       } else if (anchor.unrolledDep >= 0) {
         timeShift = trainVM.depMins - anchor.unrolledDep;
       }

@@ -10,6 +10,8 @@ interface Props {
 
 /* Searchable origin combobox: ranked list of the 100 origins, filterable
    by English or Chinese name, with full keyboard navigation. */
+const display = (o: RawOrigin) => enName(o.en) + " · " + o.zh;
+
 export default function CityPicker({ origins, curIdx, onSelect }: Props) {
   const [value, setValue] = useState("");
   const [open, setOpen] = useState(false);
@@ -19,7 +21,6 @@ export default function CityPicker({ origins, curIdx, onSelect }: Props) {
   const comboRef = useRef<HTMLDivElement | null>(null);
 
   const cur = curIdx >= 0 ? origins[curIdx] : undefined;
-  const display = (o: RawOrigin) => enName(o.en) + " · " + o.zh;
 
   // Origin indexes currently listed, given an input string.
   const computeItems = (v: string): number[] => {
@@ -43,8 +44,7 @@ export default function CityPicker({ origins, curIdx, onSelect }: Props) {
   // from outside (initial load, a pick from this list).
   useEffect(() => {
     if (cur) setValue(display(cur));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curIdx, origins]);
+  }, [cur]);
 
   // Keep the active option scrolled into view, as the original did.
   useEffect(() => {
@@ -64,8 +64,7 @@ export default function CityPicker({ origins, curIdx, onSelect }: Props) {
     };
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, curIdx, origins]);
+  }, [open, cur]);
 
   const openList = () => {
     if (!origins.length) return;

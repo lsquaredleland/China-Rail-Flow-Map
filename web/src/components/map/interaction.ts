@@ -193,7 +193,7 @@ export function pickSegment(M: MapCtx, px: number, py: number): Hit | null {
     if (isAnimated && timeline && st.animTime < timeline.totalMins) {
       if (P.current.isolatedTrainCode) {
         const isoTrain = cur.deps?.find((t) => t.code === P.current.isolatedTrainCode);
-        if (!isoTrain || (isoTrain as any).tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
+        if (!isoTrain || isoTrain.tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
           continue;
         }
       } else {
