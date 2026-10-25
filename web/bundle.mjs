@@ -1,8 +1,10 @@
-/* Bundle the React + TSX sources into the single classic script that
-   dist/index.html carries, and inline src/styles/*.css into its <style>. Run with: bun bundle.mjs
+/* Bundle the React + TSX sources into the inline module script that
+   dist/index.html carries (plus hashed lazy chunks in dist/assets), and inline src/styles/*.css into its <style>. Run with: bun bundle.mjs
    Produces dist/index.html from index.template.html (head + CSS verbatim)
    and copies public/assets into dist/assets. */
 import { createHash } from "node:crypto";
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
+import { relative, resolve, sep } from "node:path";
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 
 // Content-hash the Brotli data packs: public/assets/<name>.json.br is
@@ -20,39 +22,92 @@ for (const f of readdirSync("public/assets")) {
   assetManifest[`assets/${f.slice(0, -3)}`] = `assets/${hashed}`;
   hashedAssets.push([f, hashed, bytes]);
 }
-const manifestDefine = { __ASSET_MANIFEST__: JSON.stringify(assetManifest) };
+const manifestDefine = { __ASSET_MANIFEST__: JSON.stringify(JSON.stringify(assetManifest)) };
 
-async function bundleIife(entry) {
-  if (typeof Bun !== "undefined") {
-    const result = await Bun.build({
-      entrypoints: [entry],
-      minify: true,
-      format: "iife",
-      target: "browser",
-      define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
-    });
-    if (!result.success) {
-      for (const log of result.logs) console.error(log);
-      process.exit(1);
-    }
-    return await result.outputs[0].text();
-  }
-  const esbuild = await import("esbuild");
-  const res = await esbuild.build({
-    entryPoints: [entry],
-    bundle: true,
-    minify: true,
-    format: "iife",
-    target: "es2020",
-    define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
-    write: false,
-  });
-  return res.outputFiles[0].text;
+// Two esbuild passes so the inlined entry never statically imports a shared
+// chunk (esbuild would hoist runtime helpers used by both into one, and every
+// visitor would then fetch it):
+//   1. the lazy graph: src/components/map/deck/DeckHost.tsx -> hashed
+//      dist/assets/DeckHost-<hash>.js (+ its own shared chunks);
+//   2. the app entry src/main.tsx, inlined into index.html as a module script,
+//      with load.ts's import("./DeckHost") pointed at the hashed file.
+// Lazy code must therefore not rely on module-level state shared with the
+// entry (pass state in, e.g. via MapCtx). Nothing is written until the checks pass.
+const esbuild = await import("esbuild");
+const common = {
+  bundle: true,
+  minify: true,
+  format: "esm",
+  target: "es2020",
+  outdir: "dist",
+  metafile: true,
+  write: false,
+  define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
+};
+const relOf = (f) => relative(resolve("dist"), f.path).split(sep).join("/");
+const lazy = await esbuild.build({
+  ...common,
+  entryPoints: { DeckHost: "src/components/map/deck/DeckHost.tsx" },
+  splitting: true,
+  entryNames: "assets/[name]-[hash]",
+  chunkNames: "assets/[name]-[hash]",
+});
+const chunkOuts = lazy.outputFiles.map((f) => ({ ...f, rel: relOf(f) }));
+const deckChunks = chunkOuts.filter((o) => /^assets\/DeckHost-[^/]+\.js$/.test(o.rel));
+if (deckChunks.length !== 1 || chunkOuts.some((o) => !/^assets\/[^/]+\.js$/.test(o.rel))) {
+  console.error("unexpected lazy outputs:", chunkOuts.map((o) => o.rel).join(", "));
+  process.exit(1);
 }
-const rawJs = await bundleIife("src/main.tsx");
+const deckUrl = "./" + deckChunks[0].rel;
+const pointAtChunk = {
+  name: "deck-chunk",
+  setup(b) {
+    b.onResolve({ filter: /^\.\/DeckHost$/ }, (a) =>
+      a.kind === "dynamic-import" ? { path: deckUrl, external: true } : undefined,
+    );
+  },
+};
+const app = await esbuild.build({
+  ...common,
+  entryPoints: { main: "src/main.tsx" },
+  plugins: [pointAtChunk],
+});
+const entryOut = app.outputFiles.find((o) => relOf(o) === "main.js");
+if (app.outputFiles.length !== 1 || !entryOut) {
+  console.error("unexpected entry outputs:", app.outputFiles.map(relOf).join(", "));
+  process.exit(1);
+}
+if (!entryOut.text.includes(deckUrl)) {
+  console.error(`entry does not reference ${deckUrl}; the lazy import was not rewired`);
+  process.exit(1);
+}
+// The inlined entry must stay deck-free, or every visitor pays for deck.gl.
+const heavy = /node_modules\/(@deck\.gl|@luma\.gl)\//;
+const entryMeta = Object.values(app.metafile.outputs)[0];
+const leaked = Object.keys(entryMeta.inputs).filter((i) => heavy.test(i));
+if (leaked.length) {
+  console.error(`@deck.gl/@luma.gl inputs leaked into the inlined entry (${leaked.length}), e.g. ${leaked[0]}`);
+  process.exit(1);
+}
+const DECK_BROTLI_BUDGET = 300 * 1024;
+const kb = (n) => (n / 1024).toFixed(1) + " KB";
+let totalBr = 0;
+for (const o of chunkOuts) {
+  const b = Buffer.from(o.contents);
+  const br = brotliCompressSync(b, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 } }).length;
+  console.log(`chunk ${o.rel}: min ${kb(b.length)}, gzip ${kb(gzipSync(b).length)}, brotli ${kb(br)}`);
+  totalBr += br;
+}
+// DeckHost-*.js plus its shared chunks are all fetched with ?renderer=deck, so
+// the budget applies to the whole lazy graph (only deck code lives in it).
+console.log(`lazy chunks total brotli: ${kb(totalBr)} (budget ${DECK_BROTLI_BUDGET / 1024} KB)`);
+if (totalBr > DECK_BROTLI_BUDGET) {
+  console.error("lazy deck chunks exceed the brotli budget");
+  process.exit(1);
+}
 // A literal "</script" inside a JS string (React DOM has one) would end
 // the inline script element early; "<\/script" is the same string in JS.
-const js = rawJs.replace(/<\/script/g, "<\\/script");
+const js = entryOut.text.replace(/<\/script/g, "<\\/script");
 if (js.includes("</script")) {
   console.error("bundle still contains a </script\" sequence; refusing to inline");
   process.exit(1);
@@ -101,6 +156,9 @@ for (const [f, hashed, bytes] of hashedAssets) {
   rmSync(`dist/assets/${f}`);
   writeFileSync(`dist/assets/${hashed}`, bytes);
 }
+// Hashed lazy chunks (deck.gl etc.).
+mkdirSync("dist/assets", { recursive: true });
+for (const o of chunkOuts) writeFileSync(`dist/${o.rel}`, o.contents);
 writeFileSync(
   "dist/index.html",
   tpl.replace("/*__CSS__*/", () => css).replace("/*__BUNDLE__*/", () => js),
