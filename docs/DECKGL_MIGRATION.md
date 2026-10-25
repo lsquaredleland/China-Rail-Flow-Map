@@ -977,7 +977,8 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
   the staged national trains file, with `extra` appended to the throat set. For each
   (train, section) pair, the oracle bisected the first minute at which the client dot
   reaches the client's own `pStart`. It ran over all 462,064 pairs. Rust vs client
-  (absolute): max 0.0001 min. Shipped tick vs client minute of day: max 0.0999 min, p99
+  (absolute): max 0.00012 min, p99 0. The residue comes from bisecting the flat end of
+  the ease, where f64 `ease(1 − 1e-8) == 1`. Shipped tick vs client minute of day: max 0.0999 min, p99
   0.099, 0 pairs over 0.1. At the shipped minute the client dot is 0–0.59 km past the
   section start.
 - **R2 note.** The entry minute depends on the client's `trainEase`, which is a
