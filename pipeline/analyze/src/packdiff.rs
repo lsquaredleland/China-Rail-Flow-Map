@@ -120,11 +120,31 @@ fn train_keys(shared: &Value) -> Vec<String> {
 
 type FlowKey = (String, String);
 
+/// Origin city names, in origin order, from the out-map file.
+fn origin_names(out_map: &Value) -> Vec<String> {
+    out_map["origins"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|o| o["zh"].as_str().unwrap_or("").to_string())
+        .collect()
+}
+
 /// `(origin zh, section key) -> [total, 8 class counts]` for one direction.
-fn flow_rows(map: &Value, flows_key: &str, secs: &[String]) -> HashMap<FlowKey, Vec<i64>> {
+fn flow_rows(
+    map: &Value,
+    flows_key: &str,
+    secs: &[String],
+    names: &[String],
+) -> HashMap<FlowKey, Vec<i64>> {
     let mut out = HashMap::new();
-    for o in map["origins"].as_array().into_iter().flatten() {
-        let zh = o["zh"].as_str().unwrap_or("").to_string();
+    for (oi, o) in map["origins"].as_array().into_iter().flatten().enumerate() {
+        // in-map origins carry no identity fields: use the out-map's names
+        let zh = o["zh"]
+            .as_str()
+            .map(String::from)
+            .or_else(|| names.get(oi).cloned())
+            .unwrap_or_default();
         let mut id = 0i64;
         for r in o[flows_key].as_array().into_iter().flatten() {
             let r = ints(r);
@@ -377,6 +397,14 @@ pub fn render(old: &Pack, new: &Pack, top_n: usize) -> String {
     }
 
     let (so, sn) = (old.j(FILES[0]), new.j(FILES[0]));
+    if so["fmt"] != sn["fmt"] {
+        let _ = writeln!(
+            s,
+            "\nPack format differs (fmt {} -> {}); the structural comparison is skipped.",
+            so["fmt"], sn["fmt"]
+        );
+        return s;
+    }
     let (bo, bn) = (&so["build"], &sn["build"]);
     if bo != bn {
         let _ = writeln!(s, "\n**Build provenance**");
@@ -416,8 +444,18 @@ pub fn render(old: &Pack, new: &Pack, top_n: usize) -> String {
         ("Outbound", FILES[1], "flows", "sections"),
         ("Inbound", FILES[3], "in_flows", "in_sections"),
     ] {
-        let fo = flow_rows(old.j(map_file), flows_key, &sec_keys(&so[secs_key]));
-        let fnw = flow_rows(new.j(map_file), flows_key, &sec_keys(&sn[secs_key]));
+        let fo = flow_rows(
+            old.j(map_file),
+            flows_key,
+            &sec_keys(&so[secs_key]),
+            &origin_names(old.j(FILES[1])),
+        );
+        let fnw = flow_rows(
+            new.j(map_file),
+            flows_key,
+            &sec_keys(&sn[secs_key]),
+            &origin_names(new.j(FILES[1])),
+        );
         let d = diff_flows(&fo, &fnw, top_n);
         let _ = writeln!(
             s,
@@ -547,15 +585,18 @@ mod tests {
         let gs = ["??", "_p~iF~ps|U", "_ulLnnqC_mqNvxq`@"];
         let a = mini(&gs, &[(0, 3), (1, 4)], Value::Null, &[0]);
         let b = mini(&gs, &[(0, 10), (2, 1)], Value::Null, &[0]);
+        let names = origin_names(a.j(FILES[1]));
         let fo = flow_rows(
             a.j(FILES[1]),
             "flows",
             &sec_keys(&a.j(FILES[0])["sections"]),
+            &names,
         );
         let fnw = flow_rows(
             b.j(FILES[1]),
             "flows",
             &sec_keys(&b.j(FILES[0])["sections"]),
+            &names,
         );
         let d = diff_flows(&fo, &fnw, 5);
         assert_eq!((d.added, d.removed, d.changed), (1, 1, 1));
@@ -596,6 +637,25 @@ mod tests {
             "{md}"
         );
         assert!(md.contains("0 added, 0 removed, 0 total changed"), "{md}");
+    }
+
+    #[test]
+    fn a_format_change_skips_the_structural_diff() {
+        let a = mini(&["x"], &[(0, 3)], Value::Null, &[0]);
+        let mut b = mini(&["x"], &[(0, 3)], Value::Null, &[0]);
+        b.files.get_mut(FILES[0]).unwrap().json["fmt"] = json!(7);
+        let md = render(&a, &b, 5);
+        assert!(md.contains("Pack format differs (fmt 6 -> 7)"), "{md}");
+        assert!(!md.contains("Outbound flows"), "{md}");
+    }
+
+    #[test]
+    fn in_map_rows_are_attributed_to_the_out_map_origin() {
+        let out = json!({"origins": [{"zh": "甲"}, {"zh": "乙"}]});
+        let inm = json!({"origins": [{"in_flows": [[0, 5, 5]]}, {"in_flows": [[0, 7, 7]]}]});
+        let rows = flow_rows(&inm, "in_flows", &["a".to_string()], &origin_names(&out));
+        assert_eq!(rows[&("甲".to_string(), "a".to_string())][0], 5);
+        assert_eq!(rows.len(), 2);
     }
 
     #[test]
