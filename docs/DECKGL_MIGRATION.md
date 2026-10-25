@@ -939,29 +939,33 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
   client's motion: `prepTrainPath` distance space over the shared geometry as the client
   decodes it (1e4 polylines rounded to f32, haversine lengths, chord gaps at the widest
   join, the `virt`/`virtStop` stop rule; throats and `extra` pieces as one throat set),
-  `buildNational`'s boarding-day frame for the stop times, and `natState` (dwell between
-  arrival and departure, `trainEase` per leg, legs < 1 min stretched to 1 min). The entry
-  minute is the exact inverse (`Motion::time_at`, first leg ending at or past the distance,
-  ease inverted by bisection, a section starting at a stop lights on arrival). atlaspack
-  writes it next to the national trains file, from the packed values.
+  `buildNational`'s boarding-day frame for the stop times, and `natState`.
+- **Motion model: linear legs plus dwell (owner decision: the client's easing is
+  removed).** The dot moves at constant speed along each leg between stops, holds at a stop
+  between arrival and departure, and a leg shorter than 1 min is stretched to 1 min, so its
+  dot jumps to the stop on arrival. The entry minute is the exact inverse
+  (`Motion::time_at`: first leg ending at or past the distance, linear inside it). A
+  section that starts at a stop lights on arrival. atlaspack writes the file next to the
+  national trains file, from the packed values. No presentation function is involved.
 - **Format.** `{fmt: 6, n_sec, trains, ticks_per_min: 10, by_class[8][n_sec]}`;
   `by_class[c][s]` is the sorted list of entry ticks (0.1 min, rounded **up**, so a section
   never lights before the dot) in `[0, 14400)`, class buckets as `atlas-v2-national`.
   "Trains entered by minute m under classes C" = `Σ_{c∈C} upperBound(by_class[c][s], 10m)`:
-  binary search and sums only (R3), with no client dedupe or class join. Chosen over one sorted
-  array per section plus a parallel class array, because a class filter on that layout needs
-  a scan or per-class prefix counts. It is also smaller: 778 KB against 719 KB brotli,
-  section-major 727 KB. Values are absolute (no deltas), so the client binary-searches them
-  as shipped. Deltas would give 589 KB, but the client would then decode a delta pass.
-  Whole-minute ticks would give 480 KB, but the error would be up to 1 min.
+  binary search and sums only (R3), with no client dedupe or class join. Chosen over one
+  sorted array per section plus a parallel class array, because a class filter on that
+  layout needs a scan or per-class prefix counts. It is also smaller: 722 KB brotli against
+  781 KB, section-major 730 KB. Values are absolute (no deltas), so the client
+  binary-searches them as shipped. Deltas would give 591 KB, but the client would then
+  decode a delta pass. Whole-minute ticks would give 484 KB, but the error would be up to
+  1 min.
 - **Wrap (D7) and overnight trains.** The shipped minute is the absolute minute mod 1440
   (the client shows a train at display minute m when m + 1440k lies in its run). A train
   that runs past midnight enters later sections at small minutes, which is the previous
   day's departure of a daily service. Cumulative since 00:00, every train counts once per
-  section, so the counts at 24:00 equal B exactly. 88,153 of 462,064 entries (828 trains)
-  lie past the boarding day's midnight, for example K9217 enters section 1311 at 00:03.7
+  section, so the counts at 24:00 equal B exactly. 88,095 of 462,064 entries (828 trains)
+  lie past the boarding day's midnight, for example K9217 enters section 1311 at 00:02.5
   (衡阳 23:15 → 广州北 04:38).
-- **Size.** 721,734 B brotli (2,630,406 B raw), inside the 0.5–1 MB estimate. At 12k
+- **Size.** 724,978 B brotli (2,630,505 B raw), inside the 0.5–1 MB estimate. At 12k
   trains it would be roughly ×1.7. If that is too large, whole-minute ticks are the first
   lever. Deterministic: two builds byte-identical.
 - **Gates.** `audit --pack-only` checks the file when present. It checks shape, `fmt` and
@@ -970,23 +974,29 @@ pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
   equal too. It recomputes from the national trains file and gets the shipped arrays
   exactly. It checks that every entry lies between the arrival at the last stop before it
   on the path and the arrival at the next stop after it (0 outside), which does not depend
-  on the ease. Spot checks are printed, one per class bucket plus the first wrapped entry.
-  Goldens: `national_entries_{total,eq_national,recompute_eq}` are exact,
+  on the interpolation. Spot checks are printed, one per class bucket plus the first
+  wrapped entry. Goldens: `national_entries_{total,eq_national,recompute_eq}` are exact,
   `national_entries_{bracket_bad,wrapped}` are max. They are skipped on the committed pack.
-- **Oracle (scratch, not committed).** The client `buildNational` + `natState` was run on
-  the staged national trains file, with `extra` appended to the throat set. For each
-  (train, section) pair, the oracle bisected the first minute at which the client dot
-  reaches the client's own `pStart`. It ran over all 462,064 pairs. Rust vs client
-  (absolute): max 0.00012 min, p99 0. The residue comes from bisecting the flat end of
-  the ease, where f64 `ease(1 − 1e-8) == 1`. Shipped tick vs client minute of day: max 0.0999 min, p99
-  0.099, 0 pairs over 0.1. At the shipped minute the client dot is 0–0.59 km past the
-  section start.
-- **R2 note.** The entry minute depends on the client's `trainEase`, which is a
-  presentation function. Changing the ease, the dwell model or the day frame in
-  `national.ts`/`timeline.ts` means rebuilding this file, and the oracle is the check.
-- **Staged, not shipped.** Built in `staging/national-entries/`. Every existing pack file,
-  including the national flows and national trains files, rebuilds byte-identical
-  (`cmp`, `secdiff --packs`, same `CRFM_PIPELINE_TREE`). The swap needs owner approval.
+- **Oracle (scratch, not committed).** It ran the client `buildNational` + `natState` from
+  a scratch copy of `web/src/lib` with `trainEase` replaced by the identity (the repo's
+  client still eases until its own PR after P2.2), on the staged national trains file with
+  `extra` appended to the throat set. For each (train, section) pair, the oracle bisected
+  the first minute at which the client dot reaches the client's own `pStart`, over all
+  462,064 pairs. Rust vs client (absolute): max 0.000000 min. Shipped tick vs client
+  minute of day: max 0.100 min (the round-up to the tick), p99 0.099, 0 pairs over 0.1.
+  At the shipped minute the client dot is 0–0.53 km past the section start. Against the
+  still-eased client the difference is up to 3.9 min (p99 1.5), so the client PR must
+  drop the ease for the lighting to match the dots.
+- **Must match the client.** The file has no presentation dependency. The client's
+  dwell rule (`natState`: hold between arrival and departure), the boarding-day frame of
+  the stop minutes (`buildNational`), the 1-min stretch of short legs and the
+  stop-at-section-start rule are rail-motion rules that both sides implement. A change to
+  any of them in `national.ts`/`timeline.ts` means rebuilding this file, and the oracle
+  is the check.
+- **Staged, not shipped.** Built in `staging/national-entries/run3` (`run4` is the
+  determinism copy). Every existing pack file, including the national flows and national
+  trains files, rebuilds byte-identical (`cmp`, `secdiff --packs`, same
+  `CRFM_PIPELINE_TREE`). The swap needs owner approval.
 
 **P3.4 Optional comet mode** — only if D2 is toggled on and M4n (Trips) passed.
 
