@@ -85,6 +85,14 @@ export default function App() {
     return list.find((t) => t.code === selectedTrainCode) || null;
   }, [selectedTrainCode, cur, direction]);
 
+  // National mode: the dot's train is not in the origin's departures, so the
+  // schedule key is found by code in the shared train table (codes are unique).
+  const nationalTrainT = useMemo(() => {
+    if (!national || !selectedTrainCode || !atlas) return null;
+    const t = atlas.data.train_table.findIndex((r) => r.code === selectedTrainCode);
+    return t >= 0 ? t : null;
+  }, [national, selectedTrainCode, atlas]);
+
   const { panelCity, setPanelCity, availableClasses, closePanel } = useCityPanel({
     cur,
     viewCur,
@@ -370,15 +378,15 @@ export default function App() {
 
       <TrainScheduleModal
         code={selectedTrainCode}
-        trainT={selectedTrainVM ? selectedTrainVM.t : null}
+        trainT={selectedTrainVM ? selectedTrainVM.t : nationalTrainT}
         onClose={() => setSelectedTrainCode(null)}
         schedulesData={schedulesData}
         stationTable={atlas ? atlas.data.station_table : []}
         dark={dark}
         unit={distUnit}
-        trainVM={selectedTrainVM}
+        trainVM={national ? null : selectedTrainVM}
         isIsolated={isolatedTrainCode === selectedTrainCode}
-        onToggleIsolate={(c) => {
+        onToggleIsolate={national ? undefined : (c) => {
           setIsolatedTrainCode((prev) => (prev === c ? null : c));
         }}
         onJumpToTime={(mins) => {

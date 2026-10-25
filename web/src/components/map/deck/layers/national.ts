@@ -101,7 +101,11 @@ export function maxDots(tl: NationalTimeline): number {
 
 export interface NationalFrame {
   count: number;
+  /** Distinct trains among the dots (a run over 24 h shows more than one dot). */
+  running: number;
   buf: Float32Array;
+  /** Train index of each dot, for picking. */
+  qOf: Int32Array;
   line: Uint8Array;
   tailCount: number;
   tailSrc: Float32Array;
@@ -122,7 +126,9 @@ export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: numb
       tl,
       f: {
         count: 0,
+        running: 0,
         buf: new Float32Array(cap * 6),
+        qOf: new Int32Array(cap),
         line: new Uint8Array(cap * 4),
         tailCount: 0,
         tailSrc: new Float32Array(cap * 2),
@@ -135,9 +141,10 @@ export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: numb
     };
   }
   const f = pool.f;
-  const c = natPositions(tl, atlas, m, f.buf);
-  let tc = 0, dc = 0;
+  const c = natPositions(tl, atlas, m, f.buf, f.qOf);
+  let tc = 0, dc = 0, run = 0;
   for (let i = 0; i < c; i++) {
+    if (i === 0 || f.qOf[i] !== f.qOf[i - 1]) run++;
     const o = i * 6;
     const x = f.buf[o], y = f.buf[o + 1];
     const flags = f.buf[o + 5];
@@ -169,6 +176,7 @@ export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: numb
     tc++;
   }
   f.count = c;
+  f.running = run;
   f.tailCount = tc;
   f.dwellCount = dc;
   return f;

@@ -3,12 +3,14 @@ import type { ChordVM, FlowVM, Hit } from "../../types";
 import {
   isFerrySection,
   isTrainShown as modelIsTrainShown,
+  natTrainVM,
   stationR,
   stationZoomK,
   tooltipHtml,
   pickableChords,
   pickableFlows,
   pickPriority,
+  TRAIN_RADIUS,
 } from "../../lib";
 import type { PickCandidate } from "../../lib";
 import type { MapCtx } from "./context";
@@ -75,6 +77,37 @@ function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
   }
 }
 
+/* National mode (P2.3): the same exact scan over the current frame's dots, paused
+   only. The candidate index is the dot's index; the view-model is built for the
+   winner only. */
+function pickNational(M: MapCtx, px: number, py: number): Hit | null {
+  const { S, P, X, Y } = M;
+  const st = S.current;
+  const f = st.natPick;
+  const data = P.current.nationalTrains;
+  const atlas = P.current.atlas;
+  if (!f || !data || !atlas || !st.animEnabled || st.animPlaying) return null;
+  const cands: PickCandidate[] = [];
+  const lim2 = TRAIN_RADIUS * TRAIN_RADIUS;
+  for (let i = 0; i < f.count; i++) {
+    const lon = f.buf[i * 6], lat = f.buf[i * 6 + 1];
+    const dx = px - X(lon), dy = py - Y(lat);
+    if (dx * dx + dy * dy >= lim2) continue;
+    cands.push({ kind: "train", index: i, pos: [lon, lat] });
+  }
+  const win = pickPriority(cands, px, py, st.view, { paused: true });
+  if (!win) return null;
+  const i = win.index, q = f.qOf[i];
+  let j = i;
+  while (j > 0 && f.qOf[j - 1] === q) j--;
+  const a = f.m + 1440 * (Math.ceil((f.tl.start[q] - f.m) / 1440) + (i - j));
+  const o = i * 6;
+  return {
+    kind: "train",
+    train: natTrainVM(f.tl, atlas.data, data.schedules, q, a, f.buf[o], f.buf[o + 1], f.buf[o + 2], f.buf[o + 3]),
+  };
+}
+
 type LayerProps = { idxToSec?: Int32Array };
 
 export function pick(M: MapCtx, px: number, py: number): Hit | null {
@@ -83,8 +116,9 @@ export function pick(M: MapCtx, px: number, py: number): Hit | null {
   const { S, P } = M;
   const cur = P.current.cur;
   const set = M.flowsSet();
-  // National mode picks nothing yet (P2.3); origin stations / flows are not drawn there (D13).
-  if (!cur || P.current.national) return null;
+  // National mode: dots only; origin stations / flows are not drawn there (D13).
+  if (P.current.national) return pickNational(M, px, py);
+  if (!cur) return null;
   const st = S.current;
   const paused = st.animEnabled && !st.animPlaying;
   const q = (radius: number, layerIds: string[]) =>

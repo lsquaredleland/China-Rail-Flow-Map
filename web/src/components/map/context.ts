@@ -8,6 +8,7 @@ import type {
   DayTimelineVM,
   Direction,
   DistUnit,
+  NationalTimeline,
   NationalTrainsData,
   FlowVM,
   Hit,
@@ -31,7 +32,7 @@ export interface AnimState {
   enabled: boolean;
   /** National mode (D13): the clock spans one day and wraps; `departed` is `running`. */
   national: boolean;
-  /** Dots on the line at `time` in national mode (0 otherwise). */
+  /** Distinct trains on the line at `time` in national mode (0 otherwise). */
   running: number;
 }
 export type AnimListener = (state: AnimState) => void;
@@ -156,6 +157,8 @@ function createMapState() {
     /* National mode: trains in the timeline and dots in the last frame (set by the deck host). */
     natN: 0,
     natRunning: 0,
+    /* The last national frame's dots for picking (CPU scan, P2.3). */
+    natPick: null as { tl: NationalTimeline; count: number; buf: Float32Array; qOf: Int32Array; m: number } | null,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: false,
