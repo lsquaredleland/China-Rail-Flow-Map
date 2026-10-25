@@ -1,7 +1,7 @@
 /* Pointer input: drag-pan, pinch-zoom, hover picking and tap selection. */
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { MapCtx, Pt } from "./context";
-import { scheduleDraw, draw } from "./render";
+import { scheduleDraw } from "./render";
 import { zoomAt } from "./camera";
 import { hideTooltip, pick, sameHit, showTooltip } from "./interaction";
 
@@ -65,7 +65,7 @@ export function onPointerMove(M: MapCtx, e: ReactPointerEvent) {
     const hit = pick(M, p.x, p.y);
     if (!sameHit(hit, st.hover)) {
       st.hover = hit;
-      draw(M);
+      M.render();
     }
     if (hit) showTooltip(M, hit, p.x, p.y);
     else if (!st.pinned) hideTooltip(M);
@@ -101,7 +101,7 @@ export function endPointer(M: MapCtx, e: ReactPointerEvent) {
         hideTooltip(M);
         P.current.onSelectDest(null);
       }
-      draw(M);
+      M.render();
     }
     st.dragStart = null;
     st.moved = 0;
@@ -114,6 +114,6 @@ export function onPointerLeave(M: MapCtx) {
   if (!st.pinned) {
     st.hover = null;
     hideTooltip(M);
-    draw(M);
+    M.render();
   }
 }

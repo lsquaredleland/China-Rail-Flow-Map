@@ -9,7 +9,6 @@ import {
   stationT as stationTOf,
   zoomBounds,
 } from "../../lib";
-import { draw } from "./render";
 
 /* ---------- distance scale bar ----------
    The projection is equirectangular (px = lon/lat degrees x view.scale),
@@ -108,7 +107,7 @@ export function zoomAt(M: MapCtx, px: number, py: number, factor: number) {
   st.view.ty = py - (py - st.view.ty) * k;
   st.view.scale = ns;
   st.interacted = true;
-  draw(M);
+  M.render();
 }
 
 
@@ -143,7 +142,7 @@ export function resize(M: MapCtx) {
   const { S, P, toLon, toLat, canvasRef, wrapRef } = M;
   const wrap = wrapRef.current;
   const canvas = canvasRef.current;
-  if (!wrap || !canvas) return;
+  if (!wrap) return;
   const st = S.current;
   const r = wrap.getBoundingClientRect();
   const newW = Math.max(50, r.width);
@@ -161,8 +160,10 @@ export function resize(M: MapCtx) {
   st.DPR = Math.min(3, window.devicePixelRatio || 1);
   st.W = newW;
   st.H = newH;
-  canvas.width = Math.round(st.W * st.DPR);
-  canvas.height = Math.round(st.H * st.DPR);
+  if (canvas) {
+    canvas.width = Math.round(st.W * st.DPR);
+    canvas.height = Math.round(st.H * st.DPR);
+  }
   if (P.current.atlas && P.current.cur) {
     if (!st.interacted) {
       if (!st.initialViewApplied && P.current.initialCamera) {
@@ -185,5 +186,5 @@ export function resize(M: MapCtx) {
       st.view.ty = st.H / 2 + keepCentre.lat * st.view.scale;
     }
   }
-  draw(M);
+  M.render();
 }

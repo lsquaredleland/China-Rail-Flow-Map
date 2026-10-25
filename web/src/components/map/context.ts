@@ -201,6 +201,9 @@ export interface MapCtx {
   activeTrainsAt: (tl: DayTimelineVM, t: number) => ActiveTrainVM[];
   isFilteredView: () => boolean;
   flowsSet: () => DecodedSet | null;
+  /* The single way to request a frame. The host installs the renderer
+     (MapCanvas: the Canvas 2D `draw`); until then it is a no-op. */
+  render: () => void;
 }
 
 type MapRefs = Pick<
@@ -220,6 +223,7 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     P,
     S,
     ...refs,
+    render: () => {},
     bgRef: { current: { key: "", atlas: null, outline: null, layer: null, state: null } },
     tailGradRef: { current: new Map() },
     /* ---------- camera helpers ---------- */

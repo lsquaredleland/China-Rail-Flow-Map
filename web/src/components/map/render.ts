@@ -77,6 +77,6 @@ export function scheduleDraw(M: MapCtx) {
   st.rafPending = true;
   requestAnimationFrame(() => {
     st.rafPending = false;
-    draw(M);
+    M.render();
   });
 }
