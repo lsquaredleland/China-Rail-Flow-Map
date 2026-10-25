@@ -58,13 +58,13 @@ export const ABOUT =
    Content-Type: application/json, so the browser has already decompressed
    it and the bytes are JSON ("{"). Anything else (header missing, SPA
    fallback HTML) falls back to the plain .json split. */
-declare const __ASSET_MANIFEST__: Record<string, string> | undefined;
+declare const __ASSET_MANIFEST__: string | undefined; // JSON text (a string define keeps esbuild from hoisting it into a shared chunk)
 /* The build content-hashes the .br packs (web/bundle.mjs) and bakes the
    name -> hashed-path map into the bundle; unhashed names (dev, or a
    missing entry) resolve to the plain twin path. */
 function brUrl(jsonUrl: string): string {
-  const m =
-    typeof __ASSET_MANIFEST__ === "undefined" ? undefined : __ASSET_MANIFEST__;
+  const m: Record<string, string> | undefined =
+    typeof __ASSET_MANIFEST__ === "undefined" ? undefined : JSON.parse(__ASSET_MANIFEST__);
   return (m && m[jsonUrl]) || jsonUrl + ".br";
 }
 export async function fetchData<T>(jsonUrl: string): Promise<T> {
