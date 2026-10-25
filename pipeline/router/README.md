@@ -115,14 +115,26 @@ The hybrid rule:
      is no evidence for a longer path.
    - It uses the fast edge, not the median, so ordinary spread and
      speed-tag error are no evidence either.
-3. The best alternative has the lowest mean error, shortest on ties. It
-   replaces production only if it beats production's mean error by
-   at least `margin_min` minutes, AND by at least `margin_rel` of
-   production's error, over at least `min_legs` legs.
+3. An alternative clears the margins only if it beats production's
+   mean error by both of:
+   - at least `margin_min` minutes, plus `longer_min_per_km` for every
+     km it is longer than production;
+   - at least `margin_rel` of production's error.
 
-The margin defaults (`margin_min = 1.0`, `margin_rel = 0.2`,
-`min_legs = 1`) were picked on a train-hash tune/holdout split. They
-only take effect in `hybrid` mode.
+   The evidence must also cover at least `min_legs` legs.
+
+   The per-km term exists because a prediction is only as good as the
+   speed tags. 广深线 is mostly tagged maxspeed 140 in OSM, below its
+   real operating speed. Without the per-km term, a 50–60 km longer
+   high-speed loop "fit" its C/D trains better by about 3–4 minutes.
+4. Of the alternatives that clear the margins, the best-fitting one
+   wins, the shortest on ties. If none clears them, production stays.
+
+The margin defaults (`margin_min = 1.0`, `longer_min_per_km = 0.1`,
+`margin_rel = 0.2`, `min_legs = 1`) were picked on a train-hash
+tune/holdout split. They only take effect in `hybrid` mode. The recipe
+passes `--config recipe.toml`, which sets `mode = "hybrid"` with these
+margins:
 
 ```toml
 [canon]

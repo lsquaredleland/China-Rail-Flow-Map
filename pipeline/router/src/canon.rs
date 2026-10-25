@@ -69,12 +69,20 @@ fn mean_error(k: &Cand, legs: &[LegTime], ratio: &[f64; NCLASS]) -> Option<f64> 
 
 /// The hybrid rule. Production's gap-free path, unless another gap-free
 /// candidate fits the pair's timetabled legs better (`mean_error`) by at
-/// least `margin_min` minutes AND `margin_rel` of production's error, on
+/// least `margin_min` minutes, plus `longer_min_per_km` per km it is
+/// longer than production, AND by `margin_rel` of production's error, on
 /// at least `min_legs` legs. The evidence is every leg whose class can use
 /// production (each scored with its own class's prediction, so the pair's
 /// class mix weights it); an alternative some of those classes cannot use
-/// is not eligible. Among equally good alternatives the shortest wins.
-/// Without gap-free production: as `Shortest`.
+/// is not eligible. Of the alternatives that clear the margins, the best
+/// fitting wins, the shortest on ties. Without gap-free production: as
+/// `Shortest`.
+///
+/// The per-km margin is there because a path's prediction is only as good
+/// as its speed tags: where OSM tags a fast line below its real speed
+/// (广深线 is mostly maxspeed 140), a long high-speed loop "fits" better
+/// by a few minutes. A detour has to explain the timetable by more than
+/// its extra length could hide.
 fn hybrid(cands: &[Cand], ev: &Evidence, cfg: &CanonConfig) -> Option<usize> {
     let Some(b) = production_gap_free(cands) else {
         return shortest(cands);
@@ -89,24 +97,23 @@ fn hybrid(cands: &[Cand], ev: &Evidence, cfg: &CanonConfig) -> Option<usize> {
         return Some(b);
     }
     let base_err = mean_error(&cands[b], &legs, ev.ratio)?;
-    let best = cands
+    let clears = |c: &Cand, e: f64| {
+        let extra_km = (c.km - cands[b].km).max(0.0);
+        let need = cfg.margin_min + cfg.longer_min_per_km * extra_km;
+        base_err - e >= need && e <= base_err * (1.0 - cfg.margin_rel)
+    };
+    cands
         .iter()
         .enumerate()
         .filter(|&(i, c)| i != b && c.gap_km == 0.0)
         .filter_map(|(i, c)| mean_error(c, &legs, ev.ratio).map(|e| (e, i)))
+        .filter(|&(e, i)| clears(&cands[i], e))
         .min_by(|x, y| {
             x.0.total_cmp(&y.0)
                 .then(cands[x.1].km.total_cmp(&cands[y.1].km))
                 .then(x.1.cmp(&y.1))
-        });
-    match best {
-        Some((e, i))
-            if base_err - e >= cfg.margin_min && e <= base_err * (1.0 - cfg.margin_rel) =>
-        {
-            Some(i)
-        }
-        _ => Some(b),
-    }
+        })
+        .map_or(Some(b), |(_, i)| Some(i))
 }
 
 /// Index of the candidate whose redraw becomes the pair's canonical
@@ -379,6 +386,30 @@ mod tests {
         // both margins must hold: the absolute floor applies too
         assert_eq!(pick(&two(), HY, &l, margins(10.0, 0.5, 1)), Some(1));
         assert_eq!(pick(&two(), HY, &l, margins(10.5, 0.0, 1)), Some(0));
+    }
+
+    #[test]
+    fn hybrid_longer_paths_need_a_larger_gain() {
+        // production 100 km (41), loop 120 km (31); a leg at 31: gain 10,
+        // the loop is 20 km longer, so it needs 1 + 20 * per_km
+        let mut c = vec![cand(100.0, 0.0, true, 40.0), cand(120.0, 0.0, false, 30.0)];
+        let l = legs(&[31.0]);
+        let per_km = |k: f64| CanonConfig {
+            longer_min_per_km: k,
+            ..margins(1.0, 0.0, 1)
+        };
+        assert_eq!(pick(&c, HY, &l, per_km(0.0)), Some(1));
+        assert_eq!(pick(&c, HY, &l, per_km(0.45)), Some(1));
+        assert_eq!(pick(&c, HY, &l, per_km(0.46)), Some(0));
+        // a shorter path is never charged: the same gain on an 80 km path
+        c[1].km = 80.0;
+        assert_eq!(pick(&c, HY, &l, per_km(10.0)), Some(1));
+        // when the loop fails its margin, a worse-fitting alternative that
+        // clears its own still wins: 101 km (35), gain 6, needs 1.46
+        c[1].km = 120.0;
+        c.push(cand(101.0, 0.0, false, 34.0));
+        assert_eq!(pick(&c, HY, &l, per_km(0.0)), Some(1));
+        assert_eq!(pick(&c, HY, &l, per_km(0.46)), Some(2));
     }
 
     #[test]

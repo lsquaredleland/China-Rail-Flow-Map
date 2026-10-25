@@ -1,0 +1,13 @@
+# The recipe's router config (docs/PIPELINE.md section 3 step 5:
+# corridor-router ... --config ../pipeline/router/recipe.toml).
+# Everything not set here is Config::default(); see `--dump-config`.
+#
+# Canonical pair geometry: production's path, unless the pair's timetabled
+# legs favour another gap-free candidate (pipeline/router/README.md). The
+# margins were picked on a train-hash tune/holdout split (PR #23).
+[canon]
+mode = "hybrid"
+margin_min = 1.0
+longer_min_per_km = 0.1
+margin_rel = 0.2
+min_legs = 1

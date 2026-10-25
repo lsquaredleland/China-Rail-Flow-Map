@@ -301,6 +301,9 @@ pub struct CanonConfig {
     /// class's fast edge; `canon::best_for_canon`) must beat production's
     /// by at least this many minutes...                          [1.0]
     pub margin_min: f64,
+    /// ...plus this many minutes per km the alternative is longer than
+    /// production...                                             [0.1]
+    pub longer_min_per_km: f64,
     /// ...and by at least this share of production's error...   [0.2]
     pub margin_rel: f64,
     /// ...on at least this many timetabled legs.                 [1]
@@ -314,6 +317,7 @@ impl Default for CanonConfig {
             rounds: 4,
             mode: CanonMode::Shortest,
             margin_min: 1.0,
+            longer_min_per_km: 0.1,
             margin_rel: 0.2,
             min_legs: 1,
         }

@@ -190,22 +190,30 @@ source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp
                            # ATLAS_OVERRIDES=staging/inputs/data/leg_overrides.json
 # Router inputs (since O17, 2026-10-24): one full, deterministic corridor-router
 # run; no splice. The build reads exactly these files:
-#   ATLAS_LEG_PATHS  = staging/inputs/data/derived/corridor-v3-o17/leg_paths.json
+#   ATLAS_LEG_PATHS  = staging/inputs/data/derived/corridor-v3-hybrid/leg_paths.json
 #   ATLAS_PAIR_PATHS = data/pair_path_fixes.json,
-#                      staging/inputs/data/derived/corridor-v3-o17/pair_paths_canonical.json
-# Regenerate corridor-v3-o17/ (~25 s; byte-identical run to run and across
+#                      staging/inputs/data/derived/corridor-v3-hybrid/pair_paths_canonical.json
+# Regenerate corridor-v3-hybrid/ (~25 s; byte-identical run to run and across
 # --threads, apart from timings in summary.json):
 #   ../pipeline/target/release/corridor-router --data ../data \
 #       --files ../staging/inputs/output \
-#       --out ../staging/inputs/data/derived/corridor-v3-o17 \
-#       --station-fixes ../data/station_fixes.json
+#       --out ../staging/inputs/data/derived/corridor-v3-hybrid \
+#       --station-fixes ../data/station_fixes.json \
+#       --config ../pipeline/router/recipe.toml
+# recipe.toml sets the canonical pair geometry to `[canon] mode = "hybrid"`
+# (production's path unless the pair's timetable favours another one; the
+# rule and its margins are in pipeline/router/README.md, PR #23).
+# PENDING THE HYBRID PACK SWAP: the committed pack is still the default-config
+# build (`--out .../corridor-v3-o17`, no --config, canonical = shortest). To
+# reproduce it, point C below at corridor-v3-o17; the secdiff then reports 0
+# changed edges. The hybrid build differs from it by ~1.02M fine edges.
 # pair_path_fixes.json goes FIRST (first record per pair wins): pairs whose
 # station snapped to a homonym (禹州, 郏县; 恩平/江门–阳江, which the router
 # leaves bridged). Regenerate with scripts/o9_fix_paths.py (header has the
 # inputs). 聊城西–菏泽东 stays a chord (京港高速线 is unjoined at 菏泽东 in OSM;
 # owner: no synthetic connector). The pre-O17 corridor-v3-o9/ splice
 # (scripts/o9_splice_router.py, removed in PR #15; in git history) is retired.
-C=$PWD/../staging/inputs/data/derived/corridor-v3-o17
+C=$PWD/../staging/inputs/data/derived/corridor-v3-hybrid
 export ATLAS_LEG_PATHS=$C/leg_paths.json
 export ATLAS_PAIR_PATHS=$PWD/../data/pair_path_fixes.json,$C/pair_paths_canonical.json
 O=$PWD/../staging/corridor-v3-ordered
