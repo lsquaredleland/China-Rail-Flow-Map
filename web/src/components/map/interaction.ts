@@ -13,11 +13,12 @@ import {
   stationR,
   stationZoomK,
   tooltipHtml,
-  trainDistAt,
+  pickableChords,
+  pickableFlows,
 } from "../../lib";
 import type { MapCtx } from "./context";
 import { stationT } from "./camera";
-import { getActiveDestSectionCounts, getDestSectionCounts } from "./flows";
+import { getDestSectionCounts, modelState } from "./flows";
 import { isTrainShown } from "./trains";
 
 
@@ -74,13 +75,14 @@ export function pickStation(M: MapCtx, px: number, py: number): Hit | null {
 }
 
 export function pickSegment(M: MapCtx, px: number, py: number): Hit | null {
-  const { S, P, X, Y, toLon, toLat, flowsList, activeTimeline, flowsSet } = M;
+  const { S, P, X, Y, toLon, toLat, flowsSet } = M;
   const atlas = P.current.atlas;
   const cur = P.current.cur;
   const set = flowsSet();
   if (!atlas || !cur || !set) return null;
   const sec = set;
-  const flows = flowsList();
+  const ms = modelState(M);
+  const flows = pickableFlows(ms, S.current);
   const lon = toLon(px),
     lat = toLat(py);
   const thrDeg = 12 / S.current.view.scale;
@@ -88,65 +90,10 @@ export function pickSegment(M: MapCtx, px: number, py: number): Hit | null {
   let bestDist = 10;
   let i: number, k: number;
   const destSecCounts = getDestSectionCounts(M);
-  const st = S.current;
-  const isAnimated = st.animEnabled && !P.current.showInfra;
-  const timeline = activeTimeline();
-  const step =
-    isAnimated && timeline
-      ? Math.min(
-          timeline.numSteps - 1,
-          Math.max(0, Math.floor(st.animTime / timeline.stepMins)),
-        )
-      : 0;
-
-  let activeDestCounts: Map<number, number> | null = null;
-  if (destSecCounts && isAnimated && timeline && st.animTime < timeline.totalMins) {
-    activeDestCounts = getActiveDestSectionCounts(M, st.animTime);
-  }
-
-  let activeIsoSecs: Set<number> | null = null;
-  if (P.current.isolatedTrainCode && isAnimated && timeline && st.animTime < timeline.totalMins) {
-    activeIsoSecs = new Set<number>();
-    const isoTrain = (P.current.direction === "out" ? cur.deps : cur.arrs).find(
-      (t) => t.code === P.current.isolatedTrainCode,
-    );
-    const isoPt = isoTrain ? timeline.getPrepTrain(isoTrain.code) : undefined;
-    if (isoTrain && isoPt && st.animTime >= isoTrain.depMins) {
-      const targetDist = trainDistAt(isoPt, st.animTime);
-      const secStarts = isoPt.secStarts;
-      let curSecIdx = 0;
-      while (
-        curSecIdx < isoPt.secs.length - 1 &&
-        secStarts[curSecIdx + 1] <= targetDist
-      ) {
-        curSecIdx++;
-      }
-      for (let j = 0; j <= curSecIdx; j++) {
-        activeIsoSecs.add(isoPt.secs[j]);
-      }
-    }
-  }
 
   for (i = 0; i < flows.length; i++) {
     const f = flows[i];
     const s = f.s;
-    // When a city pair is selected, restrict segment picking ONLY to sections that belong to the city pair
-    if (
-      destSecCounts &&
-      (!destSecCounts.has(s) || (destSecCounts.get(s) ?? 0) <= 0)
-    ) {
-      continue;
-    }
-    if (isAnimated && timeline && st.animTime < timeline.totalMins) {
-      if (activeDestCounts) {
-        if ((activeDestCounts.get(s) ?? 0) <= 0) continue;
-      } else if (activeIsoSecs !== null) {
-        if (!activeIsoSecs.has(s)) continue;
-      } else {
-        const activeN = timeline.secFlowSteps.get(s)?.[step] ?? 0;
-        if (activeN <= 0) continue;
-      }
-    }
     if (
       lon < sec.bb[s * 4] - thrDeg ||
       lon > sec.bb[s * 4 + 2] + thrDeg ||
@@ -186,20 +133,9 @@ export function pickSegment(M: MapCtx, px: number, py: number): Hit | null {
   }
   if (P.current.direction !== "out" || destSecCounts) return null;
   let chordBest: ChordVM | null = null;
-  for (i = 0; i < cur.chords.length; i++) {
-    const ch = cur.chords[i];
-    if (isAnimated && timeline && st.animTime < timeline.totalMins) {
-      if (P.current.isolatedTrainCode) {
-        const isoTrain = cur.deps?.find((t) => t.code === P.current.isolatedTrainCode);
-        if (!isoTrain || isoTrain.tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
-          continue;
-        }
-      } else {
-        const destTrains = (cur.deps || []).filter((d) => d.tcIdx === ch.b);
-        const hasDeparted = destTrains.some((d) => st.animTime >= d.depMins);
-        if (!hasDeparted) continue;
-      }
-    }
+  const chords = pickableChords(ms, S.current);
+  for (i = 0; i < chords.length; i++) {
+    const ch = chords[i];
     if (
       lon < ch.bb.x0 - thrDeg ||
       lon > ch.bb.x1 + thrDeg ||

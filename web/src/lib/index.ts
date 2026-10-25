@@ -83,3 +83,30 @@ export { isFerrySection, isWaterCross, splitFerry } from "./ferry";
 export type { FerryPiece } from "./ferry";
 export { tooltipHtml } from "./tooltip";
 export type { TooltipInput } from "./tooltip";
+export {
+  activeTimeline,
+  animStep,
+  chordPlan,
+  chordVisible,
+  flowPasses,
+  flowsOf,
+  getActiveDestSectionCounts,
+  getDestSectionCounts,
+  highlightSegN,
+  infraPasses,
+  isFilteredView,
+  isolatedCorridor,
+  isolatedTrain,
+  newModelCaches,
+  pickableChords,
+  pickableFlows,
+} from "./mapModel";
+export type {
+  ChordPlan,
+  FlowItem,
+  FlowPass,
+  InfraPass,
+  IsolatedCorridor,
+  ModelCaches,
+  ModelState,
+} from "./mapModel";

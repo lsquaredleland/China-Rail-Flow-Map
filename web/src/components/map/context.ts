@@ -13,7 +13,7 @@ import type {
   OriginVM,
   PrepTrain,
 } from "../../types";
-import { flowWidth } from "../../lib";
+import { flowWidth, isFilteredView as isFilteredViewOf } from "../../lib";
 import type { DestWindow } from "../../lib";
 import type { LegendHandle } from "../Legend";
 
@@ -255,17 +255,7 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     },
     /* A filtered view (class, histogram or train filter) is a subset of the
        full origin `baseCur`; selecting a city alone is not a filter. */
-    isFilteredView: () => {
-      const cur = P.current.cur;
-      const baseCur = P.current.baseCur;
-      if (!cur || !baseCur || cur === baseCur) return false;
-      return (
-        cur.deps.length !== baseCur.deps.length ||
-        cur.arrs.length !== baseCur.arrs.length ||
-        cur.flows.length !== baseCur.flows.length ||
-        cur.maxFlow !== baseCur.maxFlow
-      );
-    },
+    isFilteredView: () => isFilteredViewOf(P.current.cur, P.current.baseCur),
     flowsSet: () => {
       const atlas = P.current.atlas;
       if (!atlas) return null;
