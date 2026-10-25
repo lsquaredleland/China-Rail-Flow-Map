@@ -3,7 +3,10 @@
 // each file's own station table, then reports per-origin outbound /
 // inbound totals and every section whose flow changed, with the
 // section midpoint for geographic classification.
-// Usage: secdiff --old <v1.json> --new <v1.json> [--city <zh>] [--all]
+// `--edges` compares per-atomic-edge totals; `--classes` compares the per-edge
+// class columns (G D C S Z T K plain) and so catches a wrong class split
+// under equal totals.
+// Usage: secdiff --old <v1.json> --new <v1.json> [--city <zh>] [--all] [--edges|--classes]
 use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
@@ -137,13 +140,18 @@ fn flows_map(
 /// coords). Invariant to section chain direction and splitting, so it
 /// isolates true flow changes from representation churn.
 type EdgeKey = ((i64, i64), (i64, i64));
+/// total, then the 8 class columns
+type EdgeVal = [i64; 9];
 
-fn edge_flows(sections: &[Value], o: &Value, field: &str) -> HashMap<EdgeKey, i64> {
-    let mut m: HashMap<EdgeKey, i64> = HashMap::new();
+fn edge_flows(sections: &[Value], o: &Value, field: &str) -> HashMap<EdgeKey, EdgeVal> {
+    let mut m: HashMap<EdgeKey, EdgeVal> = HashMap::new();
     if let Some(fl) = o.get(field).and_then(|v| v.as_array()) {
         for f in fl {
             let idx = f[0].as_i64().unwrap_or(-1);
-            let n = f[1].as_i64().unwrap_or(0);
+            let mut v: EdgeVal = [0; 9];
+            for (j, c) in v.iter_mut().enumerate() {
+                *c = f.get(1 + j).and_then(|x| x.as_i64()).unwrap_or(0);
+            }
             if idx < 0 || idx as usize >= sections.len() {
                 continue;
             }
@@ -165,7 +173,10 @@ fn edge_flows(sections: &[Value], o: &Value, field: &str) -> HashMap<EdgeKey, i6
                     continue;
                 }
                 let key = if p < q { (p, q) } else { (q, p) };
-                *m.entry(key).or_insert(0) += n;
+                let acc = m.entry(key).or_insert([0; 9]);
+                for (a, b) in acc.iter_mut().zip(v.iter()) {
+                    *a += b;
+                }
             }
         }
     }
@@ -177,7 +188,8 @@ fn main() {
     let new_path = argval("--new").unwrap();
     let city_filter = argval("--city");
     let show_all = env::args().any(|a| a == "--all");
-    let edges_mode = env::args().any(|a| a == "--edges");
+    let classes_mode = env::args().any(|a| a == "--classes");
+    let edges_mode = classes_mode || env::args().any(|a| a == "--edges");
     let old: Value = serde_json::from_str(&fs::read_to_string(&old_path).unwrap()).unwrap();
     let new: Value = serde_json::from_str(&fs::read_to_string(&new_path).unwrap()).unwrap();
     let old_st = old
@@ -265,6 +277,7 @@ fn main() {
         }
     }
     if edges_mode {
+        let mut changed_total = 0usize;
         // true flow changes at atomic-edge level, per origin/direction
         for zh in cities.iter() {
             if let Some(cf) = &city_filter {
@@ -284,26 +297,55 @@ fn main() {
                 keys.dedup();
                 let mut lines: Vec<String> = Vec::new();
                 for k in keys {
-                    let ov = om.get(k).copied().unwrap_or(0);
-                    let nv = nm.get(k).copied().unwrap_or(0);
-                    if ov != nv {
+                    let ov = om.get(k).copied().unwrap_or([0; 9]);
+                    let nv = nm.get(k).copied().unwrap_or([0; 9]);
+                    // --classes: class columns only (equal or not totals)
+                    let changed = if classes_mode {
+                        ov[1..] != nv[1..]
+                    } else {
+                        ov[0] != nv[0]
+                    };
+                    if changed {
                         // midpoint in [lon, lat] degrees
                         let mlon = (k.0 .1 + k.1 .1) as f64 / 2.0 / 1e5;
                         let mlat = (k.0 .0 + k.1 .0) as f64 / 2.0 / 1e5;
-                        lines.push(format!(
-                            "  {} {:>4} -> {:>4}  mid=[{:.3},{:.3}]",
-                            label, ov, nv, mlon, mlat
-                        ));
+                        if classes_mode {
+                            lines.push(format!(
+                                "  {} {:?} -> {:?}  mid=[{:.3},{:.3}]",
+                                label,
+                                &ov[1..],
+                                &nv[1..],
+                                mlon,
+                                mlat
+                            ));
+                        } else {
+                            lines.push(format!(
+                                "  {} {:>4} -> {:>4}  mid=[{:.3},{:.3}]",
+                                label, ov[0], nv[0], mlon, mlat
+                            ));
+                        }
                     }
                 }
+                changed_total += lines.len();
                 if !lines.is_empty() {
-                    println!("== {} {} changed edges: {} ==", zh, label, lines.len());
+                    println!(
+                        "== {} {} changed {}: {} ==",
+                        zh,
+                        label,
+                        if classes_mode { "class edges" } else { "edges" },
+                        lines.len()
+                    );
                     for l in lines {
                         println!("{}", l);
                     }
                 }
             }
         }
+        println!(
+            "TOTAL changed {}: {}",
+            if classes_mode { "class edges" } else { "edges" },
+            changed_total
+        );
         return;
     }
     // section diffs per origin/direction

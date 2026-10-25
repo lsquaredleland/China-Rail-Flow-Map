@@ -1,9 +1,13 @@
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[path = "../chains.rs"]
+mod chains;
 
 const CORE: &[&str] = &[
     "北京",
@@ -777,14 +781,15 @@ fn dijkstra_chain(
     let mut dist: HashMap<String, f64> = HashMap::from([(a.to_string(), 0.0)]);
     let mut prev: HashMap<String, (String, Option<(String, String)>)> = HashMap::new();
     let mut visited: HashSet<String> = HashSet::new();
+    // min-heap on (cost bits, name): exact-cost ties pop in name order
+    let mut heap: BinaryHeap<Reverse<(u64, String)>> =
+        BinaryHeap::from([Reverse((0f64.to_bits(), a.to_string()))]);
     loop {
-        let mut best: Option<(String, f64)> = None;
-        for (k, v) in dist.iter() {
-            if !visited.contains(k) && best.as_ref().is_none_or(|(_, bv)| v < bv) {
-                best = Some((k.clone(), *v));
-            }
+        let Reverse((dbits, u)) = heap.pop()?;
+        if visited.contains(&u) {
+            continue;
         }
-        let (u, du) = best?;
+        let du = f64::from_bits(dbits);
         if u == b {
             break;
         }
@@ -795,6 +800,7 @@ fn dijkstra_chain(
                 if nd < *dist.get(v).unwrap_or(&f64::INFINITY) {
                     dist.insert(v.clone(), nd);
                     prev.insert(v.clone(), (u.clone(), pk.clone()));
+                    heap.push(Reverse((nd.to_bits(), v.clone())));
                 }
             }
         }
@@ -820,6 +826,19 @@ fn dijkstra_chain(
         .map(|k| pair_len.get(k).copied().unwrap_or(0.0))
         .sum();
     Some((pair_chain, drawn_total))
+}
+
+fn class_idx(c: &str) -> usize {
+    match c {
+        "G" => 0,
+        "D" => 1,
+        "C" => 2,
+        "S" => 3,
+        "Z" => 4,
+        "T" => 5,
+        "K" => 6,
+        _ => 7,
+    }
 }
 
 fn hav_km_ll(p: [f64; 2], q: [f64; 2]) -> f64 {
@@ -1369,6 +1388,25 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         .iter()
         .map(|o| o["zh"].as_str().unwrap().to_string())
         .collect();
+    // ---- flow rows: [sec, total, g, d, c, s, z, t, k, plain]; the class
+    // columns must add up to the total (a wrong class split under a right
+    // total passes every other check) ----
+    let (mut class_rows, mut class_bad) = (0u64, 0u64);
+    for (m, key) in [(&out_map, "flows"), (&in_map, "in_flows")] {
+        for o in arr(&m["origins"]).iter() {
+            for r in arr(&o[key]).iter() {
+                let r: Vec<i64> = arr(r).iter().map(int).collect();
+                class_rows += 1;
+                if r.len() < 2 || r.len() > 10 || r[2..].iter().sum::<i64>() != r[1] {
+                    class_bad += 1;
+                }
+            }
+        }
+    }
+    println!(
+        "AUDIT pack flow class columns: {class_rows} rows, {class_bad} where sum(classes) != total"
+    );
+    ok &= class_bad == 0;
     // ---- path continuity: exit of oriented section k-1 -> entry of k ----
     let mut worst: Vec<(f64, String)> = Vec::new();
     let (mut checked, mut gaps, mut chord_rows, mut chord_legs) = (0u64, 0u64, 0u64, 0u64);
@@ -2075,7 +2113,9 @@ fn main() {
         .collect();
     let mut adj_pure: CorridorAdj = HashMap::new();
     let mut adj: CorridorAdj = HashMap::new();
-    for (k, l) in pair_len.iter() {
+    let mut pair_lens: Vec<(&(String, String), &f64)> = pair_len.iter().collect();
+    pair_lens.sort_by(|a, b| a.0.cmp(b.0));
+    for (k, l) in pair_lens {
         adj_pure
             .entry(k.0.clone())
             .or_default()
@@ -2101,7 +2141,10 @@ fn main() {
         for s in all_stations.iter() {
             by_city.entry(city_of(s)).or_default().push(s.clone());
         }
-        for sts in by_city.values() {
+        let mut by_city: Vec<(String, Vec<String>)> = by_city.into_iter().collect();
+        by_city.sort();
+        for (_, sts) in by_city.iter_mut() {
+            sts.sort();
             if sts.len() < 2 || sts.len() > 12 {
                 continue;
             }
@@ -2160,6 +2203,7 @@ fn main() {
         deps: Vec<DepRaw>,
         home_pt: [f64; 2],
         train_leg_keys: Vec<Vec<(String, String, String)>>,
+        train_cls: Vec<usize>,
     }
     let mut works: Vec<CityWork> = Vec::new();
     let mut throat_stations: HashSet<String> = HashSet::new();
@@ -2170,6 +2214,7 @@ fn main() {
         let mut deps: Vec<DepRaw> = Vec::new();
         let mut outbound = 0u64;
         let mut train_legs: Vec<Vec<(String, String, String)>> = Vec::new();
+        let mut train_cls: Vec<usize> = Vec::new();
         for (ti, t) in trains.iter().enumerate() {
             let names = &train_names[ti];
             let cities = &train_cities[ti];
@@ -2252,6 +2297,7 @@ fn main() {
                 legs.push(key);
             }
             train_legs.push(legs);
+            train_cls.push(class_idx(&t.train_class));
         }
         let mut legs_vec: Vec<((String, String, String), u64)> = Vec::new();
         let mut resolved_flags: HashMap<(String, String, String), bool> = HashMap::new();
@@ -2302,6 +2348,7 @@ fn main() {
             deps,
             home_pt: [hp[1], hp[0]],
             train_leg_keys: train_legs,
+            train_cls,
         });
     }
 
@@ -2334,8 +2381,9 @@ fn main() {
     };
     // atomic edge -> per-city DISTINCT train counts (dedup, as production)
     let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
+    let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
     for (ci, w) in works.iter().enumerate() {
-        for legs in w.train_leg_keys.iter() {
+        for (legs, cidx) in w.train_leg_keys.iter().zip(w.train_cls.iter()) {
             let mut eset: HashSet<(i64, i64)> = HashSet::new();
             for key in legs.iter() {
                 let seqs = match leg_seqs(key, &leg_cache, &variant_cache) {
@@ -2362,84 +2410,19 @@ fn main() {
             }
             for e in eset {
                 *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
+                edge_class_counts
+                    .entry(e)
+                    .or_default()
+                    .entry(ci)
+                    .or_insert([0; 8])[*cidx] += 1;
             }
         }
     }
     println!("union atomic edges: {}", edge_counts.len());
     // intern count signatures: a global section has constant per-city counts
-    let mut sig_ids: HashMap<Vec<(usize, u64)>, u32> = HashMap::new();
-    let mut sig_list: Vec<Vec<(usize, u64)>> = Vec::new();
-    let mut edge_sig: HashMap<(i64, i64), u32> = HashMap::new();
-    for (e, m) in edge_counts.iter() {
-        let mut sig: Vec<(usize, u64)> = m.iter().map(|(c, n)| (*c, *n)).collect();
-        sig.sort();
-        let id = match sig_ids.get(&sig) {
-            Some(id) => *id,
-            None => {
-                let id = sig_list.len() as u32;
-                sig_list.push(sig.clone());
-                sig_ids.insert(sig, id);
-                id
-            }
-        };
-        edge_sig.insert(*e, id);
-    }
+    let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
     println!("distinct signatures: {}", sig_list.len());
-    let mut nadj: HashMap<i64, Vec<(i64, u32)>> = HashMap::new();
-    for (e, sid) in edge_sig.iter() {
-        nadj.entry(e.0).or_default().push((e.1, *sid));
-        nadj.entry(e.1).or_default().push((e.0, *sid));
-    }
-    let ekey = |u: i64, v: i64| if u < v { (u, v) } else { (v, u) };
-    let mut used: HashSet<(i64, i64)> = HashSet::new();
-    let mut section_chains: Vec<(u32, Vec<i64>)> = Vec::new();
-    for (e, sid) in edge_sig.iter() {
-        if used.contains(e) {
-            continue;
-        }
-        let sid = *sid;
-        let mut chain: Vec<i64> = vec![e.0, e.1];
-        used.insert(*e);
-        loop {
-            let cur = *chain.last().unwrap();
-            let prev = chain[chain.len() - 2];
-            let cands: Vec<i64> = nadj
-                .get(&cur)
-                .map(|v| {
-                    v.iter()
-                        .filter(|(n, s)| *n != prev && *s == sid)
-                        .map(|(n, _)| *n)
-                        .collect()
-                })
-                .unwrap_or_default();
-            if cands.len() == 1 && !used.contains(&ekey(cur, cands[0])) {
-                used.insert(ekey(cur, cands[0]));
-                chain.push(cands[0]);
-            } else {
-                break;
-            }
-        }
-        loop {
-            let cur = chain[0];
-            let next = chain[1];
-            let cands: Vec<i64> = nadj
-                .get(&cur)
-                .map(|v| {
-                    v.iter()
-                        .filter(|(n, s)| *n != next && *s == sid)
-                        .map(|(n, _)| *n)
-                        .collect()
-                })
-                .unwrap_or_default();
-            if cands.len() == 1 && !used.contains(&ekey(cur, cands[0])) {
-                used.insert(ekey(cur, cands[0]));
-                chain.insert(0, cands[0]);
-            } else {
-                break;
-            }
-        }
-        section_chains.push((sid, chain));
-    }
+    let section_chains = chains::build_section_chains(&edge_sig);
     // section endpoint station names (nearest real station point)
     let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
     for (a, b) in path_map.keys() {
@@ -2453,7 +2436,7 @@ fn main() {
         let mut best: Option<(&String, f64)> = None;
         for (nm, sp) in station_pts_all.iter() {
             let d = hav_km_ll(pt, *sp);
-            if d < 5.0 && best.is_none_or(|(_, bd)| d < bd) {
+            if d < 5.0 && best.is_none_or(|(bn, bd)| d < bd || (d == bd && nm < bn)) {
                 best = Some((nm, d));
             }
         }
@@ -2484,7 +2467,7 @@ fn main() {
             b: -1,
             g: polyline_encode(&simp),
         });
-        for (ci, n) in sig_list[*sid as usize].iter() {
+        for (ci, n, _) in sig_list[*sid as usize].iter() {
             flows_per_city[*ci].push([sec_idx, *n as usize]);
         }
     }
@@ -2503,7 +2486,7 @@ fn main() {
         let raw_n = chain.iter().filter(|id| coords.contains_key(id)).count();
         if raw_n < 2 {
             dropped_chains += 1;
-            for (_, n) in sig_list[*sid as usize].iter() {
+            for (_, n, _) in sig_list[*sid as usize].iter() {
                 dropped_flow += n;
             }
         }
@@ -2531,7 +2514,7 @@ fn main() {
         // signature flows per chain
         let mut sig_flow: HashMap<usize, u64> = HashMap::new();
         for (ch, (sid, _)) in section_chains.iter().enumerate() {
-            for (c2, n) in sig_list[*sid as usize].iter() {
+            for (c2, n, _) in sig_list[*sid as usize].iter() {
                 if *c2 == ci {
                     sig_flow.insert(ch, *n);
                 }
@@ -2599,7 +2582,7 @@ fn main() {
         for (ci, w) in works.iter().enumerate() {
             let mut sig_flow: HashMap<usize, u64> = HashMap::new();
             for (ch, (sid, _)) in section_chains.iter().enumerate() {
-                for (c2, n) in sig_list[*sid as usize].iter() {
+                for (c2, n, _) in sig_list[*sid as usize].iter() {
                     if *c2 == ci {
                         sig_flow.insert(ch, *n);
                     }
@@ -2733,7 +2716,7 @@ fn main() {
             .collect();
         let mut sig_flow: HashMap<usize, u64> = HashMap::new();
         for (ch, (sid, _)) in section_chains.iter().enumerate() {
-            for (c2, n) in sig_list[*sid as usize].iter() {
+            for (c2, n, _) in sig_list[*sid as usize].iter() {
                 if *c2 == ci {
                     sig_flow.insert(ch, *n);
                 }

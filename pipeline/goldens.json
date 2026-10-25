@@ -1,8 +1,8 @@
 {
   "exact": {
     "origins": 102,
-    "sections": 8431,
-    "in_sections": 8478,
+    "sections": 8432,
+    "in_sections": 8479,
     "schedules_trains": 7157,
     "chengdu_out": 564,
     "chengdu_dests": 610,
@@ -32,6 +32,6 @@
     "dep_rows_jump_gt35km_outside_chords": 0,
     "nonmonotone_sec_cnt_trains": 49,
     "dep_stops_time_regressions": 0,
-    "continuity_gaps_gt100m": 103390
+    "continuity_gaps_gt100m": 103384
   }
 }

@@ -44,6 +44,9 @@ Two products from one pipeline:
    Minard-style flow map of China's top 100 rail cities by outbound and
    inbound trains/day; line width = exact count of distinct trains/day per
    shared track section (per-train dedupe, strictly proportional).
+   A train that re-covers the same track (e.g. 土溪→平昌→达州) counts once in the
+   static flows while the animation shows each pass, so static < animated there
+   by design (成都 out, 达州 side: static 1, animated 2).
    Features Outbound + Inbound modes, exact per-train city-pair routing
    (clicking any station dot fades non-connecting trunks to ~18% opacity and
    draws the exact city-pair train volume at 100% opacity on top of the
@@ -209,7 +212,9 @@ ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
 AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
 ./target/release/secdiff --old ../staging/o1-build/o1v2/china-flow-atlas-data.json \
-    --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
+    --new $O/china-flow-atlas-data.json --edges   # 0 changed edges, except 8 on the 成都 loop vs the pre-O18 baseline (progress log, O18)
+./target/release/secdiff --old ... --new ... --classes   # per-edge class columns (8 classes)
+# atlas + atlaspack are deterministic: two runs on identical inputs are byte-identical (O18)
 ```
 The `--old` baseline is the build behind the committed pack (its `.br` files
 are md5-identical to `web/public/assets`); `staging/live-v1` predates O4-O1 and
