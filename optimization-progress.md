@@ -3,9 +3,9 @@
 Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update this file at the end of every work session.
 
 ## How to resume
-1. `cd /Users/leland/Downloads/china-rail-animation && git status --short --branch`: must be `explore/24h-train-flow-animation`.
+1. `cd ~/Downloads/china-rail-flow-map && git status --short --branch` (primary checkout since the 2026-10-24 migration; branch from `main`).
 2. Read the **Status** table and the newest **Session** entry below.
-3. Continue with the first phase not marked done. Never write into `/Users/leland/Downloads/china-rail-handoff-v3`.
+3. Continue with the first phase not marked done. Never write into `~/Downloads/china-rail-handoff-v3` (only `data/osm` remains there; this repo's `data/osm` links to it).
 
 ## Status (end of session 1, 2026-10-24)
 
@@ -15,35 +15,36 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | 1. Ordered, oriented paths (pipeline) | done in staging; full audit + goldens PASS; 0 changed edges vs live | retrace fix in; >35 km jumps outside chord legs = 0 (live old chainer: 5,804 rows) |
 | 2. Generated schedules (pipeline) | done in staging; schedules audit PASS | indexed by `t`; client switched |
 | Goldens gate | `pipeline/goldens.json` + `audit` gate (exact / max counters, `--update-goldens`) | dropped chains / flow lost gated only in full audit, not `--pack-only` |
-| 3. Throat stubs | ✅ O1, PR open | fmt 6 |
+| 3. Throat stubs | ✅ O1, PR #8 merged | fmt 6 |
 | 4. Client on new data | done (4.1–4.6, virtual crow-flies spans for chord legs); owner browser check OK | live assets swapped |
-| 5. Path dedupe | ✅ O6 (with O15), PR open | fmt 5 |
+| 5. Path dedupe | ✅ O6 (with O15), PR #6 merged | fmt 5 |
 
 ## Session 1 outcome (committed 2026-10-24)
 - Phases 0, 1, 2, 4.1–4.5, goldens gate, staged pack swapped into `web/public/assets/` (owner verified in browser: equivalent to pre-port). At commit: typecheck, build and `node staging/scripts/check_client_decode.mjs` pass.
 - **Finished after the usage-limit interruption:** (a) Phase 4.6 cleanup sweep: done (unused locals, 6 `as any` removed). (b) `docs/PIPELINE.md`: done (§3 step 5 live recipe + fmt-3 format; §7 now points to `pipeline/goldens.json`).
 
-## Backlog: optional improvements (not started)
+## Backlog: optional improvements
 | # | Item | Changes flows? | Notes |
 |---|---|---|---|
-| O1 | ✅ DONE (PR open): Phase 3 station-throat stubs | no | fmt 6: 9,128 geometry-only throats in the paths; continuity (3, 6] km 64,852 -> 43, > 6 km 391 -> 149; +248 KB brotli; see #### O1 |
+| O1 | ✅ DONE (PR #8, merged): Phase 3 station-throat stubs | no | fmt 6: 9,128 geometry-only throats in the paths; continuity (3, 6] km 64,852 -> 43, > 6 km 391 -> 149; +248 KB brotli; see #### O1 |
 | O2 | Triage the 417 continuity gaps over 6 km | no | 69 orientation-fixable, rest unexplained (e.g. K237 69.7 km); scripts in `staging/scripts/` |
 | O3 | Chord legs at a path end | no | no virtual span there, so the dot waits, then appears; use the stop/city point as the far end |
 | O4 | ✅ DONE (PR #2, merged 2026-10-24): fix router `#cv3` node coordinates in `atlas.rs` | **yes**: owner approval + staged diff | 13,420 chord rows / 223 legs (e.g. K118 成都西→广元) |
-| O5 | ✅ DONE (PR #7): resolve inbound-only legs | **yes**: owner approval | 1,587 chord rows / 304 legs; after O4+O5 only ~5 real gap legs remain |
-| O6 | ✅ DONE (with O15, PR open): per-train path dedupe | no | fmt 5: per-train `paths` / `stop_pos` / `chords`, per-row `dep_off` / `arr_len`; out-tables -304 KB, in-tables -121 KB; see #### O15 + O6 |
+| O5 | ✅ DONE (PR #7, merged): resolve inbound-only legs | **yes**: owner approval | 1,587 chord rows / 304 legs; after O4+O5 only ~5 real gap legs remain |
+| O6 | ✅ DONE (with O15, PR #6, merged): per-train path dedupe | no | fmt 5: per-train `paths` / `stop_pos` / `chords`, per-row `dep_off` / `arr_len`; out-tables -304 KB, in-tables -121 KB; see #### O15 + O6 |
 | O7 | 48 inbound loop trains with non-monotone `sec_cnt` | no | documented quirk (cutoff clamps to 0); decide whether to fix |
 | O8 | Gate `dropped chains` / `flow lost` in `--pack-only` audits too | no | currently only the full audit enforces them |
-| O9 | Fill real OSM geometry gaps (平昌→达州, 南京→扬州, …) | yes | data work, prerequisite noted in PIPELINE.md §4 |
+| O9 | ✅ DONE (with O5, PR #7, merged): fill real OSM geometry gaps (平昌→达州, 南京→扬州, …) | yes | data work, prerequisite noted in PIPELINE.md §4 |
 | O10 | Move the client city-coordinate patches (lib.ts `prepAtlas`: 铜仁, 兰溪, 溆浦) into the pipeline gazetteer | no flows; dest points + `distKm` change | from the PR #1 review (B); the pipeline should be the source of truth |
 | O11 | ~~U-turn overlap fix~~ | — | **Won't do** (owner 2026-10-24): a train reversing over track at a station is acceptable behaviour |
 | O12 | CI pack audit: run `audit --pack-only` on committed `web/public/assets` against `pipeline/goldens.json`; PR job diffs the PR's pack vs main's at edge level (like `secdiff`) and posts a summary comment | no | CI can't rebuild (needs 513 MB OSM + handoff inputs), so audit the committed pack; catches bad asset swaps and surfaces flow changes like O4 at review time |
 | O13 | Client regression tests (`bun test` in `web/tests/`): promote `staging/scripts/check_client_decode.mjs` + `check_filter_animation.mjs`; invariants on real assets (trainDistAt monotone, dwell == stop.dist, final-step flows == static flows with/without filters, animated trains ⊆ filter, 0 jumps outside chord legs) + snapshot tests (per-hour departed/arrived, per-section flow at fixed times for 2–3 origins) | no | wire into CI's web job |
-| O14 | ✅ DONE (PR #5, open): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
-| O15 | ✅ DONE (with O6, PR open): renumber sections (long paths first) + sort map flow rows + delta `sec_idx` | no (ids only) | fmt 5: out-map -535 KB, in-map -524 KB, shared -16 KB; first paint 1.62 -> 1.07 MB (-34%); see #### O15 + O6 |
-| O16 | ✅ DONE (in the fmt 5 PR): schedules load after first paint, in parallel with the out-tables | no | first paint (shared + out-map + outline) 2.07 -> 1.10 MB with O15; out-tables still wait for schedules, so dwells are never wrong; the schedule modal requests them itself and shows its loading note |
-| O17 | Make the corridor-v3 router deterministic | possibly | found in O5/O9 (PR #7): two control runs on identical inputs differed on 490 legs, so a full router rerun can't be shipped as-is (PR #7 spliced only the 阳江 records). Fix the iteration/tie-break order, then a full rerun becomes reviewable |
-| O18 | Make `atlas` section numbering deterministic | no | HashMap iteration renumbers sections every run; fmt 5 renumbers anyway, but determinism would make packs byte-reproducible and diffs trivial |
+| O14 | ✅ DONE (PR #5, merged): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
+| O15 | ✅ DONE (with O6, PR #6, merged): renumber sections (long paths first) + sort map flow rows + delta `sec_idx` | no (ids only) | fmt 5: out-map -535 KB, in-map -524 KB, shared -16 KB; first paint 1.62 -> 1.07 MB (-34%); see #### O15 + O6 |
+| O16 | ✅ DONE (PR #6, merged): schedules load after first paint, in parallel with the out-tables | no | first paint (shared + out-map + outline) 2.07 -> 1.10 MB with O15; out-tables still wait for schedules, so dwells are never wrong; the schedule modal requests them itself and shows its loading note |
+| O17 | IN PROGRESS (branch `fix/o17-o18-determinism`): make the corridor-v3 router deterministic | possibly | found in O5/O9 (PR #7): two control runs on identical inputs differed on 490 legs, so a full router rerun can't be shipped as-is (PR #7 spliced only the 阳江 records). Fix the iteration/tie-break order, then a full rerun becomes reviewable |
+| O18 | IN PROGRESS (branch `fix/o17-o18-determinism`): make `atlas` section numbering deterministic | no | HashMap iteration renumbers sections every run; fmt 5 renumbers anyway, but determinism would make packs byte-reproducible and diffs trivial |
+| O19 | Close the ~97k 0.1–1 km joins where the arriving and departing legs end on different station nodes | possibly | follow-up from O1 (see #### O1); not started |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
 
@@ -307,4 +308,4 @@ Read-only; scripts and decoded live pack in `staging/spotcheck/` (`g1.py`, `g2.p
 - Verified from the new home: the staged rebuild (O9 rerun + splice byte-identical to `staging/inputs/.../corridor-v3-o9`), full audit + goldens PASS, `secdiff --edges` 0 vs `staging/o1-build/o1v2`, roundtrip OK, `audit --pack-only` PASS on the committed assets, typecheck + build OK.
 - All worktrees removed; branches pushed. The handoff's unpushed local `main` commit is preserved as `backup/handoff-local-main-3484031`; its old stash 686f72a is saved as `staging/handoff-stash-686f72a.patch`.
 - `~/workspace/your_files` and `~/workspace/goals/china-rail-network-map/files` now point at the new `output/`.
-- Follow-up from O1: about 97k joins of 0.1-1 km remain, where the arriving and departing legs end on different station nodes (candidate O19).
+- Follow-up from O1: about 97k joins of 0.1-1 km remain, where the arriving and departing legs end on different station nodes (backlog O19).
