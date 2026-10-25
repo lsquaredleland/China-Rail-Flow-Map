@@ -42,8 +42,8 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O14 | ✅ DONE (PR #5, merged): dwell at every station, not just one per city (G3764: 重庆东 → 江北机场 → 重庆北) | no | `dep_stop_pos` (fmt 4) + client dwells from the schedule; see #### O14 |
 | O15 | ✅ DONE (with O6, PR #6, merged): renumber sections (long paths first) + sort map flow rows + delta `sec_idx` | no (ids only) | fmt 5: out-map -535 KB, in-map -524 KB, shared -16 KB; first paint 1.62 -> 1.07 MB (-34%); see #### O15 + O6 |
 | O16 | ✅ DONE (PR #6, merged): schedules load after first paint, in parallel with the out-tables | no | first paint (shared + out-map + outline) 2.07 -> 1.10 MB with O15; out-tables still wait for schedules, so dwells are never wrong; the schedule modal requests them itself and shows its loading note |
-| O17 | PR open after O18 (branch `fix/o17-router-determinism`, stacked on `fix/o17-o18-determinism`): make the corridor-v3 router deterministic | possibly | found in O5/O9 (PR #7): two control runs on identical inputs differed on 490 legs, so a full router rerun can't be shipped as-is (PR #7 spliced only the 阳江 records). Fix the iteration/tie-break order, then a full rerun becomes reviewable |
-| O18 | PR open (branch `fix/o17-o18-determinism`): make `atlas`/`atlaspack` deterministic (byte-reproducible packs) | no flow totals; class columns of 10 edges corrected, see #### O18 | HashMap iteration renumbers sections every run; fmt 5 renumbers anyway, but determinism would make packs byte-reproducible and diffs trivial |
+| O17 | PR #15 open, awaiting owner approval (changes flows; branch `fix/o17-router-determinism`): make the corridor-v3 router deterministic | possibly | found in O5/O9 (PR #7): two control runs on identical inputs differed on 490 legs, so a full router rerun can't be shipped as-is (PR #7 spliced only the 阳江 records). Fix the iteration/tie-break order, then a full rerun becomes reviewable |
+| O18 | ✅ DONE (PR #13, merged; pack swapped into `web/public/assets` 2026-10-24, owner-approved): make `atlas`/`atlaspack` deterministic (byte-reproducible packs) | no flow totals; class columns of 10 edges corrected, see #### O18 | HashMap iteration renumbers sections every run; fmt 5 renumbers anyway, but determinism would make packs byte-reproducible and diffs trivial |
 | O19 | Close the ~97k 0.1–1 km joins where the arriving and departing legs end on different station nodes | possibly | follow-up from O1 (see #### O1); not started |
 
 Rule for every item: staged rebuild → `audit` (goldens must pass or be deliberately rebased with `--update-goldens`) → `secdiff --edges` vs live → owner approval → swap.
@@ -56,7 +56,7 @@ Rule for every item: staged rebuild → `audit` (goldens must pass or be deliber
 ## Sessions
 
 ### Session 1 (2026-10-23)
-- Plan written (`optimization.md`), reviewed against `optimizations-gemini.md` (see the plan's notes in 1.2, 1.3, 4.2).
+- Plan written (`optimization.md`), reviewed against `optimizations-gemini.md` (deleted in PR #10; in git history) (see the plan's notes in 1.2, 1.3, 4.2).
 - Started Phase 0 and Phases 1–2 in parallel with subagents. Results are appended below by each agent.
 
 #### Phase 0 result (client-phase0)
