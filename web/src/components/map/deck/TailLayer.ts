@@ -1,7 +1,7 @@
 /* Motion-tail layer (C1): LineLayer has only getColor, so the tail fades from
    transparent at the source to opaque at the target by injecting
    `vColor.a *= positions.x` (positions.x is 0 at the source, 1 at the target).
-   Not drawn until P1b.3; kept here so the shader hook is reviewed with the host. */
+   Used by layers/trains.ts. */
 import { LineLayer } from "@deck.gl/layers";
 
 export class TailLayer<DataT = unknown> extends LineLayer<DataT> {

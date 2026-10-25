@@ -1,9 +1,12 @@
 // Deck flow layers: buildPassData / layer props, no GPU.
 import { describe, expect, test } from "bun:test";
-import { WIDTH_K, flowColor, flowPasses, isFerrySection, newModelCaches, palette, rgba } from "../src/lib";
+import { WIDTH_K, flowColor, flowPasses, getSelCache, isFerrySection, isTrainShown, newModelCaches, palette, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
+import type { SelCache, SelInput } from "../src/lib";
 import type { ModelState } from "../src/lib";
 import { buildPassData, flowPassLayers } from "../src/components/map/deck/layers/flows";
 import type { DestVM } from "../src/types";
+import { stationDots, stationLayers, stationRipples, stationRings } from "../src/components/map/deck/layers/stations";
+import { buildTrainBuffers, glowOf, shownTrains, tailLength, trainLayers } from "../src/components/map/deck/layers/trains";
 import { origin, pack } from "./fixture";
 
 const cur = origin("广州");
@@ -84,5 +87,112 @@ describe("buildPassData", () => {
     const pdf = buildPassData(set, passes[1].items, pal, 1, passes[1].maxN);
     expect(l.props.getWidth(undefined, { index: 0 })).toBeCloseTo((pdf.n[0] * WIDTH_K) / 12.5, 9);
     expect(l.props.data).toBe(pdf.data);
+  });
+});
+
+describe("station layers", () => {
+  const stIn = (animTime: number, pd: DestVM | null) => ({
+    points: cur.dests, panelDest: pd, hoverIdx: -1, dark: false, animEnabled: true,
+    animTime, totalMins: cur.timeline?.totalMins, sk: 0.5,
+  });
+  const memo = { selCache: null as SelCache | null };
+
+  test("dot radius = stationR(n) * stationZoomK(r, t); stroke 1.5 light / 3 dark", () => {
+    const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
+    const dots = stationDots(states, pal, false, false);
+    expect(dots.length).toBe(cur.dests.length);
+    for (let i = 0; i < dots.length; i += 37) {
+      const r = stationR(cur.dests[i].trains);
+      expect(dots[i].r).toBeCloseTo(r * stationZoomK(r, 0.5), 9);
+      expect(dots[i].lw).toBe(1.5);
+    }
+    expect(stationDots(states, palette(true), true, false)[0].lw).toBe(3);
+  });
+
+  test("ripple radius r + frac*7*kd, alpha 1 - frac; dimmed dots paint first", () => {
+    let found = false;
+    for (let t = 300; t < 1400 && !found; t += 5) {
+      const states = stationStates(stIn(t, null), null);
+      const rp = stationRipples(states, false);
+      const withR = states.filter((s) => s.ripple);
+      expect(rp.length).toBe(withR.length);
+      for (let k = 0; k < rp.length; k++) {
+        const s = withR[k], f = s.ripple!.frac;
+        expect(rp[k].r).toBeCloseTo(s.r0 * s.kd + f * 7 * s.kd, 9);
+        expect(rp[k].col[3]).toBe(Math.round(255 * Math.max(0, 1 - f)));
+        found = true;
+      }
+    }
+    expect(found).toBe(true);
+    const pd = dest;
+    const states = stationStates({ ...stIn(0, pd), animEnabled: false }, null);
+    const dots = stationDots(states, pal, false, true);
+    const firstFull = dots.findIndex((d) => d.fill[3] === 255);
+    expect(dots.slice(0, firstFull).every((d) => d.fill[3] < 255)).toBe(true);
+    expect(dots.slice(firstFull).every((d) => d.fill[3] === 255)).toBe(true);
+    const rings = stationRings({ panelDest: pd, hoverStation: null, hoverOrigin: true, originPt: [0, 0], sk: 0.5, dark: false });
+    expect(rings.map((r) => r.w)).toEqual([3, 2]);
+    expect(rings[1].r).toBe(14.5);
+  });
+
+  test("layer ids and origin disc", () => {
+    const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
+    const ls = stationLayers({ states, pal, dark: false, hasDest: false, originPt: [1, 2], panelDest: null, hoverStation: null, hoverOrigin: false, sk: 0.5, key: "k", posKey: "p" });
+    expect(ls.map((l) => l.id)).toEqual(["stations", "ripples", "origin", "rings"]);
+    expect(ls[2].props.getRadius).toBe(9);
+  });
+});
+
+describe("train layers", () => {
+  const tl = cur.timeline!;
+  const pd = dest;
+  const sel: SelInput = { cur, panelDest: pd, isolatedTrainCode: null, direction: "out" };
+  const memo = { selCache: null as SelCache | null };
+
+  test("dots exclude trains with isTrainShown === false; none beyond the destination window", () => {
+    const cache = getSelCache(sel, memo)!;
+    const maxArr = Math.max(...[...cache.win!.values()].map((w) => w.arrMins));
+    for (const t of [400, 600, 900, 1200]) {
+      const act = tl.getActiveTrains(t);
+      const shown = shownTrains(act, (c) => isTrainShown(sel, memo, t, c), null);
+      expect(shown.length).toBeLessThanOrEqual(act.length);
+      expect(shown.every((x) => isTrainShown(sel, memo, t, x.code))).toBe(true);
+      expect(shown.length).toBe(act.filter((x) => isTrainShown(sel, memo, t, x.code)).length);
+      if (t > maxArr) expect(shown.length).toBe(0);
+    }
+    const act = tl.getActiveTrains(600);
+    expect(shownTrains(act, () => true, act[0].code).map((x) => x.code)).toEqual([act[0].code]);
+  });
+
+  test("train dot getRadius 3 + ring width 2 (outer edge 4 px); isolated 4.15 / 2.7", () => {
+    const act = tl.getActiveTrains(600).slice(0, 20);
+    const mk = (iso: string | null) =>
+      trainLayers({ trains: act, scale: 100, isolatedCode: iso, selectedCode: null, hoveredCode: null, pickable: false, animTime: 600 });
+    const dot = mk(null).find((l) => l.id === "trains")!;
+    expect(dot.props.getRadius).toBe(3);
+    expect(dot.props.getLineWidth).toBe(2);
+    expect((dot.props.getRadius as number) + (dot.props.getLineWidth as number) / 2).toBe(4);
+    const isoDot = mk(act[0].code).find((l) => l.id === "trains")!;
+    expect(isoDot.props.getRadius).toBe(4.15);
+    expect(isoDot.props.getLineWidth).toBe(2.7);
+    expect(mk(null).map((l) => l.id)).toEqual(["tails", "trains", "dwell", "trainring"]);
+  });
+
+  test("tails: 12 px x speedFrac (22 isolated), none dwelling / on chord; source = pos - heading*len/scale", () => {
+    const act = tl.getActiveTrains(600).filter((x) => !x.isDwelling && !x.onChord && (x.speedFrac ?? 1) > 0.5).slice(0, 10);
+    const b = buildTrainBuffers(act, 50, null, null, null);
+    expect(b.count).toBe(act.length);
+    expect(b.tailCount).toBe(act.length);
+    for (let i = 0; i < act.length; i++) {
+      const len = tailLength(act[i], false);
+      expect(len).toBe(Math.round(12 * (act[i].speedFrac ?? 1)));
+      expect(b.tailTgt[i * 2]).toBeCloseTo(act[i].lon, 4);
+      expect(b.tailSrc[i * 2]).toBeCloseTo(act[i].lon - (Math.cos(act[i].heading) * len) / 50, 4);
+      expect(b.tailSrc[i * 2 + 1]).toBeCloseTo(act[i].lat - (Math.sin(act[i].heading) * len) / 50, 4);
+      expect(Array.from(b.line.subarray(i * 4, i * 4 + 3))).toEqual(glowOf(act[i].cls).slice(0, 3));
+    }
+    expect(tailLength({ ...act[0], isDwelling: true } as any, false)).toBe(0);
+    expect(tailLength({ ...act[0], onChord: true } as any, false)).toBe(0);
+    expect(tailLength({ ...act[0], speedFrac: 1 } as any, true)).toBe(22);
   });
 });

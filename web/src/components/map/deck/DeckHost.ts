@@ -12,11 +12,13 @@
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import { palette, viewToViewState } from "../../../lib";
+import { getSelCache, isTrainShown, palette, stationStates, stationT, viewToViewState } from "../../../lib";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
 import { flowLayers } from "./layers/flows";
+import { stationLayers } from "./layers/stations";
+import { shownTrains, trainLayers } from "./layers/trains";
 
 export interface PickOptions {
   x: number;
@@ -62,7 +64,7 @@ const NOTICE_TEXT = "Map paused — tap to resume";
 
 /* Debug query ?layers= (both renderers; removed in P1c.2): "backdrop" builds
    only the backdrop; "flows" adds chords, flows, infra and the hover highlight
-   (no stations or trains, which land in P1b.3). */
+   (no stations or trains). */
 const LAYERS = new URLSearchParams(location.search).get("layers");
 const GPU_TIME = new URLSearchParams(location.search).get("gputime") === "1";
 
@@ -105,9 +107,58 @@ function buildLayers(M: MapCtx): Layer[] {
       chords: cur.chords,
     });
     layers.push(...under);
-    // trains: P1b.3
+    if (st.animEnabled && LAYERS !== "flows") {
+      const tl = M.activeTimeline();
+      const active = tl ? M.activeTrainsAt(tl, st.animTime) : [];
+      const iso = P.current.isolatedTrainCode;
+      const shown = shownTrains(active, (code) => isTrainShown(P.current, st, st.animTime, code), iso);
+      layers.push(
+        ...trainLayers({
+          trains: shown,
+          scale: st.view.scale,
+          isolatedCode: iso,
+          selectedCode: P.current.selectedTrainCode,
+          hoveredCode: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
+          pickable: !st.animPlaying,
+          animTime: st.animTime,
+        }),
+      );
+    }
     layers.push(...over);
-    // stations: P1b.3
+    if (LAYERS !== "flows") {
+      const sk = stationT(st.view, st.fitScale);
+      const dark = P.current.dark;
+      const pd = P.current.panelDest ?? null;
+      const hover = st.hover;
+      const states = stationStates(
+        {
+          points: M.points(),
+          panelDest: pd,
+          hoverIdx: hover && hover.kind === "station" ? hover.station.idx : -1,
+          dark,
+          animEnabled: st.animEnabled,
+          animTime: st.animTime,
+          totalMins: M.activeTimeline()?.totalMins,
+          sk,
+        },
+        getSelCache(P.current, st),
+      );
+      layers.push(
+        ...stationLayers({
+          states,
+          pal: palette(dark),
+          dark,
+          hasDest: !!pd,
+          originPt: [cur.o.pt[0], cur.o.pt[1]],
+          panelDest: pd,
+          hoverStation: hover && hover.kind === "station" ? hover.station : null,
+          hoverOrigin: !!hover && hover.kind === "origin",
+          sk,
+          key: [dark, Math.round(sk * 1000), st.animEnabled ? st.animTime : -1, pd?.idx, hover?.kind, hover && hover.kind === "station" ? hover.station.idx : -1, P.current.cur?.o.zh, P.current.direction].join("|"),
+          posKey: (cur.o.zh ?? "") + "|" + P.current.direction,
+        }),
+      );
+    }
   }
   return layers;
 }

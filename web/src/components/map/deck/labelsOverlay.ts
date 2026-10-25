@@ -3,8 +3,9 @@
    the Canvas renderer (map/stations.ts drawLabels), so placement is identical;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
-import { palette, placeLabels, stationT } from "../../../lib";
+import { isTrainShown, palette, placeLabels, stationT } from "../../../lib";
 import type { MapCtx } from "../context";
+import { glowOf, shownTrains } from "./layers/trains";
 
 const fontOf = (fs: number, weight: string) =>
   weight +
@@ -71,6 +72,7 @@ export function drawLabelsOverlay(M: MapCtx) {
     ctx.textAlign = align;
     ctx.fillText(text, x, y);
   }
+  drawTrainTags(M, ctx);
   // The origin's diamond; its disc is a deck layer (P1b.3).
   const cx = M.X(cur.o.pt[0]);
   const cy = M.Y(cur.o.pt[1]);
@@ -80,4 +82,45 @@ export function drawLabelsOverlay(M: MapCtx) {
   ctx.fillStyle = dark ? "#1A1B1E" : "#ffffff";
   ctx.fillRect(-2.2, -2.2, 4.4, 4.4);
   ctx.restore();
+}
+
+/* The hovered / selected / isolated train's code tag (map/trains.ts), above
+   the dots. The same visibility rules as the dot layer. */
+function drawTrainTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
+  const { S, P } = M;
+  const st = S.current;
+  if (!st.animEnabled) return;
+  const tl = M.activeTimeline();
+  if (!tl) return;
+  const iso = P.current.isolatedTrainCode;
+  const hov = st.hover && st.hover.kind === "train" ? st.hover.train.code : null;
+  const sel = P.current.selectedTrainCode;
+  if (!iso && !hov && !sel) return;
+  const shown = shownTrains(M.activeTrainsAt(tl, st.animTime), (c) => isTrainShown(P.current, st, st.animTime, c), iso);
+  for (const tr of shown) {
+    const isIsolated = iso === tr.code;
+    if (!(isIsolated || hov === tr.code || sel === tr.code)) continue;
+    const px = M.X(tr.lon);
+    const py = M.Y(tr.lat);
+    if (px < -20 || px > st.W + 20 || py < -20 || py > st.H + 20) continue;
+    const g = glowOf(tr.cls);
+    const glow = `rgb(${g[0]},${g[1]},${g[2]})`;
+    ctx.font = "bold 10px monospace";
+    const tagText = isIsolated ? `${tr.code} · ${tr.progressPct}%` : tr.code;
+    const tagW = ctx.measureText(tagText).width + 8;
+    const tagH = 16;
+    const tagX = px - tagW / 2;
+    const tagY = py - 18;
+    ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+    ctx.beginPath();
+    ctx.roundRect(tagX, tagY, tagW, tagH, 3);
+    ctx.fill();
+    ctx.strokeStyle = glow;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(tagText, px, tagY + tagH / 2);
+  }
 }
