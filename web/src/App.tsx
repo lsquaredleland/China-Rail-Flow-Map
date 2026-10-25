@@ -18,9 +18,9 @@ import ActiveFilterBar from "./components/ActiveFilterBar";
 import { IsolationChip, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 
-// ?renderer=deck selects the deck.gl origin renderer; the default is Canvas 2D.
+// The deck.gl renderer is the default; ?renderer=canvas is the Canvas 2D escape hatch (until P1c.2).
 const RENDERER: "canvas" | "deck" =
-  new URLSearchParams(location.search).get("renderer") === "deck" ? "deck" : "canvas";
+  new URLSearchParams(location.search).get("renderer") === "canvas" ? "canvas" : "deck";
 
 export default function App() {
   const atlasRef = useRef<DecodedAtlas | null>(null);

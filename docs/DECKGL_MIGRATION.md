@@ -434,7 +434,7 @@ ordered flow passes, imperative host, settled-frame rule, corrected stroke radii
 
 Dependency graph:
 `P1.0` → (`P1.1` ∥ `P1a.1` ∥ `P1a.2` ∥ `P1a.3`) → `P1b.1` (needs P1.1, P1a.1) → `P1b.2`
-(needs P1a.2) → `P1b.3` (needs P1a.3) → `P1b.4` → `P1b.5` → `P1c.1` → `P1c.2`.
+(needs P1a.2) → `P1b.3` (needs P1a.3) → `P1b.4` → `P1b.5` → `P1c.1` → `P1c.2` → `P1c.3` (follow-up).
 `P2.1` (national timelines, pure) may start any time after P1.0; its files are disjoint.
 
 **P1.0 Render seam in `MapCtx`** — *sequential first (touches files the 1a tasks edit).*
@@ -624,7 +624,7 @@ not the gate), M10 label eyeball (decides whether the softer overlay text needs 
 
 **Verdict for gate G1: PASS.** Every scenario is far under its threshold (worst 0.61 %, limit 2.0 %), the §6.1 rows are green, context loss recovers, the interaction checklist matches on both renderers, perf passes on the real build. M3 (phones), the R8 feel checklist and the M10 label eyeball stay owner steps (informational, not blocking). No "needs owner sign-off" line is required for parity.
 
-*Fix made (fractional height, P1b.1 follow-up).* `#mapwrap` is 509.375 px (1.5 px border included); Canvas lays the world out in `S.W x S.H` = 1280 x 509.375 on a 509-row bitmap that the browser stretches into the 508.375 px CSS box, while deck's viewport is its rounded drawing buffer (508 rows at DPR 1/2) and its `target` was computed with `S.H`. Measured: deck and Canvas bitmaps were up to 0.5 px apart vertically (the best whole-pixel shift of the deck image was 0, so it is a sub-pixel effect; `guangzhou-initial@2x` had 16,025 differing px and mean channel delta 0.79). `DeckHost.render()` now passes a per-axis zoom `[z + log2(vp.width/S.W), z + log2(vp.height/S.H)]` (`OrthographicViewport` supports `zoom: [x, y]`); `target` is unchanged and the mapping is exactly Canvas's (derivation in the code comment). Labels, legend and pointer maths already used `S.W/S.H`. Before / after, pixelmatch %:
+*Fix made (fractional height, P1b.1 follow-up).* `#mapwrap` is 509.375 px (1.5 px border included); Canvas lays the world out in `S.W x S.H` = 1280 x 509.375 on a 509-row bitmap that the browser stretches into the 508.375 px CSS box, while deck's viewport is its rounded drawing buffer (508 rows at DPR 1/2) and its `target` was computed with `S.H`. Measured: deck and Canvas bitmaps were up to 0.5 px apart vertically (the best whole-pixel shift of the deck image was 0, so it is a sub-pixel effect; `guangzhou-initial@2x` had 16,025 differing px and mean channel delta 0.79). `DeckHost.render()` now passes a per-axis zoom `[z + log2(vp.width/S.W), z + log2(vp.height/S.H)]` (`OrthographicViewport` supports `zoom: [x, y]`); `target` is unchanged and the mapping matches Canvas's up to a residual of about 0.5 device px at the bottom edge (the viewport height is the integer 508 while the CSS box is 508.375; derivation in the code comment). Labels, legend and pointer maths already used `S.W/S.H`. Before / after, pixelmatch %:
 
 | scenario | 1x before | 1x after | 2x before | 2x after |
 |---|---|---|---|---|
@@ -662,7 +662,7 @@ not the gate), M10 label eyeball (decides whether the softer overlay text needs 
 | selected-city-minimized | 2.0 | 0.483 | 0.605 | 0.88 | 1.11 |
 | selected-city | 2.0 | 0.483 | 0.605 | 0.88 | 1.11 |
 
-All 28 pass. `selected-city` and `selected-city-minimized` are pixel-identical (minimize keeps the selection, §6.1). Masks: `docs/deckgl-spike/p1b5/` (all 14 at DPR 1; DPR 2 for `selected-city`, `class-filter-G`, `guangzhou-initial`, `anim-1815`, `labels-on`, `infra-on`; 3.4 MB; the other DPR 2 masks are reproducible with `cmp.mjs --pixelmatch --diff`). `labels-on` improved because the deck map and the overlay labels are now in one frame.
+All 28 pass. `selected-city` and `selected-city-minimized` show the same map (minimize keeps the selection, §6.1) and have the same differing-pixel counts. Masks: `docs/deckgl-spike/p1b5/` (all 14 at DPR 1; DPR 2 for `selected-city`, `class-filter-G`, `guangzhou-initial`, `anim-1815`, `labels-on`, `infra-on`; 3.4 MB; the other DPR 2 masks are reproducible with `cmp.mjs --pixelmatch --diff`). `labels-on` improved because the deck map and the overlay labels are now in one frame.
 
 *Solid differing regions >= 8 x 8 px* (windows of fully red mask pixels, clustered; 26 of the 28 images have none):
 - `class-filter-G@2x`: one, x 1363-1376, y 1399-1408 (lower right of the map), the dimmed context band. Cause: D3. Canvas alpha-blends overlapping context strokes (darker where bands overlap and at round caps); deck draws the pre-blended opaque colour (lighter, flat).
@@ -678,7 +678,7 @@ Everything else is single-pixel AA fringes of the 0.45-2.5 px network / flow edg
 |---|---|
 | Destination window / stop effects | `stopEffects.test.ts`, `mapModel.test.ts` green (154 pass, 0 fail, 16 files); `selected-city` 0.61 %, `anim-1815` 0.13 % |
 | Heading count, station breakdown | unchanged tests green |
-| Minimize keeps selection | `selected-city-minimized` identical to `selected-city` (same differing px count) |
+| Minimize keeps selection | `selected-city-minimized` shows the same map as `selected-city` (same differing px count) |
 | Stale reload | `staleReload.test.ts` green; driver with `serve.mjs --404`: `atlas-v2-shared` 404 gives exactly one reload on Canvas and on deck, 0 pageerror; `DeckHost` chunk 404 gives exactly one recovery reload |
 | Backdrop toggles | `infra-on` 0.42 / 0.11 %; checklist: `showNetwork` off/on and `showOutline` off/on equal state and <= 0.07 % pixel difference on both renderers |
 | Hover priority, tap behaviour | `pick.test.ts`; hover driver at city-zoom-x10, paused 18:15: 684 positions (stations at four offsets + a 24 x 12 grid), 676 identical tooltips, 8 where only the Canvas tooltip was still fading in (Canvas blank, deck showing the expected station or train), 0 positions with different content; P1b.4 click / tap checks unchanged (picking code untouched) |
@@ -689,7 +689,7 @@ Everything else is single-pixel AA fringes of the 0.45-2.5 px network / flow edg
 
 *Interaction checklist (`web/tools/g1-checklist.mjs`, both renderers, same steps).* At every step the camera, selected destination, isolated train, class filter, histogram bin, direction, theme, backdrop flags and scale-bar label were equal on Canvas and deck, with 0 `pageerror` on either, and the screenshots agree under pixelmatch: pan 0.07 %, wheel in / out 0.05 / 0.03 % (scale 30.56 to 53.50 to 35.87), two-finger touch pinch out / in 0.03 / 0.07 % (30.56 to 101.9 to 40.75), fit country / fit home / zoom buttons <= 0.18 %, URL restore 0.05 %, scale bar ("200 km", "200 mi", "100 mi", "200 km" after zoom) equal, select 深圳 0.61 %, isolation 0.31 %, class filter G 0.15 %, histogram bin 0.62 %, inbound 0.07 %, seek 18:15 / play 2.5 s / seek 06:00 <= 0.13 %, night 0.02 %, DPR 1 / 2 / 3 initial 0.22 / 0.07 / 0.30 % and with 深圳 selected 0.48 / 0.61 / 0.77 %, backdrop toggles <= 0.07 %. (A first run did the touch pinch after a mouse drag in the same page and Chrome pinch-zoomed the document; the driver now runs the pinch in its own page.)
 
-*Perf on the real build (`tools/perf/origin.mjs --dpr 2 --query '&renderer=deck'`, 300 frames per view, median of 3 reps).* M1: rAF p95 16.7-16.8 ms in 9/9, draw+raster p95 **10.0 / 10.5 / 11.1 ms** (origin-initial / close-up / national-fit; limit 16.7), JS draw p95 1.5-1.6 ms. M2 (4x CPU throttle): rAF p95 16.7-16.8 ms (limit 33.4), draw+raster p95 **12.6 / 12.8 / 13.4 ms**, JS draw p95 4.2-5.4 ms. M4: `deck.metrics.gpuMemory` 2.78 MB at 广州 + 深圳 selected + infra on (limit 64; it includes the binary flow / infra attributes; the figure is lower than the spike's 10.4 MB because of the P1b.2 shared-buffer layout). M7: chunk request to first deck frame, packs cached, **150-158 ms** at 1x and 393-540 ms at 4x (limit 1.0 s; includes the origin data being ready; cold first run 162 / 398 ms). M12: see context loss. M6: lazy graph **226.1 KB brotli** (limit 300); the React-in-lazy-graph guard in `bundle.mjs` passes (build exits 0).
+*Perf on the real build (`tools/perf/origin.mjs --dpr 2 --query '&renderer=deck'`, 300 frames per view, median of 3 reps).* M1: rAF p95 16.7-16.8 ms in 9/9, draw+raster p95 **10.0 / 10.5 / 11.1 ms** (origin-initial / close-up / national-fit; limit 16.7), JS draw p95 1.5-1.6 ms. M2 (4x CPU throttle): rAF p95 16.7-16.8 ms (limit 33.4), draw+raster p95 **12.6 / 12.8 / 13.4 ms**, JS draw p95 4.2-5.4 ms. M4: `deck.metrics.gpuMemory` 2.78 MB at 广州 + 深圳 selected + infra on, **read before any pick, so it was an undercount; corrected in the P1c.1 note below** (post-pick: 56.8 MB at DPR 2 and 125.5 MB at DPR 3 before the fix; 14.7 / 30.6 MB after). The layer buffers themselves are 2.3-2.7 MB (lower than the spike's 10.4 MB because of the P1b.2 shared-buffer layout). M7: chunk request to first deck frame, packs cached, **150-158 ms** at 1x and 393-540 ms at 4x (limit 1.0 s; includes the origin data being ready; cold first run 162 / 398 ms). M12: see context loss. M6: lazy graph **226.1 KB brotli** (limit 300); the React-in-lazy-graph guard in `bundle.mjs` passes (build exits 0).
 
 *Gates.* `bun run typecheck` clean, `bun test` 154 pass / 0 fail, `bun run build` ok. `pixelmatch` is now pinned to `8.0.0` (was `^8.0.0`); the library needs no dependency (its `pngjs` dependency is only for its CLI; `cmp.mjs` uses its own PNG codec).
 
@@ -698,7 +698,28 @@ Everything else is single-pixel AA fringes of the 0.45-2.5 px network / flow edg
 **Phase 1c: flip and delete, on `deckgl` only.**
 
 **P1c.1 Flip** — *after G1.* `App.tsx`: default renderer `deck`; `?renderer=canvas` stays
-as an escape hatch until P1c.2. Acceptance: `shots.mjs` default build = the P1b.5 deck shots.
+as an escape hatch until P1c.2. Acceptance (the old deck PNGs are gone, so it is stated on one
+build): `shots.mjs` default vs `?renderer=deck` on the same build = 0 differing px across all
+28 shots; default vs `?renderer=canvas` stays within the C20 thresholds (`cmp.mjs --pixelmatch`).
+Also in P1c.1 (G1 review findings): the M4 picking-memory fix, `Deck` `onResize` hardening,
+a live-resize step in `g1-checklist.mjs`, tool nits.
+
+*P1c.1 as built (2026-10-25, agent; same GPU, load average 2.7-4.3).*
+
+**M4 correction and fix.** The P1b.5 reading (2.78 MB) was taken before the first pick. deck 9.4.0's `DeckPicker._resizeBuffer` allocates, on the first pick, two framebuffers the size of the drawing buffer: an rgba8unorm + depth16 picking framebuffer, and an rgba32float + depth16 "depth" framebuffer that only serves `pickZ` (never used here). Post-pick `deck.metrics.gpuMemory` (广州 + 深圳 selected + infra on, 41 `pickRect` calls):
+
+| viewport @ DPR | P1b.5 build (before) | with the fix (after) | depth framebuffer cost |
+|---|---|---|---|
+| 1280x800 @ 1 | 16.3 MB | 5.8 MB | 10.5 MB |
+| 1280x800 @ 2 | 56.8 MB | 14.7 MB | 42.2 MB |
+| 1280x800 @ 3 | **125.5 MB (fails 64)** | 30.6 MB | 94.9 MB |
+| 390x844 @ 3 (phone) | 44.4 MB | 11.8 MB | 32.6 MB |
+
+Pre-pick it is 2.3-2.7 MB at every size (buffers only). Fix, option (a): `dropDepthPickBuffer` in `DeckHost.ts` wraps the picker instance's `_resizeBuffer` and, for that one call, makes `device.isTextureFormatRenderable('rgba32float')` report false, so deck skips creating the depth framebuffer (deck guards every use with `if (this.depthFBO)`; `pickZ` is unused). No `node_modules` patch, no option exists in 9.4.0, ~15 lines, applied in `onLoad` of each `Deck` (also after a context-loss re-creation). Options (b) (reduced-resolution picking: deck's picking maths assumes the framebuffer is the drawing-buffer size) and (c) (idle release) were not needed. **The D8 DPR-2 cap was not extended to origin mode**: the worst case (1280x800 @ 3) is 30.6 MB, well under 64 MB, so origin mode keeps `min(3, dpr)`. The fallback stays available (a coarse-pointer cap of 2 would cut the picking framebuffer by 2.25x) if M3 on phones shows pressure. Pick cost, median of 41 `pickRect` calls (9 x 9 px, three proxy layers): 0.4-0.6 ms (was 0.5-0.7 ms); the first pick, which allocates, is 10-24 ms in both. The P1b.4 parity driver (6 scenarios, ~931 positions each) is unchanged by the fix: 100 % in four scenarios and 99.89 % (one position) in `city-zoom-x30` and `selected-city-x10`, identically on the P1b.5 build before the fix. Both are overlapping-segment ties (`seg:7565` vs `seg:5745`, `seg:7724` vs `seg:7738`) at sub-pixel offsets, most likely from the P1b.5 fractional-viewport change; the earlier 100 % was measured before it. Not investigated further here.
+
+**Resize hardening.** `Deck` gets `onResize: () => render()` (guarded to the current canvas). luma re-measures the canvas from a `ResizeObserver` later than `resize(M)` runs, so the viewport size could change after the per-axis zoom was computed; now the redraw (and the zoom recompute) happens when deck's viewport actually changes. `g1-checklist.mjs` has a `resize` group on both renderers (zoom in, shrink the window to 1000x700, grow back to 1280x800): the geographic centre is kept (112.25, 28.8 on both, at every step), state equal, pixelmatch 0.05-0.07 %, 0 `pageerror`; a differing centre or any `pageerror` now fails the script.
+
+**Acceptance numbers.** Shots, default vs `?renderer=deck` (28 PNGs): 0 differing px in 28/28 on the second run; the first run had 9 px (max delta 19) in `labels-on@1x`, which did not reproduce in three reruns of that scenario (a label-fade timing flake of the driver, not a renderer difference). Default vs `?renderer=canvas`, `--pixelmatch`: worst 0.605 % (`selected-city@2x`; limit 2.0), all 28 under their limits (the P1b.5 table is reproduced to within 0.01 %). `bun run typecheck` clean, `bun test` 154 pass / 0 fail, M6 lazy graph 226.4 KB brotli (limit 300), React guard passes (build exits 0). g1-checklist (both renderers, now with explicit `&renderer=`): 39 steps, state equal in all, worst pixelmatch 0.77 %, 0 `pageerror`. Context loss (`g1-ctxloss.mjs`, now pauses and re-seeks to 18:15 before each count): DPR 2 239,452 before and after, DPR 1 68,168 before and after, playing and paused, exactly one re-creation per loss, 0 `pageerror`. Perf (`origin.mjs --dpr 2`, default build, 3 reps): rAF p95 16.7-16.8 ms, draw+raster p95 median 10.1 / 10.7 / 10.9 ms (origin-initial / close-up / national-fit; P1b.5: 10.0 / 10.5 / 11.1), JS draw p95 1.5-1.8 ms; one rep with 12.6 ms at national-fit was a load outlier. M2 (4x throttle): rAF p95 16.7-16.8 ms, draw+raster p95 13.6 / 12.9 / 13.5 ms. Stale assets (`serve.mjs --404`): `atlas-v2-shared` 404 gives exactly one reload on the default and on `?renderer=canvas`; a `DeckHost-` chunk 404 gives exactly one reload on the default (then "The map renderer could not be loaded", the designed path via `importFailureDecision`) and none on the Canvas hatch (it never fetches the chunk); 0 `pageerror` in all four.
 
 **P1c.2 Delete Canvas** — *after P1c.1; its own PR.* Files deleted: `backdrop.ts` (240),
 `flows.ts` drawing (`traceInto`, `tracePartialSec`, `strokeFlowList`, `drawInfra`,
@@ -708,6 +729,15 @@ the `interaction.ts` Canvas pick maths, `BackdropCache`/`tailGradRef` in `contex
 `<canvas id="map">` element stays as the labels overlay and pointer target); `?renderer=`
 removed. **Kept:** `pointer.ts`, the wheel listener and `camera.ts zoomAt` (D17). Acceptance:
 no TS errors; tests green; `shots.mjs` vs the P1c.1 build = 0 differing pixels.
+
+**P1c.3 Padding-box viewport (follow-up; after P1c.2, its own re-baseline PR; recorded, not built).**
+`resize()` (`camera.ts`) measures `#mapwrap`'s border-inclusive rect (`getBoundingClientRect`,
+509.375 px with the 1.5 px `border-bottom` in `map.css`), while the canvases fill the padding box
+(508.375 px). Deck's per-axis zoom in `DeckHost.render()` reproduces that artifact. Change
+`S.W` / `S.H` to the padding box (`clientWidth` / `clientHeight` of the wrapper, or the rect minus
+borders) and drop the per-axis zoom, which makes the viewport square-pixel by construction.
+This moves every camera-dependent pixel by up to 0.5 px, so shots are re-baselined in that PR
+(no cross-version zero-diff criterion) and the URL camera / fit maths are re-checked.
 
 **G-MAIN (owner, D16).** After P1c.2 the owner decides whether `deckgl` merges to `main` now
 (origin view on deck, no national mode) or after Phase 2. Agents do not open that PR.
@@ -922,7 +952,7 @@ mattered.
 | M1 frame time, origin anim on 广州, national fit | rAF p95 **16.7–16.8 ms** in 3/3 reps (≤ 16.7); draw+raster (forced `readPixels` flush) p95 **8.5–8.9 ms**; JS draw p95 1.1–1.3 ms; `deck.metrics.cpuTimePerFrame` **2.4–2.9 ms** (≤ 4); `gpuTimePerFrame` 2.8–3.1 ms | rAF p95 16.7-16.8 ms (9/9 reps); draw+raster p95 **10.0 / 10.5 / 11.1 ms** (origin-initial / close-up / national-fit, DPR 2); JS draw p95 1.5-1.6 ms | PASS | agent, 10-25 |
 | M2 M1 at 4× CPU throttle | rAF p95 **33.3 / 16.8 / 16.7 ms** (reps 1–3; median 16.8; ≤ 33); draw+raster p95 11.9–13.9 ms; JS draw p95 4.5–6.2 ms; cpuTimePerFrame 8.7–11 ms | rAF p95 16.7-16.8 ms; draw+raster p95 **12.6 / 12.8 / 13.4 ms**; JS draw p95 4.2-5.4 ms (median of 3) | PASS (one rep at exactly 2 vsyncs, 33.3) | agent, 10-25 |
 | M3 phones | not run | — | owner step, §11.4 | owner |
-| M4 GPU memory, 广州 + selected city + infra on | **10.4 MB** buffer memory (≤ 64); equals the sum of layer attribute buffers (10.35 MB: flows 2×2.55, infra 2×1.95, network 0.88) | **2.78 MB** `gpuMemory` (≤ 64) | PASS | agent, 10-25 |
+| M4 GPU memory, 广州 + selected city + infra on | **10.4 MB** buffer memory (≤ 64); equals the sum of layer attribute buffers (10.35 MB: flows 2×2.55, infra 2×1.95, network 0.88) | P1b.5 read **2.78 MB** `gpuMemory` before any pick (undercount). **Post-pick** (G1 review, P1c.1): before the fix 16.3 / 56.8 / **125.5 MB** at DPR 1 / 2 / 3 (1280x800; 44.4 MB for 390x844 @ 3), of which the unused pickZ depth framebuffer was 10.5 / 42.2 / 94.9 MB; after the fix **5.8 / 14.7 / 30.6 MB** (11.8 MB phone @ 3), all ≤ 64 | PASS after the P1c.1 fix (FAIL at DPR 3 before it) | agent, 10-25 |
 | M6 bundle | deck chunk (all deck/luma/math/loaders code the spike uses): **907 KB min, 253 KB gzip, 209 KB brotli** (≤ 300 brotli). The spike inlines it (`index.html` JS 392,735 → 1,348,019 B) because the lazy split is P1.1, so the chunk is measured standalone (`web/tools/spike/size.mjs`) | lazy graph **226.1 KB brotli** (≤ 300); React guard passes | PASS | agent, 10-25 |
 | M7 time to first deck frame, packs cached | **84 ms** (1×; 3 warm runs 82–85 ms, cold first run 571 ms) and **240–268 ms** at 4× (≤ 1.0 s) | **150-158 ms** warm (chunk request to first frame, 1×), 393-540 ms at 4× (≤ 1.0 s) | PASS | agent, 10-25 |
 | M8 projection exactness | **7.3e-11 px** worst over 1,000 random points × 5 zooms (≤ 1e-6); `web/tests/deckProjection.test.ts` on the spike | — | PASS | agent, 10-25 |
