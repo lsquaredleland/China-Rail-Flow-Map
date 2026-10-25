@@ -304,8 +304,19 @@ rebuild, and what `audit` expands to):
   means section `s` is travelled against its stored point order. A train
   that runs back over track it already used repeats those sections; only
   back-to-back duplicates collapse (of the same signed section, also across
-  throats in between). Flow counting still dedupes per train. Entries `>= n`
-  are throats (above).
+  throats in between). A leg that runs back over only part of a section the
+  row also runs whole (a reversal at a station, a turn-back onto a branch)
+  draws that stretch as a piece (an entry `>= n`, interned like a throat)
+  instead of the whole section again, so the path stays continuous; the
+  row's set of flow sections is unchanged. Flow counting still dedupes per
+  train. Entries `>= n` are throats and such pieces (above).
+- Sections are chains of edges with equal per-city counts. At a junction
+  (3+ edges) a chain also needs both edges to carry the same trains, so two
+  branches that only happen to carry equal counts are separate sections
+  (`chains.rs`). Chains are also cut where a row's walk leaves or joins
+  equal-count track mid-way (it stops, turns back, or turns off while the
+  track goes on: a reversal at a station or a junction), so rows run whole
+  sections (`atlas.rs` `chain_cuts`).
 - Positions (`dep_chord_legs`, `arr_chord_legs`, `dep_stop_pos`, and
   `dep_off` / `arr_len`) index the whole path, throats included; `sec_cnt`
   counts flow sections only.

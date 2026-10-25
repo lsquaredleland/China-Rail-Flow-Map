@@ -155,6 +155,8 @@ fn main() {
     let n_prod = g.mark_prod(&prod_segs);
     drop(prod_segs);
     println!("production track edges preferred on double track: {n_prod}");
+    let n_st = g.mark_stations(stations.all_points(), cfg.model.inner_reversal_station_km);
+    println!("graph nodes at a station (inner-reversal exemption): {n_st}");
     let g = g;
     let snapper = SnapIndex::new(&g);
     let fine = FineIndex::new(&g);

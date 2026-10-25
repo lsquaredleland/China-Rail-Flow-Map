@@ -24,3 +24,9 @@ require_router_agreement = true
 #   supplements = ["train-operating-days.json"]
 [schedule]
 source = "timetables"
+
+# A train runs a leg without stopping, so a candidate path that turns back
+# between its two stations (at a junction, say) is penalised per turn-back
+# in the run-time model (pipeline/router/README.md).
+[model]
+inner_reversal_penalty = 2.0

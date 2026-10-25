@@ -228,6 +228,8 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     let mut sec_cnt_over = 0u64;
     // outbound rows with a > 35 km jump, inside chord legs only / outside
     let (mut jump_in, mut jump_out) = (0i64, 0i64);
+    // and outbound rows with a > 20 km jump outside chord legs (report only)
+    let mut jump20_out = 0i64;
     for (label, tables, secs_key, chords_key, rows_key, ends, n_secs) in [
         (
             "out",
@@ -276,7 +278,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                         (b, a)
                     }
                 };
-                let (mut j_in, mut j_out) = (false, false);
+                let (mut j_in, mut j_out, mut j20_out) = (false, false, false);
                 for k in 1..path.len() {
                     let gap = hav_km_ll(oriented(path[k - 1]).1, oriented(path[k]).0);
                     if exempt.contains(&k) {
@@ -284,6 +286,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                         continue;
                     }
                     j_out |= gap > 35.0;
+                    j20_out |= gap > 20.0;
                     checked += 1;
                     if gap > 0.1 {
                         gaps_100m += 1;
@@ -308,6 +311,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                 }
                 if label == "out" {
                     jump_out += j_out as i64;
+                    jump20_out += j20_out as i64;
                     jump_in += (j_in && !j_out) as i64;
                 }
             }
@@ -367,6 +371,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         non_mono.len()
     );
     println!("AUDIT pack outbound rows with a > 35 km jump: {jump_out} outside chord legs, {jump_in} only inside");
+    println!("AUDIT pack outbound rows with a > 20 km jump: {jump20_out} outside chord legs");
     ok &= sec_cnt_over == 0;
     // ---- schedules: every row's train has one, consistent with the row ----
     let scheds = arr(&sch["schedules"]);
@@ -1616,8 +1621,9 @@ fn main() {
     // atomic edge -> per-city DISTINCT train counts (dedup, as production)
     let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
+    let mut edge_trains = chains::EdgeTrains::new();
     for (ci, w) in works.iter().enumerate() {
-        for (legs, cidx) in w.train_leg_keys.iter().zip(w.train_cls.iter()) {
+        for (k, (legs, cidx)) in w.train_leg_keys.iter().zip(w.train_cls.iter()).enumerate() {
             let mut eset: HashSet<(i64, i64)> = HashSet::new();
             for key in legs.iter() {
                 let seqs = match leg_seqs(key, &leg_cache, &variant_cache) {
@@ -1642,7 +1648,10 @@ fn main() {
                     }
                 }
             }
+            let mark = chains::train_mark(ci, k);
             for e in eset {
+                let m = edge_trains.entry(e).or_insert(0);
+                *m = m.wrapping_add(mark);
                 *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
                 edge_class_counts
                     .entry(e)
@@ -1656,7 +1665,9 @@ fn main() {
     // intern count signatures: a global section has constant per-city counts
     let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
     println!("distinct signatures: {}", sig_list.len());
-    let section_chains = chains::build_section_chains(&edge_sig);
+    // (no walk cuts: they only split chains of equal counts, which the
+    // recounts below do not see)
+    let section_chains = chains::build_section_chains(&edge_sig, &edge_trains, &HashSet::new());
     // section endpoint station names (nearest real station point)
     let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
     for (a, b) in path_map.keys() {

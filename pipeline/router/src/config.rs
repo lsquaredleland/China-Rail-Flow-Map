@@ -218,6 +218,16 @@ pub struct ModelConfig {
     pub reversal_penalty: f64,
     /// ...whose dwell is shorter than this (min).  [6]
     pub reversal_dwell_min: i64,
+    /// Log-penalty per turn-back inside a candidate path: a train runs a
+    /// leg without stopping, so it cannot reverse between its stations
+    /// (e.g. at a junction). 0 = off.               [0]
+    pub inner_reversal_penalty: f64,
+    /// A turn-back is a heading change above 150 degrees between the
+    /// path this far (km) before a node and this far after it. [1.0]
+    pub inner_reversal_km: f64,
+    /// ...and not within this distance (km) of any station point, where a
+    /// train may reverse (a stop or a technical stop). [1.5]
+    pub inner_reversal_station_km: f64,
     /// Log-likelihood of a run faster than ever observed. [-30]
     pub infeasible_loglik: f64,
 }
@@ -235,6 +245,9 @@ impl Default for ModelConfig {
             gap_kmh: 80.0,
             reversal_penalty: 4.0,
             reversal_dwell_min: 6,
+            inner_reversal_penalty: 0.0,
+            inner_reversal_km: 1.0,
+            inner_reversal_station_km: 1.5,
             infeasible_loglik: -30.0,
         }
     }

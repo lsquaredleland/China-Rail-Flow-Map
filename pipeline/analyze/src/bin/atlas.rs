@@ -475,6 +475,12 @@ struct RowPath {
 /// equal `on`. A flow repeat with only throats since the last flow
 /// entry drops those throats too, so the flow-only sequence is unchanged;
 /// `drops` counts [such drops, drops reaching back into an earlier leg].
+///
+/// Partial re-coverage: a run of one leg's edges over only part of a
+/// section (`sec_edges[s]` edges) that the row also runs over whole (a
+/// reversal at a station, a turn-back onto a branch) is drawn as a piece
+/// on that section instead of the whole section again, so the path stays
+/// continuous. The row's set of flow sections does not change.
 #[allow(clippy::too_many_arguments)]
 fn row_path<'g>(
     leg_keys: &[(String, String, String)],
@@ -482,12 +488,15 @@ fn row_path<'g>(
     leg_stop: &[usize],
     geom: &LegGeom<'g>,
     sec_of: &dyn Fn(i64, i64) -> Option<(usize, bool)>,
+    sec_edges: &[usize],
     run_key: &RunKey<'_>,
     coords: &HashMap<i64, [f64; 2]>,
     throats: &mut Throats,
     base: usize,
     drops: &mut [u64; 2],
 ) -> RowPath {
+    let partial = partial_runs(leg_keys, leg_fwd, geom, sec_of, sec_edges);
+    let mut visit = 0usize;
     let n = leg_keys.len();
     let mut p = RowPath {
         secs: Vec::new(),
@@ -506,7 +515,10 @@ fn row_path<'g>(
                 throats.flush(run, secs, coords, base, on, &mut p.on_sec)
             };
             walk_edges(seqs, walk, leg_fwd[li], |u, v| {
-                if let Some((sidx, rev)) = sec_of(u, v) {
+                let sec = sec_of(u, v);
+                let piece = partial[visit];
+                visit += 1;
+                if let (Some((sidx, rev)), false) = (sec, piece) {
                     flush(&mut run, run_on, &mut p.secs);
                     let s = if rev { !(sidx as i64) } else { sidx as i64 };
                     match last_flow {
@@ -534,7 +546,12 @@ fn row_path<'g>(
                         }
                     }
                 } else if let (Some(c1), Some(c2)) = (coords.get(&u), coords.get(&v)) {
-                    match run_key(u, v, &[(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0]) {
+                    let key = if piece {
+                        Some(sec.map(|x| x.0))
+                    } else {
+                        run_key(u, v, &[(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0])
+                    };
+                    match key {
                         Some(on) => {
                             if run.last() != Some(&u) || on != run_on {
                                 flush(&mut run, run_on, &mut p.secs);
@@ -559,6 +576,120 @@ fn row_path<'g>(
         p.flow_cnt[li + 1] = n_flow;
     }
     p
+}
+
+/// Per edge visit of a row (its legs' walks in order, as `row_path` visits
+/// them): whether the edge is on a run over part of a section that the
+/// row also covers whole in one run. A run is a leg's consecutive edges on
+/// one section; whole = all `sec_edges[s]` of its edges.
+fn partial_runs<'g>(
+    leg_keys: &[(String, String, String)],
+    leg_fwd: &[bool],
+    geom: &LegGeom<'g>,
+    sec_of: &dyn Fn(i64, i64) -> Option<(usize, bool)>,
+    sec_edges: &[usize],
+) -> Vec<bool> {
+    // per visit its run (index into `runs`); runs as (section, edges)
+    let mut run_of: Vec<Option<usize>> = Vec::new();
+    let mut runs: Vec<(usize, HashSet<(i64, i64)>)> = Vec::new();
+    for (li, key) in leg_keys.iter().enumerate() {
+        let Some((seqs, walk)) = geom(key) else {
+            continue;
+        };
+        let mut open: Option<usize> = None;
+        walk_edges(seqs, walk, leg_fwd[li], |u, v| match sec_of(u, v) {
+            Some((s, _)) => {
+                let r = match open {
+                    Some(r) if runs[r].0 == s => r,
+                    _ => {
+                        runs.push((s, HashSet::new()));
+                        runs.len() - 1
+                    }
+                };
+                runs[r].1.insert((u.min(v), u.max(v)));
+                open = Some(r);
+                run_of.push(Some(r));
+            }
+            None => {
+                open = None;
+                run_of.push(None);
+            }
+        });
+    }
+    let whole = |r: usize| runs[r].1.len() == sec_edges[runs[r].0];
+    let whole_secs: HashSet<usize> = (0..runs.len())
+        .filter(|&r| whole(r))
+        .map(|r| runs[r].0)
+        .collect();
+    run_of
+        .iter()
+        .map(|r| r.is_some_and(|r| !whole(r) && whole_secs.contains(&runs[r].0)))
+        .collect()
+}
+
+/// Nodes where a row's walk leaves (or joins) a stretch of equal-signature
+/// track that goes on past the node: it arrives on an edge of signature
+/// `edge_sig` and then stops, turns back over that edge, or takes an edge
+/// of another (or no) signature, while another edge of the same signature
+/// meets the node. Cutting the section chains there makes every row run
+/// whole sections (a reversal at a station or a junction re-runs only what
+/// it really re-runs). Rows are `(leg keys, leg directions)`.
+fn chain_cuts<'r, 'g>(
+    rows: impl Iterator<Item = (&'r [(String, String, String)], &'r [bool])>,
+    geom: &LegGeom<'g>,
+    edge_sig: &HashMap<(i64, i64), u32>,
+) -> HashSet<i64> {
+    let key = |u: i64, v: i64| if u < v { (u, v) } else { (v, u) };
+    // node -> (neighbour, signature) over the signed edges
+    let mut nadj: HashMap<i64, Vec<(i64, u32)>> = HashMap::new();
+    for (&(u, v), &s) in edge_sig.iter() {
+        nadj.entry(u).or_default().push((v, s));
+        nadj.entry(v).or_default().push((u, s));
+    }
+    // an edge of signature `s` from `from` ends at `v`: does `s` go on?
+    let goes_on = |v: i64, from: i64, s: u32| {
+        nadj.get(&v)
+            .is_some_and(|es| es.iter().any(|&(n, t)| n != from && t == s))
+    };
+    let mut cuts: HashSet<i64> = HashSet::new();
+    let mut steps: Vec<Option<(i64, i64)>> = Vec::new();
+    for (keys, fwd) in rows {
+        steps.clear();
+        for (li, k) in keys.iter().enumerate() {
+            steps.push(None);
+            if let Some((seqs, walk)) = geom(k) {
+                walk_edges(seqs, walk, fwd[li], |u, v| steps.push(Some((u, v))));
+            }
+        }
+        steps.push(None);
+        for w in steps.windows(2) {
+            let sig =
+                |st: Option<(i64, i64)>| st.and_then(|(u, v)| edge_sig.get(&key(u, v)).copied());
+            let (a, b) = (w[0], w[1]);
+            let same = match (a, b) {
+                (Some((u0, v0)), Some((u1, v1))) => {
+                    v0 == u1 && u0 != v1 && sig(a).is_some() && sig(a) == sig(b)
+                }
+                _ => false,
+            };
+            if same {
+                continue;
+            }
+            // leaving a's signature at a's end
+            if let (Some((u0, v0)), Some(s)) = (a, sig(a)) {
+                if goes_on(v0, u0, s) {
+                    cuts.insert(v0);
+                }
+            }
+            // joining b's signature at b's start
+            if let (Some((u1, v1)), Some(s)) = (b, sig(b)) {
+                if goes_on(u1, v1, s) {
+                    cuts.insert(u1);
+                }
+            }
+        }
+    }
+    cuts
 }
 
 /// Visit a leg's track edges in travel order: along the walk when the
@@ -1234,253 +1365,6 @@ fn main() {
         );
     }
 
-    // ---- global atomic sections over the union of all selected cities ----
-    let throat_grid = |names: &HashSet<String>| {
-        let mut grid: HashMap<(i32, i32), Vec<[f64; 2]>> = HashMap::new();
-        for nm in names.iter() {
-            if let Some(p) = station_pt(nm) {
-                let ll = [p[1], p[0]];
-                grid.entry(((ll[0] * 50.0).floor() as i32, (ll[1] * 50.0).floor() as i32))
-                    .or_default()
-                    .push(ll);
-            }
-        }
-        grid
-    };
-    let station_grid = throat_grid(&throat_stations);
-    let in_station_grid = throat_grid(&in_throat_stations);
-    let near_station = |station_grid: &HashMap<(i32, i32), Vec<[f64; 2]>>, pt: &[f64; 2]| -> bool {
-        let gx = (pt[0] * 50.0).floor() as i32;
-        let gy = (pt[1] * 50.0).floor() as i32;
-        for dx in -1..=1 {
-            for dy in -1..=1 {
-                if let Some(cell) = station_grid.get(&(gx + dx, gy + dy)) {
-                    for c in cell {
-                        if hav_km_ll(*pt, *c) < 1.3 {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        false
-    };
-    // atomic edge -> per-city DISTINCT train counts: each train counts at
-    // most once per edge, no matter how many of its legs' paths overlap
-    // there (adjacent-leg path overlap near stations otherwise inflates
-    // short sections between close stations). The rule lives in
-    // flows::train_edges, shared with the inbound and national counts.
-    let seqs_of = |k: &(String, String, String)| leg_seqs(k, &leg_cache, &variant_cache);
-    let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
-    let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
-    for (ci, w) in works.iter().enumerate() {
-        for (cidx, _, legs) in w.train_leg_keys.iter() {
-            let eset =
-                flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
-            for e in eset {
-                *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
-                edge_class_counts
-                    .entry(e)
-                    .or_default()
-                    .entry(ci)
-                    .or_insert([0; 8])[*cidx] += 1;
-            }
-        }
-    }
-    println!("union atomic edges: {}", edge_counts.len());
-    // intern count signatures: a global section has constant per-city counts
-    let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
-    println!("distinct signatures: {}", sig_list.len());
-    let section_chains = chains::build_section_chains(&edge_sig);
-    // section endpoint station names (nearest real station point)
-    let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
-    for (a, b) in path_map.keys() {
-        for s in [a, b] {
-            if let Some(p) = station_pt(s) {
-                station_pts_all.insert(s.clone(), [p[1], p[0]]);
-            }
-        }
-    }
-    let nearest_station = |pt: [f64; 2]| -> String {
-        let mut best: Option<(&String, f64)> = None;
-        for (nm, sp) in station_pts_all.iter() {
-            let d = hav_km_ll(pt, *sp);
-            if d < 5.0 && best.is_none_or(|(bn, bd)| d < bd || (d == bd && nm < bn)) {
-                best = Some((nm, d));
-            }
-        }
-        best.map(|(nm, _)| nm.clone()).unwrap_or_default()
-    };
-    // directed edge -> (section, travelled against the section's stored
-    // point order); built here, where sec_idx is known (chains with too
-    // few points are skipped, so chain and section indices drift).
-    let mut edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
-    let mut sections: Vec<AtlasSection> = Vec::new();
-    let mut flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); works.len()];
-    let mut total_sec_pts = 0usize;
-    for (sid, chain) in section_chains.iter() {
-        let raw: Vec<[f64; 2]> = chain
-            .iter()
-            .filter_map(|id| coords.get(id).copied())
-            .collect();
-        if raw.len() < 2 {
-            continue;
-        }
-        let simp = dp_keep(&raw, 0.00035);
-        let simp: Vec<[f64; 2]> = simp.iter().map(|p| round_pt(*p, 4)).collect();
-        if simp.len() < 2 {
-            continue;
-        }
-        total_sec_pts += simp.len();
-        let sec_idx = sections.len();
-        for win in chain.windows(2) {
-            edge_dir_to_sec.insert((win[0], win[1]), (sec_idx, false));
-            edge_dir_to_sec.insert((win[1], win[0]), (sec_idx, true));
-        }
-        let a_nm = nearest_station(simp[0]);
-        let b_nm = nearest_station(*simp.last().unwrap());
-        let a_i = if a_nm.is_empty() {
-            -1
-        } else {
-            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
-        };
-        let b_i = if b_nm.is_empty() {
-            -1
-        } else {
-            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
-        };
-        sections.push(AtlasSection {
-            a: a_i,
-            b: b_i,
-            g: polyline_encode(&simp),
-            h: chain_hsr(chain),
-        });
-        for (ci, n, cls_counts) in sig_list[*sid as usize].iter() {
-            flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
-        }
-    }
-    for f in flows_per_city.iter_mut() {
-        f.sort_by(|a, b| b[1].cmp(&a[1]));
-    }
-    println!("sections: {} points: {}", sections.len(), total_sec_pts);
-
-    // ---- P3.1 national table over `sections`: every train once ----
-    // A train's legs are the union of its outbound rows (from its first
-    // selected city on) and inbound rows (from its first stop to a selected
-    // city), so it covers its whole run whenever it calls at a selected city.
-    // Edges go through the same rule as the per-city counts (one count per
-    // edge, outbound near_station grid); a train counts once on a section
-    // when it covers any of its edges (flows::national_table).
-    let mut nat_legs: std::collections::BTreeMap<usize, TrainLegs> = Default::default();
-    let all_legs = works
-        .iter()
-        .flat_map(|w| w.train_leg_keys.iter())
-        .chain(in_works.iter().flat_map(|w| w.train_leg_keys.iter()));
-    for (cidx, ti, legs) in all_legs {
-        nat_legs
-            .entry(*ti)
-            .or_insert_with(|| (*cidx, *ti, Vec::new()))
-            .2
-            .extend(legs.iter().cloned());
-    }
-    for (_, _, legs) in nat_legs.values_mut() {
-        legs.sort();
-        legs.dedup();
-    }
-    let nat_trains = nat_legs.values().map(|(cidx, ti, legs)| {
-        let eset = flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
-        (*ti, *cidx, eset)
-    });
-    let (national, nat_u) = flows::national_table(
-        nat_trains,
-        |e| edge_dir_to_sec.get(e).map(|&(s, _)| s),
-        sections.len(),
-    );
-    println!(
-        "national: {} trains; widest section {}; sum over sections {}",
-        national.trains,
-        national.total.iter().max().copied().unwrap_or(0),
-        national.total.iter().map(|&n| n as u64).sum::<u64>()
-    );
-    println!(
-        "national uniformity: {} sections with unequal per-edge counts (max spread {}); {} sections whose distinct trains exceed their busiest edge (max +{})",
-        nat_u.nonuniform, nat_u.max_spread, nat_u.union_above_max, nat_u.max_union_gain
-    );
-
-    // ---- inbound atomic sections: same machinery, indexed by dest city ----
-    let mut in_edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
-    let mut in_edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
-    for (ci, w) in in_works.iter().enumerate() {
-        for (cidx, _, legs) in w.train_leg_keys.iter() {
-            let eset =
-                flows::train_edges(legs, seqs_of, coords, |p| near_station(&in_station_grid, p));
-            for e in eset {
-                *in_edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
-                in_edge_class_counts
-                    .entry(e)
-                    .or_default()
-                    .entry(ci)
-                    .or_insert([0; 8])[*cidx] += 1;
-            }
-        }
-    }
-    println!("union inbound atomic edges: {}", in_edge_counts.len());
-    let (in_sig_list, in_edge_sig) = chains::intern_sigs(&in_edge_counts, &in_edge_class_counts);
-    let in_section_chains = chains::build_section_chains(&in_edge_sig);
-    let mut in_edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
-    let mut in_sections: Vec<AtlasSection> = Vec::new();
-    let mut in_flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); in_works.len()];
-    let mut in_total_sec_pts = 0usize;
-    for (sid, chain) in in_section_chains.iter() {
-        let raw: Vec<[f64; 2]> = chain
-            .iter()
-            .filter_map(|id| coords.get(id).copied())
-            .collect();
-        if raw.len() < 2 {
-            continue;
-        }
-        let simp = dp_keep(&raw, 0.00035);
-        let simp: Vec<[f64; 2]> = simp.iter().map(|p| round_pt(*p, 4)).collect();
-        if simp.len() < 2 {
-            continue;
-        }
-        in_total_sec_pts += simp.len();
-        let sec_idx = in_sections.len();
-        for win in chain.windows(2) {
-            in_edge_dir_to_sec.insert((win[0], win[1]), (sec_idx, false));
-            in_edge_dir_to_sec.insert((win[1], win[0]), (sec_idx, true));
-        }
-        let a_nm = nearest_station(simp[0]);
-        let b_nm = nearest_station(*simp.last().unwrap());
-        let a_i = if a_nm.is_empty() {
-            -1
-        } else {
-            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
-        };
-        let b_i = if b_nm.is_empty() {
-            -1
-        } else {
-            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
-        };
-        in_sections.push(AtlasSection {
-            a: a_i,
-            b: b_i,
-            g: polyline_encode(&simp),
-            h: chain_hsr(chain),
-        });
-        for (ci, n, cls_counts) in in_sig_list[*sid as usize].iter() {
-            in_flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
-        }
-    }
-    for f in in_flows_per_city.iter_mut() {
-        f.sort_by(|a, b| b[1].cmp(&a[1]));
-    }
-    println!(
-        "in_sections: {} points: {}",
-        in_sections.len(),
-        in_total_sec_pts
-    );
-
     // ---- leg walks: every resolved leg oriented key.0 -> key.1 ----
     // One-time direction check: base pair paths must already run
     // key.0 -> key.1 (fail loudly otherwise); router, variant (via) and
@@ -1580,6 +1464,294 @@ fn main() {
     );
     println!("leg orientation: all checked pair paths run key.0 -> key.1");
 
+    // ---- global atomic sections over the union of all selected cities ----
+    let throat_grid = |names: &HashSet<String>| {
+        let mut grid: HashMap<(i32, i32), Vec<[f64; 2]>> = HashMap::new();
+        for nm in names.iter() {
+            if let Some(p) = station_pt(nm) {
+                let ll = [p[1], p[0]];
+                grid.entry(((ll[0] * 50.0).floor() as i32, (ll[1] * 50.0).floor() as i32))
+                    .or_default()
+                    .push(ll);
+            }
+        }
+        grid
+    };
+    let station_grid = throat_grid(&throat_stations);
+    let in_station_grid = throat_grid(&in_throat_stations);
+    let near_station = |station_grid: &HashMap<(i32, i32), Vec<[f64; 2]>>, pt: &[f64; 2]| -> bool {
+        let gx = (pt[0] * 50.0).floor() as i32;
+        let gy = (pt[1] * 50.0).floor() as i32;
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                if let Some(cell) = station_grid.get(&(gx + dx, gy + dy)) {
+                    for c in cell {
+                        if hav_km_ll(*pt, *c) < 1.3 {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    };
+    // atomic edge -> per-city DISTINCT train counts: each train counts at
+    // most once per edge, no matter how many of its legs' paths overlap
+    // there (adjacent-leg path overlap near stations otherwise inflates
+    // short sections between close stations). The rule lives in
+    // flows::train_edges, shared with the inbound and national counts.
+    let seqs_of = |k: &(String, String, String)| leg_seqs(k, &leg_cache, &variant_cache);
+    let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
+    let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
+    let mut edge_trains = chains::EdgeTrains::new();
+    for (ci, w) in works.iter().enumerate() {
+        for (k, (cidx, _, legs)) in w.train_leg_keys.iter().enumerate() {
+            let eset =
+                flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
+            let mark = chains::train_mark(ci, k);
+            for e in eset {
+                let m = edge_trains.entry(e).or_insert(0);
+                *m = m.wrapping_add(mark);
+                *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
+                edge_class_counts
+                    .entry(e)
+                    .or_default()
+                    .entry(ci)
+                    .or_insert([0; 8])[*cidx] += 1;
+            }
+        }
+    }
+    println!("union atomic edges: {}", edge_counts.len());
+    // intern count signatures: a global section has constant per-city counts
+    let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
+    println!("distinct signatures: {}", sig_list.len());
+    let walk_geom = |key: &(String, String, String)| {
+        leg_seqs(key, &leg_cache, &variant_cache).zip(leg_walks.get(key))
+    };
+    let cuts = chain_cuts(
+        works
+            .iter()
+            .flat_map(|w| w.deps.iter())
+            .map(|d| (&d.leg_keys[..], &d.leg_fwd[..])),
+        &walk_geom,
+        &edge_sig,
+    );
+    println!(
+        "section chain cuts (rows leaving equal-signature track mid-way): {}",
+        cuts.len()
+    );
+    let section_chains = chains::build_section_chains(&edge_sig, &edge_trains, &cuts);
+    // section endpoint station names (nearest real station point)
+    let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
+    for (a, b) in path_map.keys() {
+        for s in [a, b] {
+            if let Some(p) = station_pt(s) {
+                station_pts_all.insert(s.clone(), [p[1], p[0]]);
+            }
+        }
+    }
+    let nearest_station = |pt: [f64; 2]| -> String {
+        let mut best: Option<(&String, f64)> = None;
+        for (nm, sp) in station_pts_all.iter() {
+            let d = hav_km_ll(pt, *sp);
+            if d < 5.0 && best.is_none_or(|(bn, bd)| d < bd || (d == bd && nm < bn)) {
+                best = Some((nm, d));
+            }
+        }
+        best.map(|(nm, _)| nm.clone()).unwrap_or_default()
+    };
+    // directed edge -> (section, travelled against the section's stored
+    // point order); built here, where sec_idx is known (chains with too
+    // few points are skipped, so chain and section indices drift).
+    let mut edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
+    let mut sections: Vec<AtlasSection> = Vec::new();
+    let mut flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); works.len()];
+    let mut total_sec_pts = 0usize;
+    for (sid, chain) in section_chains.iter() {
+        let raw: Vec<[f64; 2]> = chain
+            .iter()
+            .filter_map(|id| coords.get(id).copied())
+            .collect();
+        if raw.len() < 2 {
+            continue;
+        }
+        let simp = dp_keep(&raw, 0.00035);
+        let simp: Vec<[f64; 2]> = simp.iter().map(|p| round_pt(*p, 4)).collect();
+        if simp.len() < 2 {
+            continue;
+        }
+        total_sec_pts += simp.len();
+        let sec_idx = sections.len();
+        for win in chain.windows(2) {
+            edge_dir_to_sec.insert((win[0], win[1]), (sec_idx, false));
+            edge_dir_to_sec.insert((win[1], win[0]), (sec_idx, true));
+        }
+        let a_nm = nearest_station(simp[0]);
+        let b_nm = nearest_station(*simp.last().unwrap());
+        let a_i = if a_nm.is_empty() {
+            -1
+        } else {
+            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
+        };
+        let b_i = if b_nm.is_empty() {
+            -1
+        } else {
+            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
+        };
+        sections.push(AtlasSection {
+            a: a_i,
+            b: b_i,
+            g: polyline_encode(&simp),
+            h: chain_hsr(chain),
+        });
+        for (ci, n, cls_counts) in sig_list[*sid as usize].iter() {
+            flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
+        }
+    }
+    for f in flows_per_city.iter_mut() {
+        f.sort_by(|a, b| b[1].cmp(&a[1]));
+    }
+    println!("sections: {} points: {}", sections.len(), total_sec_pts);
+    // edges per section (row_path's partial re-coverage, national heads)
+    let mut sec_edges = vec![0usize; sections.len()];
+    for &(s, rev) in edge_dir_to_sec.values() {
+        sec_edges[s] += !rev as usize;
+    }
+
+    // ---- P3.1 national table over `sections`: every train once ----
+    // A train's legs are the union of its outbound rows (from its first
+    // selected city on) and inbound rows (from its first stop to a selected
+    // city), so it covers its whole run whenever it calls at a selected city.
+    // Edges go through the same rule as the per-city counts (one count per
+    // edge, outbound near_station grid); a train counts once on a section
+    // when it covers any of its edges (flows::national_table).
+    let mut nat_legs: std::collections::BTreeMap<usize, TrainLegs> = Default::default();
+    let all_legs = works
+        .iter()
+        .flat_map(|w| w.train_leg_keys.iter())
+        .chain(in_works.iter().flat_map(|w| w.train_leg_keys.iter()));
+    for (cidx, ti, legs) in all_legs {
+        nat_legs
+            .entry(*ti)
+            .or_insert_with(|| (*cidx, *ti, Vec::new()))
+            .2
+            .extend(legs.iter().cloned());
+    }
+    for (_, _, legs) in nat_legs.values_mut() {
+        legs.sort();
+        legs.dedup();
+    }
+    let nat_trains = nat_legs.values().map(|(cidx, ti, legs)| {
+        let eset = flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
+        (*ti, *cidx, eset)
+    });
+    let (national, nat_u) = flows::national_table(
+        nat_trains,
+        |e| edge_dir_to_sec.get(e).map(|&(s, _)| s),
+        sections.len(),
+    );
+    println!(
+        "national: {} trains; widest section {}; sum over sections {}",
+        national.trains,
+        national.total.iter().max().copied().unwrap_or(0),
+        national.total.iter().map(|&n| n as u64).sum::<u64>()
+    );
+    println!(
+        "national uniformity: {} sections with unequal per-edge counts (max spread {}); {} sections whose distinct trains exceed their busiest edge (max +{})",
+        nat_u.nonuniform, nat_u.max_spread, nat_u.union_above_max, nat_u.max_union_gain
+    );
+
+    // ---- inbound atomic sections: same machinery, indexed by dest city ----
+    let mut in_edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
+    let mut in_edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
+    let mut in_edge_trains = chains::EdgeTrains::new();
+    for (ci, w) in in_works.iter().enumerate() {
+        for (k, (cidx, _, legs)) in w.train_leg_keys.iter().enumerate() {
+            let eset =
+                flows::train_edges(legs, seqs_of, coords, |p| near_station(&in_station_grid, p));
+            let mark = chains::train_mark(ci, k);
+            for e in eset {
+                let m = in_edge_trains.entry(e).or_insert(0);
+                *m = m.wrapping_add(mark);
+                *in_edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
+                in_edge_class_counts
+                    .entry(e)
+                    .or_default()
+                    .entry(ci)
+                    .or_insert([0; 8])[*cidx] += 1;
+            }
+        }
+    }
+    println!("union inbound atomic edges: {}", in_edge_counts.len());
+    let (in_sig_list, in_edge_sig) = chains::intern_sigs(&in_edge_counts, &in_edge_class_counts);
+    let in_cuts = chain_cuts(
+        in_works
+            .iter()
+            .flat_map(|w| w.arrs.iter())
+            .map(|a| (&a.leg_keys[..], &a.leg_fwd[..])),
+        &walk_geom,
+        &in_edge_sig,
+    );
+    println!("inbound section chain cuts: {}", in_cuts.len());
+    let in_section_chains = chains::build_section_chains(&in_edge_sig, &in_edge_trains, &in_cuts);
+    let mut in_edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
+    let mut in_sections: Vec<AtlasSection> = Vec::new();
+    let mut in_flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); in_works.len()];
+    let mut in_total_sec_pts = 0usize;
+    for (sid, chain) in in_section_chains.iter() {
+        let raw: Vec<[f64; 2]> = chain
+            .iter()
+            .filter_map(|id| coords.get(id).copied())
+            .collect();
+        if raw.len() < 2 {
+            continue;
+        }
+        let simp = dp_keep(&raw, 0.00035);
+        let simp: Vec<[f64; 2]> = simp.iter().map(|p| round_pt(*p, 4)).collect();
+        if simp.len() < 2 {
+            continue;
+        }
+        in_total_sec_pts += simp.len();
+        let sec_idx = in_sections.len();
+        for win in chain.windows(2) {
+            in_edge_dir_to_sec.insert((win[0], win[1]), (sec_idx, false));
+            in_edge_dir_to_sec.insert((win[1], win[0]), (sec_idx, true));
+        }
+        let a_nm = nearest_station(simp[0]);
+        let b_nm = nearest_station(*simp.last().unwrap());
+        let a_i = if a_nm.is_empty() {
+            -1
+        } else {
+            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
+        };
+        let b_i = if b_nm.is_empty() {
+            -1
+        } else {
+            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
+        };
+        in_sections.push(AtlasSection {
+            a: a_i,
+            b: b_i,
+            g: polyline_encode(&simp),
+            h: chain_hsr(chain),
+        });
+        for (ci, n, cls_counts) in in_sig_list[*sid as usize].iter() {
+            in_flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
+        }
+    }
+    for f in in_flows_per_city.iter_mut() {
+        f.sort_by(|a, b| b[1].cmp(&a[1]));
+    }
+    println!(
+        "in_sections: {} points: {}",
+        in_sections.len(),
+        in_total_sec_pts
+    );
+    let mut in_sec_edges = vec![0usize; in_sections.len()];
+    for &(s, rev) in in_edge_dir_to_sec.values() {
+        in_sec_edges[s] += !rev as usize;
+    }
+
     // ---- assemble origins ----
     let (mut chord_legs_out, mut chord_legs_in) = (0usize, 0usize);
     // O1: throat pieces shared by both directions; path entries `base + j`
@@ -1613,6 +1785,7 @@ fn main() {
                 &d.leg_stop,
                 &geom,
                 &|u, v| edge_dir_to_sec.get(&(u, v)).copied(),
+                &sec_edges,
                 &|_, _, p| near_station(&station_grid, p).then_some(None),
                 coords,
                 &mut throats,
@@ -1765,6 +1938,7 @@ fn main() {
                 &a.leg_stop,
                 &geom,
                 &|u, v| in_edge_dir_to_sec.get(&(u, v)).copied(),
+                &in_sec_edges,
                 &|_, _, p| near_station(&in_station_grid, p).then_some(None),
                 coords,
                 &mut throats,
@@ -1965,10 +2139,6 @@ fn main() {
     // pieces interned like throats (a shared throat when the node chain
     // matches one, else a new piece in `extra`); a piece on a partly covered
     // section is listed in `on_sec`, so the train still counts there.
-    let mut sec_edges = vec![0usize; sections.len()];
-    for &(s, rev) in edge_dir_to_sec.values() {
-        sec_edges[s] += !rev as usize;
-    }
     // ti -> (boarding stop, origin, dep row) of its earliest outbound row
     let mut first_dep: HashMap<usize, (usize, usize, usize)> = HashMap::new();
     for (ci, w) in works.iter().enumerate() {
@@ -2045,6 +2215,7 @@ fn main() {
                     .copied()
                     .filter(|&(s, _)| whole_sec(s))
             },
+            &sec_edges,
             &|u, v, _| Some(edge_dir_to_sec.get(&(u, v)).map(|&(s, _)| s)),
             coords,
             &mut nat_throats,
@@ -2564,6 +2735,7 @@ mod tests {
             &[0],
             &geom,
             &sec_of,
+            &[1, 1],
             &run_key,
             &c,
             &mut t,
@@ -2574,5 +2746,53 @@ mod tests {
         assert_eq!(t.chains, vec![vec![2, 3], vec![3, 4]]);
         assert_eq!(p.on_sec, vec![(1, 1)]);
         assert_eq!(p.full_cnt, vec![0, 3]);
+    }
+
+    #[test]
+    fn row_path_draws_a_partial_rerun_of_a_section_as_a_piece() {
+        // leg a: 1-2-3-4 runs all of section 0; leg b reverses at 4 and runs
+        // back over part of it (4-3), then off onto section 1 (3-5)
+        let mut c = line_coords();
+        c.insert(5, [0.2, 0.1]);
+        let (sa, sb) = (vec![vec![1, 2, 3, 4]], vec![vec![4, 3, 5]]);
+        let walk = |n: usize| LegWalk {
+            steps: (0..n).map(|i| (i, false)).collect(),
+            max_gap: 0.0,
+        };
+        let (wa, wb) = (walk(1), walk(1));
+        let ka = ("a".to_string(), "b".to_string(), String::new());
+        let kb = ("b".to_string(), "c".to_string(), String::new());
+        let geom = |k: &(String, String, String)| {
+            if k.0 == "a" {
+                Some((&sa, &wa))
+            } else {
+                Some((&sb, &wb))
+            }
+        };
+        let sec_of = |u: i64, v: i64| match (u.min(v), u.max(v)) {
+            (1, 2) | (2, 3) | (3, 4) => Some((0, u > v)),
+            (3, 5) => Some((1, u > v)),
+            _ => None,
+        };
+        let mut t = Throats::default();
+        let p = row_path(
+            &[ka, kb],
+            &[true, true],
+            &[0, 1],
+            &geom,
+            &sec_of,
+            &[3, 1],
+            &|_, _, _| None,
+            &c,
+            &mut t,
+            10,
+            &mut [0; 2],
+        );
+        // section 0 once, the piece 4-3 on it (reversed: stored 3-4), section 1
+        assert_eq!(p.secs, vec![0, !10, 1]);
+        assert_eq!(t.chains, vec![vec![3, 4]]);
+        assert_eq!(p.on_sec, vec![(0, 0)]);
+        assert_eq!(p.flow_cnt, vec![0, 1, 2]);
+        assert_eq!(p.full_cnt, vec![0, 1, 3]);
     }
 }
