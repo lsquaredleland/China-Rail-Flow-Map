@@ -732,6 +732,9 @@ fn main() {
                 break;
             }
         }
+        if let Some(p) = city_point_override(cty) {
+            city_pt.insert(cty.clone(), p);
+        }
     }
 
     // ---- corridor graph (shared by all cities) ----
