@@ -82,7 +82,12 @@ describe("buildPassData", () => {
     const layers = flowPassLayers(set, passes, pal, false, 100, 12.5);
     const flows = layers.filter((l) => l.id.startsWith("flows-") && !l.id.endsWith("-ferry"));
     expect(flows.map((l) => l.id)).toEqual(["flows-context", "flows-focus"]);
-    expect(flows.map((l) => l.props.pickable)).toEqual([false, true]);
+    // Drawn flows are never picked (their width is the train count); the hairline proxy of the focus pass is.
+    expect(flows.map((l) => l.props.pickable)).toEqual([false, false]);
+    const proxies = layers.filter((l) => l.id.startsWith("pick-"));
+    expect(proxies.map((l) => l.id)).toEqual(["pick-flows-focus"]);
+    expect(proxies[0].props.pickable).toBe(true);
+    expect((proxies[0].props as any).idxToSec).toBe(buildPassData(set, passes[1].items, pal, 1, passes[1].maxN).idxToSec);
     const l: any = flows[1];
     const pdf = buildPassData(set, passes[1].items, pal, 1, passes[1].maxN);
     expect(l.props.getWidth(undefined, { index: 0 })).toBeCloseTo((pdf.n[0] * WIDTH_K) / 12.5, 9);
@@ -175,7 +180,14 @@ describe("train layers", () => {
     const isoDot = mk(act[0].code).find((l) => l.id === "trains")!;
     expect(isoDot.props.getRadius).toBe(4.15);
     expect(isoDot.props.getLineWidth).toBe(2.7);
-    expect(mk(null).map((l) => l.id)).toEqual(["tails", "trains", "dwell", "trainring"]);
+    expect(mk(null).map((l) => l.id)).toEqual(["tails", "trains", "pick-trains", "dwell", "trainring"]);
+    // Picking: the drawn dots never are; the 1 px proxy is, while paused, and maps index -> train through `shown`.
+    const px = (pickable: boolean) =>
+      trainLayers({ trains: act, scale: 100, isolatedCode: null, selectedCode: null, hoveredCode: null, pickable, animTime: 600 });
+    expect(dot.props.pickable).toBe(false);
+    expect(px(true).find((l) => l.id === "pick-trains")!.props.pickable).toBe(true);
+    expect(px(false).find((l) => l.id === "pick-trains")!.props.pickable).toBe(false);
+    expect((px(true).find((l) => l.id === "pick-trains")!.props as any).shown).toBe(act);
   });
 
   test("tails: 12 px x speedFrac (22 isolated), none dwelling / on chord; source = pos - heading*len/scale", () => {

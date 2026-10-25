@@ -16,6 +16,7 @@ import { ScatterplotLayer } from "@deck.gl/layers";
 import type { ActiveTrainVM } from "../../../../types";
 import type { RGBA } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
+import { PICK_PREFIX } from "./flows";
 
 const AMBER: RGBA = [245, 158, 11, 255]; // G D C
 const CYAN: RGBA = [6, 182, 212, 255]; // Z T K S
@@ -204,9 +205,26 @@ export function trainLayers(inp: TrainLayerInput): Layer[] {
       filled: true,
       getRadius: iso ? 4.15 : 3,
       getLineWidth: iso ? 2.7 : 2,
-      pickable: inp.pickable,
+      pickable: false,
       parameters: { depthCompare: "always" },
     }),
+    // Picking proxy (see flows.ts PICK_PREFIX): a 1 px dot per train, so GPU picking ranks
+    // trains by centre distance instead of treating every dot that covers the cursor as 0.
+    new ScatterplotLayer({
+      id: PICK_PREFIX + "trains",
+      data: {
+        length: b.count,
+        attributes: { getPosition: { value: b.pos, size: 2 } },
+      },
+      radiusUnits: "pixels",
+      getRadius: 1,
+      getFillColor: [0, 0, 0, 0],
+      pickable: inp.pickable,
+      // Read back by interaction.ts pick(): instance index -> train.
+      shown: inp.trains,
+      // Where dots overlap the first (lowest index) keeps the pixel, as Canvas keeps the first of equal distances.
+      parameters: { depthCompare: "less" },
+    } as object),
     new ScatterplotLayer<Disc>({
       ...common,
       id: "dwell",
