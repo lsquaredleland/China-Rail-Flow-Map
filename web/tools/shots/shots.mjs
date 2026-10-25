@@ -124,7 +124,7 @@ for (const dpr of dprs) {
     pg.on("pageerror", (e) => { errors++; console.log(`  pageerror [${name}]`, e.message); });
     await pg.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }, { name: "prefers-reduced-motion", value: "no-preference" }]);
     await pg.setViewport({ width: W, height: H, deviceScaleFactor: dpr });
-    await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
+    await pg.goto(`${url}/?theme=light${process.env.SHOTS_QUERY || ""}`, { waitUntil: "networkidle0" });
     await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
     await sleep(3000); // origin fade-in + staged pack loading settle
     await run(pg);

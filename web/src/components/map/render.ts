@@ -8,9 +8,11 @@ import { scheduleViewReport, stationT, updateScaleBar } from "./camera";
 import { drawChords, drawFlows, drawHighlightSeg, drawInfra, getDestSectionCounts } from "./flows";
 import { drawLabels, drawStations } from "./stations";
 import { drawTrains } from "./trains";
+import { DECK_MODE, draw as deckDraw } from "./deck/spike";
 
 
 export function draw(M: MapCtx) {
+  if (DECK_MODE) return deckDraw(M);
   const { S, P, canvasRef } = M;
   const atlas = P.current.atlas;
   const cur = P.current.cur;

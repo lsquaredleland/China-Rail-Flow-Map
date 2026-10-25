@@ -21,7 +21,7 @@ const stat = (a) => {
 
 /** cfg: { argv, defaults: {start, end, frames}, views: {name: "origin"|"fit"|"city"|null}, origin?: zh } */
 export async function runPerf(cfg) {
-const { pos, opt } = parseArgs(cfg.argv, ["frames", "dpr", "throttle", "start", "end", "out"]);
+const { pos, opt } = parseArgs(cfg.argv, ["frames", "dpr", "throttle", "start", "end", "out", "query"]);
 const FR = +(opt.frames || cfg.defaults.frames), thr = +(opt.throttle || 1);
 const START = +(opt.start ?? cfg.defaults.start), END = +(opt.end ?? cfg.defaults.end);
 const STEP = (END - START) / FR;
@@ -35,9 +35,14 @@ try {
     const pg = await browser.newPage();
     pg.on("pageerror", (e) => console.log("PAGEERR", e.message));
     await pg.setViewport({ width: 1280, height: 800, deviceScaleFactor: dpr });
-    await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
+    await pg.goto(`${url}/?theme=light${opt.query || ""}`, { waitUntil: "networkidle0" });
     await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 90000 });
     await sleep(3000);
+    if (/national=deck/.test(opt.query || "")) {
+      await pg.evaluate(() => { window.__mapApi.setAnimEnabled(true); });
+      await pg.waitForFunction("window.__nat && window.__nat.ready", { timeout: 90000 });
+      await sleep(1500);
+    }
     if (!renderer) {
       renderer = await pg.evaluate(() => {
         const gl = document.createElement("canvas").getContext("webgl");
@@ -55,7 +60,7 @@ try {
     if (thr > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: thr });
     if (cfg.origin) {
       await pg.evaluate((zh) => window.__selectOrigin(zh), cfg.origin);
-      await sleep(3000);
+      await sleep(8000);
     }
     await pg.evaluate(() => { window.__mapApi.setAnimEnabled(true); window.__mapApi.setPlaying(false); });
     for (const [name, kind] of Object.entries(cfg.views)) {
@@ -65,6 +70,8 @@ try {
       await sleep(500);
       const r = await pg.evaluate(async (FR, START, STEP) => {
         const M = window.__M, S = M.S.current, cv = M.canvasRef.current, ctx = cv.getContext("2d");
+        const DH = window.__deckHost; const gl = DH && DH.deck.device.handle; const px4 = new Uint8Array(4);
+        const flushFn = () => { if (gl) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px4); else ctx.getImageData(0, 0, 1, 1); };
         const run = (n, flush) => new Promise((res) => {
           const iv = [], dr = []; let last = 0, i = 0;
           const step = (ts) => {
@@ -73,7 +80,7 @@ try {
             S.animTime = START + i * STEP;
             const t0 = performance.now();
             window.__draw();
-            if (flush) ctx.getImageData(0, 0, 1, 1);
+            if (flush) flushFn();
             dr.push(performance.now() - t0);
             if (++i < n) requestAnimationFrame(step); else res({ iv, dr });
           };
@@ -83,7 +90,10 @@ try {
         const a = await run(FR, false);
         await new Promise((r) => setTimeout(r, 300));
         const f = await run(FR, true);
-        return { active: M.activeTimeline() ? 1 : 0, a, f };
+        const m = DH ? DH.deck.metrics : null;
+        if (DH) { try { DH.deck._getFrameStats && DH.deck._getFrameStats(); DH.deck._getMetrics && DH.deck._getMetrics(); } catch (e) {} }
+        const mm = DH ? JSON.parse(JSON.stringify(DH.deck.metrics)) : null;
+        return { active: M.activeTimeline() ? 1 : 0, a, f, metrics: mm, nat: window.__nat ? { count: window.__nat.count, tails: window.__nat.tails, posMs: window.__nat.ms.pos / Math.max(1, window.__nat.ms.frames) } : null };
       }, FR, START, STEP);
       const row = {
         dpr, throttle: thr, view: name, renderer, frames: FR,
@@ -91,6 +101,7 @@ try {
         droppedPct: +((100 * r.a.iv.filter((x) => x > 20).length) / r.a.iv.length).toFixed(1),
         drawJsMs: stat(r.a.dr),
         drawPlusRasterMs: stat(r.f.dr),
+        metrics: r.metrics, nat: r.nat,
       };
       rows.push(row);
     }

@@ -21,6 +21,7 @@ import type { MapCtx } from "./context";
 import { stationT } from "./camera";
 import { getActiveDestSectionCounts, getDestSectionCounts } from "./flows";
 import { isTrainShown } from "./trains";
+import { DECK_MODE, deckPick } from "./deck/spike";
 
 
 /* ---------- hit testing & tooltip ---------- */
@@ -258,6 +259,11 @@ export function pickTrain(M: MapCtx, px: number, py: number): Hit | null {
 }
 
 export function pick(M: MapCtx, px: number, py: number): Hit | null {
+  if (DECK_MODE) {
+    const h = deckPick(M, px, py);
+    if (h) return h;
+    return pickSegment(M, px, py);
+  }
   const tr = pickTrain(M, px, py);
   if (tr) return tr;
   const c = pickStation(M, px, py);
