@@ -187,41 +187,40 @@ edges elsewhere. In this repo, rebuild staged:
 source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp -c clones of
                            # handoff-v3 inputs), ATLAS_PAIR_PATHS, ATLAS_LEG_PATHS,
                            # ATLAS_OVERRIDES=staging/inputs/data/leg_overrides.json
-# O9 router inputs (since 2026-10-24). The build reads exactly these files:
-#   ATLAS_LEG_PATHS  = staging/inputs/data/derived/corridor-v3-o9/leg_paths.json
+# Router inputs (since O17, 2026-10-24): one full, deterministic corridor-router
+# run; no splice. The build reads exactly these files:
+#   ATLAS_LEG_PATHS  = staging/inputs/data/derived/corridor-v3-o17/leg_paths.json
 #   ATLAS_PAIR_PATHS = data/pair_path_fixes.json,
-#                      staging/inputs/data/derived/corridor-v3-o9/pair_paths_canonical.json
-# corridor-v3-o9/ = the shipped corridor-v3 outputs (handoff-v3
-# data/derived/corridor-v3/) with every record touching 阳江 replaced from a
-# router rerun that uses data/station_fixes.json (阳江 = the 深茂铁路 station):
-#   corridor-router --data <copy of handoff-v3 data> --files ../staging/inputs/output \
-#       --out <rerun dir> --station-fixes ../data/station_fixes.json
-#   python3 -I ../scripts/o9_splice_router.py <handoff-v3>/data/derived/corridor-v3 \
-#       <rerun dir> ../staging/inputs/data/derived/corridor-v3-o9 阳江
-# Splice, don't swap (until the O17 rerun is approved): the shipped router outputs came from
-# the pre-O17 router, which was not deterministic run to run (two runs on
-# identical inputs differ on ~400 legs); the O17 router is, but a full rerun changes flows. pair_path_fixes.json goes FIRST (first
-# record per pair wins): pairs whose station snapped to a homonym (禹州, 郏县;
-# 恩平/江门–阳江, which the rerun leaves bridged). Regenerate with
-# scripts/o9_fix_paths.py (header has the inputs). 聊城西–菏泽东 stays a chord
-# (京港高速线 is unjoined at 菏泽东 in OSM; owner: no synthetic connector).
-C=$PWD/../staging/inputs/data/derived/corridor-v3-o9
+#                      staging/inputs/data/derived/corridor-v3-o17/pair_paths_canonical.json
+# Regenerate corridor-v3-o17/ (~25 s; byte-identical run to run and across
+# --threads, apart from timings in summary.json):
+#   ../pipeline/target/release/corridor-router --data ../data \
+#       --files ../staging/inputs/output \
+#       --out ../staging/inputs/data/derived/corridor-v3-o17 \
+#       --station-fixes ../data/station_fixes.json
+# pair_path_fixes.json goes FIRST (first record per pair wins): pairs whose
+# station snapped to a homonym (禹州, 郏县; 恩平/江门–阳江, which the router
+# leaves bridged). Regenerate with scripts/o9_fix_paths.py (header has the
+# inputs). 聊城西–菏泽东 stays a chord (京港高速线 is unjoined at 菏泽东 in OSM;
+# owner: no synthetic connector). The pre-O17 corridor-v3-o9/ splice
+# (scripts/o9_splice_router.py, removed in PR #15; in git history) is retired.
+C=$PWD/../staging/inputs/data/derived/corridor-v3-o17
 export ATLAS_LEG_PATHS=$C/leg_paths.json
 export ATLAS_PAIR_PATHS=$PWD/../data/pair_path_fixes.json,$C/pair_paths_canonical.json
 O=$PWD/../staging/corridor-v3-ordered
 ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
 AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
-./target/release/secdiff --old ../staging/o1-build/o1v2/china-flow-atlas-data.json \
-    --new $O/china-flow-atlas-data.json --edges   # 0 changed edges, except 8 on the 成都 loop vs the pre-O18 baseline (progress log, O18)
+./target/release/secdiff --old ../staging/determinism/o17/final-atlas/china-flow-atlas-data.json \
+    --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
 ./target/release/secdiff --old ... --new ... --classes   # per-edge class columns (8 classes)
-# atlas + atlaspack are deterministic: two runs on identical inputs are byte-identical (O18)
+# router, atlas and atlaspack are deterministic: identical inputs give a
+# byte-identical pack (O17, O18), so `cmp` the .br files against web/public/assets.
 ```
 The `--old` baseline is the build behind the committed pack (its `.br` files
-are md5-identical to `web/public/assets`); `staging/live-v1` predates O4-O1 and
-now differs on 273,633 edges. Always set `CRFM_OUTPUT_DIR` / `ATLAS_OUT` /
-`--out-dir` so a build never overwrites `output/` or `web/public/assets`. Section indices change
-on every run (HashMap iteration), so ship the whole five-file pack together.
+are byte-identical to `web/public/assets`). Always set `CRFM_OUTPUT_DIR` /
+`ATLAS_OUT` / `--out-dir` so a build never overwrites `output/` or
+`web/public/assets`.
 
 **Pack format `fmt: 6`** (every one of shared / out-map / in-map /
 out-tables / in-tables carries `fmt: 6`; the client refuses anything else.
