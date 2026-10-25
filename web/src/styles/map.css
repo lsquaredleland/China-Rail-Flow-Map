@@ -93,10 +93,8 @@
 #legend .lg-steps { fill: var(--rust); }
 #legend .lg-dot { fill: var(--ink); fill-opacity: 0.3; stroke: var(--ink); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #legend .lg-steps { fill: var(--rust); }
   :root:not([data-theme="light"]) #legend .lg-dot { fill: var(--ink); fill-opacity: 1; stroke: var(--ink); }
 }
-:root[data-theme="dark"] #legend .lg-steps { fill: var(--rust); }
 :root[data-theme="dark"] #legend .lg-dot { fill: var(--ink); fill-opacity: 1; stroke: var(--ink); }
 :root[data-theme="light"] #legend .lg-dot { fill-opacity: 0.3; }
 #legendNotes {
@@ -112,15 +110,6 @@
   color: var(--ink-soft);
 }
 #legendNotes .note:last-child { margin-bottom: 0; }
-#legendNotes .dash {
-  display: inline-block; width: 20px; border-top: 2px dashed #c9b8a6;
-  vertical-align: middle; margin-right: 5px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #legendNotes .dash { border-top-color: rgba(190, 160, 120, 0.75); }
-}
-:root[data-theme="dark"] #legendNotes .dash { border-top-color: rgba(190, 160, 120, 0.75); }
-:root[data-theme="light"] #legendNotes .dash { border-top-color: #c9b8a6; }
 :root[data-theme="dark"] .lg-band-label { fill: #111214 !important; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .lg-band-label { fill: #111214 !important; }
