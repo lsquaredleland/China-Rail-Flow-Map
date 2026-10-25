@@ -601,6 +601,17 @@ function ensure(M: MapCtx): Host | null {
     W.__deckStats.errors.push("webglcontextlost (canvas event)");
   });
   cv.addEventListener("webglcontextrestored", () => { if (W.__deckRecreate) W.__deckRecreate(); });
+  if (Q.get("fps") === "1") { // M3 (owner, phones): on-page meter
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;left:6px;top:6px;z-index:99;background:#000c;color:#0f0;font:12px monospace;padding:3px 6px;border-radius:3px;pointer-events:none";
+    document.body.appendChild(el);
+    let last = performance.now(), n0 = 0;
+    setInterval(() => {
+      const now = performance.now(), n = W.__deckStats.afterRenders;
+      el.textContent = "frames/s " + (((n - n0) * 1000) / (now - last)).toFixed(0) + " | deck.metrics.fps " + Math.round(host.deck.metrics.fps || 0) + " | trains " + (host.trainCount || 0);
+      last = now; n0 = n;
+    }, 500);
+  }
   W.__deck = host.deck;
   W.__deckHost = host;
   W.__deckRecreate = () => {

@@ -48,7 +48,7 @@ export function serve(dir, port, { quiet = true, notFound = [] } = {}) {
     res.writeHead(200, h);
     res.end(b);
   });
-  return new Promise((resolve) => server.listen(port, "127.0.0.1", () => resolve(server)));
+  return new Promise((resolve) => server.listen(port, process.env.HOST || "127.0.0.1", () => resolve(server)));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
