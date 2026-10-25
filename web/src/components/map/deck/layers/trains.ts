@@ -1,6 +1,6 @@
 /* Train layers: the moving dots, their gradient tails, station-dwell rings and
    the hover / selected / isolated ring, as deck.gl layers. Mirrors
-   map/trains.ts drawTrains; which trains are shown (class filter, selected
+   the former Canvas drawTrains; which trains are shown (class filter, selected
    destination window, isolation) comes from lib isTrainShown, so both
    renderers agree.
 
@@ -21,7 +21,7 @@ const AMBER: RGBA = [245, 158, 11, 255]; // G D C
 const CYAN: RGBA = [6, 182, 212, 255]; // Z T K S
 const SLATE: RGBA = [226, 232, 240, 255]; // 普 and the rest
 
-/** The train's glow colour (map/trains.ts: high-speed amber, conventional cyan). */
+/** The train's glow colour (the former Canvas renderer: high-speed amber, conventional cyan). */
 export function glowOf(cls: string): RGBA {
   if (cls === "G" || cls === "D" || cls === "C") return AMBER;
   if (cls === "Z" || cls === "T" || cls === "K" || cls === "S") return CYAN;

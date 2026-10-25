@@ -1,6 +1,6 @@
 /* Station layers: city dots (size from arrivals, dimming under a selected
    destination), golden arrival ripples, selection / hover rings and the origin
-   disc, as ScatterplotLayers. Mirrors map/stations.ts drawStations; the
+   disc, as ScatterplotLayers. Mirrors the former Canvas drawStations; the
    decisions (radius, growth, alpha, ripple) come from lib/mapModel
    stationStates, so both renderers agree.
 

@@ -22,6 +22,27 @@ jobs:
       - run: bun run build
       - run: bun test
 
+  # Headless WebGL smoke: with the Canvas renderer gone, nothing else boots the
+  # lazy deck chunk. SwiftShader software GL on the runner's preinstalled Chrome
+  # (no browser download); deterministic assertions only, no pixel comparison.
+  web-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Boot dist in headless Chrome (SwiftShader)
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node tools/smoke.mjs
+
   # O12: audit the committed pack. CI cannot rebuild it (needs the OSM
   # extract), but --pack-only needs only the pack files and goldens.json.
   # dropped_chains / flow_lost are not gated here: they need the OSM extract

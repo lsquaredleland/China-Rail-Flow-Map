@@ -32,7 +32,7 @@ import {
 } from "../../../../lib";
 import type { FlowItem, FlowPass, InfraPass, ModelCaches, ModelState, RGBA } from "../../../../lib";
 
-/** Infrastructure hairline width, CSS px (map/flows.ts INFRA_WIDTH). */
+/** Infrastructure hairline width, CSS px (the former Canvas renderer's INFRA_WIDTH). */
 export const INFRA_WIDTH = 1.25;
 
 const dashExt = new PathStyleExtension({ dash: true });
@@ -305,7 +305,7 @@ function flowPickLayer(role: string, pd: PassData) {
   } as object);
 }
 
-/** Dashed open-water crossings of a pass's ferry items (map/flows.ts strokeFlowList). */
+/** Dashed open-water crossings of a pass's ferry items (the former Canvas renderer's strokeFlowList). */
 function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: number, colour: RGBA) {
   return new PathLayer<DashPiece>({
     id,
@@ -518,7 +518,7 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
 
 /* ---------- isolated corridor ---------- */
 
-/** map/flows.ts tracePartialSec: the section up to the vertex nearest `end`, then `end`. */
+/** The former Canvas renderer's tracePartialSec: the section up to the vertex nearest `end`, then `end`. */
 function partialPath(set: DecodedSet, s: number, endLon: number, endLat: number, rev: boolean): number[] {
   const { pts, off, len } = set;
   const o = off[s];
