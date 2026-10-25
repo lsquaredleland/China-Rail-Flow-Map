@@ -856,6 +856,73 @@ pipeline now emits each national train's whole run, so the client does no stitch
   needs owner approval. P2.1's test values (2,668 dots at 1095, 6,972 trains) are on the
   out-tables source and move when P2.2 switches to this file (185 more trains, longer runs).
 
+*P2.2 as built (2026-10-25, agent; same GPU, load average 3-5.5).*
+- **Data.** `buildNational(atlas, nt, sched)` reads the national trains file; `extra` is
+  decoded after the shared throats into `NationalTimeline.thr` (one throat set, ids
+  `n_sec + n_thr + j`), which `prepTrainPath` and `natXY` use; `on_sec` is not read (counting
+  only). `requireNationalTrains` checks `fmt`, `n_sec`, `n_thr` and one path / stop list per
+  `train_table` row (a mismatch is a `FmtError` in `loadError`). `useAtlasData` gains
+  `ensureNationalTrains()` (the file plus the schedules, fetched only on entering national
+  mode; never in the origin view, checked by the driver) and returns `nationalTrains` /
+  `nationalTrainsFailed`; the P2.1 `outTablesRaw` state (out-tables raw paths kept in memory) is
+  removed. The timeline is built in the deck chunk on the first national frame, once per
+  (atlas, file). **New counts:** 7,157 trains (0 skipped), 717,035 path refs, **2,893 dots at
+  18:15** (was 2,668), **992 at 00:30** (was 934), longest run 3,477 min (3 dots max per train).
+  `buildNational` 20-22 ms, heap delta 20.9-22.1 MB (≤ 30), `natPositions` 0.42-0.48 ms/call
+  at the peak (Bun).
+- **Tests.** `national.test.ts` runs on the full file when found (`web/public/assets` after
+  the swap, else `staging/national-trains/dev` in this checkout or a parent), otherwise on
+  the committed sample `tests/fixtures/national-trains-sample.json.br` (78 KB; every 10th train
+  plus every train with an `extra` piece or chord legs, 783 trains; `tools/national-trains-sample.mjs`
+  regenerates it), so CI runs the same tests (`CRFM_NATIONAL_SAMPLE=1` forces the sample). Each
+  source has its own expected counts (full 7,157 / 2,893 / 992; sample 783 / 347 / 148). (b)
+  wrap holds; (c) now runs on the outbound tail: for 200 trains with an out-tables row the
+  national path ends with it verbatim, and positions along the tail (offset by the head's
+  length) equal the expanded-vertex oracle over the out-tables path within 1e-6°. New: the
+  file check, heads / extra pieces decode on the map, `nationalLayers.test.ts` (buffers,
+  layer props, `natSynth`), national clock in `animation.test.ts` (`totalMins` 1440, counters,
+  wrap 1439.5 → 0, the origin clock keeps its day-2 tail).
+- **Layers / host.** `deck/layers/national.ts`: `nat-tails` (TailLayer), `nat-trains`
+  (positions read straight from `natPositions`' buffer, `stride 24`), `nat-dwell`; same marks
+  as the origin trains; `pickable: !animPlaying` on the dots only. `buildLayers` is the seam:
+  in national mode it returns the backdrop plus these and nothing origin-specific (D13); the
+  labels overlay clears and draws nothing; `pick()` returns null (picking is P2.3). National
+  mode sits behind the existing no-WebGL2 state (no chunk, the same notice; driver: 0
+  `pageerror`, tables 1,201 rows). D8: `useDevicePixels` is `min(2, dpr)` in national mode
+  when `deviceMemory ≤ 4` or `maxTouchPoints > 0`, else `min(3, dpr)`, switched by `setProps`
+  on a mode change. `?natSynth=N` repeats the trains (+37 min each copy, perf only).
+- **UI.** Toolbar toggle "National · beta" (`#tglNational`, last in the toolbar so it takes
+  free space at the end of the second row and moves nothing), `?national=1` (URL only, not
+  persisted). Entering national opens the scrubber and plays from the current minute (a day-2
+  origin time folds into 0-1440), closes the city panel, hides the isolation chip and the
+  legend, and shows the coverage note "7,157 of ~12,000 daily services" (count of non-empty
+  paths in the file; `NATIONAL_DAILY_SERVICES_REF = 12000` in `data.ts`). Scrubber: "Running" /
+  "Trains", the Arrived column, Finish and the "All arrived" tick hidden. `AnimState` gains
+  `national` and `running` (dots on the line at the clock's minute; a > 24 h run counts once
+  per dot). Leaving national with the direction inbound collapses the bar as before.
+- **Acceptance.** `bun run typecheck` clean; `bun test` 182 pass / 0 fail (on 2b844b8; full file and
+  sample), no skip / only. Driver (scratch, not committed): toggle on/off, `?national=1`
+  restore (playing, dots > 0), seek 18:15 = 2,893 and 00:30 = 992 running, play from 23:59.5
+  wraps to 00:01, the view (`S.current.view`) equal before/after both switches, origin panel
+  and table (331 rows) work after returning, labels back, 0 `pageerror`. M7n **197-214 ms**
+  (toggle to first frame with dots; build 26-29 ms; ≤ 1.5 s). M4n post-pick (paused at
+  18:15, one `pickRect` on `nat-trains`): 4.4 / 12.8 / 26.8 MB at DPR 1 / 2 / 3 (1280x800),
+  11.2 MB at 390x844 @ 3 (pre-pick 1.6 MB; ≤ 64). M5n heap delta on entering (after GC):
+  20.3-21.9 MB (P2.1 target ≤ 30; spike 47.5). M1n/M2n: §11.1. Shots vs the c613bc4 build
+  (28): at DPR 2 the only differing pixels are inside the new toggle's box (12,636 px; 2,760
+  in `night`); at DPR 1 the toggle's box plus ≤ 7 px (channel delta ≤ 19) on class-button
+  edges in row 1, which vanish when the toggle node is removed from the DOM (that variant is
+  0 px against the base); the first run's `anim-0600@1x` extra diff did not reproduce (0 px on
+  rerun). Layout rects of every other toolbar child are identical. M6 lazy graph 229.6 KB
+  brotli (was 226.4; ≤ 300), React guard passes; main bundle 377,576 → 380,858 B (+3,282).
+- **Swap needs** (owner): copy `staging/national-trains/dev/atlas-v2-national-trains.json.br`
+  (258,163 B, sha256 e5fe2d35…) into `web/public/assets` (bundle.mjs content-hashes it like
+  the other packs; before that the client fetches the unhashed name and national mode says
+  the data could not be loaded). Nothing else: the shared, schedules and out-tables files it
+  is checked against rebuild byte-identical (the staged shared file differs only in
+  `build.pipeline_tree`). After the swap `national.test.ts` picks up the full file from
+  `public/assets` in CI.
+
 **P2.3 National picking + tooltip + modal** — *after P2.2.* Files: `DeckHost.tsx` (`onHover`
 mouse-only when paused on national dots; `onClick` → `onSelectTrain(code)`),
 `lib/tooltip.ts` (train builder reused). Acceptance: pause → hover → tooltip; click →
@@ -1094,11 +1161,11 @@ mattered.
 | M12 context loss | `loseContext()` then `restoreContext()`: **0 `pageerror`; the map draws again after re-creating `Deck`** (245,760 non-empty px). **`Deck.onError` is never called on context loss in 9.4.0** (`_onContextLost` is defined but not wired, see §11.2); the loss is caught by our own `webglcontextlost`/`webglcontextrestored` listeners on the canvas | full scene 广州 18:15: **0.000 %** (paused) / +0.97 % (playing) non-empty px, exactly one re-creation, 0 `pageerror` | PASS with the criterion reworded (§11.2 G3) | agent, 10-25 |
 | M13 `TailLayer` fade | 120 px probe tail, alpha at 0.5 / 5 / 30 / 60 / 90 / 115 / 119.5 px = 0.008 / 0.043 / 0.25 / 0.50 / 0.75 / 0.96 / **0.996** (source < 10 %, head ≥ 90 %); linear. Injection `vs:#main-end: vColor.a *= positions.x` works; no fallback needed | — | PASS (C1 injection) | agent, 10-25 |
 | M14 parity feasibility | Canvas vs deck, DPR 2, per-scenario differing pixels (tolerance 25/255 per channel, our `cmp.mjs`, the closest match to pixelmatch 0.1): `national-fit` **0.91 %**, `guangzhou-initial` **1.60 %**, `city-zoom-x10` **3.35 %**, `selected-city` **1.68 %**, `anim-1815` **1.27 %**, `night` **1.01 %**, `labels-on` **2.69 %** (all ≤ 5 %). Other 7: `anim-0600` 0.75, `anim-2350` 1.13, `class-filter-G` 1.38, `inbound` 1.65, `infra-on` 1.89, `isolated-train-mid` 0.77, `selected-city-minimized` 1.68. Structural differences in §11.3 | all 28 scenarios ≤ **0.61 %** pixelmatch (G1 rule, C20), see P1b.5 note | PASS | agent, 10-25 |
-| M1n national peak, 18:15 (`natSynth` 0 = 2,668 trains; 12,000 = 4,715 active) | `natSynth=0`: rAF p95 16.7 ms, draw+raster p95 10.3 ms, cpuTimePerFrame 1.7 ms. **`natSynth=12000`: rAF p95 16.7–16.8 ms in 3/3 reps, draw+raster p95 12.5–13.9 ms, cpuTimePerFrame 1.3–1.4 ms, JS draw p95 2.5–2.6 ms (CPU position loop 1.5 ms)** | — | report (meets the Phase 2 bar: p95 ≤ 16.7, CPU ≤ 4) | agent |
-| M2n M1n at 4× throttle | `natSynth=0`: rAF p95 16.8 ms; `natSynth=12000`: rAF p95 16.7 / 16.8 / 16.8 (national fit), 33.3 on the origin-initial view; draw+raster p95 19.5–20.3 ms; cpuTimePerFrame 5.1 ms | — | report (meets the Phase 2 bar: p95 ≤ 33) | agent |
-| M4n GPU memory, dots + tails | 4.5 MB total layer stack at 2,570 dots (tails 0.42 MB, dots 0.25 MB); 5.0 MB at 4,715 dots (tails 0.72 MB). TripsLayer not built | — | report (≤ 64 MB) | agent |
-| M5n CPU heap of the national build | **47.5 MB** (3.97 M vertices, 6,972 trains; `usedSize + backingStorageSize` after GC, `natSynth` adds < 1 MB); build 119 ms | — | report (spike expectation ≈ 48 MB; P2.1 target ≤ 30 MB) | agent |
-| M7n time to first national frame | **0.18 s** (fetch+parse 62 ms, build 119 ms, from toggle to first `onAfterRender` with dots) | — | report (≤ 1.5 s) | agent |
+| M1n national peak, 18:15 (`natSynth` 0 = 2,668 trains; 12,000 = 4,715 active) | `natSynth=0`: rAF p95 16.7 ms, draw+raster p95 10.3 ms, cpuTimePerFrame 1.7 ms. **`natSynth=12000`: rAF p95 16.7–16.8 ms in 3/3 reps, draw+raster p95 12.5–13.9 ms, cpuTimePerFrame 1.3–1.4 ms, JS draw p95 2.5–2.6 ms (CPU position loop 1.5 ms)** | **P2.2 (national trains file, DPR 2, 3 reps, sweep 1095→1155):** 2,781-2,893 dots; rAF p95 16.7-16.8 ms in 9/9; draw+raster p95 8.4-10.2 / 9.9-11.8 / 5.8-8.2 ms (initial / national fit / city x10); JS draw p95 1.3-3.0 ms; cpuTimePerFrame 0.4-1.1 ms. `natSynth=12000` (4,782 dots): rAF p95 16.7-16.8, draw+raster p95 9.9-12.3 / 11.9-14.6 / 7.4-9.6 ms, JS draw p95 2.0-3.7 ms | PASS | agent, 10-25 |
+| M2n M1n at 4× throttle | `natSynth=0`: rAF p95 16.8 ms; `natSynth=12000`: rAF p95 16.7 / 16.8 / 16.8 (national fit), 33.3 on the origin-initial view; draw+raster p95 19.5–20.3 ms; cpuTimePerFrame 5.1 ms | **P2.2 (4× throttle, 3 reps):** rAF p95 16.7-16.8 ms; draw+raster p95 12.2-13.5 / 14.1-15.0 / 10.4-10.8 ms; JS draw p95 5.5-6.4 ms. `natSynth=12000`: rAF p95 16.7-16.8; draw+raster p95 15.8-16.9 / **17.4-18.6** / 13.5-15.0 ms (national fit above 16.7 in 3/3, as in the spike) | PASS on the real file; `natSynth=12000` meets rAF ≤ 33.4 but draw+raster is 0.7-1.9 ms over at national fit | agent, 10-25 |
+| M4n GPU memory, dots + tails | 4.5 MB total layer stack at 2,570 dots (tails 0.42 MB, dots 0.25 MB); 5.0 MB at 4,715 dots (tails 0.72 MB). TripsLayer not built | **P2.2, post-pick** (paused 18:15, one pick on `nat-trains`): 4.4 / 12.8 / 26.8 MB at DPR 1 / 2 / 3 (1280x800), 11.2 MB at 390x844 @ 3; pre-pick 1.6 MB (1.9 MB at `natSynth=12000`) | PASS | agent, 10-25 |
+| M5n CPU heap of the national build | **47.5 MB** (3.97 M vertices, 6,972 trains; `usedSize + backingStorageSize` after GC, `natSynth` adds < 1 MB); build 119 ms | **P2.2:** 20.3-21.9 MB in the browser (heap delta on entering, after GC; 7,157 trains, 717,035 refs); Bun test 20.9-22.1 MB | PASS (≤ 30) | agent, 10-25 |
+| M7n time to first national frame | **0.18 s** (fetch+parse 62 ms, build 119 ms, from toggle to first `onAfterRender` with dots) | **P2.2: 197-214 ms** (toggle to the first rendered frame with dots: the 258 KB file + schedules fetched, checked, built in 26-29 ms) | PASS (≤ 1.5 s) | agent, 10-25 |
 | M11 TripsLayer dwell | not built | — | n/a | — |
 
 Counts check: 2,668 national trains at minute 1095 on the current pack, as the plan says.

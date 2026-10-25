@@ -1,4 +1,4 @@
-/* The deck.gl origin renderer, as an imperative module (C23): no React, no
+/* The deck.gl renderer (origin view and national mode), as an imperative module (C23): no React, no
    JSX, and no module state shared with the entry bundle (this file is the
    root of a separate lazy esbuild graph, so anything it imports from src/ is
    duplicated). Everything it needs comes in through MapCtx.
@@ -17,6 +17,7 @@ import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
 import { PICK_PREFIX, flowLayers } from "./layers/flows";
 import { stationLayers } from "./layers/stations";
+import { nationalFrame, nationalLayers, nationalTimeline } from "./layers/national";
 import { shownTrains, trainLayers } from "./layers/trains";
 
 export interface PickRectOptions {
@@ -47,6 +48,11 @@ export interface DeckStats {
   /** Deck re-creations after a WebGL context loss (C18). */
   recreated: number;
   errors: string[];
+  /** National mode: dots in the last frame, the timeline build time and
+      the performance.now() of the first rendered frame with dots (M7n). */
+  natDots: number;
+  natBuildMs: number;
+  natFirstFrameAt: number;
 }
 
 /* The slice of Deck used here; layerManager / device are protected in the typings. */
@@ -97,7 +103,17 @@ const NOTICE_TEXT = "Map paused — tap to resume";
 
 const GPU_TIME = typeof location !== "undefined" && new URLSearchParams(location.search).get("gputime") === "1";
 
-function buildLayers(M: MapCtx): Layer[] {
+/** Drawing-buffer DPR: up to 3; D8 caps it at 2 in national mode on a
+    low-memory (deviceMemory <= 4, Chrome only) or touch device. */
+function devicePixels(M: MapCtx): number {
+  const dpr = window.devicePixelRatio || 1;
+  if (!M.P.current.national) return Math.min(3, dpr);
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  const weak = (mem !== undefined && mem <= 4) || navigator.maxTouchPoints > 0;
+  return Math.min(weak ? 2 : 3, dpr);
+}
+
+function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   const { P, S } = M;
   const atlas = P.current.atlas;
   if (!atlas) return [];
@@ -109,6 +125,22 @@ function buildLayers(M: MapCtx): Layer[] {
     dark: P.current.dark,
     scale: S.current.view.scale,
   });
+  if (P.current.national) {
+    // D13 map-only mode: the backdrop and every national train; no origin
+    // flows, stations, selection or isolation.
+    const st = S.current;
+    const built = nationalTimeline(atlas, P.current.nationalTrains);
+    if (!built) {
+      st.natN = st.natRunning = stats.natDots = 0;
+      return layers;
+    }
+    const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale);
+    st.natN = built.tl.n;
+    st.natRunning = stats.natDots = f.count;
+    stats.natBuildMs = built.ms;
+    layers.push(...nationalLayers(f, !st.animPlaying));
+    return layers;
+  }
   const set = M.flowsSet();
   const cur = P.current.cur;
   if (set && cur) {
@@ -204,7 +236,7 @@ function pipelinesReady(deck: DeckInternals): boolean {
 
 export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
   const w = window as unknown as { __deckStats?: DeckStats; __deck?: Deck; __deckHost?: DeckHandle };
-  const stats: DeckStats = (w.__deckStats = { afterRenders: 0, settled: false, recreated: 0, errors: [] });
+  const stats: DeckStats = (w.__deckStats = { afterRenders: 0, settled: false, recreated: 0, errors: [], natDots: 0, natBuildMs: 0, natFirstFrameAt: 0 });
 
   let canvas: HTMLCanvasElement;
   let deck: DeckInternals;
@@ -213,6 +245,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
   let layerSig = ""; // layer-id set of the last render()
   let sigStreak = 0; // consecutive afterRenders with that set
   let settleRaf = 0;
+  let dpr = devicePixels(M); // useDevicePixels of the current Deck
   let notice: HTMLDivElement | null = null;
 
   const showNotice = () => {
@@ -262,7 +295,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       views: [new OrthographicView({ id: "map", flipY: false })],
       viewState: viewToViewState(st.view, st.W || 1, st.H || 1),
       controller: false,
-      useDevicePixels: Math.min(3, window.devicePixelRatio || 1),
+      useDevicePixels: (dpr = devicePixels(M)),
       deviceProps: GPU_TIME ? { debugGPUTime: true } : {},
       pickingRadius: 14,
       // Picking proxies exist for the picking passes only.
@@ -282,6 +315,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       },
       onAfterRender: () => {
         stats.afterRenders++;
+        if (stats.natDots > 0 && !stats.natFirstFrameAt && M.P.current.national) stats.natFirstFrameAt = performance.now();
         const sig = deck.layerManager?.getLayers().map((l) => l.id).join("|") ?? "";
         sigStreak = sig === layerSig ? sigStreak + 1 : 1;
         stats.settled = sigStreak >= 2 && pipelinesReady(deck);
@@ -324,7 +358,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
     const st = S.current;
     if (!P.current.atlas || !P.current.cur || !deck.isInitialized) return;
     canvas.style.background = palette(P.current.dark).paper;
-    const layers = buildLayers(M);
+    const layers = buildLayers(M, stats);
     const sig = layers.map((l) => l.id).join("|");
     if (sig !== layerSig) {
       layerSig = sig;
@@ -338,6 +372,11 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
     const vs = viewToViewState(st.view, st.W, st.H);
     const vp = deck.getViewports()[0];
     const zoom: number | [number, number] = vp ? [vs.zoom + Math.log2(vp.width / st.W), vs.zoom + Math.log2(vp.height / st.H)] : vs.zoom;
+    const dp = devicePixels(M);
+    if (dp !== dpr) {
+      dpr = dp; // D8: entering / leaving national mode on a weak device
+      deck.setProps({ useDevicePixels: dp });
+    }
     deck.setProps({ viewState: { ...vs, zoom }, layers });
     deck.redraw("render"); // synchronous (C22)
     drawLabelsOverlay(M);

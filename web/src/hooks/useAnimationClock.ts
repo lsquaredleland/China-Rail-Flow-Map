@@ -5,21 +5,28 @@ import type { MapApi } from "../components/MapCanvas";
 
 /* The 24h animation bar: whether it is collapsed and the commands that
    start / stop the clock on the map. The clock itself lives in the map
-   engine (components/map/anim.ts). The animation is outbound-only, so
-   switching to inbound collapses the bar and stops the clock. */
+   engine (components/map/anim.ts). The origin animation is outbound-only,
+   so switching to inbound collapses the bar and stops the clock; national
+   mode (D13) is an animation in either direction, so entering it opens the
+   bar and plays from the current minute. */
 export function useAnimationClock(
   mapRef: RefObject<MapApi | null>,
   direction: Direction,
+  national: boolean,
 ) {
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(true);
 
   useEffect(() => {
-    if (direction === "in") {
+    if (national) {
+      setIsTimelineCollapsed(false);
+      mapRef.current?.setAnimEnabled?.(true);
+      mapRef.current?.setPlaying?.(true);
+    } else if (direction === "in") {
       setIsTimelineCollapsed(true);
       mapRef.current?.setPlaying?.(false);
       mapRef.current?.setAnimEnabled?.(false);
     }
-  }, [direction, mapRef]);
+  }, [direction, national, mapRef]);
 
   const expandTimeline = () => {
     setIsTimelineCollapsed(false);

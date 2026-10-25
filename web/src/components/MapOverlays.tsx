@@ -1,4 +1,5 @@
 /* Floating controls drawn over the map canvas. */
+import { NATIONAL_DAILY_SERVICES_REF } from "../data";
 
 /** "Isolated: K9217 [Timetable] [x]" pill while one train is isolated. */
 export function IsolationChip({
@@ -31,6 +32,23 @@ export function IsolationChip({
       >
         ✕
       </button>
+    </div>
+  );
+}
+
+/** National mode's coverage note: the trains drawn against the reference
+    size of the daily timetable (NATIONAL_DAILY_SERVICES_REF). */
+export function NationalNote({ trains, failed }: { trains: number; failed: boolean }) {
+  return (
+    <div className="nat-note" role="note">
+      <span className="nat-note-tag">National · beta</span>
+      <span>
+        {failed
+          ? "The national train data could not be loaded."
+          : trains
+          ? `${trains.toLocaleString("en-US")} of ~${NATIONAL_DAILY_SERVICES_REF.toLocaleString("en-US")} daily services`
+          : "Loading national trains…"}
+      </span>
     </div>
   );
 }

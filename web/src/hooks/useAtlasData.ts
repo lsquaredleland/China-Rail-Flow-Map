@@ -11,7 +11,8 @@ import type {
   OutMapData,
   OutTablesData,
   OutTablesPack,
-  OutTablesRaw,
+  NationalTrainsData,
+  NationalTrainsPack,
   OutlineData,
   SchedulesData,
   SharedData,
@@ -23,12 +24,14 @@ import {
   prepOutline,
   requireFmt,
   requireNationalFlows,
+  requireNationalTrains,
 } from "../lib";
 import {
   ABOUT,
   IN_MAP_URL,
   IN_TABLES_URL,
   NATIONAL_FLOWS_URL,
+  NATIONAL_TRAINS_URL,
   OUTLINE_URL,
   OUT_TABLES_URL,
   SCHEDULES_URL,
@@ -59,15 +62,15 @@ export function useAtlasData({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [outline, setOutline] = useState<DecodedOutline | null>(null);
   const [outTablesReady, setOutTablesReady] = useState(false);
-  // The path tables as shipped, kept for the national timelines (the
-  // per-origin parts are expanded and merged, then dropped).
-  const [outTablesRaw, setOutTablesRaw] = useState<OutTablesRaw | null>(null);
   const [inMapReady, setInMapReady] = useState(false);
   const [inTablesReady, setInTablesReady] = useState(false);
   const [inMapLoading, setInMapLoading] = useState(false);
   const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
   // National per-section flows (P3.2): only national mode asks for them.
   const [nationalFlows, setNationalFlows] = useState<NationalFlowsPack | null>(null);
+  // National trains (P2.2) with the schedules they are timed by: national mode only.
+  const [nationalTrains, setNationalTrains] = useState<NationalTrainsData | null>(null);
+  const [nationalTrainsFailed, setNationalTrainsFailed] = useState(false);
 
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
@@ -80,13 +83,14 @@ export function useAtlasData({
     const inMapDataRef: { current: InMapData | null } = { current: null };
     const inTablesRef: { current: InTablesData | null } = { current: null };
     const nationalFlowsRef: { current: NationalFlowsPack | null } = { current: null };
+    const nationalTrainsRef: { current: NationalTrainsData | null } = { current: null };
     // The schedules asset (O16): not part of first paint. It is fetched once, in
     // parallel with the out tables, which wait for it so every timeline is
     // built with station-level stops (null if it failed to load); an opened
     // schedule modal also requests it.
     let schedulesPromise: Promise<SchedulesData | null> | null = null;
     let schedData: SchedulesData | null = null;
-    const flights = { outTables: false, inMap: false, inTables: false, nationalFlows: false };
+    const flights = { outTables: false, inMap: false, inTables: false, nationalFlows: false, nationalTrains: false };
 
     const loadSchedules = () => {
       if (!schedulesPromise) {
@@ -144,7 +148,6 @@ export function useAtlasData({
           schedData = sched;
           if (sched) setSchedulesData(sched);
           outTablesRef.current = expandOutTables(d);
-          setOutTablesRaw({ paths: d.paths, stop_pos: d.stop_pos, chords: d.chords });
           flights.outTables = false;
           setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
           applyOutTables();
@@ -212,6 +215,48 @@ export function useAtlasData({
           if (err.name === "FmtError") setLoadError(err.message);
         });
     };
+    // National trains: on entering national mode only. The ids index the
+    // shared sections and throats and the rows the train table, so they are
+    // checked against the atlas once both exist; the schedules time them.
+    const applyNationalTrains = () => {
+      const d = nationalTrainsRef.current;
+      const at = atlasRef.current;
+      if (!d || !at) return;
+      try {
+        requireNationalTrains(d.trains, at.sec.len.length, at.thr.len.length, at.data.train_table.length, NATIONAL_TRAINS_URL);
+      } catch (err) {
+        nationalTrainsRef.current = null;
+        setLoadError((err as Error).message);
+        return;
+      }
+      setNationalTrains(d);
+    };
+    const ensureNationalTrains = () => {
+      if (nationalTrainsRef.current) {
+        applyNationalTrains();
+        return;
+      }
+      if (flights.nationalTrains) return;
+      flights.nationalTrains = true;
+      setNationalTrainsFailed(false);
+      Promise.all([fetchData<NationalTrainsPack>(NATIONAL_TRAINS_URL), loadSchedules()])
+        .then(([d, sched]) => {
+          requireFmt(d.fmt, NATIONAL_TRAINS_URL);
+          if (!sched) throw new Error(SCHEDULES_URL + ": not loaded");
+          setSchedulesData(sched);
+          nationalTrainsRef.current = { trains: d, schedules: sched.schedules };
+          flights.nationalTrains = false;
+          setLoadError((e) => (e && e.startsWith(NATIONAL_TRAINS_URL) ? null : e));
+          applyNationalTrains();
+        })
+        .catch((err: Error) => {
+          flights.nationalTrains = false;
+          // Only a wrong format blocks the map; a failed fetch leaves the
+          // origin view as it is and national mode says so.
+          if (err.name === "FmtError") setLoadError(err.message);
+          else setNationalTrainsFailed(true);
+        });
+    };
     // Phase 3 for inbound: the map file first (paint), and only once it
     // has landed do its tables follow behind it, as in phases 1–2.
     const ensureInMap = () => {
@@ -242,6 +287,7 @@ export function useAtlasData({
       ensureInMap,
       ensureInTables,
       ensureNationalFlows,
+      ensureNationalTrains,
       /** Phase 1 finished: merge any staged file that beat the atlas. */
       mergeEarly(inMap: InMapData | null) {
         if (inMap) {
@@ -251,6 +297,7 @@ export function useAtlasData({
         if (outTablesRef.current) applyOutTables();
         if (inTablesRef.current) applyInTables();
         if (nationalFlowsRef.current) applyNationalFlows();
+        if (nationalTrainsRef.current) applyNationalTrains();
       },
       hasInMap: () => !!inMapDataRef.current,
     };
@@ -341,14 +388,16 @@ export function useAtlasData({
     outline,
     loadError,
     outTablesReady,
-    outTablesRaw,
     inMapReady,
     inTablesReady,
     inMapLoading,
     schedulesData,
     nationalFlows,
+    nationalTrains,
+    nationalTrainsFailed,
     ensureOutTables: loader.ensureOutTables,
     ensureInMap: loader.ensureInMap,
     ensureNationalFlows: loader.ensureNationalFlows,
+    ensureNationalTrains: loader.ensureNationalTrains,
   };
 }

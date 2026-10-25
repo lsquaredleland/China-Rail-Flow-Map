@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
 import { buildOrigin } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
-import { usePrefs, useUrlSync } from "./hooks/useUrlState";
+import { initialNational, usePrefs, useUrlSync, writeNationalParam } from "./hooks/useUrlState";
 import { useFilters, useCityPanel, useTrainSelection } from "./hooks/useSelection";
 import { useAnimationClock } from "./hooks/useAnimationClock";
 import MapCanvas, { type MapApi } from "./components/MapCanvas";
@@ -15,7 +15,7 @@ import TrainScheduleModal from "./components/TrainScheduleModal";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
-import { IsolationChip, TimelineExpandButton } from "./components/MapOverlays";
+import { IsolationChip, NationalNote, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 
 export default function App() {
@@ -27,6 +27,8 @@ export default function App() {
   const [showNetwork, setShowNetwork] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [showTimeline] = useState<boolean>(true);
+  // National mode (D11 / D13): every national train on one 24h clock, map-only.
+  const [national, setNational] = useState<boolean>(initialNational);
 
   const prefs = usePrefs();
   const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
@@ -54,6 +56,9 @@ export default function App() {
     schedulesData,
     ensureOutTables,
     ensureInMap,
+    nationalTrains,
+    nationalTrainsFailed,
+    ensureNationalTrains,
   } = useAtlasData({
     atlasRef,
     selectedTrainCode,
@@ -91,11 +96,29 @@ export default function App() {
   });
 
   const { isTimelineCollapsed, expandTimeline, collapseTimeline } =
-    useAnimationClock(mapRef, direction);
+    useAnimationClock(mapRef, direction, national);
   // The isolated train belongs to the outbound animation.
   useEffect(() => {
     if (direction === "in") setIsolatedTrainCode(null);
   }, [direction, setIsolatedTrainCode]);
+
+  // National mode loads its trains file (never in the origin view) and
+  // closes the city panel; the departures table keeps the current origin.
+  useEffect(() => {
+    if (!national) return;
+    ensureNationalTrains();
+    setPanelCity(null);
+  }, [national, ensureNationalTrains, setPanelCity]);
+  const toggleNational = () => {
+    const v = !national;
+    setNational(v);
+    writeNationalParam(v);
+  };
+  // The coverage note: national trains in the file (a count of shipped rows).
+  const nationalTrainCount = useMemo(
+    () => (nationalTrains ? nationalTrains.trains.paths.reduce((c, p) => c + (p.length ? 1 : 0), 0) : 0),
+    [nationalTrains],
+  );
 
   /* ---------- actions ---------- */
   const selectOrigin = (idx: number) => {
@@ -203,6 +226,8 @@ export default function App() {
           onSetDistUnit={setDistUnit}
           dark={dark}
           onSetDark={setDark}
+          national={national}
+          onToggleNational={toggleNational}
         />
 
         <MapCanvas
@@ -220,7 +245,9 @@ export default function App() {
           distUnit={distUnit}
           panelDest={panelCity}
           loadError={loadError}
-          inLoading={direction === "in" && inMapLoading}
+          inLoading={direction === "in" && inMapLoading && !national}
+          national={national}
+          nationalTrains={nationalTrains}
           onSelectDest={handleSelectDest}
           selectedTrainCode={selectedTrainCode}
           onSelectTrain={setSelectedTrainCode}
@@ -230,7 +257,7 @@ export default function App() {
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
-          {direction === "out" && isolatedTrainCode && (
+          {direction === "out" && !national && isolatedTrainCode && (
             <IsolationChip
               code={isolatedTrainCode}
               onTimetable={() => setSelectedTrainCode(isolatedTrainCode)}
@@ -269,7 +296,10 @@ export default function App() {
             unit={distUnit}
             onClose={closePanel}
           />
-          <div id="legendCol">
+          {national && (
+            <NationalNote trains={nationalTrainCount} failed={nationalTrainsFailed} />
+          )}
+          <div id="legendCol" style={national ? { display: "none" } : undefined}>
             <Legend
               ref={legendRef}
               title={
@@ -280,12 +310,12 @@ export default function App() {
             />
           </div>
 
-          {direction === "out" && isTimelineCollapsed && (
+          {(direction === "out" || national) && isTimelineCollapsed && (
             <TimelineExpandButton onExpand={expandTimeline} />
           )}
         </MapCanvas>
 
-        {direction === "out" && showTimeline && !isTimelineCollapsed && (
+        {(direction === "out" || national) && showTimeline && !isTimelineCollapsed && (
           <TimelineScrubber
             mapRef={mapRef}
             dark={dark}

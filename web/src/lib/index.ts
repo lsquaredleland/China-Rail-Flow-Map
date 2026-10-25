@@ -61,7 +61,7 @@ export {
   trainEase,
   trainSpeedFrac,
 } from "./timeline";
-export { buildNational, nat, natPositions, natState, natXY } from "./national";
+export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
 export {
   nationalCounts,
   nationalFlowPasses,

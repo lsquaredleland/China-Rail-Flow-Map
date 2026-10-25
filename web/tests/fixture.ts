@@ -2,9 +2,9 @@
 // does: brotli-decode, requireFmt, decodeFlows, expandOutTables, prepAtlas.
 // The assets are stored under their source names; bundle.mjs content-hashes
 // them only in dist/, so the tests read the source files directly.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { brotliDecompressSync } from "node:zlib";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   buildOrigin,
   decodeFlows,
@@ -36,6 +36,28 @@ function build() {
   };
   const atlas = Object.assign(prepAtlas(data), { schedules });
   return { shared, map, tablesRaw, tables, atlas };
+}
+
+const NATIONAL_TRAINS = "atlas-v2-national-trains.json.br";
+const SAMPLE = join(import.meta.dir, "fixtures/national-trains-sample.json.br");
+
+/** The national trains file (P2.2): the full file when it can be found (in
+    public/assets once the owner swaps it in, else the pipeline's staging
+    dir `staging/national-trains/dev` in this checkout or a parent of it),
+    otherwise the committed sample (tools/national-trains-sample.mjs, every
+    10th train plus the extra-piece and chord trains), so CI runs the same
+    tests on the sample (CRFM_NATIONAL_SAMPLE=1 forces it, as CI sees it). */
+export function nationalTrains(): { source: "full" | "sample"; path: string; data: any } {
+  const cands = [join(ASSETS, NATIONAL_TRAINS)];
+  for (let dir = join(import.meta.dir, ".."); ; dir = dirname(dir)) {
+    cands.push(join(dir, "staging/national-trains/dev", NATIONAL_TRAINS));
+    if (dirname(dir) === dir) break;
+  }
+  const full = process.env.CRFM_NATIONAL_SAMPLE === "1" ? undefined : cands.find((p) => existsSync(p));
+  const path = full ?? SAMPLE;
+  if (!existsSync(path)) throw new Error(`national trains file missing: none of ${[...cands, SAMPLE].join(", ")}`);
+  const data = JSON.parse(brotliDecompressSync(readFileSync(path)).toString("utf8"));
+  return { source: full ? "full" : "sample", path, data };
 }
 
 let cached: ReturnType<typeof build> | undefined;

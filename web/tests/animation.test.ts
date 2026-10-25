@@ -3,7 +3,10 @@
 // filters), animated trains subset of the filter, no teleporting dots.
 import { describe, expect, test } from "bun:test";
 import { filterOrigin, trainDistAt } from "../src/lib";
-import { origin } from "./fixture";
+import { animLoop, getAnimState, setPlaying, setTime } from "../src/components/map/anim";
+import { createMapCtx } from "../src/components/map/context";
+import type { MapCtx, Props } from "../src/components/map/context";
+import { origin, pack } from "./fixture";
 
 const ORIGINS = ["成都", "北京", "广州"];
 const lastStep = (tl: { numSteps: number }) => tl.numSteps - 1;
@@ -152,4 +155,70 @@ describe("filtered views", () => {
       });
     }
   }
+});
+
+describe("national clock (P2.2)", () => {
+  // The clock code needs rAF; the test drives animLoop by hand.
+  const g = globalThis as unknown as Record<string, unknown>;
+  g.requestAnimationFrame ??= () => 0;
+  g.cancelAnimationFrame ??= () => {};
+  const ref = <T,>() => ({ current: null as T | null });
+  const ctx = (national: boolean): MapCtx => {
+    const P = {
+      current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national } as unknown as Props,
+    };
+    return createMapCtx(P, {
+      wrapRef: ref(),
+      canvasRef: ref(),
+      tooltipRef: ref(),
+      scaleWrapRef: ref(),
+      scaleLabelRef: ref(),
+      scaleBarRef: ref(),
+      viewReportTimerRef: { current: null },
+    });
+  };
+  /** One rAF step of `mins` clock minutes at the default 30 s per day. */
+  const step = (M: MapCtx, mins: number) => {
+    const st = M.S.current;
+    st.lastRafTimestamp = 1000;
+    animLoop(M, 1000 + (mins / 1440) * st.animSpeed * 1000);
+  };
+
+  test("national: one day, counters are running / trains, wrap 1440 -> 0", () => {
+    const M = ctx(true);
+    const st = M.S.current;
+    expect(M.activeTimeline()).toBeUndefined();
+    st.natN = 7157;
+    st.natRunning = 2893;
+    const s = getAnimState(M);
+    expect([s.national, s.totalMins, s.totalDays]).toEqual([true, 1440, 1]);
+    expect([s.departed, s.running, s.arrived, s.total]).toEqual([2893, 2893, 0, 7157]);
+    // seeking clamps to the day
+    setTime(M, 2000);
+    expect(st.animTime).toBe(1440);
+    // playing past 24:00 wraps to 00:00 (no day-2 tail speed-up)
+    setPlaying(M, true);
+    st.animTime = 1439;
+    step(M, 0.5);
+    expect(st.animTime).toBeCloseTo(1439.5, 6);
+    step(M, 0.6);
+    expect(st.animTime).toBe(0);
+    step(M, 30);
+    expect(st.animTime).toBeCloseTo(30, 6);
+    setPlaying(M, false);
+  });
+
+  test("origin view keeps its multi-day clock", () => {
+    const M = ctx(false);
+    const st = M.S.current;
+    const tl = M.activeTimeline()!;
+    expect(tl.totalMins).toBeGreaterThan(1440);
+    const s = getAnimState(M);
+    expect([s.national, s.running, s.totalMins]).toEqual([false, 0, tl.totalMins]);
+    setPlaying(M, true);
+    st.animTime = 1439;
+    step(M, 2); // past 24:00 into day 2, no wrap
+    expect(st.animTime).toBeCloseTo(1441, 6);
+    setPlaying(M, false);
+  });
 });

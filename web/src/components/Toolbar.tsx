@@ -27,6 +27,8 @@ export default function Toolbar({
   onSetDistUnit,
   dark,
   onSetDark,
+  national,
+  onToggleNational,
 }: {
   origins: RawOrigin[];
   originIdx: number;
@@ -50,6 +52,9 @@ export default function Toolbar({
   onSetDistUnit: (u: DistUnit) => void;
   dark: boolean;
   onSetDark: (d: boolean) => void;
+  /** National mode (D11: "National · beta", D13 map-only). */
+  national: boolean;
+  onToggleNational: () => void;
 }) {
   return (
     <div className="toolbar">
@@ -224,6 +229,18 @@ export default function Toolbar({
         Drag to pan &middot; scroll or pinch to zoom &middot; click a city
         for its distances
       </span>
+      {/* Last, so it takes free space at the row's end and moves nothing else. */}
+      <div className="group">
+        <button
+          id="tglNational"
+          type="button"
+          aria-pressed={national ? "true" : "false"}
+          onClick={() => onToggleNational()}
+          title="Every covered train in China on one 24h clock (beta)"
+        >
+          National &middot; beta
+        </button>
+      </div>
     </div>
   );
 }

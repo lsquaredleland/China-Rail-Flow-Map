@@ -83,7 +83,8 @@ export function pick(M: MapCtx, px: number, py: number): Hit | null {
   const { S, P } = M;
   const cur = P.current.cur;
   const set = M.flowsSet();
-  if (!cur) return null;
+  // National mode picks nothing yet (P2.3); origin stations / flows are not drawn there (D13).
+  if (!cur || P.current.national) return null;
   const st = S.current;
   const paused = st.animEnabled && !st.animPlaying;
   const q = (radius: number, layerIds: string[]) =>

@@ -21,7 +21,8 @@ const stat = (a) => {
   return { mean: f(s.reduce((p, x) => p + x, 0) / n), p50: f(s[n >> 1]), p95: f(s[Math.floor(n * 0.95)]), max: f(s[n - 1]) };
 };
 
-/** cfg: { argv, defaults: {start, end, frames}, views: {name: "origin"|"fit"|"city"|null}, origin?: zh } */
+/** cfg: { argv, defaults: {start, end, frames}, views: {name: "origin"|"fit"|"city"|null}, origin?: zh,
+    query?: always appended to the page URL (before --query), ready?: an in-page condition to wait for } */
 export async function runPerf(cfg) {
 const { pos, opt } = parseArgs(cfg.argv, ["frames", "dpr", "throttle", "start", "end", "out", "query", "select", "infra"]);
 const FR = +(opt.frames || cfg.defaults.frames), thr = +(opt.throttle || 1);
@@ -37,8 +38,9 @@ try {
     const pg = await browser.newPage();
     pg.on("pageerror", (e) => console.log("PAGEERR", e.message));
     await pg.setViewport({ width: 1280, height: 800, deviceScaleFactor: dpr });
-    await pg.goto(`${url}/?theme=light${opt.query || ""}`, { waitUntil: "networkidle0" });
+    await pg.goto(`${url}/?theme=light${cfg.query || ""}${opt.query || ""}`, { waitUntil: "networkidle0" });
     await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 90000 });
+    if (cfg.ready) await pg.waitForFunction(cfg.ready, { timeout: 90000 });
     await sleep(3000);
     if (!renderer) {
       renderer = await pg.evaluate(() => {
@@ -92,7 +94,7 @@ try {
         await new Promise((r) => setTimeout(r, 300));
         const f = await run(FR, true);
         const metrics = JSON.parse(JSON.stringify(DH.metrics));
-        return { active: M.activeTimeline() ? 1 : 0, a, f, metrics };
+        return { active: M.activeTimeline() ? 1 : 0, natDots: window.__deckStats.natDots, a, f, metrics };
       }, FR, START, STEP);
       const row = {
         dpr, throttle: thr, view: name, renderer, frames: FR,
@@ -100,6 +102,7 @@ try {
         droppedPct: +((100 * r.a.iv.filter((x) => x > 20).length) / r.a.iv.length).toFixed(1),
         drawJsMs: stat(r.a.dr),
         drawPlusRasterMs: stat(r.f.dr),
+        natDots: r.natDots,
         deckMetrics: r.metrics,
       };
       rows.push(row);
@@ -119,6 +122,7 @@ for (const r of rows) {
     String(r.droppedPct).padEnd(6),
     `${r.drawJsMs.mean}/${r.drawJsMs.p95}`.padEnd(19),
     `${r.drawPlusRasterMs.mean}/${r.drawPlusRasterMs.p95}`,
+    r.natDots ? `dots ${r.natDots}` : "",
   );
 }
 if (opt.out) fs.writeFileSync(opt.out, JSON.stringify(rows, null, 1));

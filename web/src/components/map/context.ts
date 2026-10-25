@@ -8,6 +8,7 @@ import type {
   DayTimelineVM,
   Direction,
   DistUnit,
+  NationalTrainsData,
   FlowVM,
   Hit,
   OriginVM,
@@ -28,6 +29,10 @@ export interface AnimState {
   arrived: number;
   total: number;
   enabled: boolean;
+  /** National mode (D13): the clock spans one day and wraps; `departed` is `running`. */
+  national: boolean;
+  /** Dots on the line at `time` in national mode (0 otherwise). */
+  running: number;
 }
 export type AnimListener = (state: AnimState) => void;
 
@@ -70,6 +75,10 @@ export interface Props {
       flight: the map shows the standard loading affordance over the
       canvas. */
   inLoading: boolean;
+  /** National mode (D13, map-only): every national train, no origin state drawn. */
+  national?: boolean;
+  /** The national trains file and its schedules, once loaded. */
+  nationalTrains?: NationalTrainsData | null;
   onSelectDest: (d: CityPointVM | null) => void;
   selectedTrainCode?: string | null;
   onSelectTrain?: (code: string | null) => void;
@@ -144,6 +153,9 @@ function createMapState() {
     } | null,
     chordDepCache: null as { cur: OriginVM; firstDep: Map<number, number> } | null,
     animTime: 360,
+    /* National mode: trains in the timeline and dots in the last frame (set by the deck host). */
+    natN: 0,
+    natRunning: 0,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: false,
@@ -232,10 +244,11 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
       if (!cur) return [];
       return P.current.direction === "out" ? cur.flows : cur.inFlows;
     },
-    // Inbound has no timeline: the animation is outbound-only.
+    // Inbound has no timeline: the animation is outbound-only. National mode
+    // has none either: its clock is one day (1440) and wraps.
     activeTimeline: () => {
       const cur = P.current.cur;
-      return cur && P.current.direction === "out" ? cur.timeline : undefined;
+      return cur && P.current.direction === "out" && !P.current.national ? cur.timeline : undefined;
     },
     // The dots at minute t, computed once per frame however many passes ask.
     activeTrainsAt: (tl, t) => {

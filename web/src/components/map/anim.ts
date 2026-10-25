@@ -7,6 +7,23 @@ import { getSelCache } from "../../lib";
 export function getAnimState(M: MapCtx): AnimState {
   const { S, P, activeTimeline } = M;
   const st = S.current;
+  if (P.current.national) {
+    // National mode (D13): no origin timeline, so the clock is one day and
+    // wraps; the counters are the dots on the line and the trains drawn.
+    return {
+      time: st.animTime,
+      totalMins: 1440,
+      totalDays: 1,
+      isPlaying: st.animPlaying,
+      speed: st.animSpeed,
+      departed: st.natRunning,
+      arrived: 0,
+      total: st.natN,
+      enabled: st.animEnabled,
+      national: true,
+      running: st.natRunning,
+    };
+  }
   const cur = P.current.cur;
   const tl = activeTimeline();
   let total = tl ? tl.totalTrains : 0;
@@ -43,6 +60,8 @@ export function getAnimState(M: MapCtx): AnimState {
     arrived,
     total,
     enabled: st.animEnabled,
+    national: false,
+    running: 0,
   };
 }
 
