@@ -559,7 +559,9 @@ Acceptance: `shots.mjs` deck vs Canvas (`cmp.mjs --pixelmatch`) on `national-fit
 the origin is gone); `perf/origin.mjs` at DPR 2: `cpuTimePerFrame` ≤ 4 ms, draw+raster p95 ≤ 16.7 ms,
 `deck.metrics.bufferMemory` ≤ 16 MB on 广州 + 深圳 selected + infra on (spike: 10.4 MB with
 whole-set flow passes; the ordered subsets are smaller).
-(Context-loss re-check) with flows drawn on 广州 initial: > 100,000 non-empty px at DPR 1 after restore.
+(Context-loss re-check) with flows drawn on 广州 initial: post-restore non-empty px equals pre-loss (±1 %) and exceeds the backdrop-only count (35,910), i.e. flows redraw; one `#deckcv`; `recreated` +1 per loss.
+
+*As built (P1b.2):* `?layers=flows` (both renderers, removed in P1c.2) draws backdrop + chords + flows + infra + highlight + labels, no stations/trains, so parity is measurable before P1b.3. Infra uses per-pass binary data from the `infraPasses` sections (conventional, ferry dashes, high-speed) instead of whole-set `DataFilterExtension` categories. `flowPasses` allocates new item arrays per call while animating, so `memoFlowPasses` keys it on (origin, filter, direction, selection, isolation, theme, 5-min step; the continuous clock only when a destination is selected and running). **Context-loss absolute:** the deck canvas holds 35,910 non-transparent px with backdrop only and 48,555 with flows on 广州 initial at DPR 1 (the flows are hairlines at that scale), so the original "> 100,000" (an estimate, wrong for hairline flows) is replaced by the check above; measured: equality before and after each restore (48,555 each time, `recreated` 1 then 2). Deviations: infra uses per-pass binary data from the `infraPasses` sections instead of whole-set `DataFilterExtension` categories; `memoFlowPasses` memoises `flowPasses` on the 5-minute step (the continuous clock only while a destination is selected and animating). Diff masks (1x): `docs/deckgl-spike/p1b2/`.
 
 **P1b.3 Station / origin / train layers** — *after P1b.2, P1a.3 (merged).* Files: new
 `deck/layers/stations.ts` (dots from `stationStates`: `getRadius = r` with the stroke centred on
@@ -602,7 +604,7 @@ train opens `TrainScheduleModal`; tap on segment pins the tooltip; no hover tool
 `web/package.json`, §11 results. Acceptance (C20): all 28 scenarios Canvas vs deck under
 `--pixelmatch` **≤ 1.0 %** differing pixels, except `selected-city`, `selected-city-minimized`,
 `class-filter-G`, `isolated-train-mid` where D3's opaque context pass is allowed **≤ 2.0 %**,
-and `labels-on` **≤ 1.5 %** (overlay text AA, C21). Spike reference values under the same rule
+and `labels-on` **≤ 1.5 %** (overlay text AA, C21). Full-scene (stations + trains + flows) context-loss re-check: post-restore px equals pre-loss ±1 % (spike reference: 245,760 px full scene). Spike reference values under the same rule
 (before the C17/C19/ferry fixes): 0.16–0.56 % for the AA-only scenarios, `selected-city` 0.84,
 `labels-on` 1.23, `city-zoom-x10` 2.02 (overdraw order, fixed by C19). The `--diff` masks for all
 28 are attached; every solid differing region ≥ 8×8 px is listed with a cause; any scenario

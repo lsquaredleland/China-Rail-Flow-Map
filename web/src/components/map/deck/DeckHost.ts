@@ -16,6 +16,7 @@ import { palette, viewToViewState } from "../../../lib";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
+import { flowLayers } from "./layers/flows";
 
 export interface PickOptions {
   x: number;
@@ -59,9 +60,10 @@ interface DeckInternals {
 
 const NOTICE_TEXT = "Map paused — tap to resume";
 
-/* Debug query ?layers=backdrop (both renderers; removed in P1c.2): only the
-   backdrop is built. Flows, stations and trains land in P1b.2 / P1b.3. */
-const BACKDROP_ONLY = new URLSearchParams(location.search).get("layers") === "backdrop";
+/* Debug query ?layers= (both renderers; removed in P1c.2): "backdrop" builds
+   only the backdrop; "flows" adds chords, flows, infra and the hover highlight
+   (no stations or trains, which land in P1b.3). */
+const LAYERS = new URLSearchParams(location.search).get("layers");
 const GPU_TIME = new URLSearchParams(location.search).get("gputime") === "1";
 
 function buildLayers(M: MapCtx): Layer[] {
@@ -76,8 +78,36 @@ function buildLayers(M: MapCtx): Layer[] {
     dark: P.current.dark,
     scale: S.current.view.scale,
   });
-  if (!BACKDROP_ONLY) {
-    // flows / infra / chords / highlights: P1b.2; stations / trains: P1b.3
+  if (LAYERS === "backdrop") return layers;
+  const set = M.flowsSet();
+  const cur = P.current.cur;
+  if (set && cur) {
+    const st = S.current;
+    const { under, over } = flowLayers({
+      set,
+      ms: {
+        cur,
+        baseCur: P.current.baseCur,
+        dir: P.current.direction,
+        animTime: st.animTime,
+        animEnabled: st.animEnabled,
+        showInfra: P.current.showInfra,
+        panelDest: P.current.panelDest,
+        iso: P.current.isolatedTrainCode,
+        dark: P.current.dark,
+      },
+      caches: st,
+      dark: P.current.dark,
+      scale: st.view.scale,
+      fitScale: st.fitScale,
+      hover: st.hover,
+      activeTrainsAt: M.activeTrainsAt,
+      chords: cur.chords,
+    });
+    layers.push(...under);
+    // trains: P1b.3
+    layers.push(...over);
+    // stations: P1b.3
   }
   return layers;
 }
