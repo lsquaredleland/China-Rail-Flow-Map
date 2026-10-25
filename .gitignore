@@ -13,10 +13,12 @@ web/dist/
 # Local-only raw timetable dumps, OSM extracts, and derived routing caches
 output
 output/
-data/
-data/raw/
+# data/: small curated inputs (data/*.json etc.) are tracked; ignore only the large/generated dirs.
+# data/osm, data/raw, data/derived may be symlinks (worktrees), so list them without a trailing slash.
+data/raw
+data/osm
 data/osm/
-data/derived/
+data/derived
 *.osm.pbf
 *.osm
 *.osm.gz

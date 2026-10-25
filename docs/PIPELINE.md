@@ -1,5 +1,16 @@
 # China Rail — barebones handoff (v3, 2026-10-22)
 
+> **Status (read first).** The live, maintained parts of this document are
+> **§3 (recipe, especially step 5 and the O9 router inputs)** and **§7 (goldens)**.
+> §1 (project description), §5 (what was removed from the v3 handoff zip) and
+> §8 (provenance) are **handoff-era history**, kept for context only; their
+> paths (`project/`, `deliverable/`) and package contents no longer match this
+> repo. Binaries that exist today: `pipeline/analyze/src/bin/{atlas,atlaspack,audit,chainfill,legclass,osm_export,paths,secdiff}.rs`
+> plus `analyze-rs` (main), `pipeline/filter` (main, `probe`), `pipeline/router`
+> (main, `cordcheck`, `splitcheck`), `pipeline/tiler` (main, `stats`, `validate`)
+> and `pipeline/outline` (main).
+
+
 The minimal continuation package for the China rail project: **all source
 code, the irreplaceable raw timetable datasets, and complete instructions
 to recreate every derived artifact.** Everything bulky was a build output
@@ -25,7 +36,7 @@ Standing engineering rules from the owner — carry them over:
 
 ---
 
-## 1. What this project is
+## 1. What this project is (history: handoff-era)
 
 Two products from one pipeline:
 
@@ -33,6 +44,9 @@ Two products from one pipeline:
    Minard-style flow map of China's top 100 rail cities by outbound and
    inbound trains/day; line width = exact count of distinct trains/day per
    shared track section (per-train dedupe, strictly proportional).
+   A train that re-covers the same track (e.g. 土溪→平昌→达州) counts once in the
+   static flows while the animation shows each pass, so static < animated there
+   by design (成都 out, 达州 side: static 1, animated 2).
    Features Outbound + Inbound modes, exact per-train city-pair routing
    (clicking any station dot fades non-connecting trunks to ~18% opacity and
    draws the exact city-pair train volume at 100% opacity on top of the
@@ -262,19 +276,14 @@ rebuild, and what `audit` expands to):
   indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm]`
   and station names normalized.
 
-**Verify against the goldens (§7) before trusting any rebuild.** Supporting datasets: `./target/release/flowmap` →
-`chengdu-flow-data.json`; `./target/release/flowstations` →
-`china-flow-stations-data.json`; the country outline comes from the
-`outline` crate in `project/outline/` → `china-outline.json`.
+**Verify against the goldens (§7) before trusting any rebuild.** The country outline comes from the
+`outline` crate (`pipeline/outline`) → `china-outline.json`. (The old `flowmap` / `flowstations`
+binaries no longer exist in this repo.)
 
-### Step 6 — spreadsheets + Chengdu workbook
-```bash
-./target/release/citypairs    # → china-city-pairs-2026-10-21.xlsx
-                              #   (gazetteer v2.2; combined +intercity
-                              #    edition: 10,072 pairs ≥10 trains)
-./target/release/chengdu      # → chengdu-direct-destinations.xlsx
-                              #   (610 cities direct from Chengdu)
-```
+### Step 6 — spreadsheets + Chengdu workbook (removed)
+The `citypairs` and `chengdu` binaries that produced the city-pair and
+Chengdu spreadsheets are not in this repo; this step is history and cannot be
+rerun from here.
 
 ### Step 7 — the corridor-routing fix (§4) as a STAGED rebuild
 ```bash
@@ -338,7 +347,7 @@ the segment-floor sum; fits neither Chengyu's ~86 floor nor the north
 the audit + small map kept it on Chengyu. Decide with fresh evidence
 (a live stop-list pull) before any swap.
 
-## 5. What is NOT in v3, and where its recipe lives
+## 5. What is NOT in v3, and where its recipe lives (history: handoff-era)
 
 | Removed artifact | Recreate |
 |---|---|
@@ -442,7 +451,7 @@ for provenance only.
 - Chengdu direct: 重庆 136, 广州 21 (6:54), 上海 17 (10:06), 北京 13
   (7:30), 香港 1 (8:18), 拉萨 1 (34:38); 819 trains/day stop in Chengdu
 
-## 8. Provenance
+## 8. Provenance (history: handoff-era)
 
 Built 2026-10-13 → 2026-10-22 (origin main chat + "China rail project"
 side chat). Day logs: `docs/session-notes/`. This v3 supersedes the v1

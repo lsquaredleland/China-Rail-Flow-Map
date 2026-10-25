@@ -139,6 +139,27 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const scaleBarRef = useRef<HTMLDivElement | null>(null);
   const [switching, setSwitching] = useState(false);
   const viewReportTimerRef = useRef<number | null>(null);
+  // Backdrop layer cache (paper + outline + graticule + network): see
+  // drawBackdrop. `layer` is built on the second consecutive frame with
+  // an unchanged key, so panning/zooming never pays for it.
+  const bgRef = useRef<{
+    key: string;
+    atlas: unknown;
+    outline: unknown;
+    layer: HTMLCanvasElement | null;
+    state: {
+      lineWidth: number;
+      strokeStyle: string | CanvasGradient | CanvasPattern;
+      fillStyle: string | CanvasGradient | CanvasPattern;
+      lineCap: CanvasLineCap;
+      lineJoin: CanvasLineJoin;
+      lineDash: number[];
+      globalAlpha: number;
+    } | null;
+  }>({ key: "", atlas: null, outline: null, layer: null, state: null });
+  // Motion-tail gradients, one per (colour, length), in the train's local
+  // frame (see drawTrains).
+  const tailGradRef = useRef<Map<string, CanvasGradient>>(new Map());
 
   // Latest props, readable from the imperative engine below.
   const P = useRef(props);
@@ -1442,21 +1463,29 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         ? 0
         : Math.round(baseTailLen * speedFrac);
       if (actualTailLen > 0) {
-        const tailX = px - vx * actualTailLen;
-        const tailY = py - vy * actualTailLen;
-
-        // Draw tapered motion tail
-        const grad = ctx.createLinearGradient(tailX, tailY, px, py);
-        grad.addColorStop(0, "rgba(255, 255, 255, 0)");
-        grad.addColorStop(1, glowColor);
-
+        // One cached gradient per (colour, length) in the train's local
+        // frame (tail along -x, head at the origin); the train's position
+        // and heading come from the transform, so no per-train, per-frame
+        // createLinearGradient.
+        const gkey = glowColor + actualTailLen;
+        let grad = tailGradRef.current.get(gkey);
+        if (!grad) {
+          grad = ctx.createLinearGradient(-actualTailLen, 0, 0, 0);
+          grad.addColorStop(0, "rgba(255, 255, 255, 0)");
+          grad.addColorStop(1, glowColor);
+          tailGradRef.current.set(gkey, grad);
+        }
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(Math.atan2(vy, vx));
         ctx.beginPath();
-        ctx.moveTo(tailX, tailY);
-        ctx.lineTo(px, py);
+        ctx.moveTo(-actualTailLen, 0);
+        ctx.lineTo(0, 0);
         ctx.strokeStyle = grad;
         ctx.lineWidth = isIsolated ? 3.5 : 2.5;
         ctx.lineCap = "round";
         ctx.stroke();
+        ctx.restore();
       }
 
       // Outer glow
@@ -1937,6 +1966,93 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     }
   }
 
+  /* The static backdrop (paper, outline, graticule, network) depends only
+     on the view, canvas size, DPR, palette, layer toggles and the data
+     objects. While animating (or hovering) none of that changes, so after
+     one frame with an unchanged key it is rendered once to an offscreen
+     canvas and blitted. A changing key (pan/zoom) draws directly, with no
+     extra cost. */
+  function paintBackdrop(ctx: CanvasRenderingContext2D, pal: Palette) {
+    const st = S.current;
+    ctx.fillStyle = pal.paper;
+    ctx.fillRect(0, 0, st.W, st.H);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (P.current.showOutline) drawOutline(ctx, pal);
+    drawGraticule(ctx, pal);
+    if (P.current.showNetwork) drawNetwork(ctx, pal);
+  }
+  function drawBackdrop(
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    pal: Palette,
+  ) {
+    const st = S.current;
+    const bg = bgRef.current;
+    const key = [
+      st.view.scale,
+      st.view.tx,
+      st.view.ty,
+      st.W,
+      st.H,
+      st.DPR,
+      canvas.width,
+      canvas.height,
+      P.current.dark ? 1 : 0,
+      P.current.showOutline ? 1 : 0,
+      P.current.showNetwork ? 1 : 0,
+    ].join("|");
+    const atlas = P.current.atlas;
+    const outline = P.current.outline;
+    if (bg.key !== key || bg.atlas !== atlas || bg.outline !== outline) {
+      bg.key = key;
+      bg.atlas = atlas;
+      bg.outline = outline;
+      bg.layer = null;
+      bg.state = null;
+      paintBackdrop(ctx, pal);
+      return;
+    }
+    if (!bg.layer) {
+      const layer = document.createElement("canvas");
+      layer.width = canvas.width;
+      layer.height = canvas.height;
+      const lctx = layer.getContext("2d");
+      if (!lctx) {
+        paintBackdrop(ctx, pal);
+        return;
+      }
+      lctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
+      paintBackdrop(lctx, pal);
+      // The later layers inherit whatever stroke/fill state the backdrop
+      // left on the context; carry it over so a blitted frame is
+      // pixel-identical to a drawn one.
+      bg.state = {
+        lineWidth: lctx.lineWidth,
+        strokeStyle: lctx.strokeStyle,
+        fillStyle: lctx.fillStyle,
+        lineCap: lctx.lineCap,
+        lineJoin: lctx.lineJoin,
+        lineDash: lctx.getLineDash(),
+        globalAlpha: lctx.globalAlpha,
+      };
+      bg.layer = layer;
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(bg.layer, 0, 0);
+    ctx.restore();
+    if (bg.state) {
+      ctx.lineWidth = bg.state.lineWidth;
+      ctx.strokeStyle = bg.state.strokeStyle;
+      ctx.fillStyle = bg.state.fillStyle;
+      ctx.lineCap = bg.state.lineCap;
+      ctx.lineJoin = bg.state.lineJoin;
+      ctx.setLineDash(bg.state.lineDash);
+      ctx.globalAlpha = bg.state.globalAlpha;
+    }
+  }
+
   function draw() {
     const atlas = P.current.atlas;
     const cur = P.current.cur;
@@ -1947,13 +2063,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     const st = S.current;
     const pal = makePalette(P.current.dark);
     ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
-    ctx.fillStyle = pal.paper;
-    ctx.fillRect(0, 0, st.W, st.H);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    if (P.current.showOutline) drawOutline(ctx, pal);
-    drawGraticule(ctx, pal);
-    if (P.current.showNetwork) drawNetwork(ctx, pal);
+    drawBackdrop(ctx, canvas, pal);
     const destSecCounts = getDestSectionCounts();
     // Chords are drawn UNDER the routed flows: a dashed leg shows only
     // where a gap in the flow coverage lets it peek out, and is hidden

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { decompress as brotliDecompress } from "brotli/decompress.js";
+import { local as localStore, session as sessionStore } from "./storage";
 import type {
   AtlasData,
   CityPointVM,
@@ -95,20 +95,41 @@ const ABOUT =
   "in the inbound view, trains are traced from their starting stations through all intermediate calls into the selected city. " +
   "Timetable data is sourced from China Railway (12306), covering 5,043 trunk services and 2,210 intercity C/S services across sample dates in October 2026.";
 
-/* Fetch one dataset file, preferring its Brotli twin (the .br asset):
-   1. if the server negotiates the encoding itself (the .br response
-      arrives with a Content-Encoding), the browser decompresses
-      transparently and the bytes parse as JSON directly;
-   2. else decompress the .br bytes through DecompressionStream
-      ("brotli") where the browser offers it (Chrome's headless shell,
-      for one, does not);
-   3. else decompress with the bundled pure-JS Brotli decoder
-      (the `brotli` package's decode half, ~91 KB minified) — the path
-      this runtime takes: phase 1 transfers shared .br (520,344 B) +
-      out-map .br (571,195 B) ≈ 1.09 MB, decoded byte-identical to the
-      plain splits;
-   4. else fall back to the plain .json split. */
+/* Fetch one dataset file, preferring its Brotli twin (the .br asset).
+   The host is configured (vercel.json) to send the .br with
+   Content-Encoding: br + Content-Type: application/json, so normally the
+   browser has already decompressed it and the bytes are JSON ("{").
+   If the encoding header is missing or stripped, the bytes are raw Brotli
+   and are decompressed here:
+   1. DecompressionStream("brotli") where the browser offers it;
+   2. else the pure-JS decoder, loaded lazily as its own script
+      (br-decoder.<hash>.js) so it costs nothing when (1) or the header
+      path works;
+   3. else fall back to the plain .json split. */
 declare const __ASSET_MANIFEST__: Record<string, string> | undefined;
+declare const __BR_DECODER__: string | undefined;
+type BrDecode = (u8: Uint8Array) => Uint8Array;
+let brDecoderPromise: Promise<BrDecode> | null = null;
+function loadBrDecoder(): Promise<BrDecode> {
+  if (!brDecoderPromise) {
+    brDecoderPromise = new Promise<BrDecode>((resolve, reject) => {
+      const name = typeof __BR_DECODER__ === "undefined" ? "" : __BR_DECODER__;
+      if (!name) return reject(new Error("no decoder in this build"));
+      const el = document.createElement("script");
+      el.src = "/" + name;
+      el.onload = () => {
+        const fn = (window as unknown as { __brDecode?: BrDecode }).__brDecode;
+        fn ? resolve(fn) : reject(new Error("decoder missing"));
+      };
+      el.onerror = () => reject(new Error("decoder load failed"));
+      document.head.appendChild(el);
+    });
+    brDecoderPromise.catch(() => {
+      brDecoderPromise = null;
+    });
+  }
+  return brDecoderPromise;
+}
 /* The build content-hashes the .br packs (web/bundle.mjs) and bakes the
    name -> hashed-path map into the bundle; unhashed names (dev, or a
    missing entry) resolve to the plain twin path. */
@@ -146,7 +167,7 @@ async function fetchData<T>(jsonUrl: string): Promise<T> {
             /* no native Brotli stream: use the bundled decoder */
           }
         }
-        const out = brotliDecompress(u8);
+        const out = (await loadBrDecoder())(u8);
         return JSON.parse(new TextDecoder().decode(out)) as T;
       }
     }
@@ -158,33 +179,15 @@ async function fetchData<T>(jsonUrl: string): Promise<T> {
   return (await r.json()) as T;
 }
 function initialDistUnit(): DistUnit {
-  try {
-    if (window.localStorage && localStorage.getItem("crfa-dist-unit") === "mi")
-      return "mi";
-  } catch {
-    /* storage unavailable: stay on km */
-  }
-  return "km";
+  return localStore.get("crfa-dist-unit") === "mi" ? "mi" : "km";
 }
 
 function initialInfra(): boolean {
-  try {
-    if (window.localStorage && localStorage.getItem("crfa-infra") === "1")
-      return true;
-  } catch {
-    /* storage unavailable: stay in flow-width mode */
-  }
-  return false;
+  return localStore.get("crfa-infra") === "1";
 }
 
 function initialDirection(): Direction {
-  try {
-    if (window.localStorage && localStorage.getItem("crfa-direction") === "in")
-      return "in";
-  } catch {
-    /* storage unavailable: stay outbound */
-  }
-  return "out";
+  return localStore.get("crfa-direction") === "in" ? "in" : "out";
 }
 
 function initialDark(): boolean {
@@ -193,11 +196,11 @@ function initialDark(): boolean {
     const p = params.get("theme");
     if (p === "dark" || p === "night") return true;
     if (p === "light" || p === "day") return false;
-    const saved = window.sessionStorage && sessionStorage.getItem("crfa-theme");
+    const saved = sessionStore.get("crfa-theme");
     if (saved === "dark") return true;
     if (saved === "light") return false;
   } catch {
-    /* storage unavailable */
+    /* unparseable URL */
   }
   return !!(
     typeof window !== "undefined" &&
@@ -695,19 +698,11 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
-    try {
-      localStorage.removeItem("crfa-theme");
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.remove("crfa-theme");
     if (!window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (e: MediaQueryListEvent) => {
-      try {
-        if (sessionStorage.getItem("crfa-theme")) return;
-      } catch {
-        /* storage unavailable */
-      }
+      if (sessionStore.get("crfa-theme")) return;
       setDarkState(e.matches);
     };
     if (mq.addEventListener) mq.addEventListener("change", onChange);
@@ -810,11 +805,7 @@ export default function App() {
     setPanelCity(null);
     clearFilters();
     setDirectionState(d);
-    try {
-      if (window.localStorage) localStorage.setItem("crfa-direction", d);
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.set("crfa-direction", d);
   };
 
   useEffect(() => {
@@ -844,22 +835,13 @@ export default function App() {
   const toggleInfra = () => {
     const v = !showInfra;
     setShowInfraState(v);
-    try {
-      if (window.localStorage)
-        localStorage.setItem("crfa-infra", v ? "1" : "0");
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.set("crfa-infra", v ? "1" : "0");
   };
 
   const setDistUnit = (u: DistUnit) => {
     if (u === distUnit) return;
     setDistUnitState(u);
-    try {
-      if (window.localStorage) localStorage.setItem("crfa-dist-unit", u);
-    } catch {
-      /* storage unavailable */
-    }
+    localStore.set("crfa-dist-unit", u);
     // The open panel re-renders from state; refresh a visible tooltip too.
     if (mapRef.current) mapRef.current.refreshTooltip();
   };
@@ -867,13 +849,8 @@ export default function App() {
   const setDark = (d: boolean) => {
     if (d === dark) return;
     setDarkState(d);
-    try {
-      if (window.sessionStorage)
-        sessionStorage.setItem("crfa-theme", d ? "dark" : "light");
-      if (window.localStorage) localStorage.removeItem("crfa-theme");
-    } catch {
-      /* storage unavailable */
-    }
+    sessionStore.set("crfa-theme", d ? "dark" : "light");
+    localStore.remove("crfa-theme");
   };
 
   const origins = atlas ? atlas.data.origins : [];
