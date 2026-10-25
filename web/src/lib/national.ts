@@ -1,17 +1,46 @@
-/* National per-train timelines on section refs: every train's full run as
-   references into the shared section geometry, with the same distance
-   scale and motion model as the origin timeline (timeline.ts). A position
-   is two binary searches per train, so no per-train vertices are kept. */
-import type { DecodedAtlas, NationalTimeline, OutTablesRaw, SchedulesData } from "../types";
+/* National per-train timelines on section refs: every train's whole run (the
+   pipeline's atlas-v2-national-trains file) as references into the shared
+   section geometry, with the same distance scale and motion model as the
+   origin timeline (timeline.ts). A position is two binary searches per
+   train, so no per-train vertices are kept. */
+import type { DecodedAtlas, NationalTimeline, NationalTrainsPack, SchedulesData } from "../types";
+import { decodeSet, requireFmt } from "./decode";
 import { getSecGeometry, prepTrainPath, trainEase, trainSpeedFrac } from "./timeline";
 
+/** Throw a FmtError unless `d` is a national trains file for a shared pack
+    with `nSec` sections, `nThr` throats and `nTrains` train_table rows: same
+    `fmt`, same id bases, one path and stop list per train. */
+export function requireNationalTrains(d: NationalTrainsPack, nSec: number, nThr: number, nTrains: number, url: string): void {
+  requireFmt(d.fmt, url);
+  const ok =
+    d.n_sec === nSec &&
+    d.n_thr === nThr &&
+    Array.isArray(d.paths) &&
+    d.paths.length === nTrains &&
+    Array.isArray(d.stop_pos) &&
+    d.stop_pos.length === nTrains &&
+    Array.isArray(d.chords) &&
+    Array.isArray(d.extra);
+  if (ok) return;
+  const msg = `${url}: national trains do not match the shared pack (${nSec} sections, ${nThr} throats, ${nTrains} trains); rebuild the data pack`;
+  console.error(msg);
+  const err = new Error(msg);
+  err.name = "FmtError";
+  throw err;
+}
+
+/** `out` is the national trains file (or any per-train path table of the
+    same shape: out-tables `paths` / `stop_pos` / `chords`, no `extra`). */
 export function buildNational(
   atlas: DecodedAtlas,
-  out: OutTablesRaw,
+  out: Pick<NationalTrainsPack, "paths" | "stop_pos" | "chords"> & { extra?: string[] },
   sched: SchedulesData["schedules"] | undefined = atlas.schedules,
 ): NationalTimeline {
   const trainTable = atlas.data.train_table;
   const chordMap = new Map(out.chords);
+  // Ids past the shared throats are the file's extra pieces: one throat set.
+  const thr = out.extra?.length ? decodeSet([...(atlas.data.throats || []), ...out.extra]) : atlas.thr;
+  const geo = { sec: atlas.sec, thr };
   const nT = out.paths.length;
   const skipped = { emptyPath: 0, noStops: 0, schedMismatch: 0, badTime: 0 };
 
@@ -44,6 +73,7 @@ export function buildNational(
     sDist: new Float64Array(nStop),
     sArr: new Float32Array(nStop),
     sDep: new Float32Array(nStop),
+    thr,
     skipped,
   };
   let pi = 0;
@@ -60,7 +90,7 @@ export function buildNational(
     tl.pOff[q] = pi;
     tl.sOff[q] = si;
 
-    const p = prepTrainPath(path, sp, chordMap.get(t) || [], atlas, b + 1);
+    const p = prepTrainPath(path, sp, chordMap.get(t) || [], geo, b + 1);
     tl.pId.set(path, pi);
     tl.pStart.set(p.pathStarts, pi);
     pi += path.length;
@@ -144,7 +174,7 @@ export function natXY(
   const rev = v < 0;
   const id = rev ? ~v : v;
   const isSec = id < nSecAll;
-  const set = isSec ? atlas.sec : atlas.thr;
+  const set = isSec ? atlas.sec : tl.thr;
   const g = isSec ? id : id - nSecAll;
   const cnt = set.len[g];
   const off = set.off[g];
@@ -160,7 +190,7 @@ export function natXY(
     const v2 = tl.pId[lo + 1];
     const id2 = v2 < 0 ? ~v2 : v2;
     const sec2 = id2 < nSecAll;
-    const set2 = sec2 ? atlas.sec : atlas.thr;
+    const set2 = sec2 ? atlas.sec : tl.thr;
     const g2 = sec2 ? id2 : id2 - nSecAll;
     const k2 = v2 < 0 ? set2.len[g2] - 1 : 0;
     const x1 = set2.pts[set2.off[g2] + k2 * 2], y1 = set2.pts[set2.off[g2] + k2 * 2 + 1];

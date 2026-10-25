@@ -54,3 +54,32 @@
   padding: 0 4px;
 }
 :root[data-theme="dark"] .iso-chip-exit { color: #9CA3AF; }
+
+/* National mode coverage note (in the legend's place, which national mode hides) */
+.nat-note {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule, #D4D2CA);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  font-size: 12px;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .nat-note {
+  background: rgba(17, 24, 39, 0.9);
+  color: #F3F4F6;
+}
+.nat-note-tag {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #D97706;
+}

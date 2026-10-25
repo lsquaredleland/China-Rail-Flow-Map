@@ -87,6 +87,9 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(30);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  // National mode (D13): Running / Trains counters, a one-day clock with no finish.
+  const [isNational, setIsNational] = useState(false);
+  const currentNationalRef = useRef(false);
 
   // Subscribe to MapCanvas animation ticks with direct DOM updates (0% React re-render overhead)
   useEffect(() => {
@@ -145,7 +148,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       // 4. Time period / Rush hour badge
       if (rushBadgeRef.current && rushBadgeTextRef.current) {
         const rushColor = dark ? "#E54035" : "#C8302A";
-        if (t >= totM) {
+        if (t >= totM && !state.national) {
           rushBadgeTextRef.current.textContent = "ALL ARRIVED";
           rushBadgeRef.current.style.borderColor = "#10B981";
           rushBadgeRef.current.style.color = "#10B981";
@@ -178,7 +181,13 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         setIsPlaying(state.isPlaying);
       }
 
-      // 6. Sync speed preset button if changed externally
+      // 6. Flip the national labels only when the mode changes
+      if (state.national !== currentNationalRef.current) {
+        currentNationalRef.current = state.national;
+        setIsNational(state.national);
+      }
+
+      // 7. Sync speed preset button if changed externally
       const spd = state.speed;
       if (spd && spd !== currentSpeedRef.current) {
         currentSpeedRef.current = spd;
@@ -211,7 +220,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       if (pollInterval) clearInterval(pollInterval);
       if (unsub) unsub();
     };
-  }, [mapRef, direction, dark]);
+  }, [mapRef, direction, dark, isNational]); // a mode flip remounts counters: re-pull the state
 
   // Global Keyboard Shortcuts (Space, ArrowLeft, ArrowRight, Home)
   useEffect(() => {
@@ -382,22 +391,24 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               0
             </span>
             <span className="tb-metric-lbl">
-              {direction === "out" ? "DEPARTED" : "BOARDED"}
+              {isNational ? "RUNNING" : direction === "out" ? "DEPARTED" : "BOARDED"}
             </span>
           </div>
 
-          <div className="tb-metric-col">
-            <span ref={arrivedValRef} className="tb-metric-val is-ink">
-              0
-            </span>
-            <span className="tb-metric-lbl">ARRIVED</span>
-          </div>
+          {!isNational && (
+            <div className="tb-metric-col">
+              <span ref={arrivedValRef} className="tb-metric-val is-ink">
+                0
+              </span>
+              <span className="tb-metric-lbl">ARRIVED</span>
+            </div>
+          )}
 
           <div className="tb-metric-col">
             <span ref={totalValRef} className="tb-metric-val is-total">
               0
             </span>
-            <span className="tb-metric-lbl">TOTAL</span>
+            <span className="tb-metric-lbl">{isNational ? "TRAINS" : "TOTAL"}</span>
           </div>
         </div>
 
@@ -432,14 +443,16 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             </button>
           </div>
 
-          <button
-            type="button"
-            className="tb-btn-action is-text"
-            onClick={handleJumpToFinish}
-            title="Jump simulation to finish when all trains have arrived"
-          >
-            Finish
-          </button>
+          {!isNational && (
+            <button
+              type="button"
+              className="tb-btn-action is-text"
+              onClick={handleJumpToFinish}
+              title="Jump simulation to finish when all trains have arrived"
+            >
+              Finish
+            </button>
+          )}
 
           <button
             type="button"
@@ -550,14 +563,16 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           >
             24:00 · Day 1 ends
           </span>
-          <span
-            ref={finishTickRef}
-            className="tb-tick-item at-end"
-            onClick={handleJumpToFinish}
-            title="All trains arrived"
-          >
-            All arrived
-          </span>
+          {!isNational && (
+            <span
+              ref={finishTickRef}
+              className="tb-tick-item at-end"
+              onClick={handleJumpToFinish}
+              title="All trains arrived"
+            >
+              All arrived
+            </span>
+          )}
         </div>
       </div>
     </div>

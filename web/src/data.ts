@@ -45,6 +45,12 @@ export const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
 // National per-section flows (P3.1/P3.2): fetched only when national flows
 // are requested, never for the origin view.
 export const NATIONAL_FLOWS_URL = "assets/atlas-v2-national.json";
+// National trains (P2.2): every national train's whole run, fetched only on
+// entering national mode, never for the origin view.
+export const NATIONAL_TRAINS_URL = "assets/atlas-v2-national-trains.json";
+// The reference size of China's daily passenger timetable the national mode's
+// coverage note compares against (an approximate, not a data value).
+export const NATIONAL_DAILY_SERVICES_REF = 12000;
 
 // The v2 files carry no `about` blurb (v1 embedded one in the data);
 // the text is unchanged apart from the geometry-precision sentence,

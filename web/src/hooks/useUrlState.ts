@@ -5,7 +5,7 @@ import type { DecodedAtlas, Direction, DistUnit } from "../types";
 import { enName } from "../lib";
 import type { MapApi } from "../components/MapCanvas";
 
-/* URL and persisted state: the ?city/lat/lon/z/theme query, and the
+/* URL and persisted state: the ?city/lat/lon/z/theme/national query, and the
    direction, unit, infrastructure and theme choices kept in storage. */
 
 export interface Camera {
@@ -24,6 +24,25 @@ export function initialInfra(): boolean {
 
 export function initialDirection(): Direction {
   return localStore.get("crfa-direction") === "in" ? "in" : "out";
+}
+
+/* National mode (D11): ?national=1, kept in the URL only (not persisted). */
+export function initialNational(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get("national") === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeNationalParam(on: boolean): void {
+  const params = new URLSearchParams(window.location.search);
+  if (on) params.set("national", "1");
+  else params.delete("national");
+  const search = params.toString();
+  if (window.location.search !== (search ? "?" + search : "")) {
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? "?" + search : ""}`);
+  }
 }
 
 export function initialDark(): boolean {

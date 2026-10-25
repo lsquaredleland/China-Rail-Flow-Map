@@ -152,8 +152,29 @@ export interface OutTablesPack {
   origins: OutTablesPackOrigin[];
 }
 
-/** The per-train part of OutTablesPack, as the national timelines read it. */
-export type OutTablesRaw = Pick<OutTablesPack, "paths" | "stop_pos" | "chords">;
+/** atlas-v2-national-trains.json (P2.2 data source), as shipped: every
+    national train's whole run, in the out-tables per-train shape.
+    `paths[t]` / `stop_pos[t]` are indexed by train_table t (`[]` = not a
+    national train); signed ids >= n_sec + n_thr are `extra` geometry pieces
+    (polylines like the throats). `stop_pos[t]` has one entry per schedule
+    stop after the first. `on_sec` ([piece, section]) is for counting only. */
+export interface NationalTrainsPack {
+  fmt: number;
+  n_sec: number;
+  n_thr: number;
+  paths: number[][];
+  stop_pos: number[][];
+  chords: [number, ChordLeg[]][];
+  extra: string[];
+  on_sec: [number, number][];
+}
+
+/** What national mode loads: the trains file, checked against the shared
+    pack, and the schedules that time it (`schedules[t]`, same t). */
+export interface NationalTrainsData {
+  trains: NationalTrainsPack;
+  schedules: SchedulesData["schedules"];
+}
 
 /** One origin's out tables, expanded to per-row paths. */
 export interface OutTablesOrigin {
@@ -598,6 +619,7 @@ export interface NationalTimeline {
   sDist: Float64Array;
   sArr: Float32Array;
   sDep: Float32Array; // -1 = no dwell (terminus)
+  thr: DecodedSet; // the shared throats, then the file's extra pieces (ids n_sec + n_thr + j)
   skipped: { emptyPath: number; noStops: number; schedMismatch: number; badTime: number };
 }
 

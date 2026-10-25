@@ -31,6 +31,7 @@ export function drawLabelsOverlay(M: MapCtx) {
   const pal = palette(dark);
   ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
   ctx.clearRect(0, 0, st.W, st.H);
+  if (P.current.national) return; // D13: national mode draws no labels
   ctx.textBaseline = "middle";
   const labels = placeLabels(
     points(),

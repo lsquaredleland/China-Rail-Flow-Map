@@ -216,6 +216,18 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     return () => cancelAnimationFrame(raf);
   }, [M, props.cur]);
 
+  // Entering / leaving national mode keeps the camera (S.current.view); the
+  // national clock is one day, so a day-2 origin time folds into it, and a
+  // hover from the other mode is dropped.
+  useEffect(() => {
+    const st = M.S.current;
+    if (props.national) st.animTime = ((st.animTime % 1440) + 1440) % 1440;
+    st.hover = null;
+    hideTooltip(M);
+    M.render();
+    notifyAnimListeners(M);
+  }, [M, props.national, props.nationalTrains]);
+
   // Toggle / theme / direction / selected-station changes just need a redraw.
   useEffect(() => {
     M.render();
