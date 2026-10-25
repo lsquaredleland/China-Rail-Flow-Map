@@ -96,40 +96,11 @@ const ABOUT =
   "Timetable data is sourced from China Railway (12306), covering 5,043 trunk services and 2,210 intercity C/S services across sample dates in October 2026.";
 
 /* Fetch one dataset file, preferring its Brotli twin (the .br asset).
-   The host is configured (vercel.json) to send the .br with
-   Content-Encoding: br + Content-Type: application/json, so normally the
-   browser has already decompressed it and the bytes are JSON ("{").
-   If the encoding header is missing or stripped, the bytes are raw Brotli
-   and are decompressed here:
-   1. DecompressionStream("brotli") where the browser offers it;
-   2. else the pure-JS decoder, loaded lazily as its own script
-      (br-decoder.<hash>.js) so it costs nothing when (1) or the header
-      path works;
-   3. else fall back to the plain .json split. */
+   The host (vercel.json) sends the .br with Content-Encoding: br +
+   Content-Type: application/json, so the browser has already decompressed
+   it and the bytes are JSON ("{"). Anything else (header missing, SPA
+   fallback HTML) falls back to the plain .json split. */
 declare const __ASSET_MANIFEST__: Record<string, string> | undefined;
-declare const __BR_DECODER__: string | undefined;
-type BrDecode = (u8: Uint8Array) => Uint8Array;
-let brDecoderPromise: Promise<BrDecode> | null = null;
-function loadBrDecoder(): Promise<BrDecode> {
-  if (!brDecoderPromise) {
-    brDecoderPromise = new Promise<BrDecode>((resolve, reject) => {
-      const name = typeof __BR_DECODER__ === "undefined" ? "" : __BR_DECODER__;
-      if (!name) return reject(new Error("no decoder in this build"));
-      const el = document.createElement("script");
-      el.src = "/" + name;
-      el.onload = () => {
-        const fn = (window as unknown as { __brDecode?: BrDecode }).__brDecode;
-        fn ? resolve(fn) : reject(new Error("decoder missing"));
-      };
-      el.onerror = () => reject(new Error("decoder load failed"));
-      document.head.appendChild(el);
-    });
-    brDecoderPromise.catch(() => {
-      brDecoderPromise = null;
-    });
-  }
-  return brDecoderPromise;
-}
 /* The build content-hashes the .br packs (web/bundle.mjs) and bakes the
    name -> hashed-path map into the bundle; unhashed names (dev, or a
    missing entry) resolve to the plain twin path. */
@@ -144,31 +115,8 @@ async function fetchData<T>(jsonUrl: string): Promise<T> {
     if (res.ok) {
       const buf = await res.arrayBuffer();
       const u8 = new Uint8Array(buf);
-      if (u8.length > 0 && u8[0] !== 0x3c) {
-        if (u8[0] === 0x7b) {
-          return JSON.parse(new TextDecoder().decode(u8)) as T;
-        }
-        const DS = (
-          window as unknown as {
-            DecompressionStream?: typeof DecompressionStream;
-          }
-        ).DecompressionStream;
-        if (DS) {
-          try {
-            const body = new Response(buf).body;
-            if (body) {
-              const stream = body.pipeThrough(
-                new DS("brotli" as CompressionFormat),
-              );
-              const text = await new Response(stream).text();
-              return JSON.parse(text) as T;
-            }
-          } catch {
-            /* no native Brotli stream: use the bundled decoder */
-          }
-        }
-        const out = (await loadBrDecoder())(u8);
-        return JSON.parse(new TextDecoder().decode(out)) as T;
+      if (u8[0] === 0x7b) {
+        return JSON.parse(new TextDecoder().decode(u8)) as T;
       }
     }
   } catch {
