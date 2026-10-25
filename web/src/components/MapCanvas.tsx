@@ -14,6 +14,7 @@ import { resize, updateScaleBar, zoomAt } from "./map/camera";
 import { hideTooltip } from "./map/interaction";
 import { endPointer, onPointerDown, onPointerLeave, onPointerMove } from "./map/pointer";
 import { draw } from "./map/render";
+import { RELOAD_NOTICE, onStaleReload } from "../staleReload";
 
 export type { AnimListener, AnimState, MapApi } from "./map/context";
 
@@ -31,6 +32,12 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const scaleBarRef = useRef<HTMLDivElement | null>(null);
   const viewReportTimerRef = useRef<number | null>(null);
   const [switching, setSwitching] = useState(false);
+  // A deploy replaced the data files under this tab: the page reloads itself.
+  const [reloading, setReloading] = useState(false);
+  useEffect(() => {
+    onStaleReload(() => setReloading(true));
+    return () => onStaleReload(null);
+  }, []);
 
   // Latest props, readable from the imperative engine.
   const P = useRef(props);
@@ -182,9 +189,11 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         onPointerCancel={(e) => endPointer(M, e)}
         onPointerLeave={() => onPointerLeave(M)}
       />
-      {(!cur || inLoading || loadError) && (
+      {(!cur || inLoading || loadError || reloading) && (
         <div id="loading" className={cur ? "is-passive" : undefined}>
-          {loadError
+          {reloading
+            ? RELOAD_NOTICE
+            : loadError
             ? "The timetable data could not be loaded (" + loadError + ")."
             : "Unfolding the timetable…"}
         </div>

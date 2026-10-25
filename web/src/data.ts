@@ -1,5 +1,6 @@
 import type { InMapData, OutMapData } from "./types";
 import { decodeFlows, requireFmt } from "./lib";
+import { maybeReloadForStale } from "./staleReload";
 
 // The v2 atlas dataset ships in five split files (same origin order
 // throughout): the shared tables and geometry, and per direction a map
@@ -68,7 +69,11 @@ function brUrl(jsonUrl: string): string {
 }
 export async function fetchData<T>(jsonUrl: string): Promise<T> {
   try {
-    const res = await fetch(brUrl(jsonUrl));
+    const url = brUrl(jsonUrl);
+    const res = await fetch(url);
+    if (!res.ok && maybeReloadForStale(res.status, url)) {
+      return new Promise<T>(() => {}); // the page is about to reload
+    }
     if (res.ok) {
       const buf = await res.arrayBuffer();
       const u8 = new Uint8Array(buf);
