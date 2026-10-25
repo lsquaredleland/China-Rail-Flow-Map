@@ -540,9 +540,11 @@ Acceptance (driver, `?renderer=deck`, 1280×800, DPR 2):
 (a) backdrop + labels + origin diamond draw. Parity of the backdrop alone: a debug query `?layers=backdrop` (honoured by both renderers: Canvas `draw()` returns after the backdrop and labels, deck builds only the backdrop layers; removed in P1c.2) and `shots.mjs --only national-fit,guangzhou-initial,labels-on` with `SHOTS_QUERY='&layers=backdrop'` on both builds: `cmp.mjs --pixelmatch` ≤ 1.0 % (`labels-on` ≤ 1.5 %), `--diff` masks attached;
 (b) pan, wheel, pinch, `fitCountry`, `fitHome`, `zoomCenter`, `panZoomTo`, URL camera restore move the deck view and clamp to `fitScale·[0.55, 60]` exactly as the Canvas path (same code, D17): driver dispatches 5 wheel events and reads identical `S.current.view` in both renderers;
 (c) renderer switch (reload with the other `?renderer=`) keeps centre within 1e-6° and scale within 1e-6;
-(d) context loss: `loseContext()` → notice visible, 0 `pageerror`; `restoreContext()` → `window.__deckStats.recreated === 1`, the map draws (> 100,000 non-empty pixels at DPR 1), notice hidden; a second lose/restore → `recreated === 2`; lose without restore → tap on the notice → `recreated` increments once and the map draws;
+(d) context loss: `loseContext()` → notice visible, 0 `pageerror`; `restoreContext()` → after each re-creation the deck canvas non-empty pixel count equals the pre-loss count (±1 %), exactly one `#deckcv`, `recreated` increments once per loss (`=== 1`, then `=== 2` after a second lose/restore), notice hidden; lose without restore → tap on the notice → `recreated` increments once and the map draws (a backdrop-only canvas has ≈ 36–42 k non-empty px, so the earlier "> 100,000" absolute is re-checked with flows in P1b.2);
 (e) `window.__deckStats.settled` becomes true within 2 s of load and a `shots.mjs` run on the deck build yields byte-identical PNGs across two runs;
 (f) Canvas path shots vs baseline = 0 differing pixels (28 PNGs); the lazy graph has no React input; `bun run typecheck`, `bun test` green; M6 budget holds (print the chunk sizes in the PR).
+
+*As built (PR #33):* the 5 s no-restore timer is replaced by an always-tappable notice; `MapCtx` gains `frameTail()` (legend, scale bar, view report; Canvas `draw()` uses it too) and `syncRendererSize()` so the lazy chunk imports no `map/` modules; **follow-up for P1b.5 parity:** the `#mapwrap` rect height is fractional (509.375 px incl. border) while deck's viewport is its CSS box (508.375 px), so deck and the Canvas bitmap differ by up to 0.5 px vertically; check it in the P1b.5 parity run. Backdrop diff masks (1x): `docs/deckgl-spike/p1b1/`.
 
 **P1b.2 Flow / infra / chord / highlight layers** — *after P1b.1, P1a.2 (merged).* Files: new
 `deck/layers/flows.ts`:
@@ -557,6 +559,7 @@ Acceptance: `shots.mjs` deck vs Canvas (`cmp.mjs --pixelmatch`) on `national-fit
 the origin is gone); `perf/origin.mjs` at DPR 2: `cpuTimePerFrame` ≤ 4 ms, draw+raster p95 ≤ 16.7 ms,
 `deck.metrics.bufferMemory` ≤ 16 MB on 广州 + 深圳 selected + infra on (spike: 10.4 MB with
 whole-set flow passes; the ordered subsets are smaller).
+(Context-loss re-check) with flows drawn on 广州 initial: > 100,000 non-empty px at DPR 1 after restore.
 
 **P1b.3 Station / origin / train layers** — *after P1b.2, P1a.3 (merged).* Files: new
 `deck/layers/stations.ts` (dots from `stationStates`: `getRadius = r` with the stroke centred on
