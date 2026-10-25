@@ -743,26 +743,112 @@ columns **[estimate]**.
 
 ## 11. Phase 0 results (filled in by P0.2; re-run in P1b.5 / P2.2)
 
-| Metric | Spike (P0.2) | Real build (P1b.5 / P2.2) | Pass? | Who / date |
+**Verdict for gate G0: GO.** All ten agent gates (M1, M2, M4, M6, M7, M8, M9, M12, M13, M14) pass on the
+spike, with the caveats and plan corrections listed below. M3 and M10 are owner steps and do not block.
+Spike: branch `spike/deckgl` @ `f04acf8` (forked from `deckgl` @ `feaf69a`, never merged; reference only). Measured
+2026-10-25 on an M4 Max (`ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max)`, real GPU; the driver refuses SwiftShader), headless
+Chrome, 1280×800, DPR 2, light theme, deck.gl 9.4.0, packs from HTTP cache. The machine was shared with other agents
+(load average 3–10); every perf number is the median of 3 repetitions unless stated, and the spread is given where it
+mattered.
+
+### 11.1 Gate and report-only metrics
+
+| Metric | Spike (P0.2): value (threshold) | Real build (P1b.5 / P2.2) | Pass? | Who / date |
 |---|---|---|---|---|
-| M1 | — | — | — | — |
-| M2 | — | — | — | — |
-| M3 | — | — | — | owner |
-| M4 | — | — | — | — |
-| M6 | — | — | — | — |
-| M7 | — | — | — | — |
-| M8 | — | — | — | — |
-| M9 | — | — | — | — |
-| M10 | — | — | — | owner |
-| M12 | — | — | — | — |
-| M13 | — | — | — | — |
-| M14 | — | — | — | — |
-| M1n | — | — | — | — |
-| M2n | — | — | — | — |
-| M4n | — | — | — | — |
-| M5n | — | — | — | — |
-| M7n | — | — | — | — |
-| M11 | — | — | — | — |
+| M1 frame time, origin anim on 广州, national fit | rAF p95 **16.7–16.8 ms** in 3/3 reps (≤ 16.7); draw+raster (forced `readPixels` flush) p95 **8.5–8.9 ms**; JS draw p95 1.1–1.3 ms; `deck.metrics.cpuTimePerFrame` **2.4–2.9 ms** (≤ 4); `gpuTimePerFrame` 2.8–3.1 ms | — | PASS | agent, 10-25 |
+| M2 M1 at 4× CPU throttle | rAF p95 **33.3 / 16.8 / 16.7 ms** (reps 1–3; median 16.8; ≤ 33); draw+raster p95 11.9–13.9 ms; JS draw p95 4.5–6.2 ms; cpuTimePerFrame 8.7–11 ms | — | PASS (one rep at exactly 2 vsyncs, 33.3) | agent, 10-25 |
+| M3 phones | not run | — | owner step, §11.4 | owner |
+| M4 GPU memory, 广州 + selected city + infra on | **10.4 MB** buffer memory (≤ 64); equals the sum of layer attribute buffers (10.35 MB: flows 2×2.55, infra 2×1.95, network 0.88) | — | PASS | agent, 10-25 |
+| M6 bundle | deck chunk (all deck/luma/math/loaders code the spike uses): **907 KB min, 253 KB gzip, 209 KB brotli** (≤ 300 brotli). The spike inlines it (`index.html` JS 392,735 → 1,348,019 B) because the lazy split is P1.1, so the chunk is measured standalone (`web/tools/spike/size.mjs`) | — | PASS | agent, 10-25 |
+| M7 time to first deck frame, packs cached | **84 ms** (1×; 3 warm runs 82–85 ms, cold first run 571 ms) and **240–268 ms** at 4× (≤ 1.0 s) | — | PASS | agent, 10-25 |
+| M8 projection exactness | **7.3e-11 px** worst over 1,000 random points × 5 zooms (≤ 1e-6); `web/tests/deckProjection.test.ts` on the spike | — | PASS | agent, 10-25 |
+| M9 SwiftShader smoke | `--use-angle=swiftshader --enable-unsafe-swiftshader`: renderer `SwiftShader Device`, 0 `pageerror`, `onAfterRender` fired 3×, 66,578 non-empty canvas pixels | — | PASS | agent, 10-25 |
+| M10 label options | spike only has the overlay-canvas variant (§11.3 side-by-side); no `TextLayer` variant built | — | owner step, §11.4 | owner |
+| M12 context loss | `loseContext()` then `restoreContext()`: **0 `pageerror`; the map draws again after re-creating `Deck`** (245,760 non-empty px). **`Deck.onError` is never called on context loss in 9.4.0** (`_onContextLost` is defined but not wired, see §11.2); the loss is caught by our own `webglcontextlost`/`webglcontextrestored` listeners on the canvas | — | PASS with the criterion reworded (§11.2 G3) | agent, 10-25 |
+| M13 `TailLayer` fade | 120 px probe tail, alpha at 0.5 / 5 / 30 / 60 / 90 / 115 / 119.5 px = 0.008 / 0.043 / 0.25 / 0.50 / 0.75 / 0.96 / **0.996** (source < 10 %, head ≥ 90 %); linear. Injection `vs:#main-end: vColor.a *= positions.x` works; no fallback needed | — | PASS (C1 injection) | agent, 10-25 |
+| M14 parity feasibility | Canvas vs deck, DPR 2, per-scenario differing pixels (tolerance 25/255 per channel, our `cmp.mjs`, the closest match to pixelmatch 0.1): `national-fit` **0.91 %**, `guangzhou-initial` **1.60 %**, `city-zoom-x10` **3.35 %**, `selected-city` **1.68 %**, `anim-1815` **1.27 %**, `night` **1.01 %**, `labels-on` **2.69 %** (all ≤ 5 %). Other 7: `anim-0600` 0.75, `anim-2350` 1.13, `class-filter-G` 1.38, `inbound` 1.65, `infra-on` 1.89, `isolated-train-mid` 0.77, `selected-city-minimized` 1.68. Structural differences in §11.3 | — | PASS | agent, 10-25 |
+| M1n national peak, 18:15 (`natSynth` 0 = 2,668 trains; 12,000 = 4,715 active) | `natSynth=0`: rAF p95 16.7 ms, draw+raster p95 10.3 ms, cpuTimePerFrame 1.7 ms. **`natSynth=12000`: rAF p95 16.7–16.8 ms in 3/3 reps, draw+raster p95 12.5–13.9 ms, cpuTimePerFrame 1.3–1.4 ms, JS draw p95 2.5–2.6 ms (CPU position loop 1.5 ms)** | — | report (meets the Phase 2 bar: p95 ≤ 16.7, CPU ≤ 4) | agent |
+| M2n M1n at 4× throttle | `natSynth=0`: rAF p95 16.8 ms; `natSynth=12000`: rAF p95 16.7 / 16.8 / 16.8 (national fit), 33.3 on the origin-initial view; draw+raster p95 19.5–20.3 ms; cpuTimePerFrame 5.1 ms | — | report (meets the Phase 2 bar: p95 ≤ 33) | agent |
+| M4n GPU memory, dots + tails | 4.5 MB total layer stack at 2,570 dots (tails 0.42 MB, dots 0.25 MB); 5.0 MB at 4,715 dots (tails 0.72 MB). TripsLayer not built | — | report (≤ 64 MB) | agent |
+| M5n CPU heap of the national build | **47.5 MB** (3.97 M vertices, 6,972 trains; `usedSize + backingStorageSize` after GC, `natSynth` adds < 1 MB); build 119 ms | — | report (spike expectation ≈ 48 MB; P2.1 target ≤ 30 MB) | agent |
+| M7n time to first national frame | **0.18 s** (fetch+parse 62 ms, build 119 ms, from toggle to first `onAfterRender` with dots) | — | report (≤ 1.5 s) | agent |
+| M11 TripsLayer dwell | not built | — | n/a | — |
+
+Counts check: 2,668 national trains at minute 1095 on the current pack, as the plan says.
+
+### 11.2 Surprises: API gaps and plan corrections (fold into §1–§4 before Phase 1)
+
+| # | Finding | Consequence |
+|---|---|---|
+| G1 | **`ScatterplotLayer` strokes are centred on `radius`, not inside it** (`outerRadiusPixels = radius + lineWidth/2`, vertex shader of 9.4.0). C2 and rows 15–23 assumed "inside". | Match the Canvas outer edge with `radius = outer − lineWidth/2`: train dots `getRadius 3`, `getLineWidth 2` (ring 2–4 px, core < 2 px, outer 4); isolated `4.15` / `2.7`; station dots `radius = r` (Canvas strokes are centred at `r` too); rings use their centre-line radius; dwell ring 6.5. Before the fix dots were visibly too big at night (M14 `night` 2.4 %, now 1.0 %). |
+| G2 | **Binary `PathLayer` draws in section-index order; Canvas strokes widest first** (`flows` is sorted by `n` descending, so narrow bands lie on top). | One layer: `city-zoom-x10` 3.35 %, wide bands overlap the wrong way near the origin (§11.3). Width-bucketed layers via `DataFilterExtension` ranges fix it (5 layers, `city-zoom-x10` 1.46 %) **but** attributes are computed per layer: `cpuTimePerFrame` 7.3 ms at 1× (fails the 4 ms CPU gate), buffer memory 31 MB. Two buckets: 3.9 ms, no parity gain. Measured, not guessed. **Phase 1 (P1b.2) decision**: keep one layer and live with ≤ 3.4 %, or upload geometry permuted into width order once per origin (static; the sort key `n` is fixed per `cur`) so one layer keeps the Canvas order. The spike default is 1 bucket (`?buckets=1|2|5`). |
+| G3 | **`Deck.onError` never receives context loss in 9.4.0**: `_onContextLost` exists but nothing calls it (luma only exposes `onContextLost` on the device creation props, deck does not pass it). M12's "`onError` receives the loss" cannot pass. | Add our own `webglcontextlost` (call `preventDefault`) and `webglcontextrestored` listeners on the canvas; on restore `finalize()` and create a new `Deck` on a **new canvas element**. Reword M12 as "own listener fires; after re-creating `Deck` the map draws, no `pageerror`" (done above). |
+| G4 | **A new layer type's first frame may not draw** (luma compiles pipelines asynchronously); the M13 probe only produced pixels after several `redraw` calls 100 ms apart. | Deterministic screenshots and tests must wait for a settled frame (e.g. two consecutive `onAfterRender` with an unchanged layer set), not a fixed sleep after `setProps`. `shots.mjs` already waits several hundred ms and was stable on all 14 scenarios. |
+| G5 | **`deck.redraw('reason')` draws synchronously**, and `setProps({layers})` updates attributes synchronously. | `M.render()` can be a plain `setProps` + `redraw('x')` with Canvas-identical semantics (this is what the spike does). `deck.metrics` is only refreshed by deck's own loop, so for synchronous drivers read `_getFrameStats()/_getMetrics()` (private) or time `draw` yourself. |
+| G6 | `deck.metrics.gpuMemory` agrees with the sum of attribute buffer byte lengths (10.44 vs 10.35 MB). `preserveDrawingBuffer` is true by default, so `readPixels` works any time after a draw (bind framebuffer `null` first). | Fine for tests and for the M13 probe. |
+| G7 | Separate (non-interleaved) typed arrays were used for dots and tails; `stride`/`offset` interleaving from §2.2 was not exercised. | Not a blocker; untested. Keep §2.2's interleave as an optimisation, not a requirement. |
+| G8 | The "rAF reads a constant 33.3 ms" caveat from P0.1 **did not reproduce**: headless gives 16.7 ms (60 Hz), `--headed` gives **8.3 ms (120 Hz ProMotion)** with draw+raster p95 4.9–6.1 ms. The 33.3 ms was very likely display-link or contention related, not Chrome throttling. | rAF numbers are valid on this setup, but under agent contention (load average > 8) they degrade sharply while `draw` time stays flat (one 4× run went to 150 ms rAF with the machine busy). Gate on draw+raster and `cpuTimePerFrame`; treat rAF as supporting evidence and rerun on a quiet machine. |
+
+### 11.3 What the spike drew, parity, and what it left out
+
+Drawn: outline (fill, stroke, lines, nine-dash), graticule, network, chords (dashed, gated), routed flows (binary `PathLayer`,
+`DataFilterExtension` for `n = 0`, context pass pre-blended per D3 + focus pass), infrastructure overlay, hover segment,
+station dots with growth and ripples, selection/hover rings, origin disc, train dots + `TailLayer` + dwell rings + hover rings,
+labels on the old `#map` canvas (reusing `drawLabels` with a `project` shim built from `deck.getViewports()[0]` inside `onAfterRender`),
+deck GPU picking for train dots (paused), stations and origin with the existing `showTooltip`, `?national=deck&natSynth=N`
+(`lib/national.ts` from `600b3de` copied unchanged). Verified by driver: hover on a paused train and on a station shows the existing tooltip.
+
+Not in the spike (do not count against M14, all listed in P1b): Qiongzhou ferry split (water crossing is drawn solid), progressive
+isolated corridor (static full path) and the train code tag, `OrthographicController` (camera still the existing pointer handlers,
+deck derives its `viewState` from `S.current.view` each frame), GPU picking of sections/chords (existing CPU `pickSegment` used),
+`onClick`, lazy chunk loading.
+
+Structural differences seen in the side-by-sides (all four screenshots are in `docs/deckgl-spike/`, Canvas on top, deck below):
+
+- `city-zoom-x10`: wide flow bands overlap in a different order near the origin (G2). Same colours and widths.
+- `selected-city`: the D3 opaque context pass is a little lighter than Canvas's alpha-blended one (allowed ≤ 2 % at P1b.5).
+- `labels-on`, `anim-1815`, `night`: no structural difference found; remaining differences are anti-aliasing of the 0.45–2.5 px
+  network and flow edges and the 0.65 px outline (§3 "Antialiasing").
+
+![city-zoom-x10](deckgl-spike/city-zoom-x10.png)
+![labels-on](deckgl-spike/labels-on.png)
+![night](deckgl-spike/night.png)
+![anim-1815](deckgl-spike/anim-1815.png)
+
+### 11.4 Owner steps (M3 phones, M10 labels)
+
+Build and serve the spike on your LAN (the spike branch is reference only; never merge it):
+
+```bash
+git fetch origin && git checkout spike/deckgl && cd web && bun install && bun run build
+HOST=0.0.0.0 node tools/serve.mjs --dir dist --port 8766        # any free port except 8090
+```
+
+Open `http://<your-mac-LAN-IP>:8766/?renderer=deck&fps=1` on each phone. A green meter (top-left) shows frames/s and
+`deck.metrics.fps` and the train count.
+
+- **M3**: on one mid-range Android (Snapdragon 7-series, Chrome) and one iPhone (A15 class, Safari): expand "24h Flow Animation",
+  press play (30 s per day), leave it running 60 s at the Guangzhou start view, then 60 s zoomed to the Pearl River Delta
+  (pinch). Write down the lowest steady frames/s. Pass: ≥ 30 sustained. Optional national stress:
+  `?renderer=deck&national=deck&natSynth=12000&fps=1` (~4,700 dots).
+- **M10**: compare `http://localhost:8766/?renderer=deck` (overlay-canvas labels, toggle "City labels") against
+  `http://localhost:8766/` (Canvas) at national fit and at the Pearl River Delta close-up; the spike has no `TextLayer`
+  variant, so the useful question is only whether the overlay labels look identical to Canvas (they use the same code).
+  The `TextLayer` comparison is a Phase 1 option if you want it; say so and a task is added.
+
+Record the numbers in the table above (rows M3, M10).
+
+### 11.5 Updated Phase 1 effort
+
+Phase 0 took about 1 day of agent time against the 1.5–2.5 day estimate. The spike showed that the layer set, shaders and picking
+work and that the effort risk is in parity edge cases, not in feasibility. **Phase 1 estimate: 9–12 days (was 10–14)**: P1b.1–P1b.3 shrink
+because the host, TailLayer, binary flows, stations and trains already have working reference code; add back about 1.5 days for the
+G2 decision (draw order), G3 (context-loss re-creation on a fresh canvas), the ferry split and progressive isolated corridor,
+`OrthographicController` wheel/pinch calibration and `onClick` semantics, and the stale-viewState-trigger class of bugs seen in the
+spike (a missing `dark` in an `updateTriggers` key left night mode half light; add the theme to every colour trigger, §2.6 already
+says so). Phase 2 estimate unchanged at 4–6 days; the national numbers (M1n/M2n, 47 MB heap) say the plan's dedup in P2.1 is still needed
+for memory but not for speed.
+
 
 ## Sources
 
