@@ -389,7 +389,7 @@ export default function DeparturesTable({
   return (
     <section id="departures">
       <h2>{view.heading}</h2>
-      <StationLine stations={view.stations} classes={selectedClasses} />
+      <StationLine stations={view.stations} />
       <p className="dep-note">{view.depNote}</p>
       {cur ? (
         <Histograms

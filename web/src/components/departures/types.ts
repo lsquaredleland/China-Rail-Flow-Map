@@ -22,6 +22,10 @@ export interface ModeView {
   chipNode?: ReactNode;
   /** Heading count split by station (null while the schedules are loading). */
   stations: StationCount[] | null;
+  /** Class-filtered row count the heading shows (== the station line sum). */
+  count: number;
+  /** Unfiltered count; the heading adds "of total" when it differs. */
+  total: number;
   showingNote: string;
   tableNode: ReactNode;
 }

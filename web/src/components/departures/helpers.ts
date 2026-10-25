@@ -62,3 +62,12 @@ export function matchCityFromQuery(
   }
   return { city: null, restQuery: q };
 }
+
+/** "D", "G/D", "普": the selected train classes as the top stat words them. */
+export const classTag = (classes: string[]): string =>
+  classes.map((c) => (c === "plain" ? "普" : c)).join("/");
+
+/** Rows whose train class is selected (no selection keeps all): the heading
+    count. Only the class chips narrow it; search and histograms do not. */
+export const byClass = <T,>(rows: T[], classes: string[], cls: (r: T) => string) =>
+  classes.length ? rows.filter((r) => classes.includes(cls(r))) : rows;

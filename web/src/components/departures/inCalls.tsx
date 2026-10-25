@@ -1,7 +1,9 @@
 /* Inbound with a source: every train arriving from that city. */
 import type { OriginVM, SrcVM } from "../../types";
 import { fmtTime } from "../../lib";
+import HeadCount, { OfTotal } from "./HeadCount";
 import TrainCell from "./TrainCell";
+import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
 import { inCallStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, InCallSortKey } from "./types";
@@ -20,6 +22,10 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
   } = ctx;
   const calls = srcFilter.inCalls;
   const stations = inCallStations(calls, ctx.selectedClasses);
+  const classCalls = byClass(calls, ctx.selectedClasses, (c) => c.arr.cls);
+  const count = classCalls.length;
+  const originating = classCalls.filter((c) => c.started).length;
+  const tag = classTag(ctx.selectedClasses);
   const list = calls.filter((c) => {
     if (
       !matchesRowFilters(
@@ -88,13 +94,14 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
   const heading = (
     <>
       <span id="depCityName">
-        {srcFilter.trains} trains arrive from {srcFilter.en} &middot;{" "}
+        <HeadCount n={count} total={calls.length} withOf={false} />{tag ? " " + tag : ""} trains arrive from {srcFilter.en} &middot;{" "}
         {srcFilter.zh}
+        <OfTotal n={count} total={calls.length} />
       </span>{" "}
       &mdash;{" "}
       <span id="depCount">
-        {srcFilter.originating > 0
-          ? srcFilter.originating + " start there"
+        {originating > 0
+          ? originating + " start there"
           : "none start there"}
       </span>
     </>
@@ -235,5 +242,5 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
       </tbody>
     </table>
   );
-  return { heading, depNote, stations, chipNode, showingNote, tableNode };
+  return { heading, depNote, stations, chipNode, count, total: calls.length, showingNote, tableNode };
 }

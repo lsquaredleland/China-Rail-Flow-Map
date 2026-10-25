@@ -3,6 +3,8 @@ import type { ArrVM, OriginVM } from "../../types";
 import { fmtDist, fmtTime } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
+import HeadCount from "./HeadCount";
+import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
 import { arrStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, ArrSortKey } from "./types";
@@ -23,6 +25,8 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   let showingNote: string;
   const arrs = cur.arrs;
   const stations = arrStations(arrs, ctx.selectedClasses);
+  const count = byClass(arrs, ctx.selectedClasses, (a) => a.cls).length;
+  const tag = classTag(ctx.selectedClasses);
   const list: ArrVM[] = arrs.filter(
     (a) =>
       matchesRowFilters(a.arr, a.distKm, a.dur, a.cls, a.code) &&
@@ -78,11 +82,13 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
 
   const heading = (
     <>
-      Arrivals into{" "}
+      {tag ? tag + " arrivals into" : "Arrivals into"}{" "}
       <span id="depCityName">
         {cur.en} &middot; {cur.o.zh}
       </span>{" "}
-      &mdash; <span id="depCount">{arrs.length} arrivals</span>
+      &mdash; <span id="depCount">
+        <HeadCount n={count} total={arrs.length} suffix=" arrivals" />
+      </span>
     </>
   );
   const depNote = (
@@ -192,5 +198,5 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
       </tbody>
     </table>
   );
-  return { heading, depNote, stations, showingNote, tableNode };
+  return { heading, depNote, stations, count, total: arrs.length, showingNote, tableNode };
 }

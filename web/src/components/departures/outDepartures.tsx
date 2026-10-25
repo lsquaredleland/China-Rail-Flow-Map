@@ -2,7 +2,8 @@
 import { fmtDist, fmtTime } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
-import { depDayOffset } from "./helpers";
+import HeadCount from "./HeadCount";
+import { byClass, classTag, depDayOffset } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
 import { depStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, SortKey } from "./types";
@@ -24,6 +25,8 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   let showingNote: string;
   const deps = cur ? cur.deps : [];
   const stations = depStations(deps, ctx.selectedClasses);
+  const count = byClass(deps, ctx.selectedClasses, (d) => d.cls).length;
+  const tag = classTag(ctx.selectedClasses);
   const list = deps.filter(
     (d) =>
       matchesRowFilters(d.dep, d.distKm, d.dur, d.cls, d.code) &&
@@ -72,11 +75,11 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
 
   const heading = (
     <>
-      Departures from{" "}
+      {tag ? tag + " departures from" : "Departures from"}{" "}
       <span id="depCityName">
         {cur ? cur.en + " · " + cur.o.zh : "…"}
       </span>{" "}
-      <b className="dep-num-lead">{cur ? cur.deps.length : "…"}</b>
+      {cur ? <HeadCount n={count} total={deps.length} /> : <b className="dep-num-lead">…</b>}
     </>
   );
   const depNote = (
@@ -183,5 +186,5 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
       </tbody>
     </table>
   );
-  return { heading, depNote, stations, showingNote, tableNode };
+  return { heading, depNote, stations, count, total: deps.length, showingNote, tableNode };
 }

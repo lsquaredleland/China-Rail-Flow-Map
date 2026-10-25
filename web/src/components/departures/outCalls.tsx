@@ -1,7 +1,9 @@
 /* Outbound with a destination: every train calling at that city. */
 import type { DestVM, OriginVM } from "../../types";
 import { fmtTime } from "../../lib";
+import HeadCount, { OfTotal } from "./HeadCount";
 import TrainCell from "./TrainCell";
+import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
 import { callStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, CallSortKey } from "./types";
@@ -26,7 +28,10 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
     atlas?.schedules,
     ctx.selectedClasses,
   );
-  const termCount = destFilter.terminating;
+  const classCalls = byClass(calls, ctx.selectedClasses, (c) => c.dep.cls);
+  const count = classCalls.length;
+  const termCount = classCalls.filter((c) => c.term).length;
+  const tag = classTag(ctx.selectedClasses);
   const list = calls.filter((c) => {
     if (
       !matchesRowFilters(
@@ -92,8 +97,9 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
   const heading = (
     <>
       <span id="depCityName">
-        <b className="dep-num-lead">{calls.length}</b> trains call at {destFilter.en} &middot;{" "}
+        <HeadCount n={count} total={calls.length} withOf={false} />{tag ? " " + tag : ""} trains call at {destFilter.en} &middot;{" "}
         {destFilter.zh}
+        <OfTotal n={count} total={calls.length} />
       </span>{" "}
       <span id="depCount">
         {termCount > 0
@@ -237,5 +243,5 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
       </tbody>
     </table>
   );
-  return { heading, depNote, stations, chipNode, showingNote, tableNode };
+  return { heading, depNote, stations, chipNode, count, total: calls.length, showingNote, tableNode };
 }
