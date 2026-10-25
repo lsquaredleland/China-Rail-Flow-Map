@@ -75,7 +75,7 @@ interface PickerInternals {
    for the one call that would make it (deck guards every use with `if (this.depthFBO)`). */
 export function dropDepthPickBuffer(picker: PickerInternals | null | undefined): void {
   if (!picker) return;
-  if (typeof picker._resizeBuffer !== "function") {
+  if (typeof picker._resizeBuffer !== "function" || typeof picker.device?.isTextureFormatRenderable !== "function") {
     // A deck upgrade renamed or removed the private hook: keep deck's default buffers.
     console.warn("deck picker has no _resizeBuffer; the pickZ depth buffer is not dropped");
     return;

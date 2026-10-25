@@ -1,7 +1,7 @@
 // G1 interaction checklist (C20): drives the interaction steps on the deck renderer,
 // records per step the camera / selection / scale-bar state, pageerrors and a screenshot
 // (checklist.json in --out). With --against DIR (the --out of an earlier run on another
-// build) it also compares every step's state and the pixelmatch % of its screenshot.
+// build, written by THIS version of the script: png paths are stored relative to --out) it also compares every step's state and the pixelmatch % of its screenshot.
 //   pan, wheel, pinch (touch), fit + zoom buttons, URL camera restore, scale bar km/mi,
 //   selection, isolation, class filter, histogram filter, inbound, play / seek, night,
 //   DPR 1/2/3, backdrop toggles (showNetwork, showOutline), live window resize (centre kept).
@@ -63,8 +63,8 @@ async function snap(h, steps, name) {
       histSel: document.querySelectorAll(".hist-col.is-selected").length,
     };
   });
-  const png = path.join(outDir, `${steps.tag}-${steps.list.length}-${name}.png`);
-  await h.pg.screenshot({ path: png });
+  const png = `${steps.tag}-${steps.list.length}-${name}.png`;
+  await h.pg.screenshot({ path: path.join(outDir, png) });
   steps.list.push({ name, state, png });
 }
 
@@ -207,7 +207,7 @@ for (const g of results) {
       else {
         const keys = Object.keys(c.state).filter((k) => !["url", "anim"].includes(k));
         const diff = keys.filter((k) => !near(c.state[k], d.state[k], k === "scale" ? 1e-6 * c.state.scale : k === "tx" || k === "ty" ? 0.01 : 0));
-        const A = decodePng(fs.readFileSync(c.png)), B = decodePng(fs.readFileSync(d.png));
+        const A = decodePng(fs.readFileSync(path.join(path.resolve(opt.against), c.png))), B = decodePng(fs.readFileSync(path.join(outDir, d.png)));
         const pm = (100 * pixelmatch(A.px, B.px, null, A.w, A.h, { threshold: 0.1, includeAA: false })) / (A.w * A.h);
         row.stateEqual = diff.length === 0;
         row.pmPct = +pm.toFixed(3);
