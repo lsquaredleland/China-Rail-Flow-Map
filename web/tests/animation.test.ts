@@ -114,13 +114,11 @@ describe("final-step flows == static flows", () => {
       const mism = o.flows
         .map((f) => [f.s, f.n, tl.secFlowSteps.get(f.s)?.[lastStep(tl)] ?? 0])
         .filter(([, n, a]) => n !== a);
-      // KNOWN: 成都 has 1 section where the static flow is below the animated
-      // count ([section, static n, animated n]): one train covers it on two
-      // overlapping legs (土溪→平昌→达州). Static flows count distinct trains
-      // per edge by design (docs/PIPELINE.md). The 成都 out-and-back loop
-      // (8362, [2, 4]) was fixed by O18's class-vector chain split. The count
-      // must not grow.
-      expect(mism).toEqual(zh === "成都" ? [[7762, 1, 2]] : []);
+      // No section's static flow differs from the animated count ([section,
+      // static n, animated n]). The 12306 pack had one on 成都 (a train on
+      // two overlapping legs, 土溪→平昌→达州); since PR #55 a partial re-run
+      // draws as a piece, not the whole section again, so it is gone.
+      expect(mism).toEqual([]);
       // and nothing lights up that is not in the static flows
       const known = new Set(o.flows.map((f) => f.s));
       for (const [s, a] of tl.secFlowSteps) if (a[lastStep(tl)] > 0) expect(known.has(s)).toBe(true);

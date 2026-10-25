@@ -10,6 +10,8 @@ export default function AppHeader({
   selectedTrainCodes,
   outTablesReady,
   inTablesReady,
+  trainCount,
+  calendarSpan,
 }: {
   cur: OriginVM | null;
   viewCur: OriginVM | null;
@@ -21,6 +23,10 @@ export default function AppHeader({
   selectedTrainCodes: string[];
   outTablesReady: boolean;
   inTablesReady: boolean;
+  /** Trains in the pack (train_table rows); 0 until the pack loads. */
+  trainCount: number;
+  /** The pack's schedule window, e.g. "23 Oct – 6 Nov" (export packs). */
+  calendarSpan: string | undefined;
 }) {
   return (
     <header>
@@ -45,8 +51,9 @@ export default function AppHeader({
         Flow diagram of trains departing and arriving across China&rsquo;s
         top rail cities. The width of each line refers to the number of
         daily trains along that particular piece of track &mdash; spanning{" "}
-        <b>7,253</b> scheduled daily passenger services (of over{" "}
-        <b>12,000</b> nationwide) across China&rsquo;s{" "}
+        <b>{trainCount ? trainCount.toLocaleString("en-US") : "…"}</b>{" "}
+        scheduled passenger services
+        {calendarSpan ? ` (running ${calendarSpan})` : ""} across China&rsquo;s{" "}
         <b>{distUnit === "mi" ? "30,000 mi" : "48,000 km"}</b> high-speed
         rail network ({distUnit === "mi" ? "100,000 mi" : "162,000 km"} of
         total track).

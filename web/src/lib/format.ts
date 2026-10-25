@@ -101,6 +101,21 @@ export function fmtClock(m: number | null | undefined): string {
   return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** The schedule window of a pack's calendar (`shared.calendar`, ISO dates in
+    order) as "23 Oct – 6 Nov"; undefined without a calendar (12306 packs). */
+export function fmtCalendarSpan(calendar: readonly string[] | undefined): string | undefined {
+  if (!calendar || calendar.length === 0) return undefined;
+  const day = (iso: string) => {
+    const [, m, d] = iso.split("-").map(Number);
+    return `${d} ${MONTHS[m - 1]}`;
+  };
+  const a = day(calendar[0]);
+  const b = day(calendar[calendar.length - 1]);
+  return a === b ? a : `${a} – ${b}`;
+}
+
 // One value, in the unit picked on the toolbar switcher; unknown
 // distances (rail_km -1, e.g. Hong Kong's unrouted tunnel leg) read
 // as an em dash.

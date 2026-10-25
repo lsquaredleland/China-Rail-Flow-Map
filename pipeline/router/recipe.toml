@@ -17,13 +17,17 @@ min_legs = 1
 require_router_agreement = true
 
 # The schedule source (pipeline/router/README.md, "Plugging in a new
-# schedule"). "timetables" reads the two timetable deliverables in --files;
-# "export" reads one train export with an operating calendar from --files:
-#   source = "export"
-#   export = "trains-all.json"
-#   supplements = ["train-operating-days.json"]
+# schedule"). The shipped pack (since 2026-10-25) is built from the train
+# export: one export with an operating calendar, paths relative to --files
+# (data/raw/train-exports-2026-10-25). The 12306 source is still available:
+# to build the 12306 pack, use a copy of this file with
+#   source = "timetables"
+# and no `export` / `supplements` lines, with --files pointing at the two
+# timetable deliverables (docs/PIPELINE.md section 3 step 5).
 [schedule]
-source = "timetables"
+source = "export"
+export = "trains-all.json"
+supplements = ["train-operating-days.json"]
 
 # A train runs a leg without stopping, so a candidate path that turns back
 # between its two stations (at a junction, say) is penalised per turn-back

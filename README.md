@@ -1,6 +1,6 @@
 # China Rail Flow Map · 中国铁路流量图
 
-An interactive, Minard-style passenger rail flow atlas across China's top 100 rail cities — rendering **7,253 scheduled daily passenger services** across **48,000 km** of high-speed rail and **162,000 km** of total track on a deck.gl (WebGL2) renderer (zero map tile libraries, zero external API keys).
+An interactive, Minard-style passenger rail flow atlas across China's top 100 rail cities — rendering **11,248 scheduled passenger services** (running 23 Oct – 6 Nov 2026) across **48,000 km** of high-speed rail and **162,000 km** of total track on a deck.gl (WebGL2) renderer (zero map tile libraries, zero external API keys).
 
 **Live Demo:** [china-rail-flow-map-web.vercel.app](https://china-rail-flow-map-web.vercel.app/)
 
@@ -23,7 +23,7 @@ An interactive, Minard-style passenger rail flow atlas across China's top 100 ra
 China-Rail-Flow-Map/
 ├── web/                  # React 19 + TypeScript + deck.gl frontend (bundled with Bun)
 │   ├── src/              # Application, deck.gl renderer, histograms, and timetable views
-│   ├── public/assets/    # 7 Brotli files (~5.5 MB): 6 atlas-v2-*.json.br + china-outline.json.br
+│   ├── public/assets/    # 10 Brotli files (~7.6 MB): 9 atlas-v2-*.json.br (3 national) + china-outline.json.br
 │   └── bundle.mjs        # Produces web/dist/ (index.html + assets/)
 ├── pipeline/             # Unified Rust Cargo workspace for OSM & timetable processing
 │   ├── analyze/          # Core graph router, section decomposition (atlas) & v2 packer (atlaspack)

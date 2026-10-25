@@ -4,6 +4,7 @@
 export {
   enName,
   esc,
+  fmtCalendarSpan,
   fmtClock,
   fmtDist,
   fmtTime,

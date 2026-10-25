@@ -1212,6 +1212,21 @@ dots, tails and ripples (diff masks).
   `web/public/assets` (with the national trains file). Until then national Flows and
   Trains + flows say the flow data could not be loaded and draw the trains.
 
+*Swap done (2026-10-25, owner-approved, `data/swap-11k-national`).* The 11k train-export
+pack (PR #51 data, PR #55 fixes) replaced the six existing files, and the three national
+files (`atlas-v2-national`, `-national-trains`, `-national-entries`) are in
+`web/public/assets`, built from a clean export of the committed tree (`staging/swap-11k/run1`
+= `run2`). National counts on the full files: 11,248 trains, 945,827 path refs, **3,694 dots
+at 18:15** (3,521 trains running), **1,214 at 00:30**; national Σ total 609,273 over 9,106
+sections (entries by 18:15: 450,766). `buildNational` heap delta 27.4 MB (≤ 30). The coverage
+note reads "11,248 trains running 23 Oct – 6 Nov" (paths in the file; the window from
+`shared.calendar`); `NATIONAL_DAILY_SERVICES_REF` is gone. The tests now read the full files
+from `public/assets` (CI too); the committed samples were regenerated from them (trains sample
+1,226 trains, flows sample 466 sections). Perf (`perf/national.mjs --dpr 2`, 18:15 sweep, 1x):
+Trains rAF p95 16.7-16.8, draw+raster p95 12.3 / 14.6 / 10.5 ms (initial / national fit / city
+x10), JS draw p95 3.0-3.3 ms; Trains + flows draw+raster p95 12.7 / 13.1 / 12.9 ms; 4x Trains
+draw+raster p95 12.8 / 15.1 / 9.9 ms.
+
 **P3.4 Optional comet mode** — only if D2 is toggled on and M4n (Trips) passed.
 
 ---

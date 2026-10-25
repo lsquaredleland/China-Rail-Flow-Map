@@ -50,9 +50,6 @@ export const NATIONAL_ENTRIES_URL = "assets/atlas-v2-national-entries.json";
 // National trains (P2.2): every national train's whole run, fetched only on
 // entering national mode, never for the origin view.
 export const NATIONAL_TRAINS_URL = "assets/atlas-v2-national-trains.json";
-// The reference size of China's daily passenger timetable the national mode's
-// coverage note compares against (an approximate, not a data value).
-export const NATIONAL_DAILY_SERVICES_REF = 12000;
 
 // The v2 files carry no `about` blurb (v1 embedded one in the data);
 // the text is unchanged apart from the geometry-precision sentence,
@@ -62,7 +59,7 @@ export const ABOUT =
   "Flow line width reflects daily train frequency along each railway corridor. " +
   "In the outbound view, trains are traced from the origin city outward to their destinations; " +
   "in the inbound view, trains are traced from their starting stations through all intermediate calls into the selected city. " +
-  "Timetable data is sourced from China Railway (12306), covering 5,043 trunk services and 2,210 intercity C/S services across sample dates in October 2026.";
+  "Timetable data is sourced from China Railway (12306), covering the passenger trains listed as running on at least one date from 23 October to 6 November 2026.";
 
 /* Fetch one dataset file, preferring its Brotli twin (the .br asset).
    The host (vercel.json) sends the .br with Content-Encoding: br +
