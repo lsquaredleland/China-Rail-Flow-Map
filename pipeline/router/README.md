@@ -130,18 +130,20 @@ The hybrid rule:
 4. Of the alternatives that clear the margins, the best-fitting one
    wins, the shortest on ties. If none clears them, production stays.
 5. With `require_router_agreement = true` (default `false`, set in
-   `recipe.toml`), a pair may leave production only if the router moved
-   at least one of its legs off production. A leg counts as moved when
-   its `decide()` outcome draws its own path (`switched`, `filled` or
-   `bridge-fix`) and the chosen candidate is not production's
-   (`!is_base`). Every other outcome keeps the leg on production:
-   `production`, `ambiguous-keep`, `infeasible-keep`, `chord`,
-   `no-candidates` and `not-routed`.
+   `recipe.toml`), a pair may leave production only if the router
+   disagrees with production on at least one of its legs
+   (`canon::router_disagrees`). A leg disagrees in two cases:
+   - its `decide()` outcome draws its own path (`switched`, `filled`,
+     `bridge-fix`) on a candidate that is not production's; or
+   - its outcome is `ambiguous-keep` and its best guess, the posterior
+     argmax, is not production's.
 
-   This keeps the map's pair geometry consistent with the router's
-   per-leg evidence, which includes the length prior and the stopping
-   services. A pair the router keeps entirely on production, such as
-   广州–深圳 on 广深线, stays there.
+   Every other outcome agrees with production: `production`,
+   `infeasible-keep`, `chord`, `no-candidates`, `not-routed`. The guard
+   keeps the map's pair geometry consistent with the router's per-leg
+   evidence, including the length prior and stopping services. A pair
+   the router keeps entirely on production, such as 广州–深圳 on 广深线,
+   stays there.
 
 The margin defaults (`margin_min = 1.0`, `longer_min_per_km = 0.1`,
 `margin_rel = 0.2`, `min_legs = 1`) were picked on a train-hash

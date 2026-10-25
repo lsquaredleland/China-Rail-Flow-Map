@@ -253,14 +253,13 @@ fn main() {
     // ---- double track as one corridor, for the map ----
     let weight = |pi: usize| pair_legs[&pairs[pi].key].len() as u32;
     let fast_edge: [f64; NCLASS] = std::array::from_fn(|c| cal.q05[c].exp());
-    // pairs with a leg the router moved off production (own path on a
-    // non-production candidate)
+    // pairs with a leg the router disagrees with production on
     let mut router_moved = vec![false; pairs.len()];
     for d in &decisions {
         let Some(&pi) = pair_idx.get(&legs[d.leg].key) else {
             continue;
         };
-        if d.outcome.draws_own_path() && d.chosen.is_some_and(|k| !cands[pi][k].is_base) {
+        if canon::router_disagrees(d.outcome, d.chosen, &d.post, &cands[pi]) {
             router_moved[pi] = true;
         }
     }

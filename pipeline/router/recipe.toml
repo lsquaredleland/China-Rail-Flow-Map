@@ -11,6 +11,7 @@ margin_min = 1.0
 longer_min_per_km = 0.1
 margin_rel = 0.2
 min_legs = 1
-# Only pairs the router moved a leg of (switched / filled / bridge-fix onto a
-# non-production candidate) may leave production.
+# Only pairs where the router disagrees with production on some leg may leave
+# production: switched / filled / bridge-fix onto a non-production candidate,
+# or ambiguous-keep whose best guess is not production's.
 require_router_agreement = true

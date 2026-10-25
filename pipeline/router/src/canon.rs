@@ -7,6 +7,7 @@
 //! it applies is `CanonConfig::mode`.
 use crate::classes::NCLASS;
 use crate::config::{CanonConfig, CanonMode};
+use crate::decide::Outcome;
 use crate::graph::{self, route_custom, Buffers, FineIndex, Graph};
 use crate::model::{Cand, Shape};
 use rayon::prelude::*;
@@ -29,12 +30,34 @@ pub struct LegTime {
 pub struct Evidence<'a> {
     pub legs: &'a [LegTime],
     pub ratio: &'a [f64; NCLASS],
-    /// The router moved at least one of the pair's legs off production:
-    /// its decision draws the leg's own path (`switched`, `filled`,
-    /// `bridge-fix`) on a candidate that is not production's. Every other
-    /// outcome (`production`, `ambiguous-keep`, `infeasible-keep`, ...)
-    /// keeps the leg on production. See `CanonConfig::require_router_agreement`.
+    /// The router disagrees with production on at least one of the pair's
+    /// legs (`router_disagrees`). See `CanonConfig::require_router_agreement`.
     pub router_moved: bool,
+}
+
+/// Whether the router's decision for one leg disagrees with production:
+/// - it draws the leg's own path (`switched`, `filled`, `bridge-fix`) on
+///   a candidate that is not production's; or
+/// - it is `ambiguous-keep` (drawn on production for lack of a decisive
+///   posterior) while its best guess, the posterior argmax as in
+///   `decide`, is not production's.
+///
+/// Every other outcome agrees with production: `production`,
+/// `infeasible-keep`, `chord`, `no-candidates`, `not-routed`.
+pub fn router_disagrees(
+    outcome: Outcome,
+    chosen: Option<usize>,
+    post: &[f64],
+    cands: &[Cand],
+) -> bool {
+    let not_base = |k: usize| cands.get(k).is_some_and(|c| !c.is_base);
+    match outcome {
+        o if o.draws_own_path() => chosen.is_some_and(not_base),
+        Outcome::AmbiguousKeep => (0..post.len())
+            .max_by(|&a, &b| post[a].total_cmp(&post[b]))
+            .is_some_and(not_base),
+        _ => false,
+    }
 }
 
 /// Index of the shortest gap-free candidate (first on ties), else of
@@ -82,8 +105,8 @@ fn mean_error(k: &Cand, legs: &[LegTime], ratio: &[f64; NCLASS]) -> Option<f64> 
 /// class mix weights it); an alternative some of those classes cannot use
 /// is not eligible. Of the alternatives that clear the margins, the best
 /// fitting wins, the shortest on ties. With `require_router_agreement`,
-/// only a pair the router moved one leg of (`Evidence::router_moved`) may
-/// leave production. Without gap-free production: as `Shortest`.
+/// only a pair the router disagrees with production on for at least one
+/// leg (`router_disagrees`) may leave production. Without gap-free production: as `Shortest`.
 ///
 /// The per-km margin is there because a path's prediction is only as good
 /// as its speed tags: where OSM tags a fast line below its real speed
@@ -345,6 +368,27 @@ mod tests {
         assert_eq!(pick(&n, CanonMode::Production, &[], d()), Some(1));
         assert_eq!(pick(&n, HY, &legs(&[26.0]), d()), Some(1));
         assert_eq!(pick(&[], HY, &[], d()), None);
+    }
+
+    #[test]
+    fn router_disagrees_per_outcome() {
+        // production 0, alternative 1
+        let c = two();
+        let (prod_wins, alt_wins) = ([0.7, 0.3], [0.3, 0.7]);
+        use Outcome::*;
+        // own path on a non-production candidate: disagrees
+        for o in [Switched, Filled, BridgeFix] {
+            assert!(router_disagrees(o, Some(1), &alt_wins, &c));
+            assert!(!router_disagrees(o, Some(0), &alt_wins, &c));
+            assert!(!router_disagrees(o, None, &alt_wins, &c));
+        }
+        // ambiguous-keep: by the best guess (argmax), not the drawn path
+        assert!(router_disagrees(AmbiguousKeep, Some(0), &alt_wins, &c));
+        assert!(!router_disagrees(AmbiguousKeep, Some(0), &prod_wins, &c));
+        // every other outcome agrees, whatever the posterior
+        for o in [Production, InfeasibleKeep, Chord, NoCandidates, NotRouted] {
+            assert!(!router_disagrees(o, Some(1), &alt_wins, &c));
+        }
     }
 
     #[test]
