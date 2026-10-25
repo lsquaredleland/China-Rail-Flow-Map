@@ -1,0 +1,56 @@
+/* ---------- controls floating over the map ---------- */
+.iso-chip {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid #F59E0B;
+  border-radius: 30px;
+  padding: 6px 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #111827;
+}
+:root[data-theme="dark"] .iso-chip {
+  background: rgba(17, 24, 39, 0.94);
+  color: #F3F4F6;
+}
+.iso-chip-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #F59E0B;
+  box-shadow: 0 0 8px #F59E0B;
+}
+.iso-chip-code {
+  font-family: monospace;
+  font-weight: 800;
+}
+.iso-chip-timetable {
+  border: none;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+:root[data-theme="dark"] .iso-chip-timetable { background: rgba(255, 255, 255, 0.12); }
+.iso-chip-exit {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #64748B;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 0 4px;
+}
+:root[data-theme="dark"] .iso-chip-exit { color: #9CA3AF; }

@@ -1,0 +1,488 @@
+/* ---------- train schedule modal and its minimized HUD ----------
+   Colours are variables on the two roots so the dark theme is one block
+   instead of a ternary at every use. */
+.tsm-backdrop,
+.tsm-hud {
+  --tsm-bg: #FFFFFF;
+  --tsm-ink: #111827;
+  --tsm-muted: #64748B;
+  --tsm-faint: #94A3B8;
+  --tsm-btn: rgba(0, 0, 0, 0.05);
+  --tsm-btn-strong: rgba(0, 0, 0, 0.06);
+  --tsm-btn-ink: #374151;
+  --tsm-edge: rgba(0, 0, 0, 0.1);
+  --tsm-rule-strong: rgba(0, 0, 0, 0.08);
+  --tsm-rule: rgba(0, 0, 0, 0.06);
+  --tsm-rule-faint: rgba(0, 0, 0, 0.03);
+  --tsm-tint: rgba(0, 0, 0, 0.02);
+  --tsm-progress-bg: rgba(0, 0, 0, 0.02);
+  --tsm-track: rgba(0, 0, 0, 0.08);
+  --tsm-hover: rgba(0, 0, 0, 0.03);
+  --tsm-current: rgba(245, 158, 11, 0.18);
+  --tsm-origin: rgba(59, 130, 246, 0.12);
+  --tsm-chip-bg: rgba(59, 130, 246, 0.15);
+  --tsm-chip-edge: rgba(59, 130, 246, 0.3);
+  --tsm-chip-ink: #1D4ED8;
+  --tsm-origin-time: rgba(59, 130, 246, 0.18);
+  --tsm-transit: rgba(245, 158, 11, 0.08);
+  --tsm-hud-bg: rgba(255, 255, 255, 0.96);
+  --tsm-hud-edge: rgba(0, 0, 0, 0.12);
+}
+:root[data-theme="dark"] .tsm-backdrop,
+:root[data-theme="dark"] .tsm-hud {
+  --tsm-bg: #111827;
+  --tsm-ink: #F3F4F6;
+  --tsm-muted: #9CA3AF;
+  --tsm-faint: #6B7280;
+  --tsm-btn: rgba(255, 255, 255, 0.08);
+  --tsm-btn-strong: rgba(255, 255, 255, 0.1);
+  --tsm-btn-ink: #E5E7EB;
+  --tsm-edge: rgba(255, 255, 255, 0.12);
+  --tsm-rule-strong: rgba(255, 255, 255, 0.1);
+  --tsm-rule: rgba(255, 255, 255, 0.08);
+  --tsm-rule-faint: rgba(255, 255, 255, 0.04);
+  --tsm-tint: rgba(255, 255, 255, 0.02);
+  --tsm-progress-bg: rgba(0, 0, 0, 0.24);
+  --tsm-track: rgba(255, 255, 255, 0.12);
+  --tsm-hover: rgba(255, 255, 255, 0.04);
+  --tsm-current: rgba(245, 158, 11, 0.26);
+  --tsm-origin: rgba(59, 130, 246, 0.18);
+  --tsm-chip-bg: rgba(59, 130, 246, 0.25);
+  --tsm-chip-edge: rgba(59, 130, 246, 0.4);
+  --tsm-chip-ink: #93C5FD;
+  --tsm-origin-time: rgba(59, 130, 246, 0.28);
+  --tsm-transit: rgba(245, 158, 11, 0.12);
+  --tsm-hud-bg: rgba(17, 24, 39, 0.94);
+  --tsm-hud-edge: rgba(255, 255, 255, 0.15);
+}
+
+.tsm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+}
+.tsm-dialog {
+  width: 100%;
+  max-width: 540px;
+  max-height: 86vh;
+  background: var(--tsm-bg);
+  color: var(--tsm-ink);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--tsm-edge);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tsm-dialog:focus { outline: none; }
+.tsm-dialog.is-isolated,
+.tsm-hud.is-isolated { border-color: #F59E0B; }
+
+/* the floating pill the modal minimizes to */
+.tsm-hud {
+  position: fixed;
+  bottom: 90px;
+  right: 24px;
+  z-index: 200;
+  background: var(--tsm-hud-bg);
+  color: var(--tsm-ink);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--tsm-hud-edge);
+  backdrop-filter: blur(12px);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 460px;
+}
+.tsm-hud.is-isolated { border-color: #F59E0B; }
+.tsm-hud-main,
+.tsm-head-main { min-width: 0; flex: 1; }
+.tsm-hud-route {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tsm-hud-status {
+  font-size: 11px;
+  color: var(--tsm-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tsm-hud.is-isolated .tsm-hud-status { color: #F59E0B; }
+.tsm-hud-expand {
+  background: var(--tsm-btn-strong);
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tsm-hud-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--tsm-muted);
+  font-size: 14px;
+  padding: 2px 4px;
+}
+
+/* class chip: amber for high-speed (G/D/C), blue for conventional */
+.tsm-code {
+  background: #0284C7;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-family: monospace;
+}
+.tsm-code.is-hs { background: #F59E0B; }
+.tsm-dialog .tsm-code {
+  font-size: 15px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* header */
+.tsm-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--tsm-rule-strong);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tsm-head-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.tsm-title {
+  font-weight: 700;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tsm-subtitle {
+  font-size: 12px;
+  color: var(--tsm-muted);
+  margin-top: 2px;
+}
+.tsm-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.tsm-icon-btn {
+  background: var(--tsm-btn);
+  border: none;
+  color: var(--tsm-btn-ink);
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tsm-icon-btn.is-close { font-size: 16px; }
+
+/* toolbar: isolate / jump / origin-stop chip / live status */
+.tsm-toolbar {
+  padding: 8px 20px;
+  background: var(--tsm-tint);
+  border-bottom: 1px solid var(--tsm-rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tsm-toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tsm-iso-btn {
+  background: var(--tsm-btn-strong);
+  color: inherit;
+  border: none;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tsm-iso-btn.is-on {
+  background: #F59E0B;
+  color: #000000;
+  border: 1px solid #D97706;
+}
+.tsm-jump-btn {
+  background: var(--tsm-btn);
+  color: inherit;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tsm-origin-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--tsm-chip-bg);
+  color: var(--tsm-chip-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--tsm-chip-edge);
+}
+.tsm-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tsm-muted);
+}
+.tsm-dialog.is-isolated .tsm-status { color: #F59E0B; }
+
+/* live journey progress */
+.tsm-progress {
+  padding: 10px 20px 12px 20px;
+  background: var(--tsm-progress-bg);
+  border-bottom: 1px solid var(--tsm-rule);
+}
+.tsm-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.tsm-progress-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tsm-progress-icon { font-size: 15px; }
+.tsm-progress-pct {
+  font-family: monospace;
+  font-weight: 800;
+  font-size: 13px;
+  color: #F59E0B;
+}
+.tsm-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: var(--tsm-track);
+  border-radius: 3px;
+}
+.tsm-track-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3B82F6 0%, #F59E0B 100%);
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+.tsm-track-train {
+  position: absolute;
+  top: -8px;
+  transform: translateX(-50%);
+  font-size: 14px;
+  transition: left 0.25s ease;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* timetable */
+.tsm-scroll {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+.tsm-empty {
+  padding: 36px;
+  text-align: center;
+  color: var(--tsm-muted);
+}
+.tsm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tsm-table thead tr {
+  border-bottom: 1px solid var(--tsm-rule);
+  color: var(--tsm-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tsm-table th { padding: 8px 16px; }
+.tsm-table td { padding: 9px 16px; }
+.tsm-th-c { text-align: center; }
+.tsm-th-l { text-align: left; }
+.tsm-th-r { text-align: right; }
+.tsm-th-idx { text-align: center; width: 40px; }
+
+.tsm-row {
+  border-bottom: 1px solid var(--tsm-rule-faint);
+  border-left: 4px solid transparent;
+  background: transparent;
+  cursor: default;
+  transition: background 0.15s ease;
+}
+.tsm-row.is-jumpable { cursor: pointer; }
+.tsm-row:hover { background: var(--tsm-hover); }
+/* The selected origin and the stop the train is at both tint the row and
+   win over the hover tint; the current stop's fill wins over the origin's
+   but the origin keeps the blue edge. */
+.tsm-row.is-origin {
+  border-left-color: #3B82F6;
+  background: var(--tsm-origin);
+}
+.tsm-row.is-current {
+  border-left-color: #F59E0B;
+  background: var(--tsm-current);
+}
+.tsm-row.is-origin.is-current { border-left-color: #3B82F6; }
+
+.tsm-cell-idx {
+  text-align: center;
+  color: var(--tsm-faint);
+  font-family: monospace;
+  font-size: 12px;
+}
+.tsm-mark-now { font-size: 16px; }
+.tsm-mark-past { color: #10B981; font-weight: 800; }
+.tsm-mark-next { color: #F59E0B; font-weight: 800; }
+.tsm-mark-num { opacity: 0.6; }
+.tsm-st-zh { font-weight: 600; }
+.tsm-st-en {
+  font-size: 11px;
+  color: var(--tsm-faint);
+}
+.tsm-tag {
+  margin-left: 8px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.tsm-tag.is-origin {
+  font-weight: 800;
+  background: #3B82F6;
+  color: #FFFFFF;
+  letter-spacing: 0.5px;
+}
+.tsm-tag.is-now {
+  background: #F59E0B;
+  color: #000;
+  font-weight: 800;
+}
+.tsm-tag.is-next {
+  background: rgba(245, 158, 11, 0.2);
+  color: #F59E0B;
+  font-weight: 700;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.tsm-cell-dist {
+  text-align: right;
+  font-family: monospace;
+  font-size: 12px;
+}
+.tsm-cell-time {
+  text-align: center;
+  font-family: monospace;
+}
+.tsm-cell-time.is-dep { font-weight: 600; }
+.tsm-cell-dwell {
+  text-align: right;
+  font-size: 12px;
+  color: var(--tsm-muted);
+}
+.tsm-dim { opacity: 0.4; }
+/* stops already passed read in the faint tone, except the selected origin */
+.tsm-row.is-past .tsm-st-zh,
+.tsm-row.is-past .tsm-cell-dist,
+.tsm-row.is-past .tsm-cell-time { color: var(--tsm-faint); }
+.tsm-time-pill {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--tsm-origin-time);
+  font-weight: 800;
+  color: var(--tsm-chip-ink);
+}
+
+/* "en route" row between two stops */
+.tsm-transit-row {
+  background: var(--tsm-transit);
+  border-left: 4px solid #F59E0B;
+}
+.tsm-transit-row td { padding: 8px 16px 8px 18px; }
+.tsm-transit-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tsm-transit-icon { font-size: 16px; }
+.tsm-transit-main { flex: 1; }
+.tsm-transit-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: #F59E0B;
+}
+.tsm-transit-km {
+  opacity: 0.85;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.tsm-transit-track {
+  width: 100%;
+  height: 5px;
+  background: rgba(245, 158, 11, 0.25);
+  border-radius: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.tsm-transit-fill {
+  height: 100%;
+  background: #F59E0B;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+.tsm-foot {
+  padding: 10px 20px;
+  border-top: 1px solid var(--tsm-rule);
+  font-size: 11px;
+  color: var(--tsm-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
