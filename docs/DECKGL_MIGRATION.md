@@ -763,6 +763,44 @@ national mode (a fail re-opens D8, not Phase 2).
 shipped as `atlas-v2-national.json.br` (fmt 7 or a new file; `DATA_FMT` check extended);
 `pack-audit` goldens extended. Scheduled with the ≈ 12k-train data.
 
+*P3.1 as built (2026-10-25, owner decision D12: Rust, started early).*
+- **Rule (one copy).** `pipeline/analyze/src/flows.rs train_edges` is the static-flow rule
+  (a train counts once per atomic edge, re-covered track once, `near_station` throats out);
+  atlas's per-city outbound, per-city inbound and national counts all call it.
+- **National = every train once.** A train's legs are the union of its outbound rows (from
+  its first selected city on) and inbound rows (from its first stop to a selected city), so
+  its whole run counts whenever it calls at a selected city (7,157 of 7,253 trains; the 96
+  that call at none have no resolved legs). Edges use the outbound `near_station` grid and
+  map onto the shared `sections` (the 7,922 the client already has; no new geometry).
+- **Edges → sections.** A train counts once on a section when it covers any of the
+  section's edges (union of the edges' train sets). This is never below any edge's count,
+  so never below any single origin's count (constant along a section). National counts
+  vary inside **51** sections (max spread 15 trains between their edges); the union exceeds
+  the busiest edge on **1** section (by 2).
+- **File.** `atlas-v2-national.json(.br)`, written by atlaspack only when atlas's v1 output
+  has `national`: `{fmt: 6, trains, total[s], by_class[8][s]}`, section-parallel in the
+  shared file's (renumbered) order; class order as the flow rows (g d c s z t k plain).
+  `fmt` is the shared file's, since the indices only mean something against it; the
+  client (P3.2) checks `fmt === DATA_FMT` and `total.length === sections.length`.
+  18,843 B brotli (161,577 B raw), deterministic run to run.
+- **Numbers (corridor-v3-hybrid inputs).** 7,157 distinct trains; widest section 522;
+  Σ total 462,064. On 3,869 sections the national total is above the recount from
+  out-tables `paths` (track a train runs before its first selected-city departure,
+  e.g. northbound Dalian trains: 大连 is not a featured origin): 116 vs 58 on one section
+  south of 沈阳.
+- **Gates.** `audit --pack-only` checks the file when present: shape and `fmt`; Σ by_class =
+  total; ≥ every origin flow row (total and per class; 270,313 rows); ≥ an independent
+  recount from out-tables' per-train paths on every section (equal on 4,053); spot checks
+  printed. `goldens.json` gains `national_{sections,trains,total_sum,widest,eq_out_recount}`
+  (exact); with the committed pack (no national file yet) they are skipped.
+- **Staged, not shipped.** Built in `staging/national-flows/`; the committed pack is
+  unchanged (all existing files rebuild byte-identical). The swap needs owner approval.
+- **P3.3 groundwork (not built).** atlas has no per-section entry times (that needs leg
+  interpolation, which the client's national timelines already do). Size if precomputed:
+  dense 7,922 × 288 × u16 ≈ 4.6 MB raw; sparse (≈ 462k section entries/day as
+  `(step, +n)` deltas) roughly 1–1.5 MB brotli (estimate, not measured). Computing it client-side from `trainEntries`
+  stays the cheaper path.
+
 **P3.2 B layer** — `deck/layers/national.ts` (+ flows `PathLayer`, class filter =
 `Σ byClass[selected]` into `widthArr`). Test: per-section totals equal the pack audit.
 
@@ -895,7 +933,7 @@ columns **[estimate]**.
 | D9 | Canvas fallback after the migration? | **No.** Notice + working tables/panels | — |
 | D10 | Freeze Canvas drawing features once deck layers start? | **Yes**, on `deckgl` from P1b.1; `main` changes are mirrored by the sync PR | Scope clarified (C15) |
 | D11 | National entry point | **Toolbar toggle "National · beta" + `?national=1`** (Phase 2) | — |
-| D12 | Separate pipeline task for B? | **Yes**, with the ≈ 12k-train data | — |
+| D12 | Separate pipeline task for B? | **Yes (Rust), started early by owner decision 2026-10-25, client maps counts to widths only** | Changed (owner, 2026-10-25): P3.1 no longer waits for the ≈ 12k-train data |
 | D13 | What national mode shows and ignores | **Map-only mode:** outline, graticule, network, every covered train's dot/tail/dwell ring, wrap at 1440. Origin-specific map state (selection, filters, isolation, inbound flows, station dots, labels) is not drawn; entering national closes the city panel; the departures table and panels keep working for the current origin; the scrubber shows Running / Trains | New |
 | D14 | Production bundler | **esbuild via `node bundle.mjs`** (already the case on Vercel and CI); the `Bun.build` branch is deleted in P1.1 | New (C5) |
 | D15 | `@deck.gl/react` or imperative `Deck`? | **Imperative `Deck`** owned by `DeckHost.tsx`, one `setProps` per `M.render()` | New (C14) |
