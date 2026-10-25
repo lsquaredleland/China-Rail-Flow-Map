@@ -600,3 +600,16 @@ export interface NationalTimeline {
   sDep: Float32Array; // -1 = no dwell (terminus)
   skipped: { emptyPath: number; noStops: number; schedMismatch: number; badTime: number };
 }
+
+/** atlas-v2-national.json (P3.1), as shipped: national per-section flow
+    counts, every train counted once. Section-parallel in the shared file's
+    `sections` order (so it carries the shared file's `fmt`): `total[s]` is
+    the distinct trains/day on section `s`; `by_class[c][s]` splits it into
+    the 8 flow-row class buckets (FLOW_CLASSES order) and sums to `total`. */
+export interface NationalFlowsPack {
+  fmt: number;
+  /** Distinct trains on at least one section. */
+  trains: number;
+  total: number[];
+  by_class: number[][];
+}

@@ -42,6 +42,9 @@ export async function fetchInMap(): Promise<InMapData> {
 }
 
 export const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
+// National per-section flows (P3.1/P3.2): fetched only when national flows
+// are requested, never for the origin view.
+export const NATIONAL_FLOWS_URL = "assets/atlas-v2-national.json";
 
 // The v2 files carry no `about` blurb (v1 embedded one in the data);
 // the text is unchanged apart from the geometry-precision sentence,
