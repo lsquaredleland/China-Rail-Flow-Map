@@ -1,24 +1,5 @@
 import type { DistBinFilter, DurBinFilter } from "../types";
-
-function pad2(n: number): string {
-  return n < 10 ? "0" + n : String(n);
-}
-
-function formatHoursLabel(hours: number[]): string {
-  if (hours.length === 0) return "";
-  if (hours.length === 1) {
-    const h = hours[0];
-    return `${pad2(h)}:00–${pad2(h + 1)}:00`;
-  }
-  const sorted = [...hours].sort((a, b) => a - b);
-  const isConsecutive = sorted.every(
-    (h, i) => i === 0 || h === sorted[i - 1] + 1,
-  );
-  if (isConsecutive) {
-    return `${pad2(sorted[0])}:00–${pad2(sorted[sorted.length - 1] + 1)}:00`;
-  }
-  return sorted.map((h) => `${pad2(h)}:00`).join(", ");
-}
+import { formatHoursLabel } from "../lib";
 
 export default function ActiveFilterBar({
   classes,
