@@ -522,6 +522,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     g.insert("dep_rows_jump_gt35km_inside_chords".into(), jump_in);
     g.insert("nonmonotone_sec_cnt_trains".into(), non_mono.len() as i64);
     ok &= audit_national(dir, &shared, &out_map, &out_t, &mut g);
+    ok &= audit_national_trains(dir, &shared, &out_t, &in_t, &sch, &mut g);
     // Chengdu goldens (PIPELINE.md section 7 shape)
     let cities: Vec<String> = arr(&shared["city_table"])
         .iter()
@@ -685,6 +686,265 @@ fn audit_national(
     g.insert("national_eq_out_recount".into(), equal as i64);
     println!(
         "AUDIT national checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    ok
+}
+
+/// P2.2 national trains (`atlas-v2-national-trains.json`; skipped while a
+/// pack has none). Hard checks: shape, `fmt` and id bases against the shared
+/// file, every id resolvable; the train set is exactly the trains with an
+/// out- or in-tables path; recounting distinct trains per section (and per
+/// class) from the whole paths reproduces `atlas-v2-national.json` exactly
+/// (when present; a piece listed in `on_sec` counts on its section); every
+/// out-tables path is the tail of its train's whole
+/// path, with its stop positions and chord legs; stop positions are one per
+/// schedule stop after the first, monotone, ending at the path end.
+/// Counters: path continuity outside chord legs (as for the table rows),
+/// chord legs, and reversals where the head meets the out-tables tail.
+fn audit_national_trains(
+    dir: &Path,
+    shared: &Value,
+    out_t: &Value,
+    in_t: &Value,
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let name = "atlas-v2-national-trains.json";
+    if !pack::exists(dir, name) {
+        println!("AUDIT national trains: no {name} in this pack, skipped");
+        return true;
+    }
+    let nt = pack::read_json(dir, name);
+    let ints = |v: &Value| -> Vec<i64> {
+        v.as_array()
+            .map(|a| a.iter().map(|x| x.as_i64().unwrap()).collect())
+            .unwrap_or_default()
+    };
+    let rows = |v: &Value| -> Vec<Vec<i64>> {
+        v.as_array()
+            .map(|a| a.iter().map(ints).collect())
+            .unwrap_or_default()
+    };
+    let chord_map = |v: &Value| -> HashMap<usize, Vec<Vec<i64>>> {
+        v.as_array()
+            .into_iter()
+            .flatten()
+            .map(|c| (c[0].as_u64().unwrap() as usize, rows(&c[1])))
+            .collect()
+    };
+    let polys = |v: &Value| -> Vec<Vec<[f64; 2]>> {
+        v.as_array()
+            .into_iter()
+            .flatten()
+            .map(|s| decode_poly4(s.as_str().unwrap()))
+            .collect()
+    };
+    let sec_geo: Vec<Vec<[f64; 2]>> = shared["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| decode_poly4(s["g"].as_str().unwrap()))
+        .collect();
+    let (n_sec, n_thr) = (sec_geo.len(), shared["throats"].as_array().unwrap().len());
+    let extra = polys(&nt["extra"]);
+    let ends: Vec<([f64; 2], [f64; 2])> = sec_geo
+        .iter()
+        .chain(polys(&shared["throats"]).iter())
+        .chain(extra.iter())
+        .map(|p| (p[0], *p.last().unwrap()))
+        .collect();
+    let paths = rows(&nt["paths"]);
+    let stop_pos = rows(&nt["stop_pos"]);
+    let chords = chord_map(&nt["chords"]);
+    let train_table = shared["train_table"].as_array().unwrap();
+    let scheds = sch["schedules"].as_array().unwrap();
+    let fmt = nt["fmt"].as_i64();
+    let shape_ok = fmt == Some(6)
+        && nt["n_sec"].as_u64() == Some(n_sec as u64)
+        && nt["n_thr"].as_u64() == Some(n_thr as u64)
+        && paths.len() == train_table.len()
+        && stop_pos.len() == train_table.len();
+    let sec_of = |v: i64| (if v >= 0 { v } else { !v }) as usize;
+    let bad_ids = paths
+        .iter()
+        .flatten()
+        .filter(|&&v| sec_of(v) >= ends.len())
+        .count();
+    if !shape_ok || bad_ids > 0 {
+        println!(
+            "AUDIT national trains FAIL: fmt {fmt:?}, n_sec {} / n_thr {} vs shared {n_sec} / {n_thr}, {} paths and {} stop lists for {} trains, {bad_ids} ids out of range",
+            nt["n_sec"],
+            nt["n_thr"],
+            paths.len(),
+            stop_pos.len(),
+            train_table.len()
+        );
+        return false;
+    }
+    let is_flow = |v: i64| sec_of(v) < n_sec;
+    // ---- train set: exactly the trains with an out- or in-tables path ----
+    let (out_p, in_p) = (rows(&out_t["paths"]), rows(&in_t["paths"]));
+    let set_diff = (0..paths.len())
+        .filter(|&t| {
+            let has_row = out_p.get(t).is_some_and(|p| !p.is_empty())
+                || in_p.get(t).is_some_and(|p| !p.is_empty());
+            paths[t].is_empty() == has_row
+        })
+        .count();
+    let trains = paths.iter().filter(|p| !p.is_empty()).count() as i64;
+    // ---- A <-> B: recount distinct trains per section and class ----
+    let classes: Vec<usize> = train_table
+        .iter()
+        .map(|t| class_idx(t["class"].as_str().unwrap()))
+        .collect();
+    // geometry-only pieces on a section a head covers only part of
+    let on_sec: HashMap<usize, usize> = rows(&nt["on_sec"])
+        .iter()
+        .map(|r| (r[0] as usize, r[1] as usize))
+        .collect();
+    let mut cnt = vec![0i64; n_sec];
+    let mut cls_cnt = vec![vec![0i64; n_sec]; 8];
+    for (t, p) in paths.iter().enumerate() {
+        let mut secs: Vec<usize> = p
+            .iter()
+            .filter_map(|&v| {
+                let id = sec_of(v);
+                if id < n_sec {
+                    Some(id)
+                } else {
+                    on_sec.get(&id).copied()
+                }
+            })
+            .collect();
+        secs.sort_unstable();
+        secs.dedup();
+        for s in secs {
+            cnt[s] += 1;
+            cls_cnt[classes[t]][s] += 1;
+        }
+    }
+    let (mut recount_eq, mut recount_ok) = (-1i64, true);
+    let nat_name = "atlas-v2-national.json";
+    if pack::exists(dir, nat_name) {
+        let nat = pack::read_json(dir, nat_name);
+        let total = ints(&nat["total"]);
+        let by_class = rows(&nat["by_class"]);
+        recount_eq = (0..n_sec)
+            .filter(|&s| {
+                total.get(s) == Some(&cnt[s])
+                    && (0..8)
+                        .all(|c| by_class.get(c).and_then(|v| v.get(s)) == Some(&cls_cnt[c][s]))
+            })
+            .count() as i64;
+        let nat_trains = nat["trains"].as_i64().unwrap_or(-1);
+        recount_ok = recount_eq == n_sec as i64 && nat_trains == trains;
+        println!(
+            "AUDIT national trains vs national table: {trains} vs {nat_trains} trains; recount equal (total and every class) on {recount_eq} of {n_sec} sections"
+        );
+    }
+    // ---- out-tables tail, stop positions, chord legs, continuity ----
+    let (out_sp, out_ch) = (rows(&out_t["stop_pos"]), chord_map(&out_t["chords"]));
+    let (mut tail_eq, mut tail_bad, mut seam_rev) = (0i64, 0i64, 0i64);
+    let (mut stops_bad, mut stops_total) = (0i64, 0i64);
+    let (mut checked, mut gaps, mut gaps_100m, mut chord_legs) = (0u64, 0i64, 0i64, 0i64);
+    let mut worst: Vec<(f64, String)> = Vec::new();
+    for (t, w) in paths.iter().enumerate() {
+        if w.is_empty() {
+            continue;
+        }
+        let sp = &stop_pos[t];
+        let o = out_p.get(t).cloned().unwrap_or_default();
+        if !o.is_empty() {
+            let fine = w.ends_with(&o) && {
+                let off = (w.len() - o.len()) as i64;
+                let osp = &out_sp[t];
+                let tail_sp: Vec<i64> = sp[sp.len().saturating_sub(osp.len())..]
+                    .iter()
+                    .map(|p| p - off)
+                    .collect();
+                let tail_legs: Vec<Vec<i64>> = chords
+                    .get(&t)
+                    .into_iter()
+                    .flatten()
+                    .filter(|l| l[1] >= off)
+                    .map(|l| vec![l[0], l[1] - off, l[2] - off])
+                    .collect();
+                // the head's last flow section against the tail's first
+                let head_last = w[..off as usize].iter().rev().find(|&&v| is_flow(v));
+                let tail_first = o.iter().find(|&&v| is_flow(v));
+                if let (Some(&a), Some(&b)) = (head_last, tail_first) {
+                    seam_rev += (a == !b) as i64;
+                }
+                sp.len() >= osp.len()
+                    && tail_sp == *osp
+                    && tail_legs == out_ch.get(&t).cloned().unwrap_or_default()
+            };
+            if fine {
+                tail_eq += 1;
+            } else {
+                tail_bad += 1;
+            }
+        }
+        let n_stops = scheds.get(t).and_then(Value::as_array).map_or(0, Vec::len);
+        stops_total += sp.len() as i64;
+        if sp.len() + 1 != n_stops
+            || sp.windows(2).any(|x| x[1] < x[0])
+            || sp.last() != Some(&(w.len() as i64))
+        {
+            stops_bad += 1;
+        }
+        // continuity outside chord legs, as for the table rows
+        let mut exempt: HashSet<usize> = HashSet::new();
+        for l in chords.get(&t).into_iter().flatten() {
+            chord_legs += 1;
+            exempt.extend(l[1] as usize..=l[2] as usize);
+        }
+        let oriented = |v: i64| {
+            let (a, b) = ends[sec_of(v)];
+            if v >= 0 {
+                (a, b)
+            } else {
+                (b, a)
+            }
+        };
+        for k in 1..w.len() {
+            if exempt.contains(&k) {
+                continue;
+            }
+            checked += 1;
+            let gap = hav_km_ll(oriented(w[k - 1]).1, oriented(w[k]).0);
+            gaps_100m += (gap > 0.1) as i64;
+            if gap > 3.0 {
+                gaps += 1;
+                let code = train_table[t]["code"].as_str().unwrap_or("?");
+                worst.push((gap, format!("{code} at {k}/{}", w.len())));
+            }
+        }
+    }
+    worst.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    println!(
+        "AUDIT national trains: {trains} trains ({set_diff} differ from the trains with a table row); {tail_eq} end with their out-tables path ({tail_bad} do not); {stops_total} stop positions, {stops_bad} trains inconsistent (count/order/path end); {} extra pieces; {seam_rev} reversals where the head meets the out-tables path",
+        extra.len()
+    );
+    println!(
+        "AUDIT national trains continuity: {gaps} gaps > 3 km, {gaps_100m} > 0.1 km in {checked} joins outside {chord_legs} chord legs"
+    );
+    for (gap, what) in worst.iter().take(10) {
+        println!("   {gap:>8.1} km  {what}");
+    }
+    let ok = set_diff == 0 && recount_ok && tail_bad == 0 && stops_bad == 0;
+    g.insert("national_trains_trains".into(), trains);
+    if recount_eq >= 0 {
+        g.insert("national_trains_recount_eq".into(), recount_eq);
+    }
+    g.insert("national_trains_out_tail_eq".into(), tail_eq);
+    g.insert("national_trains_stops_total".into(), stops_total);
+    g.insert("national_trains_chord_legs".into(), chord_legs);
+    g.insert("national_trains_gaps_gt3km".into(), gaps);
+    g.insert("national_trains_gaps_gt100m".into(), gaps_100m);
+    println!(
+        "AUDIT national trains checks: {}",
         if ok { "PASS" } else { "FAIL" }
     );
     ok
