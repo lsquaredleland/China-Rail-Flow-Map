@@ -789,6 +789,62 @@ PR); dots at 00:30 include trains that left the day before (count equals the P2.
 national ↔ origin switch keeps centre/scale (same `S.current.view`); origin-view shots
 unchanged vs P1c.1.
 
+*P2.2 data source as built (2026-10-25): `atlas-v2-national-trains.json(.br)`.* The P2.1
+build reads out-tables `paths`, which start at a train's first featured city, so a 大连 →
+沈阳 run has no geometry before 沈阳 and 185 trains (no outbound row) are skipped. The
+pipeline now emits each national train's whole run, so the client does no stitching.
+- **Same trains, same legs as B.** The train set and legs are P3.1's (`nat_legs`: the union
+  of a train's outbound and inbound legs, which is every leg of its run): 7,157 trains.
+  Whole path = a *head* over the legs before the train's first selected-city departure,
+  then its out-tables `paths[t]` **verbatim** (a train with no outbound row is all head:
+  185 trains). 1,583 trains have a head. `pipeline/analyze/src/trainpath.rs join` does
+  the join; `atlas` builds the head with the out-tables `row_path` over `sections`
+  (the national table's edge map).
+- **Joins.** At the seam: 0 duplicated pieces (head's last entry = tail's first; the rule
+  drops head's copy), 0 flow repeats, 22 reversals (the head's last section is the tail's
+  first reversed: the leg geometry turns back at the boarding station, e.g. K96 at 沈阳,
+  C496 at 衢州; kept, because the tail is verbatim). Seam joins are as tight as other stop
+  joins: 1,229 ≤ 0.1 km, 159 in (0.1, 1], 10 in (1, 3], **0 > 3 km** (other stops in the
+  tails: 83 % ≤ 0.1 km, 3 > 3 km).
+- **Partial sections and extra geometry.** Sections are cut where per-city counts change,
+  so a head (track no selected city's outbound train runs over) can join a section at a
+  junction mid-way (e.g. G540 北海 → 南宁 joins a 216 km section). Emitting the section id
+  would jump; instead the covered stretch is a geometry-only piece, listed in `on_sec`
+  (`[id, section]`) so the train still counts there (86 train/section pairs, 92 pieces).
+  Head track the shared sections and throats do not draw (those stretches, and track no
+  section carries) becomes `extra` pieces (166 pieces, 3,235 km, simplified like throats),
+  ids `n_sec + n_thr + j`; a chain equal to a shared throat reuses it. Gaps: 43 joins
+  > 3 km outside chord legs (14 in heads in 12 trains, 29 in the out-tables tails, 0 at
+  seams). The head ones sit inside legs, not at the join (e.g. 郯城 → 新沂 26 km, where the
+  leg geometry doubles back, as out-tables rows K1068 / K1132 show); 3 chord legs.
+- **Format.** `{fmt: 6, n_sec, n_thr, paths, stop_pos, chords, extra, on_sec}`, the
+  out-tables per-train shape: `paths[t]` / `stop_pos[t]` indexed by `train_table` t (the
+  `atlas-v2-schedules` key; `[]` = not a national train), signed ids in the shared file's
+  renumbered order, raw (no deltas, like out-tables); `stop_pos[t]` has one entry per
+  stop after the first (`schedules[t][1..]`, every stop, timed or not), monotone, the
+  terminus at the path end; `chords` `[[t, [[stop, s0, s1]]]]`. So `buildNational(atlas,
+  nt)` takes it as-is (boarding stop = stop 0); the client change is decoding `extra`
+  into the throat set (ids past `n_sec + n_thr`) and checking `fmt === DATA_FMT`,
+  `n_sec`, `n_thr` against shared. A separate file, not folded into `atlas-v2-national`:
+  B needs only the 19 KB section table at once, A needs this train-indexed 258 KB file and
+  loads it lazily on entering national mode.
+- **Size.** 258,163 B brotli (4,267,249 B raw), below the 0.5–1 MB estimate; deterministic
+  (two builds byte-identical).
+- **Gates.** `audit --pack-only` checks it when present: shape, `fmt`, id bases and range;
+  the train set is exactly the trains with an out- or in-tables row; recounting distinct
+  trains per section (and per class; `on_sec` pieces count) reproduces
+  `atlas-v2-national.json` **exactly, 7,922 of 7,922 sections**; every out-tables path is
+  the tail of its whole path, with its stop positions and chord legs (6,972 of 6,972);
+  stop positions one per schedule stop after the first, monotone, ending at the path end
+  (74,002). atlaspack asserts the tail property at pack time. Goldens:
+  `national_trains_{trains,recount_eq,out_tail_eq,stops_total}` (exact),
+  `national_trains_{chord_legs,gaps_gt3km,gaps_gt100m}` (max); skipped on the committed
+  pack, which has no such file yet.
+- **Staged, not shipped.** Built in `staging/national-trains/dev`; every existing pack file
+  rebuilds byte-identical (`cmp`, `secdiff --packs`, same `CRFM_PIPELINE_TREE`). The swap
+  needs owner approval. P2.1's test values (2,668 dots at 1095, 6,972 trains) are on the
+  out-tables source and move when P2.2 switches to this file (185 more trains, longer runs).
+
 **P2.3 National picking + tooltip + modal** — *after P2.2.* Files: `DeckHost.tsx` (`onHover`
 mouse-only when paused on national dots; `onClick` → `onSelectTrain(code)`),
 `lib/tooltip.ts` (train builder reused). Acceptance: pause → hover → tooltip; click →
