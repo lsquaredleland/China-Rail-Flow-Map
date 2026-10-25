@@ -108,6 +108,8 @@
 //!   origins exactly; the packer asserts the partition before writing.
 //! - atlas-v2-schedules.json
 //! - atlas-v2-national.json (P3.1; only when the v1 input has `national`)
+//! - atlas-v2-national-trains.json (P2.2 data source; only when the v1 input
+//!   has `national_trains`)
 //!
 //! National table (`atlas-v2-national.json`, P3.1): `{fmt, trains, total,
 //! by_class}` over the shared file's `sections`, in its (renumbered) order:
@@ -118,6 +120,36 @@
 //! `trains` = distinct trains on at least one section. It carries the same
 //! `fmt` as the shared file because its indices are only valid against that
 //! file's section numbering. The counting rule is atlas's (`flows.rs`).
+//!
+//! National trains (`atlas-v2-national-trains.json`, P2.2 data source for
+//! the national animation A): `{fmt, n_sec, n_thr, paths, stop_pos, chords,
+//! extra}`, the out-tables per-train shape over the whole run:
+//! - `paths[t]` (t = train_table index, the `schedules` key): the train's
+//!   whole path, first stop to terminus, in the out-tables encoding and the
+//!   shared file's renumbered section ids; `[]` for a train outside the
+//!   national set. The set and the legs are the national table's (every
+//!   train calling at a selected city; its legs are the union of its
+//!   outbound and inbound legs), so recounting distinct trains per section
+//!   from these paths gives `atlas-v2-national.json` exactly.
+//! - The path is a head (legs before the train's first selected-city
+//!   departure) followed verbatim by its out-tables `paths[t]`: the whole
+//!   path ends with exactly that row, and a train with no outbound row is
+//!   all head. Ids `>= n_sec` are throats `id - n_sec` of the shared file
+//!   (`n_thr` of them); ids `>= n_sec + n_thr` are `extra[id - n_sec -
+//!   n_thr]`: geometry-only pieces (polylines like `throats`) for track that
+//!   only a head runs over and no shared section or throat carries.
+//! - `stop_pos[t]`: one entry per stop after the first (`schedules[t][1..]`),
+//!   entries before that stop, as out-tables `stop_pos` with the boarding
+//!   stop = the first stop; the terminus sits at the path length.
+//! - `chords`: `[[t, legs]]`, legs `[stop, s0, s1]` in whole-path positions.
+//! - `on_sec`: `[[id, s]]`, sorted by id: geometry-only ids (throat or
+//!   extra) that lie on flow section `s`. Sections are cut where per-city
+//!   counts change, so a head can join one mid-way (at a junction with
+//!   track no selected city's outbound train runs over); the stretch it
+//!   covers is such a piece, and the train counts on `s` (counting only:
+//!   the geometry is the piece's own).
+//!
+//! `n_sec` / `n_thr` / `fmt` must match the shared file.
 //!
 //! After writing, the packer verifies v2 against v1 by reconstructing the
 //! v1 rows from the v2 arrays (inverse mapping) and comparing every field,
@@ -713,6 +745,103 @@ fn pack_national(nat: &Value, perm: &[usize]) -> Value {
     json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class })
 }
 
+/// The national trains in the shared file's section order (see the
+/// header). Asserts that every train with an out-tables path ends with it:
+/// path, stop positions and chord legs (`op` / `osp` / `och`, already
+/// remapped, as `pack_paths` returns them).
+fn pack_national_trains(
+    nt: &Value,
+    perm: &[usize],
+    n_thr: usize,
+    op: &[Value],
+    osp: &[Value],
+    och: &[Value],
+) -> Value {
+    let paths: Vec<Vec<i64>> = arr(get(nt, "paths"))
+        .iter()
+        .map(|p| ints(p).into_iter().map(|v| remap(v, perm)).collect())
+        .collect();
+    let stop_pos: Vec<Vec<i64>> = arr(get(nt, "stop_pos")).iter().map(ints).collect();
+    let chords: std::collections::BTreeMap<usize, Vec<Vec<i64>>> = arr(get(nt, "chords"))
+        .iter()
+        .map(|c| {
+            let c = arr(c);
+            (
+                c[0].as_u64().unwrap() as usize,
+                arr(&c[1]).iter().map(ints).collect(),
+            )
+        })
+        .collect();
+    let out_chords: std::collections::HashMap<usize, Vec<Vec<i64>>> = och
+        .iter()
+        .map(|c| {
+            let c = arr(c);
+            (
+                c[0].as_u64().unwrap() as usize,
+                arr(&c[1]).iter().map(ints).collect(),
+            )
+        })
+        .collect();
+    assert_eq!(paths.len(), op.len(), "national trains: one path per train");
+    assert_eq!(
+        stop_pos.len(),
+        op.len(),
+        "national trains: one stop list per train"
+    );
+    for t in 0..op.len() {
+        let o = ints(&op[t]);
+        if o.is_empty() {
+            continue;
+        }
+        let (w, sp) = (&paths[t], &stop_pos[t]);
+        assert!(
+            w.ends_with(&o),
+            "national train {t}: whole path does not end with its out-tables path"
+        );
+        let off = (w.len() - o.len()) as i64;
+        let osp_t = ints(&osp[t]);
+        let tail: Vec<i64> = sp[sp.len() - osp_t.len()..]
+            .iter()
+            .map(|p| p - off)
+            .collect();
+        assert_eq!(
+            tail, osp_t,
+            "national train {t}: stop positions of the out part"
+        );
+        let tail_legs: Vec<Vec<i64>> = chords
+            .get(&t)
+            .into_iter()
+            .flatten()
+            .filter(|l| l[1] >= off)
+            .map(|l| vec![l[0], l[1] - off, l[2] - off])
+            .collect();
+        let want = out_chords.get(&t).cloned().unwrap_or_default();
+        assert_eq!(
+            tail_legs, want,
+            "national train {t}: chord legs of the out part"
+        );
+    }
+    let chords: Vec<Value> = chords.into_iter().map(|(t, l)| json!([t, l])).collect();
+    let on_sec: Vec<Value> = arr(get(nt, "on_sec"))
+        .iter()
+        .map(|r| {
+            let r = ints(r);
+            json!([r[0], perm[r[1] as usize]])
+        })
+        .collect();
+    json!({
+        "fmt": FMT,
+        "n_sec": perm.len(),
+        "n_thr": n_thr,
+        "paths": paths,
+        "stop_pos": stop_pos,
+        "chords": chords,
+        "extra": arr(get(nt, "extra")).iter()
+            .map(|s| json!(requant(s.as_str().unwrap()))).collect::<Vec<_>>(),
+        "on_sec": on_sec,
+    })
+}
+
 fn with_fmt(mut m: Map<String, Value>) -> Value {
     m.insert("fmt".into(), json!(FMT));
     Value::Object(m)
@@ -860,6 +989,10 @@ fn main() {
             .insert("build".into(), b.clone());
     }
     let (op, osp, och, ooff) = pack_paths(&origins, &OUT, n_trains, &perm_out);
+    let national_trains = v1.get("national_trains").map(|nt| {
+        let n_thr = arr(get(&v1, "throats")).len();
+        pack_national_trains(nt, &perm_out, n_thr, &op, &osp, &och)
+    });
     let (ip, _, ich, ilen) = pack_paths(&origins, &IN, n_trains, &perm_in);
     let map5 = |maps: &[Value], key: &str, perm: &[usize]| -> Vec<Value> {
         maps.iter()
@@ -930,6 +1063,14 @@ fn main() {
             perm_out.len()
         );
         by_name.push(("atlas-v2-national.json", national));
+    }
+    if let Some(packed) = national_trains {
+        println!(
+            "national trains: {} trains, {} extra pieces; every out-tables path is the tail of its whole path",
+            arr(get(&packed, "paths")).iter().filter(|p| !arr(p).is_empty()).count(),
+            arr(get(&packed, "extra")).len()
+        );
+        by_name.push(("atlas-v2-national-trains.json", packed));
     }
 
     let items: Vec<(&str, Vec<u8>)> = by_name
@@ -1036,6 +1177,39 @@ mod tests {
         by_class[0] = json!([1]);
         let nat = json!({ "trains": 1, "total": [2], "by_class": by_class });
         pack_national(&nat, &[0]);
+    }
+
+    #[test]
+    fn pack_national_trains_renumbers_and_checks_the_out_tail() {
+        // train 0: head [5] (a throat, id >= 3 sections) then out path [0, !1];
+        // train 1: no national path
+        let nt = json!({
+            "paths": [[5, 0, !1], []],
+            "stop_pos": [[1, 3], []],
+            "chords": [[0, [[1, 1, 3]]]],
+            "extra": [],
+            "on_sec": [[5, 2]],
+        });
+        let perm = [2, 0, 1];
+        let op = [json!([2, !0]), json!([])];
+        let osp = [json!([2]), json!([])];
+        let och = [json!([0, [[1, 0, 2]]])];
+        let p = pack_national_trains(&nt, &perm, 4, &op, &osp, &och);
+        assert_eq!(p["paths"], json!([[5, 2, !0], []]));
+        assert_eq!(p["on_sec"], json!([[5, 1]]));
+        assert_eq!(
+            (p["n_sec"].clone(), p["n_thr"].clone()),
+            (json!(3), json!(4))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "does not end with its out-tables path")]
+    fn pack_national_trains_rejects_a_path_without_its_out_tail() {
+        let nt = json!({
+            "paths": [[5, 0]], "stop_pos": [[1, 2]], "chords": [], "extra": [], "on_sec": [],
+        });
+        pack_national_trains(&nt, &[0, 1], 4, &[json!([1])], &[json!([2])], &[]);
     }
 
     #[test]

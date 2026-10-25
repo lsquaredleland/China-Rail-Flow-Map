@@ -9,6 +9,7 @@
 //! - `chains`: station-chain canonicalization.
 //! - `flows`: the static-flow counting rule (per-train edge sets) and the
 //!   national per-section table.
+//! - `trainpath`: joining a train's path stretches into its whole path.
 //! - `pack`, `packdiff`: reading the v2 pack files and diffing two packs.
 //! - `provenance`: the build block (`shared.build`) recorded in the pack.
 //! - `model`: output row types.
@@ -28,3 +29,4 @@ pub mod packdiff;
 pub mod polyline;
 pub mod provenance;
 pub mod timetable;
+pub mod trainpath;

@@ -16,6 +16,7 @@ use analyze_rs::osm;
 use analyze_rs::polyline::*;
 use analyze_rs::provenance;
 use analyze_rs::timetable::*;
+use analyze_rs::trainpath;
 
 /// One train in data/raw/stops*.jsonl (the 12306 stop-list dump).
 #[derive(Deserialize)]
@@ -166,6 +167,29 @@ struct AtlasOut {
     /// numbering; atlaspack renumbers it with the sections). Last, so the
     /// fields before it serialize exactly as before it existed.
     national: flows::National,
+    /// P2.2 national trains (A): every national train's whole run, after
+    /// `national` for the same reason.
+    national_trains: NationalTrains,
+}
+
+/// Every national train's whole path (see atlaspack's header for the
+/// packed form), indexed by train_table t like `schedules`; a train outside
+/// the national set has an empty path.
+#[derive(serde::Serialize, Default)]
+struct NationalTrains {
+    /// Whole path per train, out-tables encoding over `sections` (this
+    /// file's numbering), then `throats`, then `extra`.
+    paths: Vec<Vec<i64>>,
+    /// Per train: entries before each stop after its first.
+    stop_pos: Vec<Vec<usize>>,
+    /// `[t, legs]` for trains with chord legs (`[stop, s0, s1]`).
+    chords: Vec<(usize, Vec<[usize; 3]>)>,
+    /// Geometry-only pieces the shared throats lack: path entries
+    /// `sections.len() + throats.len() + j` (polylines like `throats`).
+    extra: Vec<String>,
+    /// `(path id, section)` for the geometry-only entries that lie on a flow
+    /// section a head covers only part of (a train counts on that section).
+    on_sec: Vec<(usize, usize)>,
 }
 
 /// One train's call at one destination city (first stop in that city).
@@ -345,7 +369,7 @@ const ORIENT_TRUST_KM: f64 = 10.0;
 /// the flow sections, kept as geometry only so per-train paths run through
 /// stations. One piece = a maximal run of consecutive trimmed edges inside
 /// one leg's walk, interned globally by node chain (either direction).
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Throats {
     ids: HashMap<Vec<i64>, usize>,
     chains: Vec<Vec<i64>>,
@@ -356,13 +380,18 @@ const THROAT_MIN_KM: f64 = 0.02;
 
 impl Throats {
     /// Intern node chain `c` (travel order): (throat index, walked against
-    /// its stored order), or None for a sliver.
-    fn intern(&mut self, c: &[i64], coords: &HashMap<i64, [f64; 2]>) -> Option<(usize, bool)> {
+    /// its stored order), or None for a sliver (shorter than `min_km`).
+    fn intern(
+        &mut self,
+        c: &[i64],
+        coords: &HashMap<i64, [f64; 2]>,
+        min_km: f64,
+    ) -> Option<(usize, bool)> {
         let km: f64 = c
             .windows(2)
             .map(|w| hav_km_ll(coords[&w[0]], coords[&w[1]]))
             .sum();
-        if km < THROAT_MIN_KM {
+        if km < min_km {
             return None;
         }
         let rev: Vec<i64> = c.iter().rev().copied().collect();
@@ -384,23 +413,35 @@ impl Throats {
     }
 
     /// Close the current run of trimmed edges: append its throat entry
-    /// (`base + j`, `!` when reversed) to `secs`.
+    /// (`base + j`, `!` when reversed) to `secs`. A run on flow section `on`
+    /// (a stretch of a section the train only partly covers) is kept however
+    /// short and recorded as `(throat index, section)` in `on_sec`; any other
+    /// run shorter than THROAT_MIN_KM is a sliver and dropped.
     fn flush(
         &mut self,
         run: &mut Vec<i64>,
         secs: &mut Vec<i64>,
         coords: &HashMap<i64, [f64; 2]>,
         base: usize,
+        on: Option<usize>,
+        on_sec: &mut Vec<(usize, usize)>,
     ) {
         if run.len() >= 2 {
-            if let Some((j, flip)) = self.intern(run, coords) {
+            let min_km = if on.is_some() { 0.0 } else { THROAT_MIN_KM };
+            if let Some((j, flip)) = self.intern(run, coords, min_km) {
                 let v = (base + j) as i64;
                 secs.push(if flip { !v } else { v });
+                if let Some(s) = on {
+                    on_sec.push((j, s));
+                }
             }
         }
         run.clear();
     }
 }
+
+/// Which throat run an edge `(u, v, midpoint)` is part of (see `row_path`).
+type RunKey<'a> = dyn Fn(i64, i64, &[f64; 2]) -> Option<Option<usize>> + 'a;
 
 /// A leg's resolved geometry and walk, if it has them (see `row_path`).
 type LegGeom<'g> =
@@ -414,12 +455,18 @@ struct RowPath {
     full_cnt: Vec<usize>,
     flow_cnt: Vec<usize>,
     chord_legs: Vec<[usize; 3]>,
+    /// `(throat index, section)` for the throat entries that lie on a flow
+    /// section (`run_key` gave `Some(Some(s))`).
+    on_sec: Vec<(usize, usize)>,
 }
 
-/// Build one row's path over its legs. Edges in `dir_to_sec` emit their
-/// flow section exactly as before throats (consecutive repeats of the same
-/// signed section collapse); runs of edges trimmed by `near` become throat
-/// entries `base + j`. A flow repeat with only throats since the last flow
+/// Build one row's path over its legs. Edges `sec_of` maps (directed edge
+/// -> section, travelled against its stored order) emit their flow section
+/// exactly as before throats (consecutive repeats of the same signed section
+/// collapse); runs of edges `run_key` trims (from the edge's nodes and
+/// midpoint: `None` = not trimmed, `Some(on)` = trimmed, lying on flow
+/// section `on` or on none) become throat entries `base + j`, one per run of
+/// equal `on`. A flow repeat with only throats since the last flow
 /// entry drops those throats too, so the flow-only sequence is unchanged;
 /// `drops` counts [such drops, drops reaching back into an earlier leg].
 #[allow(clippy::too_many_arguments)]
@@ -428,8 +475,8 @@ fn row_path<'g>(
     leg_fwd: &[bool],
     leg_stop: &[usize],
     geom: &LegGeom<'g>,
-    dir_to_sec: &HashMap<(i64, i64), (usize, bool)>,
-    near: &dyn Fn(&[f64; 2]) -> bool,
+    sec_of: &dyn Fn(i64, i64) -> Option<(usize, bool)>,
+    run_key: &RunKey<'_>,
     coords: &HashMap<i64, [f64; 2]>,
     throats: &mut Throats,
     base: usize,
@@ -441,15 +488,20 @@ fn row_path<'g>(
         full_cnt: vec![0; n + 1],
         flow_cnt: vec![0; n + 1],
         chord_legs: Vec::new(),
+        on_sec: Vec::new(),
     };
     let (mut last_flow, mut n_flow): (Option<usize>, usize) = (None, 0);
     for (li, key) in leg_keys.iter().enumerate() {
         let g = geom(key);
         if let Some((seqs, walk)) = g {
             let mut run: Vec<i64> = Vec::new();
+            let mut run_on: Option<usize> = None;
+            let mut flush = |run: &mut Vec<i64>, on: Option<usize>, secs: &mut Vec<i64>| {
+                throats.flush(run, secs, coords, base, on, &mut p.on_sec)
+            };
             walk_edges(seqs, walk, leg_fwd[li], |u, v| {
-                if let Some(&(sidx, rev)) = dir_to_sec.get(&(u, v)) {
-                    throats.flush(&mut run, &mut p.secs, coords, base);
+                if let Some((sidx, rev)) = sec_of(u, v) {
+                    flush(&mut run, run_on, &mut p.secs);
                     let s = if rev { !(sidx as i64) } else { sidx as i64 };
                     match last_flow {
                         Some(k) if p.secs[k] == s => {
@@ -476,20 +528,22 @@ fn row_path<'g>(
                         }
                     }
                 } else if let (Some(c1), Some(c2)) = (coords.get(&u), coords.get(&v)) {
-                    if near(&[(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0]) {
-                        if run.last() != Some(&u) {
-                            throats.flush(&mut run, &mut p.secs, coords, base);
-                            run.push(u);
+                    match run_key(u, v, &[(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0]) {
+                        Some(on) => {
+                            if run.last() != Some(&u) || on != run_on {
+                                flush(&mut run, run_on, &mut p.secs);
+                                run.push(u);
+                            }
+                            run_on = on;
+                            run.push(v);
                         }
-                        run.push(v);
-                    } else {
-                        throats.flush(&mut run, &mut p.secs, coords, base);
+                        None => flush(&mut run, run_on, &mut p.secs),
                     }
                 } else {
-                    throats.flush(&mut run, &mut p.secs, coords, base);
+                    flush(&mut run, run_on, &mut p.secs);
                 }
             });
-            throats.flush(&mut run, &mut p.secs, coords, base);
+            flush(&mut run, run_on, &mut p.secs);
         }
         if g.is_none_or(|(_, w)| w.max_gap > CHORD_GAP_KM) {
             p.chord_legs
@@ -753,6 +807,8 @@ fn main() {
         leg_stop: Vec<usize>,
         /// Index of the boarding stop in the train's stop list.
         board: usize,
+        /// The train's index into `trains`.
+        ti: usize,
     }
     /// (class bucket, train index into `trains`, leg keys)
     type TrainLegs = (usize, usize, Vec<(String, String, String)>);
@@ -823,6 +879,7 @@ fn main() {
                 leg_fwd,
                 leg_stop,
                 board: cd_idx,
+                ti,
             });
             let mut seen_dest: HashSet<String> = HashSet::new();
             let mut skipped = [false; 3];
@@ -1319,11 +1376,13 @@ fn main() {
             .2
             .extend(legs.iter().cloned());
     }
-    let nat_trains = nat_legs.into_values().map(|(cidx, ti, mut legs)| {
+    for (_, _, legs) in nat_legs.values_mut() {
         legs.sort();
         legs.dedup();
-        let eset = flows::train_edges(&legs, seqs_of, coords, |p| near_station(&station_grid, p));
-        (ti, cidx, eset)
+    }
+    let nat_trains = nat_legs.values().map(|(cidx, ti, legs)| {
+        let eset = flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
+        (*ti, *cidx, eset)
     });
     let (national, nat_u) = flows::national_table(
         nat_trains,
@@ -1546,8 +1605,8 @@ fn main() {
                 &d.leg_fwd,
                 &d.leg_stop,
                 &geom,
-                &edge_dir_to_sec,
-                &|p: &[f64; 2]| near_station(&station_grid, p),
+                &|u, v| edge_dir_to_sec.get(&(u, v)).copied(),
+                &|_, _, p| near_station(&station_grid, p).then_some(None),
                 coords,
                 &mut throats,
                 sections.len(),
@@ -1704,8 +1763,8 @@ fn main() {
                 &a.leg_fwd,
                 &a.leg_stop,
                 &geom,
-                &in_edge_dir_to_sec,
-                &|p: &[f64; 2]| near_station(&in_station_grid, p),
+                &|u, v| in_edge_dir_to_sec.get(&(u, v)).copied(),
+                &|_, _, p| near_station(&in_station_grid, p).then_some(None),
                 coords,
                 &mut throats,
                 in_sections.len(),
@@ -1903,6 +1962,238 @@ fn main() {
         "variant legs: {} resolved via override tiling, {} fell back to base pair geometry",
         variant_stats.0, variant_stats.1
     );
+    // ---- P2.2 national trains (A): every national train's whole run ----
+    // Same train set and legs as the national table (nat_legs: the union of
+    // a train's outbound and inbound legs, which is every leg of its run).
+    // The whole path is a head over the legs before the train's first
+    // selected-city departure, then that city's out-tables row verbatim (a
+    // train with no outbound row is all head). The head walks `sections`
+    // through the same edge map as the national table, so the sections it
+    // touches are exactly the ones that table counts. A section the head
+    // covers whole is a flow entry as in the out-tables rows. Sections are
+    // cut where per-city counts change, so a head (track no selected city's
+    // outbound train runs over) can join one at a junction mid-way: that
+    // partial stretch, and track no section carries, become geometry-only
+    // pieces interned like throats (a shared throat when the node chain
+    // matches one, else a new piece in `extra`); a piece on a partly covered
+    // section is listed in `on_sec`, so the train still counts there.
+    let mut sec_edges = vec![0usize; sections.len()];
+    for &(s, rev) in edge_dir_to_sec.values() {
+        sec_edges[s] += !rev as usize;
+    }
+    let ti_of: HashMap<(&str, &str), usize> = trains
+        .iter()
+        .enumerate()
+        .map(|(ti, t)| ((t.code.as_str(), t.train_class.as_str()), ti))
+        .collect();
+    // ti -> (boarding stop, origin, dep row) of its earliest outbound row
+    let mut first_dep: HashMap<usize, (usize, usize, usize)> = HashMap::new();
+    for (ci, w) in works.iter().enumerate() {
+        for (ri, d) in w.deps.iter().enumerate() {
+            let e = first_dep.entry(d.ti).or_insert((d.board, ci, ri));
+            if d.board < e.0 {
+                *e = (d.board, ci, ri);
+            }
+        }
+    }
+    let n_sec = sections.len();
+    let is_flow = |v: i64| ((if v >= 0 { v } else { !v }) as usize) < n_sec;
+    let mut nat_throats = throats.clone();
+    let mut national_trains = NationalTrains::default();
+    // trains, with a head, all head, emptied (on no section)
+    let mut nt_n = [0usize; 4];
+    // seam: dup dropped, flow repeat, reversal
+    let mut nt_seam = [0usize; 3];
+    // head entries: flow sections, shared throats, extra pieces
+    let mut nt_head = [0usize; 3];
+    // (throat index, section) of pieces on partly covered sections
+    let mut nt_on_sec: std::collections::BTreeMap<usize, usize> = Default::default();
+    let mut nt_partial = 0usize;
+    let mut nt_rev_examples: Vec<String> = Vec::new();
+    for (t, tr) in train_table.iter().enumerate() {
+        let ti = ti_of[&(tr.code.as_str(), tr.class.as_str())];
+        let Some((_, _, nat_keys)) = nat_legs.get(&ti) else {
+            national_trains.paths.push(Vec::new());
+            national_trains.stop_pos.push(Vec::new());
+            continue;
+        };
+        let (names, tt) = (&train_names[ti], &trains[ti]);
+        let (mut keys, mut fwd, mut stop) = (Vec::new(), Vec::new(), Vec::new());
+        for k in 0..names.len() - 1 {
+            let (a, b) = (&names[k], &names[k + 1]);
+            if a != b {
+                keys.push(leg_key3(override_map, tt, a, b));
+                fwd.push(a < b);
+                stop.push(k);
+            }
+        }
+        let mut uniq = keys.clone();
+        uniq.sort();
+        uniq.dedup();
+        assert_eq!(
+            &uniq, nat_keys,
+            "train {}: whole-run legs differ from the national table's",
+            tr.code
+        );
+        let dep = first_dep.get(&ti).copied();
+        let b = dep.map_or(names.len() - 1, |d| d.0);
+        let nh = stop.partition_point(|&s| s < b);
+        // the head's edges per section: which sections it covers whole
+        let mut cover: HashMap<usize, HashSet<(i64, i64)>> = HashMap::new();
+        for li in 0..nh {
+            if let Some((seqs, walk)) = geom(&keys[li]) {
+                walk_edges(seqs, walk, fwd[li], |u, v| {
+                    if let Some(&(s, _)) = edge_dir_to_sec.get(&(u, v)) {
+                        cover.entry(s).or_default().insert((u.min(v), u.max(v)));
+                    }
+                });
+            }
+        }
+        let whole_sec = |s: usize| cover.get(&s).is_some_and(|e| e.len() == sec_edges[s]);
+        nt_partial += cover.keys().filter(|&&s| !whole_sec(s)).count();
+        let h = row_path(
+            &keys[..nh],
+            &fwd[..nh],
+            &stop[..nh],
+            &geom,
+            &|u, v| {
+                edge_dir_to_sec
+                    .get(&(u, v))
+                    .copied()
+                    .filter(|&(s, _)| whole_sec(s))
+            },
+            &|u, v, _| Some(edge_dir_to_sec.get(&(u, v)).map(|&(s, _)| s)),
+            coords,
+            &mut nat_throats,
+            n_sec,
+            &mut [0u64; 2],
+        );
+        for &(j, s) in h.on_sec.iter() {
+            let prev = nt_on_sec.insert(j, s);
+            assert!(prev.is_none_or(|p| p == s), "piece {j} on two sections");
+        }
+        for &v in h.secs.iter() {
+            let id = (if v >= 0 { v } else { !v }) as usize;
+            nt_head[if id < n_sec {
+                0
+            } else if id < n_sec + throats.chains.len() {
+                1
+            } else {
+                2
+            }] += 1;
+        }
+        let head = trainpath::PathPart {
+            stop_pos: (1..=b)
+                .map(|j| h.full_cnt[stop[..nh].partition_point(|&s| s < j)])
+                .collect(),
+            secs: h.secs,
+            chord_legs: h.chord_legs,
+        };
+        let tail = match dep {
+            Some((_, ci, ri)) => trainpath::PathPart {
+                secs: origins[ci].dep_secs[ri].clone(),
+                stop_pos: origins[ci].dep_stop_pos[ri].clone(),
+                chord_legs: origins[ci].dep_chord_legs[ri].clone(),
+            },
+            None => Default::default(),
+        };
+        nt_n[0] += 1;
+        nt_n[1] += !head.secs.is_empty() as usize;
+        nt_n[2] += dep.is_none() as usize;
+        let (whole, seam) = trainpath::join(head, &tail, is_flow);
+        assert_eq!(whole.stop_pos.len(), names.len() - 1, "train {}", tr.code);
+        for (n, hit) in nt_seam
+            .iter_mut()
+            .zip([seam.dup_dropped, seam.flow_repeat, seam.reversal])
+        {
+            *n += hit as usize;
+        }
+        if seam.reversal && nt_rev_examples.len() < 8 {
+            nt_rev_examples.push(format!("{} at {}", tr.code, names[b]));
+        }
+        let counted = |v: i64| {
+            let id = (if v >= 0 { v } else { !v }) as usize;
+            id < n_sec || nt_on_sec.contains_key(&(id - n_sec))
+        };
+        if !whole.secs.iter().any(|&v| counted(v)) {
+            nt_n[3] += 1;
+            national_trains.paths.push(Vec::new());
+            national_trains.stop_pos.push(Vec::new());
+            continue;
+        }
+        if !whole.chord_legs.is_empty() {
+            national_trains.chords.push((t, whole.chord_legs));
+        }
+        national_trains.paths.push(whole.secs);
+        national_trains.stop_pos.push(whole.stop_pos);
+    }
+    let nt_trains = national_trains
+        .paths
+        .iter()
+        .filter(|p| !p.is_empty())
+        .count();
+    assert_eq!(
+        nt_trains, national.trains,
+        "national trains file and national table disagree on the train count"
+    );
+    // keep only the extra pieces a path still refers to (row_path drops a
+    // throat run again when a flow section repeats right after it), numbered
+    // by first use
+    let extra_base = n_sec + throats.chains.len();
+    let mut extra_chains: Vec<Vec<i64>> = Vec::new();
+    let mut extra_new: HashMap<usize, usize> = HashMap::new();
+    for v in national_trains.paths.iter_mut().flatten() {
+        let (id, rev) = if *v >= 0 {
+            (*v as usize, false)
+        } else {
+            ((!*v) as usize, true)
+        };
+        if id < extra_base {
+            continue;
+        }
+        let j = *extra_new.entry(id).or_insert_with(|| {
+            extra_chains.push(nat_throats.chains[id - n_sec].clone());
+            extra_chains.len() - 1
+        });
+        let nv = (extra_base + j) as i64;
+        *v = if rev { !nv } else { nv };
+    }
+    let n_extra = extra_chains.len();
+    // pieces on partly covered sections, in path id space (as renumbered)
+    for (j, s) in nt_on_sec.iter() {
+        let id = n_sec + j;
+        let id = if id < extra_base {
+            Some(id)
+        } else {
+            extra_new.get(&id).map(|&k| extra_base + k)
+        };
+        if let Some(id) = id {
+            national_trains.on_sec.push((id, *s));
+        }
+    }
+    national_trains.on_sec.sort_unstable();
+    println!(
+        "national trains: {} trains ({} with a head before their first selected-city departure, {} all head, {} on no section left out); seam: {} duplicated pieces dropped, {} flow repeats, {} reversals; head entries: {} sections, {} shared throats, {} extra pieces ({} distinct pieces kept); {} trains with chord legs ({} legs)",
+        nt_trains,
+        nt_n[1],
+        nt_n[2],
+        nt_n[3],
+        nt_seam[0],
+        nt_seam[1],
+        nt_seam[2],
+        nt_head[0],
+        nt_head[1],
+        nt_head[2],
+        n_extra,
+        national_trains.chords.len(),
+        national_trains.chords.iter().map(|c| c.1.len()).sum::<usize>()
+    );
+    println!("  seam reversal examples: {nt_rev_examples:?}");
+    println!(
+        "national trains: {nt_partial} (train, section) pairs where a head covers only part of a section, on {} pieces",
+        national_trains.on_sec.len()
+    );
+
     // ---- per-train schedules, indexed by train_table t, from data/raw ----
     // Names are clean()ed before interning, so every stop resolves into
     // station_table (appended after the atlas's own stations).
@@ -2020,6 +2311,24 @@ fn main() {
             polyline_encode(&simp)
         })
         .collect();
+    let mut extra_km = 0.0f64;
+    let extra_geo: Vec<String> = extra_chains
+        .iter()
+        .map(|chain| {
+            let raw: Vec<[f64; 2]> = chain.iter().map(|id| coords[id]).collect();
+            extra_km += raw.windows(2).map(|w| hav_km_ll(w[0], w[1])).sum::<f64>();
+            let simp: Vec<[f64; 2]> = dp_keep(&raw, 0.00035)
+                .iter()
+                .map(|p| round_pt(*p, 4))
+                .collect();
+            polyline_encode(&simp)
+        })
+        .collect();
+    println!(
+        "national trains extra pieces: {} ({extra_km:.1} km of head track the shared sections and throats do not draw)",
+        extra_geo.len()
+    );
+    national_trains.extra = extra_geo;
     let throat_refs = |rows: &dyn Fn(&AtlasOrigin) -> &Vec<Vec<i64>>, base: usize| -> usize {
         origins
             .iter()
@@ -2051,7 +2360,7 @@ fn main() {
         build: provenance::build_block(&inp),
         about: "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e5 precision, [lat, lon] order.".into(),
         origins, sections, in_sections, throats: throat_geo, city_table, station_table, train_table,
-        network, stats, schedules, national,
+        network, stats, schedules, national, national_trains,
     };
     let txt = serde_json::to_string(&out).unwrap();
     fs::write(&out_path, &txt).unwrap();
@@ -2174,11 +2483,11 @@ mod tests {
     fn throats_intern_dedupes_either_direction() {
         let c = line_coords();
         let mut t = Throats::default();
-        assert_eq!(t.intern(&[1, 2, 3], &c), Some((0, false)));
+        assert_eq!(t.intern(&[1, 2, 3], &c, THROAT_MIN_KM), Some((0, false)));
         // the same chain walked the other way is the same throat, flipped
-        assert_eq!(t.intern(&[3, 2, 1], &c), Some((0, true)));
-        assert_eq!(t.intern(&[2, 3, 4], &c), Some((1, false)));
-        assert_eq!(t.intern(&[1, 2, 3], &c), Some((0, false)));
+        assert_eq!(t.intern(&[3, 2, 1], &c, THROAT_MIN_KM), Some((0, true)));
+        assert_eq!(t.intern(&[2, 3, 4], &c, THROAT_MIN_KM), Some((1, false)));
+        assert_eq!(t.intern(&[1, 2, 3], &c, THROAT_MIN_KM), Some((0, false)));
         assert_eq!(t.chains, vec![vec![1, 2, 3], vec![2, 3, 4]]);
     }
 
@@ -2188,7 +2497,7 @@ mod tests {
         c.insert(10, [0.0, 0.0]);
         c.insert(11, [0.0001, 0.0]); // about 9.6 m
         let mut t = Throats::default();
-        assert_eq!(t.intern(&[10, 11], &c), None);
+        assert_eq!(t.intern(&[10, 11], &c, THROAT_MIN_KM), None);
         assert!(t.chains.is_empty());
     }
 
@@ -2198,11 +2507,50 @@ mod tests {
         let mut t = Throats::default();
         let mut secs = Vec::new();
         let mut run = vec![3, 2, 1];
-        t.flush(&mut run, &mut secs, &c, 100);
+        t.flush(&mut run, &mut secs, &c, 100, None, &mut Vec::new());
         assert!(run.is_empty());
         assert_eq!(secs, vec![!100i64]); // throat 0, walked against its stored order
         let mut run = vec![1];
-        t.flush(&mut run, &mut secs, &c, 100);
+        t.flush(&mut run, &mut secs, &c, 100, None, &mut Vec::new());
         assert_eq!(secs.len(), 1, "a single node is not a run");
+    }
+
+    #[test]
+    fn row_path_splits_trimmed_runs_by_the_section_they_lie_on() {
+        // one leg 1-2-3-4: edge 1-2 is section 0, edges 2-3 and 3-4 are
+        // trimmed, 3-4 lying on section 1 (which the train covers only partly)
+        let c = line_coords();
+        let seqs = vec![vec![1, 2, 3, 4]];
+        let walk = LegWalk {
+            steps: vec![(0, false)],
+            max_gap: 0.0,
+        };
+        let key = ("a".to_string(), "b".to_string(), String::new());
+        let geom = |_: &(String, String, String)| Some((&seqs, &walk));
+        let sec_of = |u: i64, v: i64| match (u, v) {
+            (1, 2) => Some((0, false)),
+            _ => None,
+        };
+        let run_key = |u: i64, v: i64, _: &[f64; 2]| match (u, v) {
+            (3, 4) => Some(Some(1)),
+            _ => Some(None),
+        };
+        let mut t = Throats::default();
+        let p = row_path(
+            std::slice::from_ref(&key),
+            &[true],
+            &[0],
+            &geom,
+            &sec_of,
+            &run_key,
+            &c,
+            &mut t,
+            10,
+            &mut [0; 2],
+        );
+        assert_eq!(p.secs, vec![0, 10, 11]);
+        assert_eq!(t.chains, vec![vec![2, 3], vec![3, 4]]);
+        assert_eq!(p.on_sec, vec![(1, 1)]);
+        assert_eq!(p.full_cnt, vec![0, 3]);
     }
 }
