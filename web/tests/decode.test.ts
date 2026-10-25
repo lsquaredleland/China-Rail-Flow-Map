@@ -139,3 +139,22 @@ describe("path continuity", () => {
     expect(Math.max(...out.map((g) => g.km))).toBeLessThan(30);
   });
 });
+
+describe("city points (O10)", () => {
+  // These three were patched in the browser (prepAtlas) until O10 moved the
+  // correction into the pipeline (cn/gazetteer.rs CITY_POINTS). The client no
+  // longer touches city_table, so the pack itself must carry exactly the
+  // coordinates the old patch produced.
+  const FORMER_CLIENT_PATCH: Record<string, [number, number]> = {
+    铜仁: [109.1995, 27.7306],
+    兰溪: [119.5074, 29.2152],
+    溆浦: [110.594, 27.908],
+  };
+  test("pack city_table carries the former client-patched points", () => {
+    const table: { zh: string; pt: [number, number] }[] = pack().atlas.data.city_table;
+    for (const [zh, want] of Object.entries(FORMER_CLIENT_PATCH)) {
+      const c = table.find((x) => x.zh === zh)!;
+      expect(c.pt).toEqual(want);
+    }
+  });
+});
