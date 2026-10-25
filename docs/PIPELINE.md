@@ -33,6 +33,9 @@ Two products from one pipeline:
    Minard-style flow map of China's top 100 rail cities by outbound and
    inbound trains/day; line width = exact count of distinct trains/day per
    shared track section (per-train dedupe, strictly proportional).
+   A train that re-covers the same track (e.g. 土溪→平昌→达州) counts once in the
+   static flows while the animation shows each pass, so static < animated there
+   by design (成都 out, 达州 side: static 1, animated 2).
    Features Outbound + Inbound modes, exact per-train city-pair routing
    (clicking any station dot fades non-connecting trunks to ~18% opacity and
    draws the exact city-pair train volume at 100% opacity on top of the
