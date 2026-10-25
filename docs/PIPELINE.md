@@ -206,7 +206,7 @@ source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp
 # PENDING THE HYBRID PACK SWAP: the committed pack is still the default-config
 # build (`--out .../corridor-v3-o17`, no --config, canonical = shortest). To
 # reproduce it, point C below at corridor-v3-o17; the secdiff then reports 0
-# changed edges. The hybrid build differs from it by ~1.08M fine edges.
+# changed edges. The hybrid build differs from it by ~1.01M fine edges.
 # pair_path_fixes.json goes FIRST (first record per pair wins): pairs whose
 # station snapped to a homonym (禹州, 郏县; 恩平/江门–阳江, which the router
 # leaves bridged). Regenerate with scripts/o9_fix_paths.py (header has the
