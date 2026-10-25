@@ -6,7 +6,9 @@
 // the raster flush) as mean / p50 / p95 / max.
 //
 // It prints UNMASKED_RENDERER_WEBGL and EXITS 1 if that contains
-// "SwiftShader": software-rendered numbers are meaningless. --headed
+// "SwiftShader": software-rendered numbers are meaningless. --query '&renderer=deck'
+// is appended to the page URL; on the deck renderer the frame flush is a readPixels
+// and each row carries deck.metrics. --headed
 // launches a visible window (use it when headless lands on SwiftShader).
 // env CHROME_PATH overrides the Chrome binary.
 import fs from "node:fs";
@@ -21,7 +23,7 @@ const stat = (a) => {
 
 /** cfg: { argv, defaults: {start, end, frames}, views: {name: "origin"|"fit"|"city"|null}, origin?: zh } */
 export async function runPerf(cfg) {
-const { pos, opt } = parseArgs(cfg.argv, ["frames", "dpr", "throttle", "start", "end", "out"]);
+const { pos, opt } = parseArgs(cfg.argv, ["frames", "dpr", "throttle", "start", "end", "out", "query"]);
 const FR = +(opt.frames || cfg.defaults.frames), thr = +(opt.throttle || 1);
 const START = +(opt.start ?? cfg.defaults.start), END = +(opt.end ?? cfg.defaults.end);
 const STEP = (END - START) / FR;
@@ -35,7 +37,7 @@ try {
     const pg = await browser.newPage();
     pg.on("pageerror", (e) => console.log("PAGEERR", e.message));
     await pg.setViewport({ width: 1280, height: 800, deviceScaleFactor: dpr });
-    await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
+    await pg.goto(`${url}/?theme=light${opt.query || ""}`, { waitUntil: "networkidle0" });
     await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 90000 });
     await sleep(3000);
     if (!renderer) {
@@ -65,6 +67,9 @@ try {
       await sleep(500);
       const r = await pg.evaluate(async (FR, START, STEP) => {
         const M = window.__M, S = M.S.current, cv = M.canvasRef.current, ctx = cv.getContext("2d");
+        // Deck renderer: flush with a readPixels on the deck context (a 2D getImageData would not wait for WebGL).
+        const DH = window.__deck; const gl = DH && DH.device.handle; const px4 = new Uint8Array(4);
+        const flushFn = () => { if (gl) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px4); else ctx.getImageData(0, 0, 1, 1); };
         const run = (n, flush) => new Promise((res) => {
           const iv = [], dr = []; let last = 0, i = 0;
           const step = (ts) => {
@@ -73,7 +78,7 @@ try {
             S.animTime = START + i * STEP;
             const t0 = performance.now();
             window.__draw();
-            if (flush) ctx.getImageData(0, 0, 1, 1);
+            if (flush) flushFn();
             dr.push(performance.now() - t0);
             if (++i < n) requestAnimationFrame(step); else res({ iv, dr });
           };
@@ -83,7 +88,8 @@ try {
         const a = await run(FR, false);
         await new Promise((r) => setTimeout(r, 300));
         const f = await run(FR, true);
-        return { active: M.activeTimeline() ? 1 : 0, a, f };
+        const metrics = DH ? JSON.parse(JSON.stringify(DH.metrics)) : null;
+        return { active: M.activeTimeline() ? 1 : 0, a, f, metrics };
       }, FR, START, STEP);
       const row = {
         dpr, throttle: thr, view: name, renderer, frames: FR,
@@ -91,6 +97,7 @@ try {
         droppedPct: +((100 * r.a.iv.filter((x) => x > 20).length) / r.a.iv.length).toFixed(1),
         drawJsMs: stat(r.a.dr),
         drawPlusRasterMs: stat(r.f.dr),
+        deckMetrics: r.metrics, // null on the Canvas renderer
       };
       rows.push(row);
     }

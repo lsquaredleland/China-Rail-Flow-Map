@@ -5,6 +5,9 @@
 //           that is served with the Vercel headers on a free port
 //   outdir  default "shots-out"; files are <scenario>@<dpr>x.png
 //   env CHROME_PATH overrides the Chrome binary
+//   env SHOTS_QUERY appends to the page URL, e.g. '&renderer=deck&layers=backdrop'.
+//       With renderer=deck each shot waits for window.__deckStats.settled
+//       (two identical frames, no pipeline compile pending) before and after the scenario.
 //
 // Determinism: every scenario runs in a fresh browser context (empty
 // storage), fixed 1280x800 viewport, light colour scheme, ?theme=light,
@@ -40,6 +43,13 @@ const expandAnim = async (pg) => {
 const setMinute = async (pg, m) => {
   await pg.evaluate((m) => { window.__mapApi.setTime(m); }, m);
   await sleep(500);
+};
+
+/* Deck renderer only: wait until __deckStats.settled. A no-op on the Canvas renderer. */
+const deckWanted = /renderer=deck/.test(process.env.SHOTS_QUERY || "");
+const settled = async (pg) => {
+  if (!deckWanted) return;
+  await pg.waitForFunction("window.__deckStats && window.__deckStats.settled", { timeout: 20000 });
 };
 
 /* The 14 scenarios, in plan order. Each runs on a freshly loaded page. */
@@ -124,12 +134,14 @@ for (const dpr of dprs) {
     pg.on("pageerror", (e) => { errors++; console.log(`  pageerror [${name}]`, e.message); });
     await pg.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }, { name: "prefers-reduced-motion", value: "no-preference" }]);
     await pg.setViewport({ width: W, height: H, deviceScaleFactor: dpr });
-    await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
+    await pg.goto(`${url}/?theme=light${process.env.SHOTS_QUERY || ""}`, { waitUntil: "networkidle0" });
     await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
     await sleep(3000); // origin fade-in + staged pack loading settle
+    await settled(pg);
     await run(pg);
     await pg.mouse.move(2, 2);
     await sleep(400);
+    await settled(pg);
     const file = path.join(outDir, `${name}@${dpr}x.png`);
     await pg.screenshot({ path: file });
     written++;

@@ -13,7 +13,9 @@ import { notifyAnimListeners } from "./map/anim";
 import { resize, updateScaleBar, zoomAt } from "./map/camera";
 import { hideTooltip } from "./map/interaction";
 import { endPointer, onPointerDown, onPointerLeave, onPointerMove } from "./map/pointer";
-import { draw } from "./map/render";
+import { draw, frameTail } from "./map/render";
+import { loadDeck } from "./map/deck/load";
+import type { DeckHandle } from "./map/deck/DeckHost";
 import { RELOAD_NOTICE, onStaleReload } from "../staleReload";
 
 export type { AnimListener, AnimState, MapApi } from "./map/context";
@@ -32,6 +34,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   const scaleBarRef = useRef<HTMLDivElement | null>(null);
   const viewReportTimerRef = useRef<number | null>(null);
   const [switching, setSwitching] = useState(false);
+  // Deck renderer: the lazy chunk is fetched after mount; the handle is its imperative host.
+  const renderer = props.renderer ?? "canvas";
+  const deckRef = useRef<DeckHandle | null>(null);
+  const [deckState, setDeckState] = useState<"loading" | "ready" | "error">("loading");
   // A deploy replaced the data files under this tab: the page reloads itself.
   const [reloading, setReloading] = useState(false);
   useEffect(() => {
@@ -57,7 +63,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     });
   }
   const M = mRef.current;
-  M.render = () => draw(M);
+  // One dispatch per frame request: the deck host once mounted, else the Canvas 2D draw.
+  M.render = () => {
+    if (renderer === "deck") deckRef.current?.render();
+    else draw(M);
+  };
+  M.frameTail = () => frameTail(M);
+  M.syncRendererSize = () => deckRef.current?.resize();
 
   useImperativeHandle(apiRef, () => createMapApi(M), [M]);
 
@@ -80,6 +92,34 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
       }
     };
   }, [M]);
+  // ?renderer=deck: mount the lazily loaded host (imperative, no React in the chunk).
+  useEffect(() => {
+    if (renderer !== "deck") return;
+    let cancelled = false;
+    let h: DeckHandle | undefined;
+    loadDeck()
+      .then((m) => {
+        const wrap = wrapRef.current;
+        if (cancelled || !wrap) return;
+        h = m.mountDeck(M, wrap);
+        deckRef.current = h;
+        setDeckState("ready");
+        M.render();
+      })
+      .catch(() => {
+        // loadDeck has already started the one recovery reload for a stale chunk.
+        if (!cancelled) setDeckState("error");
+      });
+    return () => {
+      cancelled = true;
+      deckRef.current = null;
+      h?.destroy();
+    };
+  }, [M, renderer]);
+  // The deck canvas fades with the overlay canvas on an origin switch.
+  useEffect(() => {
+    document.getElementById("deckcv")?.classList.toggle("switching", switching);
+  }, [switching]);
   // Wheel zoom needs a non-passive listener (React attaches passive ones).
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -200,12 +240,16 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
         onPointerCancel={(e) => endPointer(M, e)}
         onPointerLeave={() => onPointerLeave(M)}
       />
-      {(!cur || inLoading || loadError || reloading) && (
+      {(!cur || inLoading || loadError || reloading || (renderer === "deck" && deckState !== "ready")) && (
         <div id="loading" className={cur ? "is-passive" : undefined}>
           {reloading
             ? RELOAD_NOTICE
             : loadError
             ? "The timetable data could not be loaded (" + loadError + ")."
+            : renderer === "deck" && deckState === "error"
+            ? "The map renderer could not be loaded. Please reload the page."
+            : renderer === "deck" && deckState === "loading" && cur
+            ? "Loading the map renderer…"
             : "Unfolding the timetable…"}
         </div>
       )}

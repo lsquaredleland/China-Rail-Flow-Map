@@ -27,7 +27,7 @@ const manifestDefine = { __ASSET_MANIFEST__: JSON.stringify(JSON.stringify(asset
 // Two esbuild passes so the inlined entry never statically imports a shared
 // chunk (esbuild would hoist runtime helpers used by both into one, and every
 // visitor would then fetch it):
-//   1. the lazy graph: src/components/map/deck/DeckHost.tsx -> hashed
+//   1. the lazy graph: src/components/map/deck/DeckHost.ts -> hashed
 //      dist/assets/DeckHost-<hash>.js (+ its own shared chunks);
 //   2. the app entry src/main.tsx, inlined into index.html as a module script,
 //      with load.ts's import("./DeckHost") pointed at the hashed file.
@@ -47,11 +47,20 @@ const common = {
 const relOf = (f) => relative(resolve("dist"), f.path).split(sep).join("/");
 const lazy = await esbuild.build({
   ...common,
-  entryPoints: { DeckHost: "src/components/map/deck/DeckHost.tsx" },
+  entryPoints: { DeckHost: "src/components/map/deck/DeckHost.ts" },
   splitting: true,
   entryNames: "assets/[name]-[hash]",
   chunkNames: "assets/[name]-[hash]",
 });
+// The lazy graph is imperative (C23): a React in it would be a second copy,
+// whose hooks throw against the entry's. Fail the build if one gets bundled.
+const reactInputs = Object.keys(
+  Object.assign({}, ...Object.values(lazy.metafile.outputs).map((o) => o.inputs)),
+).filter((i) => /node_modules\/(react|react-dom|scheduler)\//.test(i));
+if (reactInputs.length) {
+  console.error(`React inputs in the lazy deck graph (${reactInputs.length}), e.g. ${reactInputs[0]}`);
+  process.exit(1);
+}
 const chunkOuts = lazy.outputFiles.map((f) => ({ ...f, rel: relOf(f) }));
 const deckChunks = chunkOuts.filter((o) => /^assets\/DeckHost-[^/]+\.js$/.test(o.rel));
 if (deckChunks.length !== 1 || chunkOuts.some((o) => !/^assets\/[^/]+\.js$/.test(o.rel))) {

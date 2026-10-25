@@ -13,6 +13,14 @@
   transition: opacity 0.22s ease;
 }
 #map.switching { opacity: 0.25; }
+#deckcv { transition: opacity 0.22s ease; }
+#deckcv.switching { opacity: 0.25; }
+.deck-notice {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 5; padding: 10px 16px; border-radius: 8px; cursor: pointer;
+  background: var(--tooltip-bg); color: var(--tooltip-ink);
+  border: 1px solid var(--panel-edge); font-size: 14px;
+}
 #map.dragging { cursor: grabbing; }
 #loading {
   position: absolute; inset: 0;

@@ -10,6 +10,10 @@ import { drawLabels, drawStations } from "./stations";
 import { drawTrains } from "./trains";
 
 
+/* Debug query ?layers=backdrop: draw only the backdrop and labels, in both
+   renderers (parity runs of P1b.1). Removed in P1c.2. */
+const BACKDROP_ONLY = new URLSearchParams(location.search).get("layers") === "backdrop";
+
 export function draw(M: MapCtx) {
   const { S, P, canvasRef } = M;
   const atlas = P.current.atlas;
@@ -22,6 +26,11 @@ export function draw(M: MapCtx) {
   const pal = makePalette(P.current.dark);
   ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
   drawBackdrop(M, ctx, canvas, pal);
+  if (BACKDROP_ONLY) {
+    drawLabels(M, ctx, pal);
+    frameTail(M);
+    return;
+  }
   const destSecCounts = getDestSectionCounts(M);
   // Chords are drawn UNDER the routed flows: a dashed leg shows only
   // where a gap in the flow coverage lets it peek out, and is hidden
@@ -50,6 +59,14 @@ export function draw(M: MapCtx) {
     );
   drawStations(M, ctx, pal);
   drawLabels(M, ctx, pal);
+  frameTail(M);
+}
+
+/* The end of every frame (either renderer): Legend, scale bar, view report. */
+export function frameTail(M: MapCtx) {
+  const { S, P } = M;
+  const st = S.current;
+  const pal = makePalette(P.current.dark);
   if (P.current.legendRef.current)
     P.current.legendRef.current.draw(
       pal,

@@ -1,10 +1,14 @@
 // Pixel diff of two screenshot directories (matching file names).
 //
-// usage: node tools/shots/cmp.mjs <dirA> <dirB> [--max PCT] [--tolerance D] [--diff DIR]
+// usage: node tools/shots/cmp.mjs <dirA> <dirB> [--max PCT] [--tolerance D] [--pixelmatch] [--diff DIR]
 //   --max PCT        exit 1 if any image differs in more than PCT % of its
 //                    pixels (alias --threshold; default 0: any differing pixel fails)
 //   --tolerance D    a pixel counts as differing when any channel differs by
 //                    more than D (0-255, default 0)
+//   --pixelmatch     count with pixelmatch (threshold 0.1, anti-aliased pixels
+//                    excluded: includeAA false), the G1 rule of the deck.gl
+//                    migration (C20); --tolerance is ignored. The --diff mask is
+//                    pixelmatch's own (red = differing, yellow = AA, ignored).
 //   --diff DIR       also write <name>.diff.png (differing pixels in red)
 // Prints per image: differing pixels (count and %), max and mean channel
 // delta. A missing or differently sized image counts as a failure.
@@ -81,6 +85,15 @@ function encodePng(w, h, px) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 }
 
+/** Same result shape as diffImages, counted by pixelmatch (threshold 0.1, includeAA false). */
+function pmDiff(pixelmatch, A, B) {
+  const n = A.w * A.h, mask = Buffer.alloc(n * 4);
+  const differing = pixelmatch(A.px, B.px, mask, A.w, A.h, { threshold: 0.1, includeAA: false });
+  let max = 0, sum = 0;
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) { const d = Math.abs(A.px[i * 4 + c] - B.px[i * 4 + c]); sum += d; if (d > max) max = d; }
+  return { differing, max, mean: sum / (n * 3), n, mask };
+}
+
 export function diffImages(A, B, tol = 0) {
   const n = A.w * A.h;
   let differing = 0, max = 0, sum = 0;
@@ -99,7 +112,8 @@ export function diffImages(A, B, tol = 0) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
   const { pos, opt } = parseArgs(process.argv.slice(2), ["threshold", "max", "tolerance", "diff"]);
-  if (pos.length < 2) { console.error("usage: cmp.mjs <dirA> <dirB> [--max PCT] [--tolerance D] [--diff DIR]"); process.exit(2); }
+  const pm = opt.pixelmatch ? (await import("pixelmatch")).default : null;
+  if (pos.length < 2) { console.error("usage: cmp.mjs <dirA> <dirB> [--max PCT] [--tolerance D] [--pixelmatch] [--diff DIR]"); process.exit(2); }
   const [da, db] = pos, thr = +(opt.max ?? opt.threshold ?? 0), tol = +(opt.tolerance ?? 0);
   if (opt.diff) fs.mkdirSync(opt.diff, { recursive: true });
   const list = (d) => new Set(fs.readdirSync(d).filter((f) => f.endsWith(".png") && !f.endsWith(".diff.png")));
@@ -110,7 +124,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     if (!A.has(f) || !B.has(f)) { console.log(f.padEnd(34), "MISSING in", A.has(f) ? db : da); fail++; continue; }
     const a = decodePng(fs.readFileSync(path.join(da, f))), b = decodePng(fs.readFileSync(path.join(db, f)));
     if (a.w !== b.w || a.h !== b.h) { console.log(f.padEnd(34), `SIZE ${a.w}x${a.h} vs ${b.w}x${b.h}`); fail++; continue; }
-    const r = diffImages(a, b, tol), pct = (100 * r.differing) / r.n;
+    const r = pm ? pmDiff(pm, a, b) : diffImages(a, b, tol), pct = (100 * r.differing) / r.n;
     const bad = pct > thr;
     if (bad) fail++;
     console.log(f.padEnd(34), String(r.differing).padStart(13), pct.toFixed(4).padStart(8), String(r.max).padStart(5), r.mean.toFixed(4).padStart(8), bad ? " FAIL" : "");

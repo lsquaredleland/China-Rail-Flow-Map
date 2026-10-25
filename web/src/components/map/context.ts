@@ -75,6 +75,8 @@ export interface Props {
   isolatedTrainCode?: string | null;
   onSelectIsolatedTrain?: (code: string | null) => void;
   legendRef: RefObject<LegendHandle | null>;
+  /** Which renderer draws the map (App: ?renderer=, default canvas). */
+  renderer?: "canvas" | "deck";
   initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
   onViewChange?: (view: {
     lon: number;
@@ -204,6 +206,13 @@ export interface MapCtx {
   /* The single way to request a frame. The host installs the renderer
      (MapCanvas: the Canvas 2D `draw`); until then it is a no-op. */
   render: () => void;
+  /* What every frame ends with, whichever renderer drew it: the Legend, the
+     scale bar and the debounced view report. Installed by MapCanvas; the
+     lazily loaded deck host calls it instead of importing map/ modules. */
+  frameTail: () => void;
+  /* Tells the active renderer the canvas size / DPR changed (resize() calls it
+     just before the render() that follows). Installed by MapCanvas. */
+  syncRendererSize: () => void;
 }
 
 type MapRefs = Pick<
@@ -224,6 +233,8 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     S,
     ...refs,
     render: () => {},
+    frameTail: () => {},
+    syncRendererSize: () => {},
     bgRef: { current: { key: "", atlas: null, outline: null, layer: null, state: null } },
     tailGradRef: { current: new Map() },
     /* ---------- camera helpers ---------- */
