@@ -24,6 +24,15 @@
   font-size: 0.85em;
   margin-left: 8px;
 }
+.dep-stations {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.dep-st { display: inline-block; }
+.dep-st b { color: var(--ink); font-weight: 700; }
+.dep-st-en { opacity: 0.8; }
 .dep-note {
   margin: 8px 0 0;
   max-width: 880px;

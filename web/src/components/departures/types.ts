@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from "react";
-import type { DistUnit, OriginVM } from "../../types";
+import type { DecodedAtlas, DistUnit, OriginVM } from "../../types";
+import type { StationCount } from "../../stationBreakdown";
 import type { EmptyProps } from "./EmptyMessage";
 
 export type SortDir = 1 | -1;
@@ -19,6 +20,8 @@ export interface ModeView {
   depNote: ReactNode;
   /** The "Calling at: X" / "Arriving from: X" chip, in the two city modes. */
   chipNode?: ReactNode;
+  /** Heading count split by station (null while the schedules are loading). */
+  stations: StationCount[] | null;
   showingNote: string;
   tableNode: ReactNode;
 }
@@ -26,6 +29,7 @@ export interface ModeView {
 /** Everything the mode builders read from the DeparturesTable shell. */
 export interface DepCtx {
   cur: OriginVM | null;
+  atlas?: DecodedAtlas | null;
   unit: DistUnit;
   /** The search text after any city name has been peeled off. */
   q: string;

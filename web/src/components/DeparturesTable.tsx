@@ -14,6 +14,7 @@ import { classIndex, FLOW_CLASSES } from "../lib";
 import Histograms from "./Histograms";
 import FilterToolbar from "./departures/FilterToolbar";
 import LoadingSection from "./departures/LoadingSection";
+import StationLine from "./departures/StationLine";
 import { matchCityFromQuery } from "./departures/helpers";
 import { inArrivalsMode } from "./departures/inArrivals";
 import { inCallsMode } from "./departures/inCalls";
@@ -348,6 +349,7 @@ export default function DeparturesTable({
 
   const ctx: DepCtx = {
     cur,
+    atlas,
     unit,
     q,
     hasExtraFilters,
@@ -386,6 +388,7 @@ export default function DeparturesTable({
   return (
     <section id="departures">
       <h2>{view.heading}</h2>
+      <StationLine stations={view.stations} />
       <p className="dep-note">{view.depNote}</p>
       {cur ? (
         <Histograms

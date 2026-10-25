@@ -3,6 +3,7 @@ import type { OriginVM, SrcVM } from "../../types";
 import { fmtTime } from "../../lib";
 import TrainCell from "./TrainCell";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
+import { inCallStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, InCallSortKey } from "./types";
 
 export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeView {
@@ -18,6 +19,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
     setInCallSort,
   } = ctx;
   const calls = srcFilter.inCalls;
+  const stations = inCallStations(calls);
   const list = calls.filter((c) => {
     if (
       !matchesRowFilters(
@@ -233,5 +235,5 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
       </tbody>
     </table>
   );
-  return { heading, depNote, chipNode, showingNote, tableNode };
+  return { heading, depNote, stations, chipNode, showingNote, tableNode };
 }

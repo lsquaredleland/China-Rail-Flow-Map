@@ -3,6 +3,7 @@ import type { DestVM, OriginVM } from "../../types";
 import { fmtTime } from "../../lib";
 import TrainCell from "./TrainCell";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
+import { callStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, CallSortKey } from "./types";
 
 export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): ModeView {
@@ -16,8 +17,14 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
     handleClearChip,
     callSort,
     setCallSort,
+    atlas,
   } = ctx;
   const calls = destFilter.calls;
+  const stations = callStations(
+    calls,
+    atlas ? atlas.data.station_table : [],
+    atlas?.schedules,
+  );
   const termCount = destFilter.terminating;
   const list = calls.filter((c) => {
     if (
@@ -229,5 +236,5 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
       </tbody>
     </table>
   );
-  return { heading, depNote, chipNode, showingNote, tableNode };
+  return { heading, depNote, stations, chipNode, showingNote, tableNode };
 }

@@ -4,6 +4,7 @@ import { fmtDist, fmtTime } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
+import { arrStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, ArrSortKey } from "./types";
 
 export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
@@ -21,6 +22,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   } = ctx;
   let showingNote: string;
   const arrs = cur.arrs;
+  const stations = arrStations(arrs);
   const list: ArrVM[] = arrs.filter(
     (a) =>
       matchesRowFilters(a.arr, a.distKm, a.dur, a.cls, a.code) &&
@@ -190,5 +192,5 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
       </tbody>
     </table>
   );
-  return { heading, depNote, showingNote, tableNode };
+  return { heading, depNote, stations, showingNote, tableNode };
 }

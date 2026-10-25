@@ -4,6 +4,7 @@ import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
 import { depDayOffset } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
+import { depStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, SortKey } from "./types";
 
 export function outDeparturesMode(ctx: DepCtx): ModeView {
@@ -22,6 +23,7 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   } = ctx;
   let showingNote: string;
   const deps = cur ? cur.deps : [];
+  const stations = depStations(deps);
   const list = deps.filter(
     (d) =>
       matchesRowFilters(d.dep, d.distKm, d.dur, d.cls, d.code) &&
@@ -181,5 +183,5 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
       </tbody>
     </table>
   );
-  return { heading, depNote, showingNote, tableNode };
+  return { heading, depNote, stations, showingNote, tableNode };
 }
