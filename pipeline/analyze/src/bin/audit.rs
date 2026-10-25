@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use analyze_rs::chains;
 use analyze_rs::cn::*;
+use analyze_rs::entries;
 use analyze_rs::geo::*;
 use analyze_rs::inputs;
 use analyze_rs::legs::*;
@@ -523,6 +524,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     g.insert("nonmonotone_sec_cnt_trains".into(), non_mono.len() as i64);
     ok &= audit_national(dir, &shared, &out_map, &out_t, &mut g);
     ok &= audit_national_trains(dir, &shared, &out_t, &in_t, &sch, &mut g);
+    ok &= audit_national_entries(dir, &shared, &sch, &mut g);
     // Chengdu goldens (PIPELINE.md section 7 shape)
     let cities: Vec<String> = arr(&shared["city_table"])
         .iter()
@@ -945,6 +947,210 @@ fn audit_national_trains(
     g.insert("national_trains_gaps_gt100m".into(), gaps_100m);
     println!(
         "AUDIT national trains checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    ok
+}
+
+/// P3.3 national entries (`atlas-v2-national-entries.json`; skipped while a
+/// pack has none). Hard checks: shape, `fmt` and `n_sec` against the shared
+/// file; every array sorted, every tick in the day; per section and class
+/// the entry count equals `atlas-v2-national.json` (so the A+B counts at
+/// 24:00 are B exactly) and `trains` its train count; recomputing the
+/// entries from the national trains file (`entries::from_pack`) gives the
+/// shipped arrays exactly; every entry lies between the times of the stops
+/// that bracket it on the path (the last stop at or before the entry: its
+/// arrival, or the departure at the first stop; the next stop: its
+/// arrival), a check independent of the ease. Counters: entries past
+/// midnight of the boarding day (wrapped) and the trains they belong to.
+fn audit_national_entries(
+    dir: &Path,
+    shared: &Value,
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let name = "atlas-v2-national-entries.json";
+    if !pack::exists(dir, name) {
+        println!("AUDIT national entries: no {name} in this pack, skipped");
+        return true;
+    }
+    let ne = pack::read_json(dir, name);
+    let n_sec = shared["sections"].as_array().unwrap().len();
+    let tpm = ne["ticks_per_min"].as_u64().unwrap_or(0) as i64;
+    let rows: Vec<Vec<Vec<i64>>> = ne["by_class"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            c.as_array()
+                .into_iter()
+                .flatten()
+                .map(|s| {
+                    s.as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|x| x.as_i64().unwrap())
+                        .collect()
+                })
+                .collect()
+        })
+        .collect();
+    let shape_ok = ne["fmt"].as_i64() == Some(6)
+        && ne["n_sec"].as_u64() == Some(n_sec as u64)
+        && tpm > 0
+        && rows.len() == 8
+        && rows.iter().all(|c| c.len() == n_sec);
+    if !shape_ok {
+        println!(
+            "AUDIT national entries FAIL: fmt {:?}, n_sec {} vs shared {n_sec}, ticks_per_min {tpm}, {} class rows",
+            ne["fmt"],
+            ne["n_sec"],
+            rows.len()
+        );
+        return false;
+    }
+    let day = 1440 * tpm;
+    let unsorted = rows
+        .iter()
+        .flatten()
+        .filter(|s| s.windows(2).any(|w| w[1] < w[0]))
+        .count();
+    let out_of_day = rows
+        .iter()
+        .flatten()
+        .flatten()
+        .filter(|&&v| !(0..day).contains(&v))
+        .count();
+    let total: i64 = rows.iter().flatten().map(|s| s.len() as i64).sum();
+    // ---- A+B at 24:00 == B: counts per section and class ----
+    let (mut eq_b, mut b_ok) = (-1i64, true);
+    let nat_name = "atlas-v2-national.json";
+    if pack::exists(dir, nat_name) {
+        let nat = pack::read_json(dir, nat_name);
+        let at = |v: &Value, s: usize| v.get(s).and_then(Value::as_i64);
+        eq_b = (0..n_sec)
+            .filter(|&s| {
+                let n: i64 = (0..8).map(|c| rows[c][s].len() as i64).sum();
+                at(&nat["total"], s) == Some(n)
+                    && (0..8).all(|c| at(&nat["by_class"][c], s) == Some(rows[c][s].len() as i64))
+            })
+            .count() as i64;
+        b_ok = eq_b == n_sec as i64 && ne["trains"] == nat["trains"];
+        println!(
+            "AUDIT national entries vs national table: {} vs {} trains; counts equal (total and every class) on {eq_b} of {n_sec} sections",
+            ne["trains"], nat["trains"]
+        );
+    }
+    // ---- recompute from the national trains file; stop brackets ----
+    let (mut recompute_eq, mut recompute_ok) = (-1i64, true);
+    let (mut bracket_bad, mut wrapped, mut wrapped_trains) = (0i64, 0i64, 0i64);
+    let nt_name = "atlas-v2-national-trains.json";
+    if pack::exists(dir, nt_name) {
+        let nt = pack::read_json(dir, nt_name);
+        let trains = entries::from_pack(shared, &nt, &sch["schedules"]);
+        let mine = entries::by_class(&trains, n_sec, tpm as u32);
+        recompute_eq = (0..n_sec)
+            .filter(|&s| {
+                (0..8).all(|c| {
+                    mine[c][s].len() == rows[c][s].len()
+                        && mine[c][s]
+                            .iter()
+                            .zip(&rows[c][s])
+                            .all(|(a, b)| *a as i64 == *b)
+                })
+            })
+            .count() as i64;
+        recompute_ok = recompute_eq == n_sec as i64;
+        let train_table = shared["train_table"].as_array().unwrap();
+        let st_name = |t: usize, j: usize| -> String {
+            let st = sch["schedules"][t][j][0].as_u64().unwrap_or(0) as usize;
+            shared["station_table"][st]["zh"]
+                .as_str()
+                .unwrap_or("?")
+                .to_string()
+        };
+        let clock = |a: f64| {
+            let m = a.rem_euclid(1440.0);
+            format!("{:02}:{:04.1}", (m / 60.0).floor() as i64, m % 60.0)
+        };
+        let mut spots: Vec<String> = Vec::new();
+        let mut spot_cls = [false; 8];
+        for tr in &trains {
+            let sp: Vec<usize> = nt["stop_pos"][tr.t]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap() as usize)
+                .collect();
+            let m = &tr.motion;
+            let mut any_wrap = false;
+            for (k, &(s, i, a)) in tr.entries.iter().enumerate() {
+                // stop j >= 1 sits before path entry sp[j - 1]: the train
+                // has reached every stop before entry i (the boarding stop
+                // is left at the start) and not yet any stop after it; a
+                // stop at the entry itself lies inside the bracket. The
+                // arrival, not the departure, bounds it below: a stop
+                // followed only by zero-length pieces is at the entry's
+                // distance, and the dot reaches it on arrival
+                let prev = sp.iter().take_while(|&&p| p < i).count();
+                let next = sp.iter().take_while(|&&p| p <= i).count();
+                let lo = match prev {
+                    0 => m.start,
+                    j => m.stops[j - 1].arr,
+                };
+                // the terminus sits at the path end, so some stop follows
+                let hi = m.stops[next].arr;
+                let outside = !(lo - 1e-9..=hi + 1e-9).contains(&a);
+                bracket_bad += outside as i64;
+                // spot checks: the middle entry of the first train of each
+                // class bucket, the first entry that wraps past midnight,
+                // the first misses
+                let first_wrap = a >= 1440.0 && wrapped == 0;
+                if a >= 1440.0 {
+                    wrapped += 1;
+                    any_wrap = true;
+                }
+                let first = !spot_cls[tr.cls] && k == tr.entries.len() / 2;
+                spot_cls[tr.cls] |= first;
+                if first || first_wrap || (outside && bracket_bad <= 5) {
+                    spots.push(format!(
+                        "{}{} section {s}: entry {} (abs {a:.2}) between {} {} and {} {}",
+                        match (outside, a >= 1440.0) {
+                            (true, _) => "[OUTSIDE] ",
+                            (_, true) => "[wrap] ",
+                            _ => "",
+                        },
+                        train_table[tr.t]["code"].as_str().unwrap_or("?"),
+                        clock(a),
+                        st_name(tr.t, prev),
+                        clock(lo),
+                        st_name(tr.t, next + 1),
+                        clock(hi),
+                    ));
+                }
+            }
+            wrapped_trains += any_wrap as i64;
+        }
+        for s in &spots {
+            println!("AUDIT national entries spot check: {s}");
+        }
+    }
+    println!(
+        "AUDIT national entries: {} trains, {total} entries in {n_sec} sections x 8 classes at {tpm} ticks/min; {unsorted} unsorted arrays, {out_of_day} ticks outside the day; recompute equal on {recompute_eq} sections; {bracket_bad} entries outside their stop bracket; {wrapped} entries in {wrapped_trains} trains past the boarding day's midnight (wrapped)",
+        ne["trains"]
+    );
+    let ok = unsorted == 0 && out_of_day == 0 && b_ok && recompute_ok && bracket_bad == 0;
+    g.insert("national_entries_total".into(), total);
+    if eq_b >= 0 {
+        g.insert("national_entries_eq_national".into(), eq_b);
+    }
+    if recompute_eq >= 0 {
+        g.insert("national_entries_recompute_eq".into(), recompute_eq);
+        g.insert("national_entries_bracket_bad".into(), bracket_bad);
+        g.insert("national_entries_wrapped".into(), wrapped);
+    }
+    println!(
+        "AUDIT national entries checks: {}",
         if ok { "PASS" } else { "FAIL" }
     );
     ok
