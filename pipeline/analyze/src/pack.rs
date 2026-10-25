@@ -29,6 +29,11 @@ pub fn read_text(dir: &Path, name: &str) -> String {
     }
 }
 
+/// Is pack file `name` in `dir`, as `<name>.br` or `<name>`?
+pub fn exists(dir: &Path, name: &str) -> bool {
+    dir.join(format!("{name}.br")).exists() || dir.join(name).exists()
+}
+
 /// [`read_text`] parsed as JSON.
 pub fn read_json(dir: &Path, name: &str) -> Value {
     serde_json::from_str(&read_text(dir, name))

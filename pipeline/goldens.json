@@ -22,7 +22,12 @@
     "flow_lost": 0,
     "dep_stops_total": 235264,
     "dep_rows_with_uncalled_stations": 11951,
-    "throats": 8825
+    "throats": 8825,
+    "national_sections": 7922,
+    "national_trains": 7157,
+    "national_total_sum": 462064,
+    "national_widest": 522,
+    "national_eq_out_recount": 4053
   },
   "max": {
     "chord_leg_rows": 20,

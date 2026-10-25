@@ -521,6 +521,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     g.insert("dep_rows_jump_gt35km_outside_chords".into(), jump_out);
     g.insert("dep_rows_jump_gt35km_inside_chords".into(), jump_in);
     g.insert("nonmonotone_sec_cnt_trains".into(), non_mono.len() as i64);
+    ok &= audit_national(dir, &shared, &out_map, &out_t, &mut g);
     // Chengdu goldens (PIPELINE.md section 7 shape)
     let cities: Vec<String> = arr(&shared["city_table"])
         .iter()
@@ -561,6 +562,132 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         if ok { "PASS" } else { "FAIL" }
     );
     (ok, g)
+}
+
+/// P3.1 national table (`atlas-v2-national.json`; skipped while a pack has
+/// none). Hard checks: section-parallel shape and `fmt`; classes sum to the
+/// total; never below any origin's flow row (total and per class) on the
+/// same section; and never below an independent recount from out-tables'
+/// per-train `paths` (distinct trains whose path enters the section). The
+/// recount is a lower bound, not an equality: the national table also
+/// counts track a train runs before its first selected-city departure
+/// (from its inbound legs), which no outbound path holds.
+fn audit_national(
+    dir: &Path,
+    shared: &Value,
+    out_map: &Value,
+    out_t: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let name = "atlas-v2-national.json";
+    if !pack::exists(dir, name) {
+        println!("AUDIT national: no {name} in this pack, skipped");
+        return true;
+    }
+    let nat = pack::read_json(dir, name);
+    let ints = |v: &Value| -> Vec<i64> {
+        v.as_array()
+            .map(|a| a.iter().map(|x| x.as_i64().unwrap()).collect())
+            .unwrap_or_default()
+    };
+    let n = shared["sections"].as_array().unwrap().len();
+    let total = ints(&nat["total"]);
+    let by_class: Vec<Vec<i64>> = nat["by_class"]
+        .as_array()
+        .map(|a| a.iter().map(ints).collect())
+        .unwrap_or_default();
+    let fmt = nat["fmt"].as_i64();
+    if fmt != Some(6)
+        || total.len() != n
+        || by_class.len() != 8
+        || by_class.iter().any(|c| c.len() != n)
+    {
+        println!(
+            "AUDIT national FAIL: fmt {fmt:?}, total {} / by_class {:?} entries for {n} sections",
+            total.len(),
+            by_class.iter().map(Vec::len).collect::<Vec<_>>()
+        );
+        return false;
+    }
+    let class_bad = (0..n)
+        .filter(|&s| by_class.iter().map(|c| c[s]).sum::<i64>() != total[s])
+        .count();
+    // every origin's map flow rows (delta-coded section ids)
+    let (mut rows, mut below) = (0u64, 0u64);
+    for o in out_map["origins"].as_array().unwrap() {
+        let mut sec = 0i64;
+        for r in o["flows"].as_array().unwrap() {
+            let r = ints(r);
+            sec += r[0];
+            let s = sec as usize;
+            rows += 1;
+            if total[s] < r[1] || r[2..].iter().enumerate().any(|(c, &v)| by_class[c][s] < v) {
+                below += 1;
+            }
+        }
+    }
+    // independent recount from the per-train outbound paths
+    let classes: Vec<usize> = shared["train_table"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| class_idx(t["class"].as_str().unwrap()))
+        .collect();
+    let mut cnt = vec![0i64; n];
+    let mut cls_cnt = vec![vec![0i64; n]; 8];
+    let mut path_trains = 0i64;
+    for (t, p) in out_t["paths"].as_array().unwrap().iter().enumerate() {
+        let mut secs: Vec<usize> = ints(p)
+            .into_iter()
+            .map(|v| (if v >= 0 { v } else { !v }) as usize)
+            .filter(|&s| s < n)
+            .collect();
+        secs.sort_unstable();
+        secs.dedup();
+        path_trains += !secs.is_empty() as i64;
+        for s in secs {
+            cnt[s] += 1;
+            cls_cnt[classes[t]][s] += 1;
+        }
+    }
+    let short = (0..n)
+        .filter(|&s| total[s] < cnt[s] || (0..8).any(|c| by_class[c][s] < cls_cnt[c][s]))
+        .count();
+    let equal = (0..n).filter(|&s| total[s] == cnt[s]).count();
+    let trains = nat["trains"].as_i64().unwrap_or(-1);
+    let widest = (0..n)
+        .max_by_key(|&s| (total[s], std::cmp::Reverse(s)))
+        .unwrap_or(0);
+    let most_added = (0..n)
+        .max_by_key(|&s| (total[s] - cnt[s], std::cmp::Reverse(s)))
+        .unwrap_or(0);
+    for (label, s) in [("widest", widest), ("most added", most_added), ("first", 0)] {
+        println!(
+            "AUDIT national spot check, {label} section {s}: national {} (classes {:?}), out-path recount {} (classes {:?})",
+            total[s],
+            by_class.iter().map(|c| c[s]).collect::<Vec<_>>(),
+            cnt[s],
+            cls_cnt.iter().map(|c| c[s]).collect::<Vec<_>>()
+        );
+    }
+    println!(
+        "AUDIT national: {trains} trains ({path_trains} with an outbound path) over {n} sections; {class_bad} sections where sum(classes) != total; {below} of {rows} origin flow rows above national; {short} sections below the out-path recount, {equal} equal to it"
+    );
+    let ok = class_bad == 0
+        && below == 0
+        && short == 0
+        && trains >= path_trains
+        && trains <= classes.len() as i64;
+    g.insert("national_sections".into(), n as i64);
+    g.insert("national_trains".into(), trains);
+    g.insert("national_total_sum".into(), total.iter().sum());
+    g.insert("national_widest".into(), total[widest]);
+    g.insert("national_eq_out_recount".into(), equal as i64);
+    println!(
+        "AUDIT national checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    ok
 }
 
 /// Gate the pack counters against goldens.json: {"exact": {k: v}, "max":

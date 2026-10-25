@@ -107,6 +107,17 @@
 //!   (shared is shared). The four origin files partition the combined
 //!   origins exactly; the packer asserts the partition before writing.
 //! - atlas-v2-schedules.json
+//! - atlas-v2-national.json (P3.1; only when the v1 input has `national`)
+//!
+//! National table (`atlas-v2-national.json`, P3.1): `{fmt, trains, total,
+//! by_class}` over the shared file's `sections`, in its (renumbered) order:
+//! `total[s]` is the number of distinct trains per day that run over any
+//! part of section `s`, every train counted once nationally (not once per
+//! origin); `by_class[c][s]` splits it into the 8 class buckets of the flow
+//! rows (g, d, c, s, z, t, k, plain), so `sum_c by_class[c][s] == total[s]`.
+//! `trains` = distinct trains on at least one section. It carries the same
+//! `fmt` as the shared file because its indices are only valid against that
+//! file's section numbering. The counting rule is atlas's (`flows.rs`).
 //!
 //! After writing, the packer verifies v2 against v1 by reconstructing the
 //! v1 rows from the v2 arrays (inverse mapping) and comparing every field,
@@ -673,6 +684,35 @@ fn pack_paths(
     (paths, stop_pos, chords, per_origin)
 }
 
+/// The national table in the shared file's section order (see the header).
+/// Asserts the arrays are section-parallel and the classes sum to the total.
+fn pack_national(nat: &Value, perm: &[usize]) -> Value {
+    let reorder = |v: &Value| -> Vec<i64> {
+        let old = ints(v);
+        assert_eq!(
+            old.len(),
+            perm.len(),
+            "national arrays must be section-parallel"
+        );
+        let mut out = vec![0i64; perm.len()];
+        for (o, &n) in old.iter().zip(perm) {
+            out[n] = *o;
+        }
+        out
+    };
+    let total = reorder(get(nat, "total"));
+    let by_class: Vec<Vec<i64>> = arr(get(nat, "by_class")).iter().map(reorder).collect();
+    assert_eq!(by_class.len(), 8, "national by_class: 8 class buckets");
+    for (s, &t) in total.iter().enumerate() {
+        let sum: i64 = by_class.iter().map(|c| c[s]).sum();
+        assert_eq!(
+            sum, t,
+            "national section {s}: classes sum to {sum}, total {t}"
+        );
+    }
+    json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class })
+}
+
 fn with_fmt(mut m: Map<String, Value>) -> Value {
     m.insert("fmt".into(), json!(FMT));
     Value::Object(m)
@@ -882,6 +922,15 @@ fn main() {
         "atlas-v2-schedules.json",
         json!({ "extra_stations": [], "schedules": get(&v1, "schedules") }),
     ));
+    if let Some(nat) = v1.get("national") {
+        let national = pack_national(nat, &perm_out);
+        println!(
+            "national: {} trains over {} sections",
+            get(&national, "trains"),
+            perm_out.len()
+        );
+        by_name.push(("atlas-v2-national.json", national));
+    }
 
     let items: Vec<(&str, Vec<u8>)> = by_name
         .into_iter()
@@ -963,6 +1012,30 @@ mod tests {
         let packed = pack_flows(&rows, &[1, 0, 2]);
         // new ids 0 (7), 1 (5, 3), 2 (10) -> deltas 0, 1, 1
         assert_eq!(packed, json!([[0, 7], [1, 5, 3], [1, 10]]));
+    }
+
+    #[test]
+    fn pack_national_follows_the_section_renumbering() {
+        let mut by_class = vec![json!([0, 0, 0]); 8];
+        by_class[0] = json!([2, 0, 0]);
+        by_class[1] = json!([1, 1, 0]);
+        let nat = json!({ "trains": 4, "total": [3, 1, 0], "by_class": by_class });
+        // old 0 -> 2, old 1 -> 0, old 2 -> 1
+        let p = pack_national(&nat, &[2, 0, 1]);
+        assert_eq!(p["fmt"], FMT);
+        assert_eq!(p["trains"], 4);
+        assert_eq!(p["total"], json!([1, 0, 3]));
+        assert_eq!(p["by_class"][0], json!([0, 0, 2]));
+        assert_eq!(p["by_class"][1], json!([1, 0, 1]));
+    }
+
+    #[test]
+    #[should_panic(expected = "classes sum")]
+    fn pack_national_rejects_classes_that_do_not_sum() {
+        let mut by_class = vec![json!([0]); 8];
+        by_class[0] = json!([1]);
+        let nat = json!({ "trains": 1, "total": [2], "by_class": by_class });
+        pack_national(&nat, &[0]);
     }
 
     #[test]

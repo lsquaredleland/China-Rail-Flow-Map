@@ -7,6 +7,8 @@
 //! - `osm`: reading node coordinates and way classes from an OSM XML extract.
 //! - `inputs`: the recipe's input files (env-driven paths) loaded in one place.
 //! - `chains`: station-chain canonicalization.
+//! - `flows`: the static-flow counting rule (per-train edge sets) and the
+//!   national per-section table.
 //! - `pack`, `packdiff`: reading the v2 pack files and diffing two packs.
 //! - `provenance`: the build block (`shared.build`) recorded in the pack.
 //! - `model`: output row types.
@@ -14,6 +16,7 @@
 
 pub mod chains;
 pub mod cn;
+pub mod flows;
 pub mod geo;
 pub mod inputs;
 pub mod legs;
