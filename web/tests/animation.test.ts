@@ -19,6 +19,31 @@ function sampleCodes(zh: string, n = 12): string[] {
 }
 
 describe("trainDistAt / dwell", () => {
+  test("linear legs: the midpoint in time is the midpoint of the leg distance", () => {
+    let checked = 0;
+    for (const zh of ORIGINS) {
+      const tl = origin(zh).timeline;
+      for (const code of sampleCodes(zh, 40)) {
+        const pt = tl.getPrepTrain(code);
+        if (!pt) continue;
+        // walk the legs: [departure or a stop's departure] -> [next stop's arrival or the end]
+        let d0 = 0, t0 = pt.depMins;
+        const ends = [...(pt.stops || []).map((st) => ({ d: st.dist, a: st.arrMins, dep: st.depMins })), { d: pt.totalDist, a: pt.arrMins, dep: null as number | null }];
+        for (const e of ends) {
+          const dur = Math.max(1, e.a - t0);
+          if (e.d > d0 && e.a - t0 >= 1) {
+            expect(trainDistAt(pt, t0 + dur / 2)).toBeCloseTo(d0 + (e.d - d0) / 2, 6);
+            expect(trainDistAt(pt, t0 + dur / 4)).toBeCloseTo(d0 + (e.d - d0) / 4, 6);
+            checked++;
+          }
+          d0 = e.d;
+          t0 = e.dep !== null ? e.dep : e.a;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+
   for (const zh of ORIGINS) {
     test(`${zh}: monotone and dwell == stop.dist`, () => {
       const tl = origin(zh).timeline;

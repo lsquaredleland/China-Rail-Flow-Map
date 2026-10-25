@@ -193,6 +193,28 @@ describe(`national timelines (${NT.source}: ${NT.path})`, () => {
     expect(nat.dist).toBe(tl.sDist[s]);
   });
 
+  test("natState is linear in time along a leg (midpoint = half the leg distance)", () => {
+    let checked = 0;
+    for (let q = 0; q < tl.n && checked < 200; q += 7) {
+      const s0 = tl.sOff[q], s1 = tl.sOff[q + 1];
+      let d0 = 0, t0 = tl.start[q];
+      for (let s = s0; s <= s1; s++) {
+        const d1 = s < s1 ? tl.sDist[s] : tl.total[q];
+        const a1 = s < s1 ? tl.sArr[s] : tl.end[q];
+        if (d1 > d0 && a1 - t0 >= 1) {
+          natState(tl, q, t0 + (a1 - t0) / 2);
+          expect(nat.dist).toBeCloseTo(d0 + (d1 - d0) / 2, 4);
+          natState(tl, q, t0 + (a1 - t0) * 0.25);
+          expect(nat.dist).toBeCloseTo(d0 + (d1 - d0) / 4, 4);
+          checked++;
+        }
+        d0 = d1;
+        if (s < s1) t0 = tl.sDep[s] >= 0 ? tl.sDep[s] : tl.sArr[s];
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+
   test("cost: heap, build time, per-call time at peak", () => {
     for (let i = 0; i < 50; i++) natPositions(tl, atlas, 1095 + i * 0.2, out);
     const t1 = performance.now();

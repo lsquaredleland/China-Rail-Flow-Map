@@ -5,7 +5,7 @@
    train, so no per-train vertices are kept. */
 import type { DecodedAtlas, NationalTimeline, NationalTrainsPack, SchedulesData } from "../types";
 import { decodeSet, requireFmt } from "./decode";
-import { getSecGeometry, prepTrainPath, trainEase, trainSpeedFrac } from "./timeline";
+import { getSecGeometry, prepTrainPath } from "./timeline";
 
 /** Throw a FmtError unless `d` is a national trains file for a shared pack
     with `nSec` sections, `nThr` throats and `nTrains` train_table rows: same
@@ -125,7 +125,7 @@ export const nat = { dist: 0, speed: 1, dwell: false };
 
 /** State of train q at ABSOLUTE minute `a` (start <= a <= end): distance
     along the path, speed fraction, dwelling. Same model as timeline.ts
-    trainState (dwell at stops, eased legs). */
+    trainState (dwell at stops, linear legs). */
 export function natState(tl: NationalTimeline, q: number, a: number): void {
   const s0 = tl.sOff[q], s1 = tl.sOff[q + 1];
   let legStartDist = 0;
@@ -145,9 +145,9 @@ export function natState(tl: NationalTimeline, q: number, a: number): void {
   }
   const legDur = Math.max(1, legEndTime - legStartTime);
   const tau = Math.max(0, Math.min(1, (a - legStartTime) / legDur));
-  nat.speed = trainSpeedFrac(tau, legDur);
+  nat.speed = 1;
   nat.dwell = false;
-  nat.dist = legStartDist + trainEase(tau, legDur) * (legEndDist - legStartDist);
+  nat.dist = legStartDist + tau * (legEndDist - legStartDist);
 }
 
 /** Writes lon, lat and the unit direction at route distance d of train q to
