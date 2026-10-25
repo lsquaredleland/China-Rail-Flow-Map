@@ -1,6 +1,14 @@
 /* Camera: fit/zoom maths, the distance scale bar, canvas resize and the
    debounced view report. */
 import type { MapCtx } from "./context";
+import {
+  fitCountryView,
+  fitExtentView,
+  fitGuangzhouInitialView,
+  fitHomeView,
+  stationT as stationTOf,
+  zoomBounds,
+} from "../../lib";
 import { draw } from "./render";
 
 /* ---------- distance scale bar ----------
@@ -54,18 +62,15 @@ export function fitExtent(
 ) {
   const { S } = M;
   const { W, H, view } = S.current;
-  const s = Math.min(W / (lon1 - lon0), H / (lat1 - lat0)) * (pad || 0.97);
-  view.scale = s;
-  view.tx = (W - (lon0 + lon1) * s) / 2;
-  view.ty = (H + (lat0 + lat1) * s) / 2;
+  Object.assign(view, fitExtentView(W, H, lon0, lat0, lon1, lat1, pad));
 }
 
 export function fitCountryCalc(M: MapCtx) {
   const { S, P } = M;
   const atlas = P.current.atlas;
   if (!atlas) return;
-  const e = atlas.extent;
-  fitExtent(M, e.lon0, e.lat0, e.lon1, e.lat1, 0.97);
+  const { W, H, view } = S.current;
+  Object.assign(view, fitCountryView(W, H, atlas.extent));
   S.current.fitScale = S.current.view.scale;
 }
 
@@ -73,34 +78,31 @@ export function fitGuangzhouInitialCalc(M: MapCtx) {
   fitCountryCalc(M);
   // Regional extent matching initial launch: Guangzhou near bottom,
   // Hunan/Hubei/Henan corridors extending north.
-  fitExtent(M, 102.0, 20.8, 122.5, 36.8, 0.96);
+  const { W, H, view } = M.S.current;
+  Object.assign(view, fitGuangzhouInitialView(W, H));
 }
 
 export function fitHomeCalc(M: MapCtx) {
-  const { P } = M;
+  const { S, P } = M;
   const cur = P.current.cur;
   if (!cur) return;
-  const pt = cur.o.pt;
-  fitExtent(M, pt[0] - 1.7, pt[1] - 1.3, pt[0] + 1.7, pt[1] + 1.3, 0.98);
+  const { W, H, view } = S.current;
+  Object.assign(view, fitHomeView(W, H, cur.o.pt));
 }
 
 /* Zoom progress for station sizes: 0 at the national fit, 1 at the
    maximum zoom (fitScale * 60, see zoomAt), log-spaced. Once per
    frame/pick; each dot's growth then follows its own base radius. */
 export function stationT(M: MapCtx) {
-  const { S } = M;
-  const { view, fitScale } = S.current;
-  const t = Math.log(view.scale / fitScale) / Math.log(60);
-  return Math.min(1, Math.max(0, t));
+  const { view, fitScale } = M.S.current;
+  return stationTOf(view, fitScale);
 }
 
 export function zoomAt(M: MapCtx, px: number, py: number, factor: number) {
   const { S } = M;
   const st = S.current;
-  const ns = Math.min(
-    st.fitScale * 60,
-    Math.max(st.fitScale * 0.55, st.view.scale * factor),
-  );
+  const { min, max } = zoomBounds(st.fitScale);
+  const ns = Math.min(max, Math.max(min, st.view.scale * factor));
   const k = ns / st.view.scale;
   st.view.tx = px - (px - st.view.tx) * k;
   st.view.ty = py - (py - st.view.ty) * k;

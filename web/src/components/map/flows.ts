@@ -9,6 +9,7 @@ import type {
 } from "../../types";
 import {
   flowColor,
+  isFerrySection,
   trainDistAt,
 } from "../../lib";
 import type { MapCtx } from "./context";
@@ -330,11 +331,7 @@ export function drawFlows(
       : maxN;
   const effectiveMaxN = Math.max(1, curMaxN);
 
-  const isFerry = (s: number) =>
-    bb[s * 4 + 1] < 20.15 &&
-    bb[s * 4 + 3] > 20.20 &&
-    bb[s * 4] > 110.0 &&
-    bb[s * 4 + 2] < 110.3;
+  const isFerry = (s: number) => isFerrySection(bb, s);
 
   function strokeFlowList(
     items: { s: number; n: number }[],
@@ -599,11 +596,7 @@ export function drawInfra(
 
   function infraPass(wantConnected: boolean | null, alpha: number) {
     ctx.globalAlpha = alpha;
-    const isFerry = (s: number) =>
-      bb[s * 4 + 1] < 20.15 &&
-      bb[s * 4 + 3] > 20.20 &&
-      bb[s * 4] > 110.0 &&
-      bb[s * 4 + 2] < 110.3;
+    const isFerry = (s: number) => isFerrySection(bb, s);
 
     for (let pass = 0; pass < 2; pass++) {
       const wantHsr = pass === 1 ? 1 : 0;
@@ -814,11 +807,7 @@ export function drawHighlightSeg(
   }
   const set = flowsSet();
   if (!set) return;
-  const isFerry =
-    set.bb[sIdx * 4 + 1] < 20.15 &&
-    set.bb[sIdx * 4 + 3] > 20.20 &&
-    set.bb[sIdx * 4] > 110.0 &&
-    set.bb[sIdx * 4 + 2] < 110.3;
+  const isFerry = isFerrySection(set.bb, sIdx);
   const destSecCounts = getDestSectionCounts(M);
   const subN = destSecCounts ? destSecCounts.get(sIdx) : undefined;
   const effectiveN = subN !== undefined && subN > 0 ? subN : n;

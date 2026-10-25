@@ -4,6 +4,7 @@
 import type {
   Palette,
 } from "../../types";
+import { isFerrySection } from "../../lib";
 import type { MapCtx } from "./context";
 import { inViewBB, traceInto } from "./flows";
 
@@ -110,11 +111,7 @@ export function drawNetwork(M: MapCtx, ctx: CanvasRenderingContext2D, pal: Palet
   const netScaleW = Math.min(2.5, Math.max(0.45, S.current.view.scale * 0.008));
   ctx.lineWidth = netScaleW;
 
-  const isFerry = (i: number) =>
-    bb[i * 4 + 1] < 20.15 &&
-    bb[i * 4 + 3] > 20.20 &&
-    bb[i * 4] > 110.0 &&
-    bb[i * 4 + 2] < 110.3;
+  const isFerry = (i: number) => isFerrySection(bb, i);
 
   // Solid track network (including overland tracks of ferry corridor)
   ctx.setLineDash([]);
