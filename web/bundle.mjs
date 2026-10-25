@@ -22,24 +22,24 @@ for (const f of readdirSync("public/assets")) {
 }
 const manifestDefine = { __ASSET_MANIFEST__: JSON.stringify(assetManifest) };
 
-let rawJs;
-if (typeof Bun !== "undefined") {
-  const result = await Bun.build({
-    entrypoints: ["src/main.tsx"],
-    minify: true,
-    format: "iife",
-    target: "browser",
-    define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
-  });
-  if (!result.success) {
-    for (const log of result.logs) console.error(log);
-    process.exit(1);
+async function bundleIife(entry) {
+  if (typeof Bun !== "undefined") {
+    const result = await Bun.build({
+      entrypoints: [entry],
+      minify: true,
+      format: "iife",
+      target: "browser",
+      define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
+    });
+    if (!result.success) {
+      for (const log of result.logs) console.error(log);
+      process.exit(1);
+    }
+    return await result.outputs[0].text();
   }
-  rawJs = await result.outputs[0].text();
-} else {
   const esbuild = await import("esbuild");
   const res = await esbuild.build({
-    entryPoints: ["src/main.tsx"],
+    entryPoints: [entry],
     bundle: true,
     minify: true,
     format: "iife",
@@ -47,8 +47,15 @@ if (typeof Bun !== "undefined") {
     define: { "process.env.NODE_ENV": '"production"', ...manifestDefine },
     write: false,
   });
-  rawJs = res.outputFiles[0].text;
+  return res.outputFiles[0].text;
 }
+// The pure-JS Brotli decoder is only a fallback (see fetchData in
+// App.tsx), so it ships as its own content-hashed script the app loads on
+// demand instead of riding inside index.html.
+const decoderJs = await bundleIife("src/br-decoder.ts");
+const decoderName = `br-decoder.${createHash("sha256").update(decoderJs).digest("hex").slice(0, 8)}.js`;
+manifestDefine.__BR_DECODER__ = JSON.stringify(decoderName);
+const rawJs = await bundleIife("src/main.tsx");
 // A literal "</script" inside a JS string (React DOM has one) would end
 // the inline script element early; "<\/script" is the same string in JS.
 const js = rawJs.replace(/<\/script/g, "<\\/script");
@@ -72,6 +79,7 @@ for (const [f, hashed, bytes] of hashedAssets) {
   rmSync(`dist/assets/${f}`);
   writeFileSync(`dist/assets/${hashed}`, bytes);
 }
+writeFileSync(`dist/${decoderName}`, decoderJs);
 writeFileSync(
   "dist/index.html",
   tpl.replace("/*__BUNDLE__*/", () => js),
