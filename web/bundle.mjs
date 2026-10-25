@@ -75,6 +75,7 @@ const CSS_ORDER = [
   "map.css",
   "panels.css",
   "departures.css",
+  "modal.css",
   "responsive.css",
 ];
 const cssOnDisk = readdirSync("src/styles").filter((f) => f.endsWith(".css"));

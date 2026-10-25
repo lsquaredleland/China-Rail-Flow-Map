@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { DepVM, ArrVM, DistUnit, SchedulesData, ScheduleStop } from "../types";
 import type { MapApi } from "./MapCanvas";
 import { formatScheduleStops } from "../lib";
+import { useDialogFocus } from "../hooks/useDialog";
 
 interface Props {
   code: string | null;
@@ -52,6 +53,7 @@ export default function TrainScheduleModal({
   originCityEn,
   direction,
 }: Props) {
+  const titleId = useId();
   const [minimized, setMinimized] = useState(false);
   const [liveTime, setLiveTime] = useState<number>(() => currentTime ?? 360);
 
@@ -257,82 +259,40 @@ export default function TrainScheduleModal({
 
   const cls = trainVM ? trainVM.cls : code.charAt(0);
   const isHighSpeed = cls === "G" || cls === "D" || cls === "C";
-  const badgeColor = isHighSpeed ? "#F59E0B" : "#0284C7";
+  const codeClass = "tsm-code" + (isHighSpeed ? " is-hs" : "");
+  const route = trainVM ? `${originStDisplay} ➔ ${destStDisplay}` : null;
+  const legDist = (km: number) =>
+    unit === "mi" ? `${(km * 0.621371).toFixed(1)} mi` : `${km} km`;
 
-  // Minimized floating dock pill
+  // Minimized floating dock pill (not modal: the map stays usable)
   if (minimized) {
     return (
       <div
-        style={{
-          position: "fixed",
-          bottom: "90px",
-          right: "24px",
-          zIndex: 200,
-          background: dark ? "rgba(17, 24, 39, 0.94)" : "rgba(255, 255, 255, 0.96)",
-          color: dark ? "#F3F4F6" : "#111827",
-          borderRadius: "14px",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.35)",
-          border: `1px solid ${isIsolated ? "#F59E0B" : dark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)"}`,
-          backdropFilter: "blur(12px)",
-          padding: "10px 14px",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          maxWidth: "460px",
-        }}
+        className={"tsm-hud" + (isIsolated ? " is-isolated" : "")}
+        role="dialog"
+        aria-label={`Train ${code} schedule (minimized)`}
       >
-        <span
-          style={{
-            background: badgeColor,
-            color: "#FFFFFF",
-            fontWeight: 800,
-            fontSize: "12px",
-            padding: "3px 7px",
-            borderRadius: "5px",
-            fontFamily: "monospace",
-          }}
-        >
-          {code}
-        </span>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {trainVM ? `${originStDisplay} ➔ ${destStDisplay}` : code}
-          </div>
+        <span className={codeClass}>{code}</span>
+        <div className="tsm-hud-main">
+          <div className="tsm-hud-route">{route ?? code}</div>
           {currentStatus && (
-            <div style={{ fontSize: "11px", color: isIsolated ? "#F59E0B" : dark ? "#9CA3AF" : "#64748B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {currentStatus.text}
-            </div>
+            <div className="tsm-hud-status">{currentStatus.text}</div>
           )}
         </div>
         <button
           type="button"
+          className="tsm-hud-expand"
           onClick={() => setMinimized(false)}
           title="Expand timetable"
-          style={{
-            background: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)",
-            border: "none",
-            borderRadius: "6px",
-            padding: "4px 8px",
-            cursor: "pointer",
-            color: "inherit",
-            fontSize: "12px",
-            fontWeight: 600,
-          }}
         >
           ⤢ Timetable
         </button>
         <button
           type="button"
+          className="tsm-hud-close"
           onClick={onClose}
           title="Close modal"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: dark ? "#9CA3AF" : "#64748B",
-            fontSize: "14px",
-            padding: "2px 4px",
-          }}
+          aria-label="Close timetable"
         >
           ✕
         </button>
@@ -341,654 +301,309 @@ export default function TrainScheduleModal({
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 200,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0,0,0,0.45)",
-        backdropFilter: "blur(4px)",
-        padding: "16px",
-      }}
-      onClick={onClose}
+    <ModalShell
+      className={"tsm-dialog" + (isIsolated ? " is-isolated" : "")}
+      titleId={titleId}
+      onClose={onClose}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "540px",
-          maxHeight: "86vh",
-          background: dark ? "#111827" : "#FFFFFF",
-          color: dark ? "#F3F4F6" : "#111827",
-          borderRadius: "16px",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.45)",
-          border: `1px solid ${isIsolated ? "#F59E0B" : dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
-            <span
-              style={{
-                background: badgeColor,
-                color: "#FFFFFF",
-                fontWeight: 800,
-                fontSize: "15px",
-                padding: "4px 9px",
-                borderRadius: "6px",
-                fontFamily: "monospace",
-                flexShrink: 0,
-              }}
-            >
-              {code}
-            </span>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: "16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {trainVM ? `${originStDisplay} ➔ ${destStDisplay}` : `Train ${code} Schedule`}
-              </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: dark ? "#9CA3AF" : "#64748B",
-                  marginTop: "2px",
-                }}
-              >
-                {trainVM ? `Dep ${trainVM.dep} · Arr ${trainVM.arr} (${Math.floor(trainVM.dur / 60)}h ${trainVM.dur % 60}m)` : "Full Station Timetable"}
-              </div>
+      {/* Header */}
+      <div className="tsm-head">
+        <div className="tsm-head-id">
+          <span className={codeClass}>{code}</span>
+          <div className="tsm-head-main">
+            <div className="tsm-title" id={titleId}>
+              {route ?? `Train ${code} Schedule`}
             </div>
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => setMinimized(true)}
-              title="Minimize to floating HUD"
-              style={{
-                background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
-                border: "none",
-                color: dark ? "#E5E7EB" : "#374151",
-                fontSize: "14px",
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              —
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              title="Close modal (Esc)"
-              style={{
-                background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
-                border: "none",
-                color: dark ? "#E5E7EB" : "#374151",
-                fontSize: "16px",
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              ✕
-            </button>
+            <div className="tsm-subtitle">
+              {trainVM ? `Dep ${trainVM.dep} · Arr ${trainVM.arr} (${Math.floor(trainVM.dur / 60)}h ${trainVM.dur % 60}m)` : "Full Station Timetable"}
+            </div>
           </div>
         </div>
 
-        {/* Toolbar: Isolate on map + Jump to departure */}
-        <div
-          style={{
-            padding: "8px 20px",
-            background: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
-            borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "8px",
-          }}
-        >
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            {direction !== "in" && onToggleIsolate && (
-              <button
-                type="button"
-                onClick={() => onToggleIsolate(code)}
-                style={{
-                  background: isIsolated ? "#F59E0B" : dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)",
-                  color: isIsolated ? "#000000" : "inherit",
-                  border: isIsolated ? "1px solid #D97706" : "none",
-                  fontWeight: 700,
-                  fontSize: "12px",
-                  padding: "5px 12px",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                {isIsolated ? "✕ Show all trains" : "🎯 Isolate on Map"}
-              </button>
-            )}
+        {/* Action buttons */}
+        <div className="tsm-head-actions">
+          <button
+            type="button"
+            className="tsm-icon-btn"
+            onClick={() => setMinimized(true)}
+            title="Minimize to floating HUD"
+            aria-label="Minimize timetable"
+          >
+            —
+          </button>
+          <button
+            type="button"
+            className="tsm-icon-btn is-close"
+            onClick={onClose}
+            title="Close modal (Esc)"
+            aria-label="Close timetable"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
 
-            {direction !== "in" && trainVM && onJumpToTime && (
-              <button
-                type="button"
-                onClick={() => onJumpToTime(trainVM.depMins)}
-                title={`Jump simulation time to ${trainVM.dep}`}
-                style={{
-                  background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
-                  color: "inherit",
-                  border: "none",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  padding: "5px 10px",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                ▶ Jump to dep ({trainVM.dep})
-              </button>
-            )}
-            {originStop && (
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  padding: "4px 9px",
-                  borderRadius: "6px",
-                  background: dark
-                    ? "rgba(59, 130, 246, 0.25)"
-                    : "rgba(59, 130, 246, 0.15)",
-                  color: dark ? "#93C5FD" : "#1D4ED8",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "5px",
-                  border: `1px solid ${dark ? "rgba(59, 130, 246, 0.4)" : "rgba(59, 130, 246, 0.3)"}`,
-                }}
-              >
-                <span>📍</span>
-                <span>
-                  {fmtStName(originStop.stZh, originStop.stEn)}: {originStop.arr !== "—" ? `Arr ${originStop.arr} · ` : ""}Dep {originStop.dep}
-                  {originStop.dwellMins > 0 ? ` (${originStop.dwellMins}m dwell)` : ""}
-                </span>
-              </span>
-            )}
-          </div>
-
-          {currentStatus && (
-            <span
-              style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                color: isIsolated ? "#F59E0B" : dark ? "#9CA3AF" : "#64748B",
-              }}
+      {/* Toolbar: Isolate on map + Jump to departure */}
+      <div className="tsm-toolbar">
+        <div className="tsm-toolbar-left">
+          {direction !== "in" && onToggleIsolate && (
+            <button
+              type="button"
+              className={"tsm-iso-btn" + (isIsolated ? " is-on" : "")}
+              onClick={() => onToggleIsolate(code)}
             >
-              {currentStatus.text}
+              {isIsolated ? "✕ Show all trains" : "🎯 Isolate on Map"}
+            </button>
+          )}
+
+          {direction !== "in" && trainVM && onJumpToTime && (
+            <button
+              type="button"
+              className="tsm-jump-btn"
+              onClick={() => onJumpToTime(trainVM.depMins)}
+              title={`Jump simulation time to ${trainVM.dep}`}
+            >
+              ▶ Jump to dep ({trainVM.dep})
+            </button>
+          )}
+          {originStop && (
+            <span className="tsm-origin-chip">
+              <span>📍</span>
+              <span>
+                {fmtStName(originStop.stZh, originStop.stEn)}: {originStop.arr !== "—" ? `Arr ${originStop.arr} · ` : ""}Dep {originStop.dep}
+                {originStop.dwellMins > 0 ? ` (${originStop.dwellMins}m dwell)` : ""}
+              </span>
             </span>
           )}
         </div>
 
-        {/* Live Journey Progress Track */}
-        {direction !== "in" && alignedStops && alignedStops.length > 0 && (
-          <div
-            style={{
-              padding: "10px 20px 12px 20px",
-              background: dark ? "rgba(0,0,0,0.24)" : "rgba(0,0,0,0.02)",
-              borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                fontSize: "12px",
-                fontWeight: 700,
-                marginBottom: "6px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "15px" }}>
-                  {currentStatus?.state === "stopped"
-                    ? "🚆"
-                    : currentStatus?.state === "transit"
-                      ? "🚅"
-                      : currentStatus?.state === "post"
-                        ? "🏁"
-                        : "⏳"}
-                </span>
-                <span>{currentStatus?.text || "Trip Progress"}</span>
-              </div>
-              <span
-                style={{
-                  fontFamily: "monospace",
-                  fontWeight: 800,
-                  fontSize: "13px",
-                  color: "#F59E0B",
-                }}
-              >
-                {Math.round(overallProgress * 100)}%
+        {currentStatus && <span className="tsm-status">{currentStatus.text}</span>}
+      </div>
+
+      {/* Live Journey Progress Track */}
+      {direction !== "in" && alignedStops && alignedStops.length > 0 && (
+        <div className="tsm-progress">
+          <div className="tsm-progress-head">
+            <div className="tsm-progress-state">
+              <span className="tsm-progress-icon">
+                {currentStatus?.state === "stopped"
+                  ? "🚆"
+                  : currentStatus?.state === "transit"
+                    ? "🚅"
+                    : currentStatus?.state === "post"
+                      ? "🏁"
+                      : "⏳"}
               </span>
+              <span>{currentStatus?.text || "Trip Progress"}</span>
             </div>
+            <span className="tsm-progress-pct">
+              {Math.round(overallProgress * 100)}%
+            </span>
+          </div>
+          <div className="tsm-track">
             <div
-              style={{
-                position: "relative",
-                width: "100%",
-                height: "6px",
-                background: dark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-                borderRadius: "3px",
-              }}
+              className="tsm-track-fill"
+              style={{ width: `${Math.round(overallProgress * 100)}%` }}
+            />
+            <div
+              className="tsm-track-train"
+              style={{ left: `${Math.round(overallProgress * 100)}%` }}
             >
-              <div
-                style={{
-                  width: `${Math.round(overallProgress * 100)}%`,
-                  height: "100%",
-                  background: "linear-gradient(90deg, #3B82F6 0%, #F59E0B 100%)",
-                  borderRadius: "3px",
-                  transition: "width 0.25s ease",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  left: `${Math.round(overallProgress * 100)}%`,
-                  top: "-8px",
-                  transform: "translateX(-50%)",
-                  fontSize: "14px",
-                  transition: "left 0.25s ease",
-                  pointerEvents: "none",
-                  filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
-                }}
-              >
-                🚅
-              </div>
+              🚅
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Timetable Table */}
-        <div style={{ overflowY: "auto", flex: 1, padding: "4px 0" }}>
-          {!alignedStops ? (
-            <div style={{ padding: "36px", textAlign: "center", color: dark ? "#9CA3AF" : "#64748B" }}>
-              {schedulesData ? "Schedule not available for this service." : "Loading national timetable asset (~336 KB)..."}
-            </div>
-          ) : (
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "13px",
-              }}
-            >
-              <thead>
-                <tr
-                  style={{
-                    borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-                    color: dark ? "#9CA3AF" : "#64748B",
-                    fontSize: "11px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  <th style={{ padding: "8px 16px", textAlign: "center", width: "40px" }}>#</th>
-                  <th style={{ padding: "8px 16px", textAlign: "left" }}>Station</th>
-                  <th style={{ padding: "8px 16px", textAlign: "right" }}>Distance</th>
-                  <th style={{ padding: "8px 16px", textAlign: "center" }}>Arrive</th>
-                  <th style={{ padding: "8px 16px", textAlign: "center" }}>Depart</th>
-                  <th style={{ padding: "8px 16px", textAlign: "right" }}>Dwell</th>
-                </tr>
-              </thead>
-              <tbody>
-                {alignedStops.flatMap((s, idx) => {
-                  const isOriginCity = originStop && s.stIdx === originStop.stIdx;
-                  const isCurrent =
-                    typeof liveTime === "number" &&
-                    s.simArrMins >= 0 &&
-                    s.simDepMins >= 0 &&
-                    liveTime >= s.simArrMins &&
-                    liveTime <= s.simDepMins;
-                  const isPast =
-                    typeof liveTime === "number" &&
-                    s.simDepMins >= 0 &&
-                    liveTime > s.simDepMins;
-                  const isNextStop =
-                    currentStatus?.state === "transit" &&
-                    currentStatus.toIdx === idx;
+      {/* Timetable Table */}
+      <div className="tsm-scroll">
+        {!alignedStops ? (
+          <div className="tsm-empty">
+            {schedulesData ? "Schedule not available for this service." : "Loading national timetable asset (~336 KB)..."}
+          </div>
+        ) : (
+          <table className="tsm-table">
+            <thead>
+              <tr>
+                <th className="tsm-th-idx">#</th>
+                <th className="tsm-th-l">Station</th>
+                <th className="tsm-th-r">Distance</th>
+                <th className="tsm-th-c">Arrive</th>
+                <th className="tsm-th-c">Depart</th>
+                <th className="tsm-th-r">Dwell</th>
+              </tr>
+            </thead>
+            <tbody>
+              {alignedStops.flatMap((s, idx) => {
+                const isOriginCity = originStop && s.stIdx === originStop.stIdx;
+                const isCurrent =
+                  typeof liveTime === "number" &&
+                  s.simArrMins >= 0 &&
+                  s.simDepMins >= 0 &&
+                  liveTime >= s.simArrMins &&
+                  liveTime <= s.simDepMins;
+                const isPast =
+                  typeof liveTime === "number" &&
+                  s.simDepMins >= 0 &&
+                  liveTime > s.simDepMins;
+                const isNextStop =
+                  currentStatus?.state === "transit" &&
+                  currentStatus.toIdx === idx;
 
-                  const jumpTime = s.simArrMins >= 0 ? s.simArrMins : s.simDepMins;
+                const jumpTime = s.simArrMins >= 0 ? s.simArrMins : s.simDepMins;
+                const rowClass =
+                  "tsm-row" +
+                  (onJumpToTime ? " is-jumpable" : "") +
+                  (isCurrent ? " is-current" : "") +
+                  (isOriginCity ? " is-origin" : "") +
+                  (isPast && !isOriginCity ? " is-past" : "");
+                const timePill = isOriginCity ? "tsm-time-pill" : undefined;
 
-                  const rows = [
-                    <tr
-                      key={`stop-${idx}`}
-                      onClick={() => {
-                        if (jumpTime !== undefined && onJumpToTime) {
-                          onJumpToTime(Math.max(0, jumpTime));
-                        }
-                      }}
-                      title={onJumpToTime ? `Click to jump simulation to ${fmtStName(s.stZh, s.stEn)} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
-                      style={{
-                        borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)"}`,
-                        borderLeft: isOriginCity
-                          ? "4px solid #3B82F6"
-                          : isCurrent
-                            ? "4px solid #F59E0B"
-                            : "4px solid transparent",
-                        background: isCurrent
-                          ? dark
-                            ? "rgba(245, 158, 11, 0.26)"
-                            : "rgba(245, 158, 11, 0.18)"
-                          : isOriginCity
-                            ? dark
-                              ? "rgba(59, 130, 246, 0.18)"
-                              : "rgba(59, 130, 246, 0.12)"
-                            : "transparent",
-                        cursor: onJumpToTime ? "pointer" : "default",
-                        transition: "background 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isCurrent && !isOriginCity) {
-                          e.currentTarget.style.background = dark
-                            ? "rgba(255,255,255,0.04)"
-                            : "rgba(0,0,0,0.03)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isCurrent && !isOriginCity) {
-                          e.currentTarget.style.background = "transparent";
-                        }
-                      }}
-                    >
-                      <td
-                        style={{
-                          padding: "9px 16px",
-                          textAlign: "center",
-                          color: dark ? "#6B7280" : "#94A3B8",
-                          fontFamily: "monospace",
-                          fontSize: "12px",
-                        }}
-                      >
-                        {isCurrent ? (
-                          <span style={{ fontSize: "16px" }}>🚆</span>
-                        ) : isPast ? (
-                          <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
-                        ) : isNextStop ? (
-                          <span style={{ color: "#F59E0B", fontWeight: 800 }}>▶</span>
-                        ) : (
-                          <span style={{ opacity: 0.6 }}>{idx + 1}</span>
+                const rows = [
+                  <tr
+                    key={`stop-${idx}`}
+                    className={rowClass}
+                    onClick={() => {
+                      if (jumpTime !== undefined && onJumpToTime) {
+                        onJumpToTime(Math.max(0, jumpTime));
+                      }
+                    }}
+                    title={onJumpToTime ? `Click to jump simulation to ${fmtStName(s.stZh, s.stEn)} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
+                  >
+                    <td className="tsm-cell-idx">
+                      {isCurrent ? (
+                        <span className="tsm-mark-now">🚆</span>
+                      ) : isPast ? (
+                        <span className="tsm-mark-past">✓</span>
+                      ) : isNextStop ? (
+                        <span className="tsm-mark-next">▶</span>
+                      ) : (
+                        <span className="tsm-mark-num">{idx + 1}</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="tsm-st-zh">
+                        {s.stZh}
+                        {isOriginCity && (
+                          <span className="tsm-tag is-origin">📍 SELECTED ORIGIN</span>
                         )}
-                      </td>
-                      <td style={{ padding: "9px 16px" }}>
-                        <div style={{ fontWeight: 600, color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit" }}>
-                          {s.stZh}
-                          {isOriginCity && (
-                            <span
-                              style={{
-                                marginLeft: "8px",
-                                fontSize: "10px",
-                                fontWeight: 800,
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                background: "#3B82F6",
-                                color: "#FFFFFF",
-                                letterSpacing: "0.5px",
-                                display: "inline-block",
-                              }}
-                            >
-                              📍 SELECTED ORIGIN
-                            </span>
-                          )}
-                          {isCurrent && (
-                            <span
-                              style={{
-                                marginLeft: "8px",
-                                fontSize: "10px",
-                                background: "#F59E0B",
-                                color: "#000",
-                                fontWeight: 800,
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                display: "inline-block",
-                              }}
-                            >
-                              🚆 AT STATION (NOW)
-                            </span>
-                          )}
-                          {isNextStop && (
-                            <span
-                              style={{
-                                marginLeft: "8px",
-                                fontSize: "10px",
-                                background: "rgba(245, 158, 11, 0.2)",
-                                color: "#F59E0B",
-                                fontWeight: 700,
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                                display: "inline-block",
-                                border: "1px solid rgba(245, 158, 11, 0.4)",
-                              }}
-                            >
-                              NEXT STOP (ETA {currentStatus?.eta}m)
-                            </span>
-                          )}
-                        </div>
-                        {s.stEn && s.stEn !== s.stZh && (
-                          <div style={{ fontSize: "11px", color: dark ? "#6B7280" : "#94A3B8" }}>
-                            {s.stEn}
-                          </div>
+                        {isCurrent && (
+                          <span className="tsm-tag is-now">🚆 AT STATION (NOW)</span>
                         )}
-                      </td>
-                      <td
-                        style={{
-                          padding: "9px 16px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "12px",
-                          color:
-                            isPast && !isOriginCity
-                              ? dark
-                                ? "#6B7280"
-                                : "#94A3B8"
-                              : "inherit",
-                        }}
-                      >
-                        {idx === 0 ? (
-                          <span style={{ opacity: 0.4 }}>—</span>
-                        ) : s.legKm && s.legKm > 0 ? (
-                          unit === "mi" ? (
-                            `${(s.legKm * 0.621371).toFixed(1)} mi`
-                          ) : (
-                            `${s.legKm} km`
-                          )
-                        ) : (
-                          <span style={{ opacity: 0.4 }}>—</span>
+                        {isNextStop && (
+                          <span className="tsm-tag is-next">
+                            NEXT STOP (ETA {currentStatus?.eta}m)
+                          </span>
                         )}
-                      </td>
-                      <td
-                        style={{
-                          padding: "9px 16px",
-                          textAlign: "center",
-                          fontFamily: "monospace",
-                          color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit",
-                        }}
-                      >
-                        <span
-                          style={
-                            isOriginCity
-                              ? {
-                                  padding: "2px 6px",
-                                  borderRadius: "4px",
-                                  background: dark
-                                    ? "rgba(59, 130, 246, 0.28)"
-                                    : "rgba(59, 130, 246, 0.18)",
-                                  fontWeight: 800,
-                                  color: dark ? "#93C5FD" : "#1D4ED8",
-                                }
-                              : undefined
-                          }
-                        >
-                          {s.arr}
-                        </span>
-                      </td>
-                      <td
-                        style={{
-                          padding: "9px 16px",
-                          textAlign: "center",
-                          fontFamily: "monospace",
-                          fontWeight: 600,
-                          color: isPast && !isOriginCity ? (dark ? "#6B7280" : "#94A3B8") : "inherit",
-                        }}
-                      >
-                        <span
-                          style={
-                            isOriginCity
-                              ? {
-                                  padding: "2px 6px",
-                                  borderRadius: "4px",
-                                  background: dark
-                                    ? "rgba(59, 130, 246, 0.28)"
-                                    : "rgba(59, 130, 246, 0.18)",
-                                  fontWeight: 800,
-                                  color: dark ? "#93C5FD" : "#1D4ED8",
-                                }
-                              : undefined
-                          }
-                        >
-                          {s.dep}
-                        </span>
-                      </td>
-                      <td
-                        style={{
-                          padding: "9px 16px",
-                          textAlign: "right",
-                          fontSize: "12px",
-                          color: dark ? "#9CA3AF" : "#64748B",
-                        }}
-                      >
-                        {s.dwellMins > 0 ? `${s.dwellMins}m` : "—"}
-                      </td>
-                    </tr>
-                  ];
+                      </div>
+                      {s.stEn && s.stEn !== s.stZh && (
+                        <div className="tsm-st-en">{s.stEn}</div>
+                      )}
+                    </td>
+                    <td className="tsm-cell-dist">
+                      {idx === 0 ? (
+                        <span className="tsm-dim">—</span>
+                      ) : s.legKm && s.legKm > 0 ? (
+                        legDist(s.legKm)
+                      ) : (
+                        <span className="tsm-dim">—</span>
+                      )}
+                    </td>
+                    <td className="tsm-cell-time">
+                      <span className={timePill}>{s.arr}</span>
+                    </td>
+                    <td className="tsm-cell-time is-dep">
+                      <span className={timePill}>{s.dep}</span>
+                    </td>
+                    <td className="tsm-cell-dwell">
+                      {s.dwellMins > 0 ? `${s.dwellMins}m` : "—"}
+                    </td>
+                  </tr>
+                ];
 
-                  // In transit between idx and idx + 1: insert transit tracker row
-                  if (
-                    currentStatus?.state === "transit" &&
-                    currentStatus.fromIdx === idx &&
-                    idx < alignedStops.length - 1
-                  ) {
-                    rows.push(
-                      <tr
-                        key={`transit-leg-${idx}`}
-                        style={{
-                          background: dark
-                            ? "rgba(245, 158, 11, 0.12)"
-                            : "rgba(245, 158, 11, 0.08)",
-                          borderLeft: "4px solid #F59E0B",
-                        }}
-                      >
-                        <td colSpan={6} style={{ padding: "8px 16px 8px 18px" }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "10px",
-                            }}
-                          >
-                            <span style={{ fontSize: "16px" }}>🚅</span>
-                            <div style={{ flex: 1 }}>
+                // In transit between idx and idx + 1: insert transit tracker row
+                if (
+                  currentStatus?.state === "transit" &&
+                  currentStatus.fromIdx === idx &&
+                  idx < alignedStops.length - 1
+                ) {
+                  const next = alignedStops[idx + 1];
+                  rows.push(
+                    <tr key={`transit-leg-${idx}`} className="tsm-transit-row">
+                      <td colSpan={6}>
+                        <div className="tsm-transit-body">
+                          <span className="tsm-transit-icon">🚅</span>
+                          <div className="tsm-transit-main">
+                            <div className="tsm-transit-head">
+                              <span>
+                                EN ROUTE: {fmtStName(s.stZh, s.stEn)} ➔ {fmtStName(next.stZh, next.stEn)}
+                                {next.legKm && next.legKm > 0 ? (
+                                  <span className="tsm-transit-km">
+                                    ({legDist(next.legKm)})
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span>
+                                {Math.round(legProgress * 100)}% · {currentStatus.eta}m to arrival
+                              </span>
+                            </div>
+                            <div className="tsm-transit-track">
                               <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  fontSize: "11px",
-                                  fontWeight: 700,
-                                  color: "#F59E0B",
-                                }}
-                              >
-                                <span>
-                                  EN ROUTE: {fmtStName(s.stZh, s.stEn)} ➔ {fmtStName(alignedStops[idx + 1].stZh, alignedStops[idx + 1].stEn)}
-                                  {alignedStops[idx + 1]?.legKm && alignedStops[idx + 1].legKm! > 0 ? (
-                                    <span style={{ opacity: 0.85, fontWeight: 500, marginLeft: 6 }}>
-                                      ({unit === "mi" ? `${(alignedStops[idx + 1].legKm! * 0.621371).toFixed(1)} mi` : `${alignedStops[idx + 1].legKm} km`})
-                                    </span>
-                                  ) : null}
-                                </span>
-                                <span>
-                                  {Math.round(legProgress * 100)}% · {currentStatus.eta}m to arrival
-                                </span>
-                              </div>
-                              <div
-                                style={{
-                                  width: "100%",
-                                  height: "5px",
-                                  background: "rgba(245, 158, 11, 0.25)",
-                                  borderRadius: "3px",
-                                  marginTop: "4px",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: `${Math.round(legProgress * 100)}%`,
-                                    height: "100%",
-                                    background: "#F59E0B",
-                                    borderRadius: "3px",
-                                    transition: "width 0.2s ease",
-                                  }}
-                                />
-                              </div>
+                                className="tsm-transit-fill"
+                                style={{ width: `${Math.round(legProgress * 100)}%` }}
+                              />
                             </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  }
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
 
-                  return rows;
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+                return rows;
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: "10px 20px",
-            borderTop: `1px solid ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-            fontSize: "11px",
-            color: dark ? "#9CA3AF" : "#64748B",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <span>Tip: Click any station row to jump simulation time</span>
-          <span>{alignedStops ? `${alignedStops.length} calling stops` : ""}</span>
-        </div>
+      {/* Footer */}
+      <div className="tsm-foot">
+        <span>Tip: Click any station row to jump simulation time</span>
+        <span>{alignedStops ? `${alignedStops.length} calling stops` : ""}</span>
+      </div>
+    </ModalShell>
+  );
+}
+
+/* The modal frame: backdrop (click closes), a labelled aria-modal dialog,
+   focus moved in on open, Tab kept inside and focus restored on close. */
+function ModalShell({
+  className,
+  titleId,
+  onClose,
+  children,
+}: {
+  className: string;
+  titleId: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const { onKeyDown } = useDialogFocus(ref);
+  return (
+    <div className="tsm-backdrop" onClick={onClose}>
+      <div
+        ref={ref}
+        className={className}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
       </div>
     </div>
   );
