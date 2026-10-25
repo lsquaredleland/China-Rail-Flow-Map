@@ -33,6 +33,7 @@ export default function FilterToolbar({
   onSelectDurBins,
   setSelectedDurBin,
   showingNote,
+  allClasses = false,
 }: {
   cur: OriginVM | null;
   activeCity: CityPointVM | null;
@@ -56,6 +57,8 @@ export default function FilterToolbar({
   onSelectDurBins?: (bins: DurBinFilter[]) => void;
   setSelectedDurBin: (b: DurBinFilter | null) => void;
   showingNote: string;
+  /** National mode: the toolbar's class filter offers all classes, so does this one. */
+  allClasses?: boolean;
 }) {
   const toggleClass = (cls: string) => {
     onSelectClasses(
@@ -92,7 +95,7 @@ export default function FilterToolbar({
     {FLOW_CLASSES.map((cls) => {
       const active = selectedClasses.includes(cls);
       const count = classCounts[cls] || 0;
-      const enabled = count > 0;
+      const enabled = allClasses || count > 0;
       const label = cls === "plain" ? "普" : cls;
       return (
         <button
@@ -104,9 +107,7 @@ export default function FilterToolbar({
           title={
             enabled
               ? (CLASS_NAMES[cls] || cls) +
-                " (" +
-                count +
-                (count === 1 ? " train)" : " trains)")
+                (count > 0 ? " (" + count + (count === 1 ? " train)" : " trains)") : "")
               : `No ${label} trains ${activeCity ? `between ${cur?.en || "origin"} and ${activeCity.en}` : `for ${cur?.en || "origin"}`}`
           }
           onClick={() => toggleClass(cls)}

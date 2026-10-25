@@ -32,6 +32,8 @@ import type {
 
 interface Props {
   cur: OriginVM | null;
+  /** National mode: every class button is enabled, as in the toolbar. */
+  national?: boolean;
   unit: DistUnit;
   direction: Direction;
   /** The city pinned on the map: a DestVM outbound, a SrcVM inbound. */
@@ -82,6 +84,7 @@ interface Props {
    turns it into a heading, note and table. */
 export default function DeparturesTable({
   cur,
+  national,
   unit,
   direction,
   panelCity,
@@ -435,6 +438,7 @@ export default function DeparturesTable({
         onSelectDurBins={onSelectDurBins}
         setSelectedDurBin={setSelectedDurBin}
         showingNote={view.showingNote}
+        allClasses={national}
       />
       <p className="dep-swipe">Swipe sideways for all columns &rarr;</p>
       <div className="dep-scrollwrap">
