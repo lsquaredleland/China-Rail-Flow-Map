@@ -7,6 +7,7 @@ import type {
   InMapData,
   InTablesData,
   InTablesPack,
+  NationalFlowsPack,
   OutMapData,
   OutTablesData,
   OutTablesPack,
@@ -15,11 +16,19 @@ import type {
   SchedulesData,
   SharedData,
 } from "../types";
-import { expandInTables, expandOutTables, prepAtlas, prepOutline, requireFmt } from "../lib";
+import {
+  expandInTables,
+  expandOutTables,
+  prepAtlas,
+  prepOutline,
+  requireFmt,
+  requireNationalFlows,
+} from "../lib";
 import {
   ABOUT,
   IN_MAP_URL,
   IN_TABLES_URL,
+  NATIONAL_FLOWS_URL,
   OUTLINE_URL,
   OUT_TABLES_URL,
   SCHEDULES_URL,
@@ -57,6 +66,8 @@ export function useAtlasData({
   const [inTablesReady, setInTablesReady] = useState(false);
   const [inMapLoading, setInMapLoading] = useState(false);
   const [schedulesData, setSchedulesData] = useState<SchedulesData | null>(null);
+  // National per-section flows (P3.2): only national mode asks for them.
+  const [nationalFlows, setNationalFlows] = useState<NationalFlowsPack | null>(null);
 
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
@@ -68,13 +79,14 @@ export function useAtlasData({
     const outTablesRef: { current: OutTablesData | null } = { current: null };
     const inMapDataRef: { current: InMapData | null } = { current: null };
     const inTablesRef: { current: InTablesData | null } = { current: null };
+    const nationalFlowsRef: { current: NationalFlowsPack | null } = { current: null };
     // The schedules asset (O16): not part of first paint. It is fetched once, in
     // parallel with the out tables, which wait for it so every timeline is
     // built with station-level stops (null if it failed to load); an opened
     // schedule modal also requests it.
     let schedulesPromise: Promise<SchedulesData | null> | null = null;
     let schedData: SchedulesData | null = null;
-    const flights = { outTables: false, inMap: false, inTables: false };
+    const flights = { outTables: false, inMap: false, inTables: false, nationalFlows: false };
 
     const loadSchedules = () => {
       if (!schedulesPromise) {
@@ -164,6 +176,42 @@ export function useAtlasData({
           if (err.name === "FmtError") setLoadError(err.message);
         });
     };
+    // National flows: on request only, never part of the origin view's
+    // loads. The arrays index the shared sections, so they are checked
+    // against the atlas once both exist.
+    const applyNationalFlows = () => {
+      const d = nationalFlowsRef.current;
+      const at = atlasRef.current;
+      if (!d || !at) return;
+      try {
+        requireNationalFlows(d, at.data.sections.length, NATIONAL_FLOWS_URL);
+      } catch (err) {
+        nationalFlowsRef.current = null;
+        setLoadError((err as Error).message);
+        return;
+      }
+      setNationalFlows(d);
+    };
+    const ensureNationalFlows = () => {
+      if (nationalFlowsRef.current) {
+        applyNationalFlows();
+        return;
+      }
+      if (flights.nationalFlows) return;
+      flights.nationalFlows = true;
+      fetchData<NationalFlowsPack>(NATIONAL_FLOWS_URL)
+        .then((d) => {
+          requireFmt(d.fmt, NATIONAL_FLOWS_URL);
+          nationalFlowsRef.current = d;
+          flights.nationalFlows = false;
+          setLoadError((e) => (e && e.startsWith(NATIONAL_FLOWS_URL) ? null : e));
+          applyNationalFlows();
+        })
+        .catch((err: Error) => {
+          flights.nationalFlows = false;
+          if (err.name === "FmtError") setLoadError(err.message);
+        });
+    };
     // Phase 3 for inbound: the map file first (paint), and only once it
     // has landed do its tables follow behind it, as in phases 1–2.
     const ensureInMap = () => {
@@ -193,6 +241,7 @@ export function useAtlasData({
       ensureOutTables,
       ensureInMap,
       ensureInTables,
+      ensureNationalFlows,
       /** Phase 1 finished: merge any staged file that beat the atlas. */
       mergeEarly(inMap: InMapData | null) {
         if (inMap) {
@@ -201,6 +250,7 @@ export function useAtlasData({
         } else if (inMapDataRef.current) applyInMap();
         if (outTablesRef.current) applyOutTables();
         if (inTablesRef.current) applyInTables();
+        if (nationalFlowsRef.current) applyNationalFlows();
       },
       hasInMap: () => !!inMapDataRef.current,
     };
@@ -296,7 +346,9 @@ export function useAtlasData({
     inTablesReady,
     inMapLoading,
     schedulesData,
+    nationalFlows,
     ensureOutTables: loader.ensureOutTables,
     ensureInMap: loader.ensureInMap,
+    ensureNationalFlows: loader.ensureNationalFlows,
   };
 }

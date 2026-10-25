@@ -845,6 +845,23 @@ shipped as `atlas-v2-national.json.br` (fmt 7 or a new file; `DATA_FMT` check ex
 **P3.2 B layer** — `deck/layers/national.ts` (+ flows `PathLayer`, class filter =
 `Σ byClass[selected]` into `widthArr`). Test: per-section totals equal the pack audit.
 
+*P3.2 lib as built (groundwork; the layer and UI are not built).* `types.ts
+NationalFlowsPack`; `data.ts NATIONAL_FLOWS_URL` (`assets/atlas-v2-national.json`);
+`useAtlasData` gains a lazy `ensureNationalFlows()` (fetched only on request, never in the
+origin view's phases; `requireFmt` on fetch, then `requireNationalFlows` once the atlas
+exists: same `fmt`, `total` and all 8 `by_class` rows of length `sections.length`; a
+mismatch is a `FmtError` in `loadError`) and returns `nationalFlows`; nothing calls it yet,
+and the file is not in `web/public/assets` (the swap needs owner approval). New
+`lib/nationalFlows.ts`: `nationalCounts(nf, classes)` (the origin view's `classes` list,
+empty = `total`, else Σ `by_class[classIndex]`, deduplicated), `nationalWidths(counts,
+scale, fitScale)` (calls `palette.flowWidth`), `nationalFlowPasses(counts)` (one
+`FlowPass`, role `all`, n > 0 widest first with ties in section order, `maxN` = widest), so
+the deck flows layer's `buildPassData` path takes it unchanged. Tests
+(`tests/nationalFlows.test.ts`, synthetic 5-section pack): Σ by_class = total, class subsets,
+widths = `flowWidth`, pass order, the file check. Staged file vs the committed shared pack
+(scratch, not committed): 7,922 sections on both sides, 7,157 trains, widest 522 (also
+under G/D/C), Σ 462,064; parse 1.2 ms, counts + pass + widths 1.5 ms (Bun).
+
 **P3.3 A+B** — per-section cumulative entry counts per 5-min step from the national
 timelines' `trainEntries` (≈ 7.5k sections × 288 × 2 B ≈ 4.3 MB) or precomputed by the
 pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.

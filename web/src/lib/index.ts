@@ -63,6 +63,12 @@ export {
 } from "./timeline";
 export { buildNational, nat, natPositions, natState, natXY } from "./national";
 export {
+  nationalCounts,
+  nationalFlowPasses,
+  nationalWidths,
+  requireNationalFlows,
+} from "./nationalFlows";
+export {
   callArrMins,
   destWindow,
   stopArrivalTimes,
