@@ -580,6 +580,8 @@ is 4 px). Acceptance: `shots.mjs` deck vs Canvas (`--pixelmatch`) on `selected-c
 `anim-0600/1815/2350`, `labels-on` within the P1b.5 thresholds (C20); M13 tail probe repeated
 on the real build (source < 10 %, head ≥ 90 %).
 
+*As built (P1b.3):* full scene on deck (no `?layers=` filter; `?layers=flows` still omits stations and trains). Stations: `stations`, `ripples`, `origin`, `rings` layers; trains: `tails` (`TailLayer`, binary buffers), `trains` (binary, per-instance fill/line alpha 0.45 on chords), `dwell`, `trainring`; the train code tag is drawn on the label overlay. `pickable` is set (stations, origin, paused train dots) but picking itself is P1b.4. Pixelmatch deck vs Canvas, all 20 scenarios (14 + `--extended` 6) at DPR 1 and 2: 0.11-0.86 % (max `inbound-selected-city@2x`), `labels-on` 0.22/0.27 %. Solid >= 8x8 regions only in selected-destination scenarios and `class-filter-G` (12 px windows): the D3 pre-blended context flow has no round-joint overlap darkening; dots, rings, ripples, trains match. Masks (1x): `docs/deckgl-spike/p1b3/`. Deviations: draw order inside the train layers is tails, dots, dwell rings, hover rings (Canvas interleaves per train); ripples draw above all dots (Canvas: above their own dot only); a chord train's core is white at alpha 0.45 over paper (Canvas: over its own glow disc).
+
 **P1b.4 Interaction parity** — *after P1b.3.* `pointer.ts`, the hover handlers and
 `endPointer` tap semantics stay as they are (D17); only `pick()` changes. Files: new
 `lib/pick.ts` (`pickPriority(candidates, px, py)` over `{kind, distance, n, index}` candidates),
