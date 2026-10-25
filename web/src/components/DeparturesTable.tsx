@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   ArrVM,
   DecodedAtlas,
@@ -18,6 +18,13 @@ import {
   fmtTime,
   trainOrigins,
 } from "../lib";
+import {
+  arrStations,
+  callStations,
+  depStations,
+  inCallStations,
+  type StationCount,
+} from "../stationBreakdown";
 import Histograms, {
   type DistBinFilter,
   type DurBinFilter,
@@ -79,6 +86,25 @@ const CLASS_NAMES: Record<string, string> = {
   Y: "Y · Tourist",
   plain: "普 · Ordinary",
 };
+
+/** "重庆北 Chongqing North 82 · 重庆西 …": the heading's count split by station. */
+function StationLine({ stations }: { stations: StationCount[] | null }) {
+  if (!stations || stations.length === 0) return null;
+  return (
+    <p className="dep-stations" aria-label="Trains by station">
+      {stations.map((s, i) => (
+        <Fragment key={s.zh}>
+          {i > 0 && " · "}
+          <span className="dep-st">
+            {s.zh}
+            {s.en && s.en !== s.zh && <span className="dep-st-en"> {s.en}</span>}{" "}
+            <b>{s.n}</b>
+          </span>
+        </Fragment>
+      ))}
+    </p>
+  );
+}
 
 function pad2(n: number): string {
   return n < 10 ? "0" + n : String(n);
@@ -631,11 +657,17 @@ export default function DeparturesTable({
   let depNote: ReactNode;
   let showingNote: string;
   let chipNode: ReactNode = null;
+  let stations: StationCount[] | null = null;
   let tableNode: ReactNode;
 
   /* ---------------- outbound calls mode ---------------- */
   if (cur && destFilter) {
     const calls = destFilter.calls;
+    stations = callStations(
+      calls,
+      atlas ? atlas.data.station_table : [],
+      atlas?.schedules,
+    );
     const termCount = destFilter.terminating;
     const list = calls.filter((c) => {
       if (
@@ -860,6 +892,7 @@ export default function DeparturesTable({
   } else if (cur && srcFilter) {
     /* ---------------- inbound source mode ---------------- */
     const calls = srcFilter.inCalls;
+    stations = inCallStations(calls);
     const list = calls.filter((c) => {
       if (
         !matchesRowFilters(
@@ -1088,6 +1121,7 @@ export default function DeparturesTable({
   } else if (cur && direction === "in") {
     /* ---------------- inbound arrivals mode ---------------- */
     const arrs = cur.arrs;
+    stations = arrStations(arrs);
     const list: ArrVM[] = arrs.filter(
       (a) =>
         matchesRowFilters(a.arr, a.distKm, a.dur, a.cls, a.code) &&
@@ -1270,6 +1304,7 @@ export default function DeparturesTable({
   } else {
     /* ---------------- outbound departures mode ---------------- */
     const deps = cur ? cur.deps : [];
+    stations = depStations(deps);
     const list = deps.filter(
       (d) =>
         matchesRowFilters(d.dep, d.distKm, d.dur, d.cls, d.code) &&
@@ -1444,6 +1479,7 @@ export default function DeparturesTable({
   return (
     <section id="departures">
       <h2>{heading}</h2>
+      <StationLine stations={stations} />
       <p className="dep-note">{depNote}</p>
       {cur ? (
         <Histograms
