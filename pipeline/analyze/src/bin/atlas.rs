@@ -1273,11 +1273,15 @@ fn main() {
     let seqs_of = |k: &(String, String, String)| leg_seqs(k, &leg_cache, &variant_cache);
     let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
+    let mut edge_trains = chains::EdgeTrains::new();
     for (ci, w) in works.iter().enumerate() {
-        for (cidx, _, legs) in w.train_leg_keys.iter() {
+        for (k, (cidx, _, legs)) in w.train_leg_keys.iter().enumerate() {
             let eset =
                 flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
+            let mark = chains::train_mark(ci, k);
             for e in eset {
+                let m = edge_trains.entry(e).or_insert(0);
+                *m = m.wrapping_add(mark);
                 *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
                 edge_class_counts
                     .entry(e)
@@ -1291,7 +1295,7 @@ fn main() {
     // intern count signatures: a global section has constant per-city counts
     let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
     println!("distinct signatures: {}", sig_list.len());
-    let section_chains = chains::build_section_chains(&edge_sig);
+    let section_chains = chains::build_section_chains(&edge_sig, &edge_trains);
     // section endpoint station names (nearest real station point)
     let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
     for (a, b) in path_map.keys() {
@@ -1410,11 +1414,15 @@ fn main() {
     // ---- inbound atomic sections: same machinery, indexed by dest city ----
     let mut in_edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut in_edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
+    let mut in_edge_trains = chains::EdgeTrains::new();
     for (ci, w) in in_works.iter().enumerate() {
-        for (cidx, _, legs) in w.train_leg_keys.iter() {
+        for (k, (cidx, _, legs)) in w.train_leg_keys.iter().enumerate() {
             let eset =
                 flows::train_edges(legs, seqs_of, coords, |p| near_station(&in_station_grid, p));
+            let mark = chains::train_mark(ci, k);
             for e in eset {
+                let m = in_edge_trains.entry(e).or_insert(0);
+                *m = m.wrapping_add(mark);
                 *in_edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
                 in_edge_class_counts
                     .entry(e)
@@ -1426,7 +1434,7 @@ fn main() {
     }
     println!("union inbound atomic edges: {}", in_edge_counts.len());
     let (in_sig_list, in_edge_sig) = chains::intern_sigs(&in_edge_counts, &in_edge_class_counts);
-    let in_section_chains = chains::build_section_chains(&in_edge_sig);
+    let in_section_chains = chains::build_section_chains(&in_edge_sig, &in_edge_trains);
     let mut in_edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
     let mut in_sections: Vec<AtlasSection> = Vec::new();
     let mut in_flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); in_works.len()];

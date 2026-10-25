@@ -1616,8 +1616,9 @@ fn main() {
     // atomic edge -> per-city DISTINCT train counts (dedup, as production)
     let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
+    let mut edge_trains = chains::EdgeTrains::new();
     for (ci, w) in works.iter().enumerate() {
-        for (legs, cidx) in w.train_leg_keys.iter().zip(w.train_cls.iter()) {
+        for (k, (legs, cidx)) in w.train_leg_keys.iter().zip(w.train_cls.iter()).enumerate() {
             let mut eset: HashSet<(i64, i64)> = HashSet::new();
             for key in legs.iter() {
                 let seqs = match leg_seqs(key, &leg_cache, &variant_cache) {
@@ -1642,7 +1643,10 @@ fn main() {
                     }
                 }
             }
+            let mark = chains::train_mark(ci, k);
             for e in eset {
+                let m = edge_trains.entry(e).or_insert(0);
+                *m = m.wrapping_add(mark);
                 *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
                 edge_class_counts
                     .entry(e)
@@ -1656,7 +1660,7 @@ fn main() {
     // intern count signatures: a global section has constant per-city counts
     let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
     println!("distinct signatures: {}", sig_list.len());
-    let section_chains = chains::build_section_chains(&edge_sig);
+    let section_chains = chains::build_section_chains(&edge_sig, &edge_trains);
     // section endpoint station names (nearest real station point)
     let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
     for (a, b) in path_map.keys() {
