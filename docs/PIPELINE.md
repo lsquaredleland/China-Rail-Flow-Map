@@ -154,7 +154,8 @@ strip 12306's space-typeset names) are documented in origin project notes.
 go-ahead; `docs/corridor-v3-report.md`): per-train corridor
 routing + double track merged into one corridor. The router's two outputs
 live in `data/derived/corridor-v3/` (or regenerate with `pipeline/router`,
-~20 s). The live pack is built WITH `data/leg_overrides.json` (see "Actual
+~20 s; modules, `--config` TOML thresholds and how to plug in another
+schedule or OSM network: `pipeline/router/README.md`). The live pack is built WITH `data/leg_overrides.json` (see "Actual
 live recipe" below); an empty-overrides build does not reproduce it. A bare
 `atlas` run loads `leg_overrides.json` (§4) by default.
 Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).

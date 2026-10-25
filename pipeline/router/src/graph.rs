@@ -1,7 +1,11 @@
-//! Attributed rail graph: the same topology as `analyze-rs/src/graph.rs`
+//! Network seam: OSM extract -> attributed rail graph. With the default
+//! `NetworkConfig` this is the same topology as `analyze/src/graph.rs`
 //! (railway=rail + railway=ferry ways, components stitched at <= 250 m),
 //! but every edge also carries a speed limit, a high-speed flag, a
 //! service flag and its line name, so paths can be costed in time.
+//! Which ways count as track, which tag names a line, the stitch radius
+//! and the speed defaults all come from `NetworkConfig`.
+use crate::config::NetworkConfig;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::collections::HashMap;
@@ -18,10 +22,6 @@ pub const F_PROD: u8 = 16;
 /// Cost factor on F_PROD edges.
 const PROD_DISCOUNT: f64 = 0.97;
 pub const NO_LINE: u32 = u32::MAX;
-
-/// Speed (km/h) assumed for a train-ferry link, which also carries a
-/// fixed handling time in the run-time model.
-pub const FERRY_KMH: f64 = 15.0;
 
 /// Great-circle distance in km between two [lat, lon] points.
 pub fn hav(a: [f64; 2], b: [f64; 2]) -> f64 {
@@ -126,25 +126,23 @@ struct WayTags {
 impl WayTags {
     /// Speed limit used for routing: the tagged maxspeed, else a default
     /// from the way's role (high-speed line, main line, branch, sidings).
-    fn vmax(&self) -> f64 {
+    fn vmax(&self, cfg: &NetworkConfig) -> f64 {
         if self.ferry {
-            return FERRY_KMH;
+            return cfg.ferry_kmh;
         }
         if self.service {
-            return 30.0;
+            return cfg.service_kmh;
         }
         if let Some(v) = self.maxspeed {
-            return v.clamp(10.0, 350.0);
+            return v.clamp(cfg.maxspeed_min, cfg.maxspeed_max);
         }
         if self.highspeed {
-            return 250.0;
+            return cfg.highspeed_kmh;
         }
-        match self.usage.as_str() {
-            "main" => 120.0,
-            "branch" => 80.0,
-            "industrial" | "military" | "tourism" | "test" => 40.0,
-            _ => 100.0,
-        }
+        cfg.usage_kmh
+            .get(self.usage.as_str())
+            .copied()
+            .unwrap_or(cfg.default_kmh)
     }
 
     fn flags(&self) -> u8 {
@@ -175,8 +173,16 @@ fn attr(e: &quick_xml::events::BytesStart, key: &str) -> String {
 }
 
 /// Two passes over the rail extract (ways with tags, then node coords),
-/// then the <= 250 m component stitching used by the production graph.
-pub fn build(osm_path: &std::path::Path) -> Graph {
+/// then the component stitching used by the production graph.
+pub fn build(osm_path: &std::path::Path, cfg: &NetworkConfig) -> Graph {
+    assert!(
+        cfg.stitch_km <= 1.0,
+        "network.stitch_km must be <= 1.0 (stitch grid reach)"
+    );
+    assert!(
+        cfg.maxspeed_max <= 350.0 && cfg.highspeed_kmh <= 350.0,
+        "edge speeds above 350 km/h break the A* bound (Metric::bound)"
+    );
     let mut ways: Vec<(Vec<u64>, u16, u8, u32)> = Vec::new();
     let mut lines: Vec<String> = Vec::new();
     let mut line_idx: HashMap<String, u32> = HashMap::new();
@@ -201,18 +207,23 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
                 }
                 Ok(Event::Empty(e)) if in_way && e.name().as_ref() == b"tag" => {
                     let v = attr(&e, "v");
-                    match attr(&e, "k").as_str() {
-                        "railway" => match v.as_str() {
-                            "rail" => tags.rail = true,
-                            "ferry" => tags.ferry = true,
+                    let k = attr(&e, "k");
+                    if k == cfg.way_key {
+                        if cfg.rail_values.contains(&v) {
+                            tags.rail = true;
+                        } else if cfg.ferry_values.contains(&v) {
+                            tags.ferry = true;
+                        }
+                    } else if k == cfg.name_key {
+                        tags.name = v;
+                    } else {
+                        match k.as_str() {
+                            "maxspeed" => tags.maxspeed = parse_speed(&v),
+                            "highspeed" => tags.highspeed = v == "yes",
+                            "service" => tags.service = true,
+                            "usage" => tags.usage = v,
                             _ => {}
-                        },
-                        "maxspeed" => tags.maxspeed = parse_speed(&v),
-                        "highspeed" => tags.highspeed = v == "yes",
-                        "service" => tags.service = true,
-                        "usage" => tags.usage = v,
-                        "name" => tags.name = v,
-                        _ => {}
+                        }
                     }
                 }
                 Ok(Event::End(e)) if e.name().as_ref() == b"way" => {
@@ -229,7 +240,7 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
                         };
                         ways.push((
                             std::mem::take(&mut refs),
-                            tags.vmax().round() as u16,
+                            tags.vmax(cfg).round() as u16,
                             tags.flags(),
                             line,
                         ));
@@ -305,7 +316,7 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
         })
         .collect();
 
-    // ---- stitch near-touching components (<= 250 m), as in production ----
+    // ---- stitch near-touching components (<= stitch_km), as in production ----
     let mut comp = vec![-1i32; n];
     let mut n_comp = 0i32;
     for s in 0..n {
@@ -341,7 +352,7 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
                         continue;
                     }
                     let d = hav(pt, coords[v as usize]);
-                    if d <= 0.25 {
+                    if d <= cfg.stitch_km {
                         let e =
                             best.entry((cu.min(cv), cu.max(cv)))
                                 .or_insert((f64::INFINITY, 0, 0));
@@ -356,6 +367,7 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
     // stitch edges in component-pair order, not hash order, so adjacency
     // (and with it every exact-cost tie in A*/Dijkstra) is reproducible
     let n_stitch = best.len();
+    let stitch_vmax = cfg.stitch_kmh.round() as u16;
     let mut stitches: Vec<_> = best.into_iter().collect();
     stitches.sort_unstable_by_key(|(k, _)| *k);
     for (_, (d, u, v)) in stitches {
@@ -363,7 +375,7 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
             adj[x as usize].push(Edge {
                 to: y,
                 km: d as f32,
-                vmax: 40,
+                vmax: stitch_vmax,
                 flags: F_STITCH,
                 line: NO_LINE,
             });
@@ -780,6 +792,32 @@ mod tests {
         assert!((parse_speed("60 mph").unwrap() - 96.54).abs() < 0.01);
         assert_eq!(parse_speed("signals"), None);
         assert_eq!(parse_speed("none"), None);
+    }
+
+    #[test]
+    fn way_filter_and_speeds_follow_network_config() {
+        let osm = r#"<osm>
+<node id="1" lat="30.0" lon="120.0"/><node id="2" lat="30.0" lon="120.01"/><node id="3" lat="30.0" lon="120.02"/>
+<way id="1"><nd ref="1"/><nd ref="2"/><tag k="railway" v="rail"/><tag k="usage" v="main"/><tag k="name" v="A"/></way>
+<way id="2"><nd ref="2"/><nd ref="3"/><tag k="railway" v="light_rail"/><tag k="name:en" v="B"/></way>
+</osm>"#;
+        let p = std::env::temp_dir().join(format!("router-graph-test-{}.osm", std::process::id()));
+        std::fs::write(&p, osm).unwrap();
+        let china = build(&p, &NetworkConfig::default());
+        assert_eq!(china.ids, vec![1, 2]);
+        assert_eq!(china.adj[0][0].vmax, 120);
+        assert_eq!(china.lines, vec!["A".to_string()]);
+        let cfg = NetworkConfig {
+            rail_values: vec!["rail".into(), "light_rail".into()],
+            name_key: "name:en".into(),
+            default_kmh: 70.0,
+            ..NetworkConfig::default()
+        };
+        let other = build(&p, &cfg);
+        std::fs::remove_file(&p).unwrap();
+        assert_eq!(other.ids, vec![1, 2, 3]);
+        assert_eq!(other.edge(1, 2).unwrap().vmax, 70);
+        assert_eq!(other.lines, vec!["B".to_string()]);
     }
 
     #[test]
