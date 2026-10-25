@@ -604,9 +604,39 @@ pub fn city_of(station_name: &str) -> String {
     }
 }
 
+/// Adjudicated city points `(city, lon, lat)` that replace the "most-called
+/// station" rule in the atlas, where that rule lands on the wrong place
+/// (formerly patched in the browser, backlog O10):
+/// - 铜仁: the busiest station is 铜仁南 (28 calls), ~50 km away in Yuping;
+///   the point is the city station / downtown.
+/// - 兰溪: its only called stations are 兰溪东 and 大洋, and 大洋 has two OSM
+///   candidates (Lanxi and a Qingdao one); the tie picked Shandong. The point
+///   is the Lanxi urban area, Jinhua, Zhejiang.
+/// - 溆浦: the busiest station is 溆浦南 (22 calls), outside town; the point
+///   is 溆浦 downtown.
+const CITY_POINTS: &[(&str, f64, f64)] = &[
+    ("铜仁", 109.1995, 27.7306),
+    ("兰溪", 119.5074, 29.2152),
+    ("溆浦", 110.594, 27.908),
+];
+
+/// `[lat, lon]` override for a city, if one is adjudicated.
+pub fn city_point_override(city: &str) -> Option<[f64; 2]> {
+    CITY_POINTS
+        .iter()
+        .find(|(c, _, _)| *c == city)
+        .map(|&(_, lon, lat)| [lat, lon])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn city_point_overrides_are_lat_lon() {
+        assert_eq!(city_point_override("兰溪"), Some([29.2152, 119.5074]));
+        assert_eq!(city_point_override("北京"), None);
+    }
 
     #[test]
     fn city_of_applies_the_adjudicated_corrections() {

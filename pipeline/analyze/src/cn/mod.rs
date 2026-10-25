@@ -8,7 +8,7 @@ pub mod gazetteer;
 pub mod station_en;
 
 pub use classes::class_idx;
-pub use gazetteer::{city2, city_of};
+pub use gazetteer::{city2, city_of, city_point_override};
 pub use station_en::station_en;
 
 /// Cities always offered as origins even when outside the top 100 by outbound
