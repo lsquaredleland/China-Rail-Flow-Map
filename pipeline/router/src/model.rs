@@ -217,12 +217,13 @@ impl Cand {
                 *r += FERRY_HANDLING_MIN;
             }
         }
-        let mut lines: Vec<(String, f64)> = by_line
+        let mut lines: Vec<(u32, String, f64)> = by_line
             .into_iter()
             .filter(|(l, _)| *l != crate::graph::NO_LINE)
-            .map(|(l, d)| (g.lines[l as usize].clone(), d))
+            .map(|(l, d)| (l, g.lines[l as usize].clone(), d))
             .collect();
-        lines.sort_by(|a, b| b.1.total_cmp(&a.1));
+        lines.sort_by(|a, b| b.2.total_cmp(&a.2).then(a.0.cmp(&b.0)));
+        let mut lines: Vec<(String, f64)> = lines.into_iter().map(|(_, n, d)| (n, d)).collect();
         lines.truncate(3);
         let (head_start, head_end) = end_bearings(g, &nodes);
         Cand {

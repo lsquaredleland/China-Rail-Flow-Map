@@ -266,10 +266,24 @@ fn gen_candidates(
     cands
 }
 
+/// The bridge to draw among `(gap, total, a-node, b-node)` candidates: the
+/// smallest gap, or any within 50 m of it; those compete on total length,
+/// then node ids. Depends on the set only, never on its order.
+fn pick_bridge(found: Vec<(f64, f64, u32, u32)>) -> Option<(u32, u32)> {
+    let gmin = found.iter().map(|c| c.0).fold(f64::INFINITY, f64::min);
+    found
+        .into_iter()
+        .filter(|c| c.0 <= gmin + 0.05)
+        .min_by(|a, b| a.1.total_cmp(&b.1).then(a.2.cmp(&b.2)).then(a.3.cmp(&b.3)))
+        .map(|c| (c.2, c.3))
+}
+
 /// Smallest-gap bridge between the two stations' track networks: the
 /// connection must start at a dangling track end on one side, and the
 /// bridged length must pass production's audits. Among plausible
-/// connections the smallest gap wins (ties: shorter total).
+/// connections the smallest gap wins; connections within 50 m of that gap
+/// compete on total length, then on node ids, so the winner depends on the
+/// candidate set only, never on iteration order.
 fn min_gap_bridge(g: &Graph, p: &PairInfo, sa: &Snap, sb: &Snap) -> Option<Cand> {
     let radius = (p.chord * 1.2 + 15.0).min(130.0);
     let ta = graph::reach(g, sa, radius);
@@ -289,13 +303,14 @@ fn min_gap_bridge(g: &Graph, p: &PairInfo, sa: &Snap, sb: &Snap) -> Option<Cand>
         Some(m) if m > 0.0 => total / (m / 60.0) <= BRIDGE_MAX_KMH,
         _ => true,
     };
-    let mut best: Option<(f64, f64, u32, u32)> = None; // (gap, total, a-node, b-node)
+    // (gap, total, a-node, b-node) of every plausible connection
+    let mut found: Vec<(f64, f64, u32, u32)> = Vec::new();
     let scan = |from: &HashMap<u32, (f64, u32)>,
                 other: &HashMap<u32, (f64, u32)>,
                 grid: &HashMap<(i32, i32), Vec<u32>>,
                 a_side: bool,
                 dangling_only: bool,
-                best: &mut Option<(f64, f64, u32, u32)>| {
+                found: &mut Vec<(f64, f64, u32, u32)>| {
         for (&u, &(du, _)) in from {
             if dangling_only && g.degree[u as usize] != 1 {
                 continue;
@@ -317,31 +332,23 @@ fn min_gap_bridge(g: &Graph, p: &PairInfo, sa: &Snap, sb: &Snap) -> Option<Cand>
                         if ratio < BRIDGE_RATIO.0 || ratio > BRIDGE_RATIO.1 || !speed_ok(total) {
                             continue;
                         }
-                        let better = match *best {
-                            None => true,
-                            Some((bg, bt, _, _)) => {
-                                gap < bg - 0.05 || ((gap - bg).abs() <= 0.05 && total < bt)
-                            }
-                        };
-                        if better {
-                            *best = Some(if a_side {
-                                (gap, total, u, v)
-                            } else {
-                                (gap, total, v, u)
-                            });
-                        }
+                        found.push(if a_side {
+                            (gap, total, u, v)
+                        } else {
+                            (gap, total, v, u)
+                        });
                     }
                 }
             }
         }
     };
-    scan(&ta, &tb, &gb, true, true, &mut best);
-    scan(&tb, &ta, &ga, false, true, &mut best);
-    if best.is_none() {
-        scan(&ta, &tb, &gb, true, false, &mut best);
-        scan(&tb, &ta, &ga, false, false, &mut best);
+    scan(&ta, &tb, &gb, true, true, &mut found);
+    scan(&tb, &ta, &ga, false, true, &mut found);
+    if found.is_empty() {
+        scan(&ta, &tb, &gb, true, false, &mut found);
+        scan(&tb, &ta, &ga, false, false, &mut found);
     }
-    let (_, _, u, v) = best?;
+    let (u, v) = pick_bridge(found)?;
     let mut nodes = graph::reach_path(&ta, u);
     let mut tail = graph::reach_path(&tb, v);
     tail.reverse();
@@ -1365,4 +1372,27 @@ fn validate(
         "switches_correct": switch_ok,
         "per_class": per_class,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_bridge;
+
+    #[test]
+    fn bridge_choice_ignores_candidate_order() {
+        // gaps 0.010 / 0.040 / 0.045 are within 50 m of the smallest; 0.2 is not
+        let c = vec![
+            (0.040, 31.0, 7, 9),
+            (0.010, 30.0, 5, 8),
+            (0.045, 29.0, 4, 6),
+            (0.200, 10.0, 1, 2),
+            (0.045, 29.0, 3, 6),
+        ];
+        let want = Some((3, 6)); // shortest total in the 50 m band, then lowest node ids
+        let mut rev = c.clone();
+        rev.reverse();
+        assert_eq!(pick_bridge(c), want);
+        assert_eq!(pick_bridge(rev), want);
+        assert_eq!(pick_bridge(Vec::new()), None);
+    }
 }

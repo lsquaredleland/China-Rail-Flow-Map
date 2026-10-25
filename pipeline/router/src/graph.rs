@@ -353,7 +353,12 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
             }
         }
     }
-    for &(d, u, v) in best.values() {
+    // stitch edges in component-pair order, not hash order, so adjacency
+    // (and with it every exact-cost tie in A*/Dijkstra) is reproducible
+    let n_stitch = best.len();
+    let mut stitches: Vec<_> = best.into_iter().collect();
+    stitches.sort_unstable_by_key(|(k, _)| *k);
+    for (_, (d, u, v)) in stitches {
         for (x, y) in [(u, v), (v, u)] {
             adj[x as usize].push(Edge {
                 to: y,
@@ -369,7 +374,7 @@ pub fn build(osm_path: &std::path::Path) -> Graph {
         n,
         ways.len(),
         n_comp,
-        best.len(),
+        n_stitch,
         lines.len()
     );
     Graph {
