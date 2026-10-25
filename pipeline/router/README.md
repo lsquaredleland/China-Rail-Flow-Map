@@ -34,7 +34,7 @@ library (`src/lib.rs`), which `src/bin/cordcheck.rs` uses too.
 | | `model.rs` | `Cand`, `Shape`, run-time model, `Calibration`, `emissions`, forward-backward `posteriors` |
 | | `infer.rs` | Calibration samples, bridge selection, the per-train chains, calls `decide` |
 | | `decide.rs` | `decide(obs, posteriors, cfg) -> Decision`: the pure decision policy, with its tests |
-| | `canon.rs` | Canonical double-track-merged geometry (`best_for_canon`, `redraw`, `canonical`) |
+| | `canon.rs` | Canonical double-track-merged geometry (`best_for_canon` by `[canon] mode`, `redraw`, `canonical`) |
 | | `validate.rs` | The hidden-stop self-check |
 | **Outputs** | `output.rs` | Writers for `leg_routes.jsonl`, `leg_paths.json`, `pair_paths_canonical.json`, `candidates.json`, `bridges.json`, `validation_wrong_switches.jsonl`, `summary.json` |
 
@@ -84,6 +84,76 @@ switch_post = 0.95      # stricter switches; everything else stays default
 [network]
 rail_values = ["rail", "light_rail"]
 name_key = "name:en"
+```
+
+### Canonical geometry: `[canon] mode`
+
+A pair's canonical geometry (`pair_paths_canonical.json`, after the
+double-track redraw) is what the map draws for every leg that does not
+draw its own path: every outcome except `switched`, `filled` and
+`bridge-fix`. It also sets the track usage that those own paths are
+redrawn onto.
+
+| `mode` | Picks |
+|---|---|
+| `shortest` (default) | The shortest gap-free candidate, else production. The shipped corridor-v3-o17 behaviour. |
+| `production` | Production's path when gap-free, else as `shortest`. |
+| `hybrid` | As `production`, unless the pair's timetabled legs favour another gap-free candidate. |
+
+The hybrid rule:
+
+1. Each leg of the pair is scored with its own class's prediction, so
+   the pair's class mix weights the evidence. Legs whose class cannot
+   use production are left out. An alternative that some remaining
+   leg's class cannot use is not eligible.
+2. A candidate's error on a leg is how many minutes the timetable is
+   faster than the candidate allows: `max(0, predict(c) * p5_c - t)`,
+   where `p5_c` is the class's fast-edge scheduled/model ratio from
+   calibration.
+   - It is one-sided because a train can always run slower than its
+     track allows (recovery time, overnight sleepers). A slow timetable
+     is no evidence for a longer path.
+   - It uses the fast edge, not the median, so ordinary spread and
+     speed-tag error are no evidence either.
+3. An alternative clears the margins only if it beats production's
+   mean error by both of:
+   - at least `margin_min` minutes, plus `longer_min_per_km` for every
+     km it is longer than production;
+   - at least `margin_rel` of production's error.
+
+   The evidence must also cover at least `min_legs` legs.
+
+   The per-km term exists because a prediction is only as good as the
+   speed tags. 广深线 is mostly tagged maxspeed 140 in OSM, below its
+   real operating speed. Without the per-km term, a 50–60 km longer
+   high-speed loop "fit" its C/D trains better by about 3–4 minutes.
+4. Of the alternatives that clear the margins, the best-fitting one
+   wins, the shortest on ties. If none clears them, production stays.
+5. With `require_router_agreement = true` (default `false`, set in
+   `recipe.toml`), a pair may leave production only if the router
+   disagrees with production on at least one of its legs
+   (`canon::router_disagrees`). A leg disagrees in two cases:
+   - its `decide()` outcome draws its own path (`switched`, `filled`,
+     `bridge-fix`) on a candidate that is not production's; or
+   - its outcome is `ambiguous-keep` and its best guess, the posterior
+     argmax, is not production's.
+
+   Every other outcome agrees with production: `production`,
+   `infeasible-keep`, `chord`, `no-candidates`, `not-routed`. The guard
+   keeps the map's pair geometry consistent with the router's per-leg
+   evidence, including the length prior and stopping services. A pair
+   the router keeps entirely on production, such as 广州–深圳 on 广深线,
+   stays there.
+
+The margin defaults (`margin_min = 1.0`, `longer_min_per_km = 0.1`,
+`margin_rel = 0.2`, `min_legs = 1`) were picked on a train-hash
+tune/holdout split. The router-agreement guard was the owner's choice. They only take effect in `hybrid` mode. The recipe
+passes `--config recipe.toml`, which sets `mode = "hybrid"` with these
+margins and `require_router_agreement = true`:
+
+```toml
+[canon]
+mode = "hybrid"
 ```
 
 `main` installs the config once (`config::install`). The run-time model

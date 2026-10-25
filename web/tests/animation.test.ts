@@ -92,7 +92,7 @@ describe("final-step flows == static flows", () => {
       // per edge by design (docs/PIPELINE.md). The 成都 out-and-back loop
       // (8362, [2, 4]) was fixed by O18's class-vector chain split. The count
       // must not grow.
-      expect(mism).toEqual(zh === "成都" ? [[8250, 1, 2]] : []);
+      expect(mism).toEqual(zh === "成都" ? [[7762, 1, 2]] : []);
       // and nothing lights up that is not in the static flows
       const known = new Set(o.flows.map((f) => f.s));
       for (const [s, a] of tl.secFlowSteps) if (a[lastStep(tl)] > 0) expect(known.has(s)).toBe(true);

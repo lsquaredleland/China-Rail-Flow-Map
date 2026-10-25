@@ -270,6 +270,22 @@ impl Default for DecideConfig {
     }
 }
 
+/// Which candidate becomes a pair's canonical map geometry
+/// (`canon::best_for_canon`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CanonMode {
+    /// The shortest gap-free candidate, else production. The shipped
+    /// corridor-v3-o17 behaviour.
+    #[default]
+    Shortest,
+    /// Production's path when gap-free, else as `Shortest`.
+    Production,
+    /// As `Production`, unless the pair's timetabled legs fit another
+    /// gap-free candidate better by `margin_min` and `margin_rel`.
+    Hybrid,
+}
+
 /// Canonical (double-track-merged) map geometry.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -278,6 +294,26 @@ pub struct CanonConfig {
     pub buffer_km: f64,
     /// Usage re-weighting rounds (busier parallel track wins).   [4]
     pub rounds: usize,
+    /// "shortest" | "production" | "hybrid".                    [shortest]
+    pub mode: CanonMode,
+    /// Hybrid: the alternative's timetable error over the pair's legs
+    /// (minutes the timetable is faster than the path allows at the
+    /// class's fast edge; `canon::best_for_canon`) must beat production's
+    /// by at least this many minutes...                          [1.0]
+    pub margin_min: f64,
+    /// ...plus this many minutes per km the alternative is longer than
+    /// production...                                             [0.1]
+    pub longer_min_per_km: f64,
+    /// ...and by at least this share of production's error...   [0.2]
+    pub margin_rel: f64,
+    /// ...on at least this many timetabled legs.                 [1]
+    pub min_legs: usize,
+    /// Hybrid: a pair may leave production only if the router disagrees
+    /// with production on at least one of its legs: an own path
+    /// (`switched` / `filled` / `bridge-fix`) on a non-production
+    /// candidate, or `ambiguous-keep` with a non-production best guess
+    /// (`canon::router_disagrees`).                             [false]
+    pub require_router_agreement: bool,
 }
 
 impl Default for CanonConfig {
@@ -285,6 +321,12 @@ impl Default for CanonConfig {
         CanonConfig {
             buffer_km: 0.2,
             rounds: 4,
+            mode: CanonMode::Shortest,
+            margin_min: 1.0,
+            longer_min_per_km: 0.1,
+            margin_rel: 0.2,
+            min_legs: 1,
+            require_router_agreement: false,
         }
     }
 }
@@ -361,5 +403,16 @@ mod tests {
         assert_eq!(p.decide.base_max, 0.05);
         assert_eq!(p.network.rail_values, vec!["rail".to_string()]);
         assert!(toml::from_str::<Config>("[decide]\nswitch_pst = 1.0\n").is_err());
+    }
+
+    #[test]
+    fn canon_mode_parses_lowercase_and_defaults_to_shortest() {
+        assert_eq!(Config::default().canon.mode, CanonMode::Shortest);
+        let p: Config = toml::from_str("[canon]\nmode = \"hybrid\"\nmargin_min = 2.0\n").unwrap();
+        assert_eq!(p.canon.mode, CanonMode::Hybrid);
+        assert_eq!(p.canon.margin_min, 2.0);
+        assert_eq!(p.canon.margin_rel, 0.2);
+        assert_eq!(p.canon.rounds, 4);
+        assert!(toml::from_str::<Config>("[canon]\nmode = \"longest\"\n").is_err());
     }
 }
