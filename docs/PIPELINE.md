@@ -203,10 +203,9 @@ source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp
 # recipe.toml sets the canonical pair geometry to `[canon] mode = "hybrid"`
 # (production's path unless the pair's timetable favours another one; the
 # rule and its margins are in pipeline/router/README.md, PR #23).
-# PENDING THE HYBRID PACK SWAP: the committed pack is still the default-config
-# build (`--out .../corridor-v3-o17`, no --config, canonical = shortest). To
-# reproduce it, point C below at corridor-v3-o17; the secdiff then reports 0
-# changed edges. The hybrid build differs from it by ~1.01M fine edges.
+# The committed pack is this hybrid build (swapped 2026-10-24, PR #23). The
+# previous default-config build (canonical = shortest) came from
+# corridor-v3-o17 without --config; it differs by ~1.01M fine edges.
 # pair_path_fixes.json goes FIRST (first record per pair wins): pairs whose
 # station snapped to a homonym (禹州, 郏县; 恩平/江门–阳江, which the router
 # leaves bridged). Regenerate with scripts/o9_fix_paths.py (header has the
@@ -225,7 +224,7 @@ AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + go
 #   AUDIT_PACK_DIR=../web/public/assets ./target/release/audit --pack-only --goldens goldens.json
 # --pack-only cannot gate dropped_chains / flow_lost: they need the OSM extract
 # (a dropped chain never reaches the pack), so only the full run enforces them.
-./target/release/secdiff --old ../staging/determinism/o17/final-atlas/china-flow-atlas-data.json \
+./target/release/secdiff --old ../staging/swap-hybrid/china-flow-atlas-data.json \
     --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
 ./target/release/secdiff --old ... --new ... --classes   # per-edge class columns (8 classes)
 # router, atlas and atlaspack are deterministic: identical inputs give a
