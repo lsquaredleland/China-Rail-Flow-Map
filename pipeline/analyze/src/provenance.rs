@@ -4,14 +4,19 @@
 //! copies it to `shared.build`; `audit` prints it. The client ignores it.
 //!
 //! ```json
-//! { "commit": "<git HEAD, +dirty if tracked files are modified>",
+//! { "pipeline_tree": "<tree hash of pipeline/ at HEAD>", "dirty": true,
 //!   "osm_sha256": "...", "leg_paths_sha256": "...",
 //!   "pair_paths_sha256": "...", "overrides_sha256": "..." }
 //! ```
 //!
 //! `pair_paths_sha256` hashes the pair-path files concatenated in priority
 //! order (`ATLAS_PAIR_PATHS`). A hash is `null` when its input is absent.
-//! `CRFM_BUILD_COMMIT` overrides the commit (builds outside a git checkout).
+//!
+//! `pipeline_tree` is `HEAD:pipeline`'s tree hash, so it changes only when
+//! pipeline code does (a docs-only commit leaves the pack bytes alone).
+//! `dirty: true` is present only when `pipeline/` has uncommitted changes
+//! (tracked or untracked, not ignored); the key is omitted when clean.
+//! `CRFM_PIPELINE_TREE` overrides the tree (builds outside a git checkout).
 
 use crate::inputs::{pair_path_files, Inputs};
 use crate::legs::leg_paths_file;
@@ -42,36 +47,36 @@ fn git(args: &[&str]) -> Option<String> {
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// The code revision: `CRFM_BUILD_COMMIT`, else `git rev-parse HEAD` in the
-/// working directory (suffixed `+dirty` when tracked files are modified),
-/// else `"unknown"`.
-pub fn commit() -> String {
-    if let Ok(c) = std::env::var("CRFM_BUILD_COMMIT") {
+/// Tree hash of `pipeline/` at HEAD (`CRFM_PIPELINE_TREE` overrides), or
+/// `"unknown"`.
+pub fn pipeline_tree() -> String {
+    if let Ok(c) = std::env::var("CRFM_PIPELINE_TREE") {
         return c;
     }
-    match git(&["rev-parse", "HEAD"]) {
-        Some(h)
-            if git(&["status", "--porcelain", "--untracked-files=no"])
-                .is_some_and(|s| s.is_empty()) =>
-        {
-            h
-        }
-        Some(h) => format!("{h}+dirty"),
-        None => "unknown".to_string(),
-    }
+    git(&["rev-parse", "HEAD:pipeline"]).unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Does `pipeline/` have uncommitted changes? (`:/pipeline` is relative to
+/// the repository root, so the working directory does not matter.)
+pub fn pipeline_dirty() -> bool {
+    git(&["status", "--porcelain", "--", ":/pipeline"]).is_some_and(|s| !s.is_empty())
 }
 
 /// The `build` block for the inputs this run read.
 pub fn build_block(inp: &Inputs) -> Value {
     let leg = leg_paths_file(&inp.paths.data_dir);
     let pair = pair_path_files(&inp.paths.data_dir);
-    json!({
-        "commit": commit(),
+    let mut b = json!({
+        "pipeline_tree": pipeline_tree(),
         "osm_sha256": sha256_hex(&inp.osm_data),
         "leg_paths_sha256": sha256_files(&[leg]),
         "pair_paths_sha256": sha256_files(&pair),
         "overrides_sha256": sha256_files(std::slice::from_ref(&inp.paths.overrides_path)),
-    })
+    });
+    if pipeline_dirty() {
+        b["dirty"] = json!(true);
+    }
+    b
 }
 
 #[cfg(test)]

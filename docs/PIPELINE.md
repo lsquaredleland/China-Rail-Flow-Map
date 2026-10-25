@@ -281,14 +281,16 @@ rebuild, and what `audit` expands to):
   and station names normalized.
 
 **Provenance (`shared.build`).** `atlas` records, and `atlaspack` copies into
-`atlas-v2-shared.json`, `build = { commit, osm_sha256, leg_paths_sha256,
-pair_paths_sha256, overrides_sha256 }`; `audit` prints it. `commit` is the
-checkout's HEAD (with `+dirty` if tracked files are modified; the
-`CRFM_BUILD_COMMIT` env overrides it). The hashes are SHA-256 of the input
-files as read (`pair_paths_sha256`: the `ATLAS_PAIR_PATHS` files concatenated
-in priority order); `null` when an input is absent. The client ignores it.
-Because it contains the commit, `shared` bytes change with every commit even
-when the pipeline output does not; every other pack file is unaffected. To
+`atlas-v2-shared.json`, `build = { pipeline_tree, osm_sha256, leg_paths_sha256,
+pair_paths_sha256, overrides_sha256 }` (plus `dirty: true`, only when
+`pipeline/` has uncommitted changes); `audit` prints it. `pipeline_tree` is the
+tree hash of `pipeline/` at HEAD (`CRFM_PIPELINE_TREE` overrides it), so it
+changes only when pipeline code does: a docs-only commit leaves every pack
+byte unchanged and the rebuild still `cmp`s against `web/public/assets`.
+The hashes are SHA-256 of the input files as read (`pair_paths_sha256`: the
+`ATLAS_PAIR_PATHS` files concatenated in priority order); `null` when an input
+is absent. The client ignores it. Two clean rebuilds give a byte-identical
+`shared`. To
 compare two packs use `secdiff --packs <old_dir> <new_dir>`, which ignores
 `build`: it takes two directories of `.json.br` (or `.json`) pack files and
 prints a Markdown summary (per-file sizes and whether the content changed, the
