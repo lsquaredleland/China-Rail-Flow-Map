@@ -16,91 +16,25 @@
 //! posterior over its candidates.
 use crate::graph::{bearing, hav, Graph, F_FERRY, F_HSR};
 
-pub const NCLASS: usize = 7;
-pub const CLASS_NAMES: [&str; NCLASS] = ["G", "D", "C", "S", "Z", "T", "K"];
-/// Top running speed (km/h) per class.
-const CAP: [f64; NCLASS] = [350.0, 250.0, 350.0, 200.0, 160.0, 140.0, 120.0];
-/// Classes barred from dedicated high-speed lines.
-const CONVENTIONAL: [bool; NCLASS] = [false, false, false, false, true, true, true];
-/// Track km on dedicated high-speed line above which a conventional
-/// class is infeasible on a candidate (short station-throat overlaps
-/// are mapping noise).
-const CONV_HSR_KM: f64 = 5.0;
-/// Ferry handling time (min) on top of the crossing itself.
-const FERRY_HANDLING_MIN: f64 = 60.0;
-/// Speed (km/h) assumed across an unmapped gap of a bridged path.
-const GAP_KMH: f64 = 80.0;
+pub use crate::classes::{class_group, class_index, class_metric, CLASS_NAMES, NCLASS, NGROUP};
+use crate::classes::{CAP, CONVENTIONAL};
+use crate::config::ModelConfig;
 
-/// Tunable model parameters, read once from the environment so designs
-/// can be swept without rebuilding (defaults in brackets):
-///   CV3_ACCEL        acceleration/braking rate, m/s^2          [0.4]
-///   CV3_OVERHEAD     fixed minutes per nonstop leg              [1.0]
-///   CV3_TAIL_TAU     slow-side tail scale in ln-ratio units     [0.25]
-///                    (0 = symmetric, plain learned density)
-///   CV3_LENGTH_PRIOR log-prior per ln(length / shortest)        [3.0]
-///   CV3_SWITCH_POST  posterior needed to leave production       [0.9]
-///   CV3_BASE_MAX     production's posterior must be at most     [0.05]
-///   CV3_FILL_POST    posterior needed to draw a chord pair      [0.8]
-///   CV3_SERVICE_PRIOR weight of the demonstrated-corridor prior [2.0]
-pub struct Params {
-    pub accel: f64,
-    pub overhead: f64,
-    pub tail_tau: f64,
-    pub length_prior: f64,
-    pub switch_post: f64,
-    pub base_max: f64,
-    pub fill_post: f64,
-    pub service_prior: f64,
-}
-
-pub fn params() -> &'static Params {
-    static P: std::sync::OnceLock<Params> = std::sync::OnceLock::new();
-    P.get_or_init(|| {
-        let f = |k: &str, d: f64| {
-            std::env::var(k)
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(d)
-        };
-        Params {
-            accel: f("CV3_ACCEL", 0.4),
-            overhead: f("CV3_OVERHEAD", 1.0),
-            tail_tau: f("CV3_TAIL_TAU", 0.25),
-            length_prior: f("CV3_LENGTH_PRIOR", 3.0),
-            switch_post: f("CV3_SWITCH_POST", 0.9),
-            base_max: f("CV3_BASE_MAX", 0.05),
-            fill_post: f("CV3_FILL_POST", 0.8),
-            service_prior: f("CV3_SERVICE_PRIOR", 2.0),
-        }
-    })
+/// The run-time model parameters (`Config::model`) of the installed
+/// configuration; see `config` for defaults and the CV3_* overrides.
+pub fn params() -> &'static ModelConfig {
+    &crate::config::get().model
 }
 
 /// Speed (km/h) reachable `d_km` from a standstill at rate `accel` m/s^2.
 fn brake_curve_kmh(d_km: f64, accel: f64) -> f64 {
     3.6 * (2.0 * accel * d_km * 1000.0).sqrt()
 }
-/// Log-penalty for reversing through a station with a short dwell.
-const REVERSAL_PENALTY: f64 = 4.0;
-const REVERSAL_DWELL_MIN: i64 = 6;
-const INFEASIBLE_LOGLIK: f64 = -30.0;
 const DENSITY_FLOOR: f64 = 1e-4;
 const KDE_BW: f64 = 0.04;
 const GRID_LO: f64 = -0.8;
 const GRID_HI: f64 = 2.0;
 const GRID_STEP: f64 = 0.005;
-
-/// Routing groups for the demonstrated-corridor prior: classes the
-/// operator routes alike (350 EMU, 250 EMU, intercity S, conventional).
-pub const NGROUP: usize = 4;
-
-pub fn class_group(c: usize) -> usize {
-    match c {
-        0 | 2 => 0,
-        1 => 1,
-        3 => 2,
-        _ => 3,
-    }
-}
 
 /// Demonstrated-corridor log-prior for one leg: `compat[k]` stopping
 /// services of the leg's routing group between the same two stations
@@ -114,18 +48,6 @@ pub fn service_logprior(compat: &[u32], n: u32) -> Vec<f64> {
         .collect()
 }
 
-pub fn class_index(class: &str) -> usize {
-    match class {
-        "G" => 0,
-        "D" => 1,
-        "C" => 2,
-        "S" => 3,
-        "Z" => 4,
-        "T" => 5,
-        _ => 6, // K, Y, plain numbered trains
-    }
-}
-
 /// Extra minutes a train of class `c` loses by stopping once at an
 /// intermediate station (braking + re-accelerating from a typical
 /// cruising speed), plus the fixed overhead. Used to turn a stopping
@@ -134,13 +56,6 @@ pub fn stop_loss_min(c: usize) -> f64 {
     let p = params();
     let v = CAP[c].min(300.0) / 3.6;
     v / p.accel / 60.0 + p.overhead
-}
-
-pub fn class_metric(c: usize) -> crate::graph::Metric {
-    crate::graph::Metric::Time {
-        cap: CAP[c],
-        hsr_mult: if CONVENTIONAL[c] { 8.0 } else { 1.0 },
-    }
 }
 
 /// A candidate corridor for one unordered station pair, stored in
@@ -205,7 +120,7 @@ impl Cand {
                 None => {
                     gap_km += d;
                     gaps_at.push(i);
-                    GAP_KMH
+                    params().gap_kmh
                 }
             };
             for (c, r) in run.iter_mut().enumerate() {
@@ -214,7 +129,7 @@ impl Cand {
         }
         if ferry {
             for r in run.iter_mut() {
-                *r += FERRY_HANDLING_MIN;
+                *r += params().ferry_handling_min;
             }
         }
         let mut lines: Vec<(u32, String, f64)> = by_line
@@ -244,7 +159,7 @@ impl Cand {
     /// Predicted scheduled-free minutes for class `c`, or None when the
     /// class cannot use this corridor.
     pub fn predict(&self, c: usize) -> Option<f64> {
-        if CONVENTIONAL[c] && self.hsr_km > CONV_HSR_KM {
+        if CONVENTIONAL[c] && self.hsr_km > params().conv_hsr_km {
             return None;
         }
         Some(self.run_min[c] + params().overhead)
@@ -367,9 +282,9 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
 }
 
 impl Calibration {
-    /// Fit from (class, x) samples; classes with < 200 samples borrow
+    /// Fit from (class, x) samples; classes with < `min_n` samples borrow
     /// the pooled distribution.
-    pub fn fit(samples: &[(usize, f64)]) -> Calibration {
+    pub fn fit(samples: &[(usize, f64)], min_n: usize) -> Calibration {
         let mut per: Vec<Vec<f64>> = vec![Vec::new(); NCLASS];
         for &(c, x) in samples {
             per[c].push(x);
@@ -416,8 +331,8 @@ impl Calibration {
         for (c, xs) in per.iter_mut().enumerate() {
             xs.sort_by(f64::total_cmp);
             cal.n[c] = xs.len();
-            let src: &[f64] = if xs.len() >= 200 { xs } else { &pooled };
-            cal.logpdf.push(if xs.len() >= 200 {
+            let src: &[f64] = if xs.len() >= min_n { xs } else { &pooled };
+            cal.logpdf.push(if xs.len() >= min_n {
                 kde(xs)
             } else {
                 pooled_pdf.clone()
@@ -441,7 +356,7 @@ impl Calibration {
     /// (running slow is weak evidence, running fast is strong).
     pub fn loglik(&self, c: usize, x: f64) -> f64 {
         if x < self.x_min[c] {
-            return INFEASIBLE_LOGLIK;
+            return params().infeasible_loglik;
         }
         let base = self.grid_logpdf(c, x);
         let tau = params().tail_tau;
@@ -467,7 +382,7 @@ pub fn emissions(cal: &Calibration, cands: &[Cand], c: usize, m: f64) -> Vec<f64
             Some(p) if p > 0.0 && m > 0.0 => {
                 cal.loglik(c, (m / p).ln()) - params().length_prior * (k.km / kmin).ln()
             }
-            _ => INFEASIBLE_LOGLIK * 2.0,
+            _ => params().infeasible_loglik * 2.0,
         })
         .collect()
 }
@@ -509,7 +424,7 @@ fn log_sum_exp(v: &[f64]) -> f64 {
 }
 
 fn transition(a: &LegObs, ka: usize, b: &LegObs, kb: usize) -> f64 {
-    if a.dwell_end >= REVERSAL_DWELL_MIN {
+    if a.dwell_end >= params().reversal_dwell_min {
         return 0.0;
     }
     let hin = heading_in(&a.cands[ka], a.forward);
@@ -517,7 +432,7 @@ fn transition(a: &LegObs, ka: usize, b: &LegObs, kb: usize) -> f64 {
     let diff = (hin - hout).rem_euclid(360.0);
     let diff = diff.min(360.0 - diff);
     if diff > 150.0 {
-        -REVERSAL_PENALTY
+        -params().reversal_penalty
     } else {
         0.0
     }
