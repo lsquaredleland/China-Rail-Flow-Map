@@ -110,6 +110,7 @@
 //! - atlas-v2-national.json (P3.1; only when the v1 input has `national`)
 //! - atlas-v2-national-trains.json (P2.2 data source; only when the v1 input
 //!   has `national_trains`)
+//! - atlas-v2-national-entries.json (P3.3; with the national trains file)
 //!
 //! National table (`atlas-v2-national.json`, P3.1): `{fmt, trains, total,
 //! by_class}` over the shared file's `sections`, in its (renumbered) order:
@@ -151,11 +152,25 @@
 //!
 //! `n_sec` / `n_thr` / `fmt` must match the shared file.
 //!
+//! National entries (`atlas-v2-national-entries.json`, P3.3 A+B; written
+//! with the national trains file): `{fmt, n_sec, trains, ticks_per_min,
+//! by_class}`. `by_class[c][s]` (class buckets as `atlas-v2-national`) is
+//! the sorted list of the minutes of day at which each national train of
+//! class `c` first reaches section `s` (its first path entry on `s`, an
+//! `on_sec` piece included), in ticks of `1 / ticks_per_min` minute, in
+//! `[0, 1440 * ticks_per_min)`. The minute is the client animation's
+//! (`entries.rs`: same distance space, stop times, dwell, linear legs), taken mod
+//! 1440 (D7 wrap) and rounded up to the tick. So `by_class[c][s].len()` is
+//! `atlas-v2-national`'s `by_class[c][s]`, and "trains entered by minute m
+//! under classes C" is `sum_{c in C} upper_bound(by_class[c][s], m *
+//! ticks_per_min)`.
+//!
 //! After writing, the packer verifies v2 against v1 by reconstructing the
 //! v1 rows from the v2 arrays (inverse mapping) and comparing every field,
 //! plus a geometry check (same point counts, coordinates within half a
 //! 1e4 step). Any mismatch aborts with a nonzero exit.
 
+use analyze_rs::entries;
 use serde_json::{json, Map, Value};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -842,6 +857,24 @@ fn pack_national_trains(
     })
 }
 
+/// Entry ticks per minute in the national entries file.
+const ENTRY_TICKS_PER_MIN: u32 = 10;
+
+/// The national entries file (see the header) from the packed shared file
+/// and national trains.
+fn pack_national_entries(shared: &Value, nt: &Value, schedules: &Value) -> Value {
+    let trains = entries::from_pack(shared, nt, schedules);
+    let n_sec = arr(get(shared, "sections")).len();
+    let by_class = entries::by_class(&trains, n_sec, ENTRY_TICKS_PER_MIN);
+    json!({
+        "fmt": FMT,
+        "n_sec": n_sec,
+        "trains": trains.iter().filter(|t| !t.entries.is_empty()).count(),
+        "ticks_per_min": ENTRY_TICKS_PER_MIN,
+        "by_class": by_class,
+    })
+}
+
 fn with_fmt(mut m: Map<String, Value>) -> Value {
     m.insert("fmt".into(), json!(FMT));
     Value::Object(m)
@@ -993,6 +1026,9 @@ fn main() {
         let n_thr = arr(get(&v1, "throats")).len();
         pack_national_trains(nt, &perm_out, n_thr, &op, &osp, &och)
     });
+    let national_entries = national_trains
+        .as_ref()
+        .map(|nt| pack_national_entries(&shared5, nt, get(&v1, "schedules")));
     let (ip, _, ich, ilen) = pack_paths(&origins, &IN, n_trains, &perm_in);
     let map5 = |maps: &[Value], key: &str, perm: &[usize]| -> Vec<Value> {
         maps.iter()
@@ -1071,6 +1107,18 @@ fn main() {
             arr(get(&packed, "extra")).len()
         );
         by_name.push(("atlas-v2-national-trains.json", packed));
+    }
+    if let Some(packed) = national_entries {
+        println!(
+            "national entries: {} trains, {} entry minutes",
+            get(&packed, "trains"),
+            arr(get(&packed, "by_class"))
+                .iter()
+                .flat_map(arr)
+                .map(|s| arr(s).len())
+                .sum::<usize>()
+        );
+        by_name.push(("atlas-v2-national-entries.json", packed));
     }
 
     let items: Vec<(&str, Vec<u8>)> = by_name

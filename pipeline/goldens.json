@@ -31,7 +31,10 @@
     "national_trains_trains": 7157,
     "national_trains_recount_eq": 7922,
     "national_trains_out_tail_eq": 6972,
-    "national_trains_stops_total": 74002
+    "national_trains_stops_total": 74002,
+    "national_entries_total": 462064,
+    "national_entries_eq_national": 7922,
+    "national_entries_recompute_eq": 7922
   },
   "max": {
     "chord_leg_rows": 20,
@@ -44,6 +47,8 @@
     "continuity_gaps_gt100m": 75187,
     "national_trains_chord_legs": 3,
     "national_trains_gaps_gt3km": 43,
-    "national_trains_gaps_gt100m": 12179
+    "national_trains_gaps_gt100m": 12179,
+    "national_entries_bracket_bad": 0,
+    "national_entries_wrapped": 88095
   }
 }

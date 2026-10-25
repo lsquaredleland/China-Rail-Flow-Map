@@ -10,6 +10,8 @@
 //! - `flows`: the static-flow counting rule (per-train edge sets) and the
 //!   national per-section table.
 //! - `trainpath`: joining a train's path stretches into its whole path.
+//! - `entries`: national entry minutes (when each train's animated dot first
+//!   reaches each section it counts on).
 //! - `pack`, `packdiff`: reading the v2 pack files and diffing two packs.
 //! - `provenance`: the build block (`shared.build`) recorded in the pack.
 //! - `model`: output row types.
@@ -17,6 +19,7 @@
 
 pub mod chains;
 pub mod cn;
+pub mod entries;
 pub mod flows;
 pub mod geo;
 pub mod inputs;
