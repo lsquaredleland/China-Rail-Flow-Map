@@ -24,6 +24,7 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
     calls,
     atlas ? atlas.data.station_table : [],
     atlas?.schedules,
+    ctx.selectedClasses,
   );
   const termCount = destFilter.terminating;
   const list = calls.filter((c) => {

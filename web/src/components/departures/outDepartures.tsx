@@ -23,7 +23,7 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   } = ctx;
   let showingNote: string;
   const deps = cur ? cur.deps : [];
-  const stations = depStations(deps);
+  const stations = depStations(deps, ctx.selectedClasses);
   const list = deps.filter(
     (d) =>
       matchesRowFilters(d.dep, d.distKm, d.dur, d.cls, d.code) &&

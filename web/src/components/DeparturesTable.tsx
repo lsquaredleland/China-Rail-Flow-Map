@@ -354,6 +354,7 @@ export default function DeparturesTable({
     q,
     hasExtraFilters,
     matchesRowFilters,
+    selectedClasses,
     selectedTrainCodes,
     handleRowClick,
     onSelectTrain,
@@ -388,7 +389,7 @@ export default function DeparturesTable({
   return (
     <section id="departures">
       <h2>{view.heading}</h2>
-      <StationLine stations={view.stations} />
+      <StationLine stations={view.stations} classes={selectedClasses} />
       <p className="dep-note">{view.depNote}</p>
       {cur ? (
         <Histograms

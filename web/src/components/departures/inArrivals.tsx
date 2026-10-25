@@ -22,7 +22,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   } = ctx;
   let showingNote: string;
   const arrs = cur.arrs;
-  const stations = arrStations(arrs);
+  const stations = arrStations(arrs, ctx.selectedClasses);
   const list: ArrVM[] = arrs.filter(
     (a) =>
       matchesRowFilters(a.arr, a.distKm, a.dur, a.cls, a.code) &&

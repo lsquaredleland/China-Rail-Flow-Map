@@ -94,3 +94,47 @@ describe("inbound", () => {
     expect(sum(c)).toBe(calls.length);
   });
 });
+
+describe("class filters narrow the station counts", () => {
+  test("departures: sum == class-filtered rows, zero stations dropped", () => {
+    const o = origin("广州");
+    const all = depStations(o.deps);
+    for (const cls of [["G"], ["G", "D"], ["K"]]) {
+      const rows = o.deps.filter((d) => cls.includes(d.cls));
+      const s = depStations(o.deps, cls);
+      expect(sum(s)).toBe(rows.length);
+      expect(s.every((x) => x.n > 0)).toBe(true);
+      expect(s.length).toBeLessThanOrEqual(all.length);
+    }
+    expect(sum(depStations(o.deps, []))).toBe(o.deps.length);
+    expect(depStations(o.deps, ["#"])).toEqual([]);
+  });
+  test("calls at a destination", () => {
+    const { atlas } = pack();
+    const d = origin("重庆").dests.find((x) => x.zh === "成都")!;
+    for (const cls of [["G"], ["D", "C"]]) {
+      const rows = d.calls.filter((c) => cls.includes(c.dep.cls));
+      const s = callStations(d.calls, atlas.data.station_table, atlas.schedules, cls)!;
+      expect(sum(s)).toBe(rows.length);
+      expect(s.every((x) => x.n > 0)).toBe(true);
+    }
+  });
+  test("inbound arrivals and arrive-from", () => {
+    const arrs = [
+      { cls: "G", tsZh: "甲", tsEn: "A" },
+      { cls: "D", tsZh: "乙", tsEn: "B" },
+      { cls: "G", tsZh: "乙", tsEn: "B" },
+    ] as any[];
+    const a = arrStations(arrs, ["G"]);
+    expect(a.map((x) => x.zh + x.n)).toEqual(["乙1", "甲1"]);
+    expect(arrStations(arrs, ["D"]).map((x) => x.zh)).toEqual(["乙"]);
+    const calls = [
+      { arr: { cls: "G" }, bsZh: "甲", bsEn: "A" },
+      { arr: { cls: "K" }, bsZh: "乙", bsEn: "B" },
+      { arr: { cls: "G" }, bsZh: "甲", bsEn: "A" },
+    ] as any[];
+    const c = inCallStations(calls, ["G"]);
+    expect(c.map((x) => x.zh + x.n)).toEqual(["甲2"]);
+    expect(sum(inCallStations(calls, ["G", "K"]))).toBe(3);
+  });
+});

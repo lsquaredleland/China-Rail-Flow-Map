@@ -41,6 +41,8 @@ export interface DepCtx {
     cls: string,
     code?: string,
   ) => boolean;
+  /** Train-class chips (G, D, ...) selected; empty means all. */
+  selectedClasses: string[];
   selectedTrainCodes: string[];
   handleRowClick: (
     code: string,

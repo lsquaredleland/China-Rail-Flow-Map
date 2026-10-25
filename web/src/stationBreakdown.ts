@@ -29,14 +29,26 @@ export function tallyStations(
   );
 }
 
-export const depStations = (deps: DepVM[]) =>
-  tallyStations(deps.map((d) => ({ zh: d.fsZh, en: d.fsEn })));
+/** Keep rows whose train class is selected (no selection keeps all). Only the
+    train-type filter narrows the station counts; search and histogram
+    selections do not. */
+const byClass = <T>(rows: T[], classes: string[], cls: (r: T) => string) =>
+  classes.length ? rows.filter((r) => classes.includes(cls(r))) : rows;
 
-export const arrStations = (arrs: ArrVM[]) =>
-  tallyStations(arrs.map((a) => ({ zh: a.tsZh, en: a.tsEn })));
+export const depStations = (deps: DepVM[], classes: string[] = []) =>
+  tallyStations(
+    byClass(deps, classes, (d) => d.cls).map((d) => ({ zh: d.fsZh, en: d.fsEn })),
+  );
 
-export const inCallStations = (calls: InCallVM[]) =>
-  tallyStations(calls.map((c) => ({ zh: c.bsZh, en: c.bsEn })));
+export const arrStations = (arrs: ArrVM[], classes: string[] = []) =>
+  tallyStations(
+    byClass(arrs, classes, (a) => a.cls).map((a) => ({ zh: a.tsZh, en: a.tsEn })),
+  );
+
+export const inCallStations = (calls: InCallVM[], classes: string[] = []) =>
+  tallyStations(
+    byClass(calls, classes, (c) => c.arr.cls).map((c) => ({ zh: c.bsZh, en: c.bsEn })),
+  );
 
 /** The station a call stops at in the destination city. The pack keeps no
     station on a call row, so it is read from the train's schedule: the stops
@@ -47,11 +59,12 @@ export function callStations(
   calls: CallVM[],
   stationTable: { zh: string; en: string }[],
   schedules: SchedulesData["schedules"] | undefined,
+  classes: string[] = [],
 ): StationCount[] | null {
   if (!schedules) return null;
   const OTHER = { zh: "其他", en: "other" };
   return tallyStations(
-    calls.map((c) => {
+    byClass(calls, classes, (c) => c.dep.cls).map((c) => {
       const sched = schedules[c.dep.t];
       const n = c.dep.stopPos.length;
       if (!sched || c.arrMins === undefined || c.arrMins < 0) return OTHER;

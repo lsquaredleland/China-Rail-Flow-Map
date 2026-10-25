@@ -19,7 +19,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
     setInCallSort,
   } = ctx;
   const calls = srcFilter.inCalls;
-  const stations = inCallStations(calls);
+  const stations = inCallStations(calls, ctx.selectedClasses);
   const list = calls.filter((c) => {
     if (
       !matchesRowFilters(
