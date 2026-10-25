@@ -49,12 +49,6 @@ async function bundleIife(entry) {
   });
   return res.outputFiles[0].text;
 }
-// The pure-JS Brotli decoder is only a fallback (see fetchData in
-// App.tsx), so it ships as its own content-hashed script the app loads on
-// demand instead of riding inside index.html.
-const decoderJs = await bundleIife("src/br-decoder.ts");
-const decoderName = `br-decoder.${createHash("sha256").update(decoderJs).digest("hex").slice(0, 8)}.js`;
-manifestDefine.__BR_DECODER__ = JSON.stringify(decoderName);
 const rawJs = await bundleIife("src/main.tsx");
 // A literal "</script" inside a JS string (React DOM has one) would end
 // the inline script element early; "<\/script" is the same string in JS.
@@ -70,6 +64,8 @@ if (!tpl.includes("/*__BUNDLE__*/")) {
   process.exit(1);
 }
 
+// Start from an empty dist/ so stale hashed files never accumulate.
+rmSync("dist", { recursive: true, force: true });
 mkdirSync("dist", { recursive: true });
 for (const f of readdirSync("public")) {
   cpSync(`public/${f}`, `dist/${f}`, { recursive: true });
@@ -79,7 +75,6 @@ for (const [f, hashed, bytes] of hashedAssets) {
   rmSync(`dist/assets/${f}`);
   writeFileSync(`dist/assets/${hashed}`, bytes);
 }
-writeFileSync(`dist/${decoderName}`, decoderJs);
 writeFileSync(
   "dist/index.html",
   tpl.replace("/*__BUNDLE__*/", () => js),
