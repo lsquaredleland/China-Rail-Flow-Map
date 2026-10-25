@@ -184,8 +184,9 @@ source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp
 #       --out <rerun dir> --station-fixes ../data/station_fixes.json
 #   python3 -I ../scripts/o9_splice_router.py <handoff-v3>/data/derived/corridor-v3 \
 #       <rerun dir> ../staging/inputs/data/derived/corridor-v3-o9 阳江
-# Splice, don't swap: the router is not deterministic run to run (two runs on
-# identical inputs differ on ~400 legs). pair_path_fixes.json goes FIRST (first
+# Splice, don't swap (until the O17 rerun is approved): the shipped router outputs came from
+# the pre-O17 router, which was not deterministic run to run (two runs on
+# identical inputs differ on ~400 legs); the O17 router is, but a full rerun changes flows. pair_path_fixes.json goes FIRST (first
 # record per pair wins): pairs whose station snapped to a homonym (禹州, 郏县;
 # 恩平/江门–阳江, which the rerun leaves bridged). Regenerate with
 # scripts/o9_fix_paths.py (header has the inputs). 聊城西–菏泽东 stays a chord
