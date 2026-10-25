@@ -25,6 +25,8 @@
   .filter-pill { font-size: 11px; padding: 2px 5px 2px 7px; }
   #legendCol { left: 10px; bottom: 10px; width: min(216px, calc(100vw - 20px)); }
   #scalebar { right: 10px; bottom: 10px; }
+  /* National note wraps to two rows here: sit above the scale bar (~38 px tall), not under it. */
+  .nat-note { left: 10px; bottom: 56px; max-width: calc(100% - 20px); }
   #legend { padding: 8px 10px; }
   #legendBody.collapsed { display: none; }
   #legendToggle {

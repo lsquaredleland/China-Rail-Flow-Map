@@ -19,6 +19,7 @@ import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
 import TimelineScrubber from "./components/TimelineScrubber";
 import TrainScheduleModal from "./components/TrainScheduleModal";
+import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
@@ -375,6 +376,7 @@ export default function App() {
       <DeparturesTable
         key={direction}
         cur={cur}
+        national={national}
         unit={distUnit}
         direction={direction}
         panelCity={panelCity}
@@ -407,6 +409,8 @@ export default function App() {
         selectedTrainCodes={filters.selectedTrainCodes}
         onSelectTrainCodes={filters.setSelectedTrainCodes}
       />
+
+      <AnimAnnouncer mapRef={mapRef} national={national} />
 
       <footer id="pageFooter">
         {atlas ? atlas.data.about : ""}
