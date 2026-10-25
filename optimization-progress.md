@@ -33,7 +33,7 @@ Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update
 | O5 | ✅ DONE (PR #7, merged): resolve inbound-only legs | **yes**: owner approval | 1,587 chord rows / 304 legs; after O4+O5 only ~5 real gap legs remain |
 | O6 | ✅ DONE (with O15, PR #6, merged): per-train path dedupe | no | fmt 5: per-train `paths` / `stop_pos` / `chords`, per-row `dep_off` / `arr_len`; out-tables -304 KB, in-tables -121 KB; see #### O15 + O6 |
 | O7 | 48 inbound loop trains with non-monotone `sec_cnt` | no | documented quirk (cutoff clamps to 0); decide whether to fix |
-| O8 | Gate `dropped chains` / `flow lost` in `--pack-only` audits too | no | currently only the full audit enforces them |
+| O8 | Gate `dropped chains` / `flow lost` in `--pack-only` audits too | no | currently only the full audit enforces them. Not computable from the pack: a dropped chain (no OSM coordinates) never reaches it, and its flow is absent from the flow rows and the train paths alike; only its side effect, a path join with a gap, is visible, and `continuity_gaps_*` / `chord_leg_rows` already gate that |
 | O9 | ✅ DONE (with O5, PR #7, merged): fill real OSM geometry gaps (平昌→达州, 南京→扬州, …) | yes | data work, prerequisite noted in PIPELINE.md §4 |
 | O10 | Move the client city-coordinate patches (lib.ts `prepAtlas`: 铜仁, 兰溪, 溆浦) into the pipeline gazetteer | no flows; dest points + `distKm` change | from the PR #1 review (B); the pipeline should be the source of truth |
 | O11 | ~~U-turn overlap fix~~ | — | **Won't do** (owner 2026-10-24): a train reversing over track at a station is acceptable behaviour |

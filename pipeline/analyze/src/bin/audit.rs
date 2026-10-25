@@ -11,6 +11,7 @@ use analyze_rs::inputs;
 use analyze_rs::legs::*;
 use analyze_rs::model::*;
 use analyze_rs::names::*;
+use analyze_rs::pack;
 use analyze_rs::polyline::*;
 use analyze_rs::timetable::*;
 
@@ -108,11 +109,18 @@ fn expand_tables(t: &mut Value, out: bool) {
 /// Phase 1-2 checks on a packed v2 build (env AUDIT_PACK_DIR): oriented
 /// per-train path continuity outside chord legs, monotone call cutoffs,
 /// schedule coverage, and the Chengdu goldens. Returns whether the hard
-/// checks pass, plus the counters that goldens.json gates on.
+/// checks pass, plus the counters that goldens.json gates on. Reads each file
+/// as `.json.br` when present (what ships), else `.json`.
+///
+/// `dropped_chains` / `flow_lost` (O8) are not computed here, and cannot be:
+/// a dropped chain is a section chain whose nodes have no OSM coordinates, so
+/// it never reaches the pack. Its flow is missing from the flow rows and from
+/// every train path alike, so the pack is internally consistent without it.
+/// Only the full run, which has the OSM extract, can count them; the pack
+/// shows at most their side effect (path joins with a gap), which the
+/// `continuity_gaps_*` and `chord_leg_rows` counters already gate.
 fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
-    let load = |n: &str| -> Value {
-        serde_json::from_str(&fs::read_to_string(dir.join(n)).unwrap()).unwrap()
-    };
+    let load = |n: &str| -> Value { pack::read_json(dir, n) };
     let shared = load("atlas-v2-shared.json");
     let out_map = load("atlas-v2-out-map.json");
     let in_map = load("atlas-v2-in-map.json");
@@ -121,6 +129,10 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         load("atlas-v2-in-tables.json"),
     );
     let sch = load("atlas-v2-schedules.json");
+    match shared.get("build") {
+        Some(b) => println!("AUDIT pack build: {b}"),
+        None => println!("AUDIT pack build: none (pack predates the provenance block)"),
+    }
     let arr = |v: &Value| -> Vec<Value> { v.as_array().cloned().unwrap_or_default() };
     let int = |v: &Value| v.as_i64().unwrap();
     let mut ok = true;

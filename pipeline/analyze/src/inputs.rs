@@ -110,7 +110,7 @@ impl Inputs {
 /// Pair-path files in priority order (first record per pair wins):
 /// `ATLAS_PAIR_PATHS` (comma-separated) or the canonical corridor-v3 file
 /// plus the base pair geometry.
-fn pair_path_files(data_dir: &std::path::Path) -> Vec<PathBuf> {
+pub fn pair_path_files(data_dir: &std::path::Path) -> Vec<PathBuf> {
     match env::var("ATLAS_PAIR_PATHS") {
         Ok(v) => v.split(',').map(PathBuf::from).collect(),
         Err(_) => {

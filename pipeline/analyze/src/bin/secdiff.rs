@@ -7,10 +7,13 @@
 // class columns (G D C S Z T K plain) and so catches a wrong class split
 // under equal totals.
 // Usage: secdiff --old <v1.json> --new <v1.json> [--city <zh>] [--all] [--edges|--classes]
+//        secdiff --packs <old_dir> <new_dir> [--top N]   (v2 packs, Markdown summary)
 use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+
+use analyze_rs::packdiff;
 
 fn argval(flag: &str) -> Option<String> {
     let a: Vec<String> = env::args().collect();
@@ -183,7 +186,28 @@ fn edge_flows(sections: &[Value], o: &Value, field: &str) -> HashMap<EdgeKey, Ed
     m
 }
 
+/// `--packs <old_dir> <new_dir> [--top N]`: Markdown summary of two v2 pack
+/// directories (`.json.br` or `.json`), matched through section polylines.
+fn packs_main(args: &[String]) {
+    let i = args.iter().position(|a| a == "--packs").unwrap();
+    let (old_dir, new_dir) = match (args.get(i + 1), args.get(i + 2)) {
+        (Some(a), Some(b)) => (a, b),
+        _ => {
+            eprintln!("usage: secdiff --packs <old_dir> <new_dir> [--top N]");
+            std::process::exit(2);
+        }
+    };
+    let top = argval("--top").and_then(|s| s.parse().ok()).unwrap_or(10);
+    let old = packdiff::load(std::path::Path::new(old_dir));
+    let new = packdiff::load(std::path::Path::new(new_dir));
+    print!("{}", packdiff::render(&old, &new, top));
+}
+
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.iter().any(|a| a == "--packs") {
+        return packs_main(&args);
+    }
     let old_path = argval("--old").unwrap();
     let new_path = argval("--new").unwrap();
     let city_filter = argval("--city");

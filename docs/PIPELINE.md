@@ -211,6 +211,11 @@ O=$PWD/../staging/corridor-v3-ordered
 ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas
 ./target/release/atlaspack --in $O/china-flow-atlas-data.json --out-dir $O
 AUDIT_PACK_DIR=$O ./target/release/audit          # full audit + pack gates + goldens
+# audit reads <name>.json.br when present, else <name>.json, so this audits the
+# committed pack too (what the CI `pack-audit` job does):
+#   AUDIT_PACK_DIR=../web/public/assets ./target/release/audit --pack-only --goldens goldens.json
+# --pack-only cannot gate dropped_chains / flow_lost: they need the OSM extract
+# (a dropped chain never reaches the pack), so only the full run enforces them.
 ./target/release/secdiff --old ../staging/determinism/o17/final-atlas/china-flow-atlas-data.json \
     --new $O/china-flow-atlas-data.json --edges   # must report 0 changed edges
 ./target/release/secdiff --old ... --new ... --classes   # per-edge class columns (8 classes)
@@ -274,6 +279,24 @@ rebuild, and what `audit` expands to):
 - `atlas-v2-schedules.json` is generated from `data/raw/stops*.jsonl`,
   indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm]`
   and station names normalized.
+
+**Provenance (`shared.build`).** `atlas` records, and `atlaspack` copies into
+`atlas-v2-shared.json`, `build = { commit, osm_sha256, leg_paths_sha256,
+pair_paths_sha256, overrides_sha256 }`; `audit` prints it. `commit` is the
+checkout's HEAD (with `+dirty` if tracked files are modified; the
+`CRFM_BUILD_COMMIT` env overrides it). The hashes are SHA-256 of the input
+files as read (`pair_paths_sha256`: the `ATLAS_PAIR_PATHS` files concatenated
+in priority order); `null` when an input is absent. The client ignores it.
+Because it contains the commit, `shared` bytes change with every commit even
+when the pipeline output does not; every other pack file is unaffected. To
+compare two packs use `secdiff --packs <old_dir> <new_dir>`, which ignores
+`build`: it takes two directories of `.json.br` (or `.json`) pack files and
+prints a Markdown summary (per-file sizes and whether the content changed, the
+provenance fields that differ, shared-geometry counts, per-direction flow-row
+changes matched by section polyline since ids are renumbered per pack, with the
+largest changes, changed per-train paths and schedules). The CI `pack-diff` job
+runs it on PRs that change `web/public/assets/atlas-v2-*.json.br` and posts the
+result as a PR comment (updated in place; skipped when the pack is unchanged).
 
 **`analyze` crate layout.** `atlas` (builder), `atlaspack` (packer) and
 `audit` share the library in `pipeline/analyze/src/`: `inputs` (env-driven
