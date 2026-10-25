@@ -419,6 +419,7 @@ pub fn render(old: &Pack, new: &Pack, top_n: usize) -> String {
                 let short = |v: &Value| match v.as_str() {
                     Some(x) if x.len() > 12 => format!("`{}`", &x[..12]),
                     Some(x) => format!("`{x}`"),
+                    None if v.is_null() => "none".to_string(),
                     None => format!("`{v}`"),
                 };
                 let _ = writeln!(s, "- `{k}`: {} -> {}", short(&bo[k]), short(&bn[k]));
