@@ -732,6 +732,17 @@ positions equal the spike's expanded-vertex method within 1e-6° for a 200-train
 spike's `natXY` ported into the test as the oracle); (d) snapshots unchanged (`prepTrainPath`
 is a pure refactor). Acceptance: heap delta of `buildNational` ≤ 30 MB (logged in the test).
 
+*P2.1 as built.* `prepTrainPath(path, stopPos, chordLegs, atlas, firstStopJ)` also returns
+the stop distances (`firstStopJ` = schedule row of the first stop, −1 to skip), so the origin
+and national timelines share the chord/throat/stop logic; `getSecGeometry` is exported.
+`buildNational(atlas, out, sched?)` keeps per-train signed path ids plus a Float64 start
+distance per entry (670,796 refs, 6,972 trains; 185 empty-path trains skipped);
+`natXY(tl, atlas, q, d, …)` and `natPositions(tl, atlas, m, out)` take the atlas for the
+shared geometry. `useAtlasData` exposes `outTablesRaw` (`paths`/`stop_pos`/`chords` only).
+Measured on the committed pack: 2,668 dots at 1095, heap delta 20.0 MB, build 18 ms,
+`natPositions` 0.37 ms/call at the peak. The oracle test samples stop distances +1e-6 km:
+stops sit on entry boundaries where a float tie picks either side of a join.
+
 **P2.2 National layers + mode + clock** — *after P1c.1, P2.1.* Files: new
 `deck/layers/national.ts` (dots, tails, dwell rings from the frame buffer; `pickable: !animPlaying`),
 `DeckHost.tsx` (national frame loop: `M.render()` → `natPositions` → `setProps({layers})`;

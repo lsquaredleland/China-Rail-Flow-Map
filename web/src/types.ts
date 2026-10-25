@@ -152,6 +152,9 @@ export interface OutTablesPack {
   origins: OutTablesPackOrigin[];
 }
 
+/** The per-train part of OutTablesPack, as the national timelines read it. */
+export type OutTablesRaw = Pick<OutTablesPack, "paths" | "stop_pos" | "chords">;
+
 /** One origin's out tables, expanded to per-row paths. */
 export interface OutTablesOrigin {
   deps: RawDep[];
@@ -573,4 +576,27 @@ export interface Palette {
   outline: string;
   dashLine: string;
   landFill: string;
+}
+
+/** Every train's full run as references into the shared section geometry
+    (no per-train vertices). Train q's path entries are
+    [pOff[q], pOff[q+1]): signed ids as in the path tables (< 0 = reversed;
+    ids >= the section count are station throats) and the route distance at
+    which each entry's own track starts. Minutes are on the boarding day's
+    frame, so `end` may pass 1440. */
+export interface NationalTimeline {
+  n: number;
+  tIdx: Int32Array; // train_table index
+  cls: Uint8Array; // 0 high-speed (G/D/C), 1 conventional (Z/T/K/S), 2 other
+  start: Float32Array; // minute of boarding
+  end: Float32Array; // minute of arrival
+  total: Float64Array; // route length (km)
+  pOff: Int32Array; // n + 1
+  pId: Int32Array; // signed path entry ids
+  pStart: Float64Array; // route distance where each entry's track starts
+  sOff: Int32Array; // n + 1
+  sDist: Float64Array;
+  sArr: Float32Array;
+  sDep: Float32Array; // -1 = no dwell (terminus)
+  skipped: { emptyPath: number; noStops: number; schedMismatch: number; badTime: number };
 }

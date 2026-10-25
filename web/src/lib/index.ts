@@ -56,10 +56,12 @@ export {
 } from "./origin";
 export {
   buildDayTimeline,
+  prepTrainPath,
   trainDistAt,
   trainEase,
   trainSpeedFrac,
 } from "./timeline";
+export { buildNational, nat, natPositions, natState, natXY } from "./national";
 export {
   callArrMins,
   destWindow,
