@@ -103,7 +103,8 @@ function binData(set: any, only?: (i: number) => boolean, closed = false): any {
 
 const FRC = [0, 1e9];
 const HALF = [0.5, 1e9];
-const BUCKETS = [[80, 1e9], [30, 79.5], [10, 29.5], [3, 9.5], [0.5, 2.5]];
+const BUCKET_SETS: any = { 1: [[0.5, 1e9]], 2: [[8, 1e9], [0.5, 7.5]], 5: [[80, 1e9], [30, 79.5], [10, 29.5], [3, 9.5], [0.5, 2.5]] };
+const BUCKETS = BUCKET_SETS[Q.get("buckets") || "1"];
 const dataFilter = new DataFilterExtension({ filterSize: 1 });
 const dashExt = new PathStyleExtension({ dash: true });
 
