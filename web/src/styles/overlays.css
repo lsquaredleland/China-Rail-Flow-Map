@@ -62,6 +62,9 @@
   bottom: 14px;
   z-index: 4;
   display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100% - 28px);
+  box-sizing: border-box;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
@@ -76,6 +79,11 @@
   background: rgba(17, 24, 39, 0.9);
   color: #F3F4F6;
 }
+/* Trains | Flows | Trains + flows: the toolbar's segmented buttons, compact */
+.nat-layers { display: inline-flex; pointer-events: auto; }
+.nat-layers button { padding: 3px 9px; font-size: 12px; border-radius: 0; margin-left: -1.5px; }
+.nat-layers button:first-child { border-radius: 3px 0 0 3px; margin-left: 0; }
+.nat-layers button:last-child { border-radius: 0 3px 3px 0; }
 .nat-note-tag {
   font-weight: 700;
   font-size: 11px;

@@ -997,6 +997,43 @@ widths = `flowWidth`, pass order, the file check. Staged file vs the committed s
 (scratch, not committed): 7,922 sections on both sides, 7,157 trains, widest 522 (also
 under G/D/C), Σ 462,064; parse 1.2 ms, counts + pass + widths 1.5 ms (Bun).
 
+*P3.2 layer and UI as built (2026-10-25, `feat/p32-national-flows-layer`; with the P3.3
+client below).*
+- **Control.** National mode gains a three-way segmented control, **Trains | Flows |
+  Trains + flows** (`#natLayer-trains/-flows/-both`), inside the national coverage note
+  (bottom-left map overlay, national mode only), styled as the toolbar's segmented
+  buttons. It is not in the toolbar: P2.2 put its toggle last so the toolbar does not
+  re-wrap, and at 1280 px the second row has ≈ 120 px free, too little for a third group.
+  The note exists only in national mode, so the toolbar (both modes) and every origin-view
+  pixel are unchanged. Default Trains (A only, as before). `?natLayer=flows|both` (absent =
+  trains), URL only like `?national`, restores the choice on load.
+- **Loading.** `useAtlasData` gains `ensureNationalEntries()` (the P3.3 file; `requireFmt`
+  on fetch, then `requireNationalEntries` against the atlas: `n_sec`, 8 class rows of
+  `sections.length` tick lists, `ticks_per_min > 0`). Flows loads only the 19 KB flows
+  file; Trains + flows loads it and the 725 KB entries file; Trains loads neither (as
+  before). **Change from the P3.2 lib note:** a failed fetch or check of either flows file
+  no longer sets `loadError` (which blanks the map); it sets `nationalFlowsFailed`, the note
+  says "The national flow data could not be loaded." and the map draws the trains. Driver:
+  404 on either file → trains drawn, notice shown, 0 `pageerror`.
+- **Layer.** `deck/layers/national.ts nationalFlowLayers`: B = `nationalFlowPasses(
+  nationalCounts(nf, classes))` through the origin flows' `buildPassData` (binary PathLayer,
+  widest first, ferry dashes) as `flows-national` (+ `flows-national-ferry`), on
+  `atlas.sec`, under the dots; no pick proxy (national picking is the P2.3 CPU scan over dots
+  only). Memoised per (file, class filter, theme). `buildLayers` (D13 seam) pushes it before
+  `nationalLayers`; in Flows the dots are not drawn (`natPick` null, the counters still run).
+  `flows.ts` gains `passDataLayers` (one pass's layers, the old loop body; origin output
+  unchanged) and `recountPassData` (below). `DeckStats` gains `natFlows` (sections drawn),
+  `natFlowsMs` / `natFlowsUpdates` (last count update, number of updates).
+- **Class filter (D13 decision).** The toolbar class filter is reachable in national mode,
+  so it applies to the national flows (Σ `by_class[selected]`, B and A+B). In national mode
+  all 8 class buttons are enabled (the national flows carry every class; the origin's
+  availability does not apply); leaving national drops a class the origin does not have
+  (the existing pruning effect). Not applied: to the national dots (D13; the timeline has
+  3 glow buckets, not the 8 classes, so that would be new work), and the hour / distance /
+  duration / train filters, which are the origin table's and have no national dimension.
+- **Widths** are the origin flows' scale (`WIDTH_K` common units, 0.5 px floor), as the lib
+  note fixed; at national fit the widest section (522 trains) is ≈ 42 px.
+
 **P3.3 A+B** — per-section cumulative entry counts per 5-min step from the national
 timelines' `trainEntries` (≈ 7.5k sections × 288 × 2 B ≈ 4.3 MB) or precomputed by the
 pipeline; D7 wrap semantics. Test: A+B at 24:00 equals B.
@@ -1088,6 +1125,65 @@ until both sides agree. Re-baselined shots (`shots.mjs` vs bd2e6fa, all 28): the
 scenarios stay at 0 px; `anim-0600` 0.0002 / 0.0006 %, `anim-1815` 0.055 / 0.058 %,
 `anim-2350` 0.018 / 0.020 %, `isolated-train-mid` 0.029 / 0.026 % (1x / 2x), all on train
 dots, tails and ripples (diff masks).
+
+*P3.3 client as built (2026-10-25, `feat/p32-national-flows-layer`; same GPU, load average
+≈ 4).*
+- **Counts (R3).** `lib/nationalFlows.ts nationalCountsAt(entries, classes, minute)` =
+  Σ over the selected classes (empty = all 8, deduplicated) of `upperBound(by_class[c][s],
+  minute × ticks_per_min)`: binary search and sums over the shipped arrays, nothing decoded
+  or re-derived. Monotone in the minute; at 1440 it equals `nationalCounts` (B).
+- **Clock (D7).** Trains + flows uses the whole minute `min(1440, floor(animTime))`:
+  cumulative since 00:00, so the flows reset when the clock wraps and 24:00 (the scrubber's
+  end, `setTime(1440)`) is the day's totals. A section lights up to 1 min after the dot
+  (the file's own tick is 0.1 min); counting by tick would update on every frame at every
+  speed (≥ 0.4 min per frame at 60 s/day), by minute it updates every frame at 15 s/day,
+  every 2-3 frames at 60 s/day and every 5 frames in the perf sweep (0.2 min per frame).
+- **No re-tessellation.** A+B keeps B's pass (geometry and widest-first order by the
+  day's counts) and on a minute change only replaces the per-path counts and colours
+  (`recountPassData`: same `data` object, new `id` for the `getWidth`/`getColor` update
+  triggers; a section at 0 is fully transparent, which also hides its 0.5 px floor; ferry
+  dashes of sections with n > 0). The colour ramp stays normalised to the day's widest, so
+  at 24:00 widths and colours are B's exactly. Consequence: before 24:00 paint order is by
+  the day's counts, not the current ones (overlaps only; it is B's order at 24:00).
+- **Tests** (`tests/nationalFlows.test.ts`): upper-bound edges (tick 0, an entry at
+  exactly 10:00.0 and 10:00.1, 23:59.9), a synthetic pack (24:00 = B for 5 class filters,
+  monotone per minute), the entries file check, and on the flows / entries pair: the
+  full staged files when found (`fixture.ts nationalFlowsPair`: next to the entries file,
+  public/assets or `staging/national-flows/run1`), else the committed sample
+  `tests/fixtures/national-flows-sample.json.br` (49 KB; every 20th section plus the 10
+  busiest, both files cut alike; `tools/national-flows-sample.mjs`), as
+  `national.test.ts`. On each: 24:00 = B for all, each single class and 3 subsets
+  (full: 7,922 sections, Σ 462,064; sample: 407, Σ 26,343), Σ at 18:15 against an
+  independent scan (345,530 / 19,634), monotone every 5 min, disjoint subsets and the 8
+  single classes sum to all. `bun test` 194 pass (193 with `CRFM_NATIONAL_SAMPLE=1`),
+  typecheck clean.
+- **Driver** (scratch, DPR 1 unless noted, paused 18:15): Trains → layers `nat-*` only,
+  `natFlows` 0, 2,893 dots; Flows → `flows-national` (+ ferry) only, 7,922 sections, 0 dots;
+  Trains + flows → both, 7,825 sections lit, 2,893 dots (pixel diff vs Trains 46,018 px).
+  Seek 24:00 in A+B then switch to Flows: same 7,923 paths, every width and colour equal
+  (18:15: 7,291 paths differ). `?natLayer=flows` and `=both` restore on reload (pressed
+  button and layers); Trains removes the param. 0 `pageerror` in all runs. Class filter:
+  S → 235 sections, S + 普 → 412 (普 is disabled for Guangzhou in the origin view);
+  leaving national prunes 普.
+- **Numbers.** Recount (all 7,922 sections, all classes, CPU) 0.3 ms p50 / 0.5 p95 / 7 max
+  over the 1,441 minutes of a day; 0.5 / 0.6 ms at the peak (Bun: 0.21 / 0.46 ms). Frame
+  draw + raster (DPR 2, A+B, 18:15 sweep): frames with a recount p50 8.3 / p95 11.3 ms,
+  others 7.6 / 11.7 ms, i.e. no visible update cost. **M1n** (`perf/national.mjs --dpr 2
+  --query '&natLayer=both'`, 3 reps, 2,781 dots, 7,861 sections): rAF p95 16.7-16.8 ms in
+  9/9, draw+raster p95 10.1-12.9 / 10.0-12.2 / 10.4-11.9 ms (initial / national fit / city
+  x10), cpuTimePerFrame 1.1-1.6 ms (≤ 4). **M2n** (4×): rAF p95 16.7-16.8 in 9/9,
+  draw+raster p95 13.8-16.1 / 14.4-14.8 / 12.8-15.9 ms (≤ 16.7), cpuTimePerFrame
+  2.6-3.8 ms. **M4n** post-pick (DPR 2, paused 18:15, one `pickRect`): 14.7 MB in A+B
+  (pre-pick 3.5) against 12.8 MB in Trains (pre-pick 1.6); the flows add 1.9 MB of
+  buffers. **Heap** (after GC, trains already loaded): +5.4 MB for the flows file and B's
+  pass, +3.6 MB for the entries file, +9.0 MB both. **First frame** on switching
+  (click to first frame with flows): Flows 45 ms cold (fetch included), 22 ms warm;
+  Trains + flows 51 ms cold. **M6** lazy graph 230.4 KB brotli (was 229.5), main bundle
+  382,335 → 384,773 B. Origin shots vs 2e2c162 (all 28): 0 px.
+- **Swap needs** (owner): `staging/national-flows/run1/atlas-v2-national.json.br` and
+  `staging/national-entries/run3/atlas-v2-national-entries.json.br` into
+  `web/public/assets` (with the national trains file). Until then national Flows and
+  Trains + flows say the flow data could not be loaded and draw the trains.
 
 **P3.4 Optional comet mode** — only if D2 is toggled on and M4n (Trips) passed.
 

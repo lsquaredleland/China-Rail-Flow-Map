@@ -152,6 +152,7 @@ export function useCityPanel({
   inTablesReady,
   setSelectedClasses,
   mapRef,
+  national = false,
 }: {
   cur: OriginVM | null;
   viewCur: OriginVM | null;
@@ -160,11 +161,14 @@ export function useCityPanel({
   inTablesReady: boolean;
   setSelectedClasses: (f: (prev: string[]) => string[]) => void;
   mapRef: RefObject<MapApi | null>;
+  national?: boolean;
 }) {
   const [panelCity, setPanelCity] = useState<CityPointVM | null>(null);
 
   const availableClasses: Set<string> = useMemo(() => {
-    if (!cur) return new Set(FLOW_CLASSES);
+    // National mode: the filter drives the national flows, which carry every
+    // class; leaving it drops what the origin does not have (effect below).
+    if (!cur || national) return new Set(FLOW_CLASSES);
 
     const originClasses = new Set<string>();
     const flows = direction === "out" ? cur.flows : cur.inFlows;
@@ -204,7 +208,7 @@ export function useCityPanel({
     }
 
     return originClasses;
-  }, [cur, direction, panelCity, outTablesReady, inTablesReady]);
+  }, [cur, direction, panelCity, outTablesReady, inTablesReady, national]);
 
   // A class that the new origin / city does not have drops out of the filter.
   useEffect(() => {

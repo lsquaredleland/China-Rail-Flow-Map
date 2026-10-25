@@ -94,7 +94,7 @@ try {
         await new Promise((r) => setTimeout(r, 300));
         const f = await run(FR, true);
         const metrics = JSON.parse(JSON.stringify(DH.metrics));
-        return { active: M.activeTimeline() ? 1 : 0, natDots: window.__deckStats.natDots, a, f, metrics };
+        return { active: M.activeTimeline() ? 1 : 0, natDots: window.__deckStats.natDots, natFlows: window.__deckStats.natFlows, a, f, metrics };
       }, FR, START, STEP);
       const row = {
         dpr, throttle: thr, view: name, renderer, frames: FR,
@@ -103,6 +103,7 @@ try {
         drawJsMs: stat(r.a.dr),
         drawPlusRasterMs: stat(r.f.dr),
         natDots: r.natDots,
+        natFlows: r.natFlows,
         deckMetrics: r.metrics,
       };
       rows.push(row);
@@ -123,6 +124,7 @@ for (const r of rows) {
     `${r.drawJsMs.mean}/${r.drawJsMs.p95}`.padEnd(19),
     `${r.drawPlusRasterMs.mean}/${r.drawPlusRasterMs.p95}`,
     r.natDots ? `dots ${r.natDots}` : "",
+    r.natFlows ? `flows ${r.natFlows}` : "",
   );
 }
 if (opt.out) fs.writeFileSync(opt.out, JSON.stringify(rows, null, 1));

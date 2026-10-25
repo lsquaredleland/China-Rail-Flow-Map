@@ -4,6 +4,8 @@
 // flags and the SwiftShader check: see lib.mjs. The national trains file must
 // be served with the build (dist/assets/atlas-v2-national-trains.json.br).
 // --query '&natSynth=12000' repeats the trains up to ~12,000 (perf load only).
+// --query '&natLayer=both' draws the flows under the dots (A+B, P3.3; the
+// flows and entries files must be served too), '&natLayer=flows' B alone.
 // usage: node tools/perf/national.mjs [base] [--frames 300] [--dpr 1,2]
 //          [--throttle 1] [--start 1095] [--end 1155] [--headed] [--out f.json]
 import { runPerf } from "./lib.mjs";

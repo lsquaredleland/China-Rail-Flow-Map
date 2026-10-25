@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { local as localStore, session as sessionStore } from "../storage";
-import type { DecodedAtlas, Direction, DistUnit } from "../types";
+import type { DecodedAtlas, Direction, DistUnit, NatLayer } from "../types";
 import { enName } from "../lib";
 import type { MapApi } from "../components/MapCanvas";
 
@@ -39,6 +39,27 @@ export function writeNationalParam(on: boolean): void {
   const params = new URLSearchParams(window.location.search);
   if (on) params.set("national", "1");
   else params.delete("national");
+  const search = params.toString();
+  if (window.location.search !== (search ? "?" + search : "")) {
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? "?" + search : ""}`);
+  }
+}
+
+/* What national mode draws (P3.2 / P3.3): ?natLayer=flows | both, absent =
+   trains; URL only, like ?national. */
+export function initialNatLayer(): NatLayer {
+  try {
+    const v = new URLSearchParams(window.location.search).get("natLayer");
+    return v === "flows" || v === "both" ? v : "trains";
+  } catch {
+    return "trains";
+  }
+}
+
+export function writeNatLayerParam(v: NatLayer): void {
+  const params = new URLSearchParams(window.location.search);
+  if (v === "trains") params.delete("natLayer");
+  else params.set("natLayer", v);
   const search = params.toString();
   if (window.location.search !== (search ? "?" + search : "")) {
     window.history.replaceState(null, "", `${window.location.pathname}${search ? "?" + search : ""}`);

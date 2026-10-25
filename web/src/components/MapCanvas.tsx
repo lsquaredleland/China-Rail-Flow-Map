@@ -242,6 +242,10 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     props.dark,
     props.direction,
     props.panelDest,
+    props.nationalLayer,
+    props.nationalFlows,
+    props.nationalEntries,
+    props.nationalClasses,
   ]);
 
   // The scale bar's round distance follows the km/mi switcher.
