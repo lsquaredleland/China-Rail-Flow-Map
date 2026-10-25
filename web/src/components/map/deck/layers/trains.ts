@@ -162,8 +162,6 @@ export interface TrainLayerInput {
   isolatedCode: string | null | undefined;
   selectedCode: string | null | undefined;
   hoveredCode: string | null;
-  /** Dots are pickable only while the clock is paused (P1b.4). */
-  pickable: boolean;
   /** The clock, as an update-trigger for the per-frame disc accessors. */
   animTime: number;
 }
@@ -204,7 +202,7 @@ export function trainLayers(inp: TrainLayerInput): Layer[] {
       filled: true,
       getRadius: iso ? 4.15 : 3,
       getLineWidth: iso ? 2.7 : 2,
-      pickable: inp.pickable,
+      pickable: false,
       parameters: { depthCompare: "always" },
     }),
     new ScatterplotLayer<Disc>({

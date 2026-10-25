@@ -256,7 +256,7 @@ const ferryBlue = (dark: boolean) => rgba(dark ? "#38BDF8" : "#0284C7");
 /** Canvas flowWidth in CSS px. */
 const widthPx = (n: number, scale: number, fitScale: number) => Math.max(0.5, n * WIDTH_K * (scale / fitScale));
 
-function flowPassLayer(role: string, pd: PassData, fitScale: number, dark: boolean, pickable: boolean) {
+function flowPassLayer(role: string, pd: PassData, fitScale: number, dark: boolean) {
   return new PathLayer({
     id: "flows-" + role,
     data: pd.data,
@@ -274,8 +274,34 @@ function flowPassLayer(role: string, pd: PassData, fitScale: number, dark: boole
       t[3] = pd.rgba[index * 4 + 3];
       return t as unknown as RGBA;
     },
-    pickable,
     updateTriggers: { getWidth: [pd.id, fitScale], getColor: [pd.id, dark] },
+  } as object);
+}
+
+/* Picking proxies (P1b.4). A drawn flow is as wide as its train count, so GPU
+   picking on it would rank every band under the cursor "distance 0" and hide thin
+   sections under wide ones. These hairline copies of the same geometry are
+   pickable but never drawn (DeckHost layerFilter), so one rectangle query returns
+   the sections whose centreline passes near the cursor. Costs one extra GPU copy
+   of each pickable pass's geometry. Draw order is widest first and the depth test
+   is strict (`less`), so where sections coincide the busiest keeps the pixel,
+   which is what the Canvas picker's "busier wins" rule would choose. */
+export const PICK_PREFIX = "pick-";
+export const PICK_WIDTH = 1.5;
+
+function flowPickLayer(role: string, pd: PassData) {
+  return new PathLayer({
+    id: PICK_PREFIX + "flows-" + role,
+    data: pd.data,
+    _pathType: "open",
+    widthUnits: "pixels",
+    getWidth: PICK_WIDTH,
+    getColor: [0, 0, 0, 0],
+    pickable: true,
+    // Read back by interaction.ts pick(): path index -> section (C19).
+    idxToSec: pd.idxToSec,
+    // Paths are in widest-first order; where sections coincide the first (busiest) keeps the pixel.
+    parameters: { depthCompare: "less" },
   } as object);
 }
 
@@ -316,7 +342,8 @@ export function flowPassLayers(
   const paper = rgba(pal.paper);
   for (const pass of passes) {
     const pd = buildPassData(set, pass.items, pal, pass.alpha, pass.maxN);
-    L.push(flowPassLayer(pass.role, pd, fitScale, dark, pass.pickable));
+    L.push(flowPassLayer(pass.role, pd, fitScale, dark));
+    if (pass.pickable) L.push(flowPickLayer(pass.role, pd));
     if (pd.ferry.length) {
       const col = pass.alpha >= 1 ? blue : blendOver(blue, paper, pass.alpha);
       L.push(ferryDashLayer(`flows-${pass.role}-ferry`, pd, scale, fitScale, col));
@@ -419,11 +446,16 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
   if (!plan) return [];
   const highlight = hover && hover.kind === "chord" ? hover.chord : null;
   const vis: ChordItem[] = [];
+  let pickable: ChordItem[] | null = null; // visible chords incl. the highlighted one, when it is not in `vis`
   for (const ch of chords) {
-    if (highlight === ch) continue;
     if (!chordVisible(plan, ch, ms.animTime)) continue;
+    if (highlight === ch) {
+      pickable = [];
+      continue;
+    }
     vis.push(chordItem(ch));
   }
+  if (pickable && highlight) pickable = [...vis, chordItem(highlight)];
   // Keep the data identity while the visible set is unchanged (gated by first departure).
   if (vis.length !== chordMemo.length || vis.some((v, i) => v !== chordMemo[i])) chordMemo = vis;
   const colour = rgba(pal.chord, plan.alpha);
@@ -449,6 +481,19 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
       },
     } as object),
   ];
+  L.push(
+    new PathLayer<ChordItem>({
+      id: PICK_PREFIX + "chords",
+      data: pickable ?? chordMemo,
+      getPath: (d: ChordItem) => d.path,
+      positionFormat: "XY",
+      widthUnits: "pixels",
+      getWidth: PICK_WIDTH,
+      getColor: [0, 0, 0, 0],
+      pickable: true,
+      parameters: { depthCompare: "less" },
+    } as object),
+  );
   if (highlight && !plan.isolated) {
     const hw = widthPx(highlight.n, scale, fitScale) + 1.6;
     L.push(

@@ -15,7 +15,10 @@ import {
   tooltipHtml,
   pickableChords,
   pickableFlows,
+  distToSeg,
+  pickPriority,
 } from "../../lib";
+import type { PickCandidate } from "../../lib";
 import type { MapCtx } from "./context";
 import { stationT } from "./camera";
 import { getDestSectionCounts, modelState } from "./flows";
@@ -23,24 +26,6 @@ import { isTrainShown } from "./trains";
 
 
 /* ---------- hit testing & tooltip ---------- */
-export function distToSeg(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number {
-  const dx = bx - ax,
-    dy = by - ay;
-  const len2 = dx * dx + dy * dy;
-  let t = len2 === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / len2;
-  t = Math.max(0, Math.min(1, t));
-  const ex = ax + t * dx - px,
-    ey = ay + t * dy - py;
-  return Math.sqrt(ex * ex + ey * ey);
-}
-
 export function pickStation(M: MapCtx, px: number, py: number): Hit | null {
   const { S, P, X, Y, points } = M;
   const cur = P.current.cur;
@@ -191,7 +176,123 @@ export function pickTrain(M: MapCtx, px: number, py: number): Hit | null {
   return bestTrain ? { kind: "train", train: bestTrain } : null;
 }
 
+/* Deck mode (D6): GPU candidates from the deck handle, then the same priority
+   and distances as above, recomputed exactly in lib/pick.ts. One single-pass
+   rectangle query on hairline proxy layers (sections + chords) plus exact scans
+   for stations and, while paused, trains. Layer data is read back through the
+   layers' own fields: chords by `info.object`, flow paths through the pass's
+   `idxToSec` prop (C19).
+   GPU query radius: the hit radius plus 2 px, because the nearest drawn pixel of
+   a 1 px proxy can be that much farther than its centre; lib/pick.ts applies
+   the exact radii. */
+const SEC_RADIUS = 12;
+
+/* Stations, the origin and trains are not picked on the GPU: they are at most a few thousand
+   dots, a one-pass query shows only the top dot of any pixel (dots closer than about 1 px
+   hide each other, e.g. 东莞 / 望牛墩, or trains 0.05 px apart), and the exact scan costs
+   microseconds. The candidates go through the same pickPriority. */
+function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandidate[], hits: Hit[]) {
+  const { S, P, X, Y } = M;
+  const cur = P.current.cur;
+  if (!cur) return;
+  const { W, H } = S.current;
+  const sk = stationT(M);
+  const pts = M.points();
+  for (let i = 0; i < pts.length; i++) {
+    const c = pts[i];
+    const x = X(c.pt[0]),
+      y = Y(c.pt[1]);
+    if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+    const radius = 14 * stationZoomK(stationR(c.trains), sk);
+    const dx = px - x,
+      dy = py - y;
+    if (dx * dx + dy * dy > radius * radius) continue;
+    cands.push({ kind: "station", index: i, pos: [c.pt[0], c.pt[1]], radius });
+    hits.push({ kind: "station", station: c });
+  }
+  cands.push({ kind: "origin", index: 0, pos: [cur.o.pt[0], cur.o.pt[1]] });
+  hits.push({ kind: "origin" });
+}
+
+/* Paused only, as pickTrain: same list, same shown filter (no isolation filter, as Canvas). */
+function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
+  const { S, activeTimeline, activeTrainsAt } = M;
+  const st = S.current;
+  if (!st.animEnabled || st.animPlaying) return;
+  const timeline = activeTimeline();
+  if (!timeline) return;
+  const trains = activeTrainsAt(timeline, st.animTime);
+  for (let i = 0; i < trains.length; i++) {
+    const tr = trains[i];
+    if (!isTrainShown(M, tr.code)) continue;
+    cands.push({ kind: "train", index: i, pos: [tr.lon, tr.lat] });
+    hits.push({ kind: "train", train: tr });
+  }
+}
+
+type LayerProps = { idxToSec?: Int32Array };
+
+export function pickDeck(M: MapCtx, px: number, py: number): Hit | null {
+  const deck = M.deck;
+  if (!deck) return null;
+  const { S, P } = M;
+  const cur = P.current.cur;
+  const set = M.flowsSet();
+  if (!cur) return null;
+  const st = S.current;
+  const paused = st.animEnabled && !st.animPlaying;
+  const q = (radius: number, layerIds: string[]) =>
+    deck.pickRect({ x: px - radius, y: py - radius, width: 2 * radius + 1, height: 2 * radius + 1, layerIds });
+  const infos = q(SEC_RADIUS, ["pick-chords", "pick-flows-all", "pick-flows-focus"]);
+
+  const cands: PickCandidate[] = [];
+  const hits: Hit[] = [];
+  stationCandidates(M, px, py, cands, hits);
+  trainCandidates(M, cands, hits);
+  const direction = P.current.direction;
+  const destSecCounts = getDestSectionCounts(M);
+  let flowIdx: Map<number, number> | null = null;
+  let flows: FlowVM[] = [];
+  let chordList: ChordVM[] | null = null;
+  const seen = new Set<number>();
+
+  for (const info of infos) {
+    const layer = info.layer;
+    if (!layer || info.index < 0) continue;
+    const props = layer.props as unknown as LayerProps;
+    const id = layer.id;
+    if (id === "pick-chords") {
+      if (direction !== "out" || destSecCounts) continue;
+      const ch = (info.object as { ch?: ChordVM } | null)?.ch;
+      if (!ch) continue;
+      chordList ??= pickableChords(modelState(M), st);
+      const index = chordList.indexOf(ch);
+      if (index < 0) continue;
+      cands.push({ kind: "chord", index, line: { pts: ch.flat, off: 0, count: ch.count } });
+      hits.push({ kind: "chord", chord: ch });
+    } else if (props.idxToSec && set) {
+      const s = props.idxToSec[info.index];
+      if (seen.has(s)) continue;
+      seen.add(s);
+      if (!flowIdx) {
+        flows = pickableFlows(modelState(M), st);
+        flowIdx = new Map();
+        for (let i = 0; i < flows.length; i++) flowIdx.set(flows[i].s, i);
+      }
+      const index = flowIdx.get(s);
+      if (index === undefined) continue; // drawn but not hoverable (as on Canvas)
+      const f = flows[index];
+      cands.push({ kind: "section", index, n: f.n, line: { pts: set.pts, off: set.off[s], count: set.len[s] } });
+      const subN = destSecCounts && destSecCounts.has(s) ? destSecCounts.get(s) : undefined;
+      hits.push({ kind: "seg", s, n: f.n, subN });
+    }
+  }
+  const win = pickPriority(cands, px, py, st.view, { paused, direction, destSelected: !!destSecCounts });
+  return win ? hits[cands.indexOf(win)] : null;
+}
+
 export function pick(M: MapCtx, px: number, py: number): Hit | null {
+  if (M.deck) return pickDeck(M, px, py);
   const tr = pickTrain(M, px, py);
   if (tr) return tr;
   const c = pickStation(M, px, py);

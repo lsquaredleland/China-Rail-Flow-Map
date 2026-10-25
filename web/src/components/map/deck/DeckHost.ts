@@ -16,23 +16,25 @@ import { getSelCache, isTrainShown, palette, stationStates, stationT, viewToView
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
-import { flowLayers } from "./layers/flows";
+import { PICK_PREFIX, flowLayers } from "./layers/flows";
 import { stationLayers } from "./layers/stations";
 import { shownTrains, trainLayers } from "./layers/trains";
 
-export interface PickOptions {
+export interface PickRectOptions {
+  /** Left / top of the box, CSS px. */
   x: number;
   y: number;
-  radius?: number;
+  width: number;
+  height: number;
   layerIds?: string[];
-  depth?: number;
 }
 
 export interface DeckHandle {
   /** setProps(viewState, layers) + a synchronous redraw, then labels + frame tail. */
   render(): void;
-  pick(opts: PickOptions): PickingInfo | null;
-  pickMultiple(opts: PickOptions): PickingInfo[];
+  /** Every distinct object with a visible pixel in the box, from ONE picking pass
+      (deck's pickMultipleObjects peels one object per pass: far too slow for hover). */
+  pickRect(opts: PickRectOptions): PickingInfo[];
   /** Re-measures the deck canvas after S.W / S.H / S.DPR changed. */
   resize(): void;
   destroy(): void;
@@ -55,8 +57,7 @@ interface DeckInternals {
   setProps(p: object): void;
   redraw(reason?: string): void;
   finalize(): void;
-  pickObject(o: PickOptions): PickingInfo | null;
-  pickMultipleObjects(o: PickOptions): PickingInfo[];
+  pickObjects(o: PickRectOptions & { maxObjects?: number | null }): PickingInfo[];
   _updateCanvasSize?: () => void;
 }
 
@@ -119,7 +120,6 @@ function buildLayers(M: MapCtx): Layer[] {
           isolatedCode: iso,
           selectedCode: P.current.selectedTrainCode,
           hoveredCode: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
-          pickable: !st.animPlaying,
           animTime: st.animTime,
         }),
       );
@@ -240,6 +240,8 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       useDevicePixels: Math.min(3, window.devicePixelRatio || 1),
       deviceProps: GPU_TIME ? { debugGPUTime: true } : {},
       pickingRadius: 14,
+      // Picking proxies exist for the picking passes only.
+      layerFilter: ({ layer, isPicking }: { layer: Layer; isPicking: boolean }) => isPicking || !layer.id.startsWith(PICK_PREFIX),
       layers: [],
       onLoad: () => {
         if (cv === canvas) render(); // the device initialises asynchronously; draw once it is up
@@ -308,8 +310,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
   create();
   const handle: DeckHandle = {
     render,
-    pick: (opts) => (lost || destroyed ? null : deck.pickObject(opts)),
-    pickMultiple: (opts) => (lost || destroyed ? [] : deck.pickMultipleObjects(opts)),
+    pickRect: (opts) => (lost || destroyed || !deck.isInitialized ? [] : deck.pickObjects(opts)),
     resize() {
       if (destroyed || lost) return;
       // luma owns the drawing buffer and re-measures from a ResizeObserver
@@ -329,8 +330,10 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       notice?.remove();
       if ((w.__deck as unknown) === deck) delete w.__deck;
       if (w.__deckHost === handle) delete w.__deckHost;
+      if (M.deck === handle) M.deck = undefined;
     },
   };
   w.__deckHost = handle;
+  M.deck = handle;
   return handle;
 }

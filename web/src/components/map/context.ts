@@ -16,6 +16,7 @@ import type {
 import { flowWidth, isFilteredView as isFilteredViewOf } from "../../lib";
 import type { DestWindow } from "../../lib";
 import type { LegendHandle } from "../Legend";
+import type { DeckHandle } from "./deck/DeckHost";
 
 export interface AnimState {
   time: number; // minutes from midnight (0 up to totalMins)
@@ -213,6 +214,9 @@ export interface MapCtx {
   /* Tells the active renderer the canvas size / DPR changed (resize() calls it
      just before the render() that follows). Installed by MapCanvas. */
   syncRendererSize: () => void;
+  /* The deck renderer's handle while it is mounted (MapCanvas sets and clears
+     it); interaction.ts pick() asks it for GPU candidates. Absent on Canvas. */
+  deck?: DeckHandle;
 }
 
 type MapRefs = Pick<
