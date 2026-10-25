@@ -253,6 +253,17 @@ fn main() {
     // ---- double track as one corridor, for the map ----
     let weight = |pi: usize| pair_legs[&pairs[pi].key].len() as u32;
     let fast_edge: [f64; NCLASS] = std::array::from_fn(|c| cal.q05[c].exp());
+    // pairs with a leg the router moved off production (own path on a
+    // non-production candidate)
+    let mut router_moved = vec![false; pairs.len()];
+    for d in &decisions {
+        let Some(&pi) = pair_idx.get(&legs[d.leg].key) else {
+            continue;
+        };
+        if d.outcome.draws_own_path() && d.chosen.is_some_and(|k| !cands[pi][k].is_base) {
+            router_moved[pi] = true;
+        }
+    }
     let canon_picks: Vec<Option<usize>> = (0..pairs.len())
         .map(|pi| {
             let times: Vec<canon::LegTime> = pair_legs[&pairs[pi].key]
@@ -267,6 +278,7 @@ fn main() {
             let ev = canon::Evidence {
                 legs: &times,
                 ratio: &fast_edge,
+                router_moved: router_moved[pi],
             };
             canon::best_for_canon(&cands[pi], &ev, &cfg.canon)
         })

@@ -29,6 +29,12 @@ pub struct LegTime {
 pub struct Evidence<'a> {
     pub legs: &'a [LegTime],
     pub ratio: &'a [f64; NCLASS],
+    /// The router moved at least one of the pair's legs off production:
+    /// its decision draws the leg's own path (`switched`, `filled`,
+    /// `bridge-fix`) on a candidate that is not production's. Every other
+    /// outcome (`production`, `ambiguous-keep`, `infeasible-keep`, ...)
+    /// keeps the leg on production. See `CanonConfig::require_router_agreement`.
+    pub router_moved: bool,
 }
 
 /// Index of the shortest gap-free candidate (first on ties), else of
@@ -75,8 +81,9 @@ fn mean_error(k: &Cand, legs: &[LegTime], ratio: &[f64; NCLASS]) -> Option<f64> 
 /// production (each scored with its own class's prediction, so the pair's
 /// class mix weights it); an alternative some of those classes cannot use
 /// is not eligible. Of the alternatives that clear the margins, the best
-/// fitting wins, the shortest on ties. Without gap-free production: as
-/// `Shortest`.
+/// fitting wins, the shortest on ties. With `require_router_agreement`,
+/// only a pair the router moved one leg of (`Evidence::router_moved`) may
+/// leave production. Without gap-free production: as `Shortest`.
 ///
 /// The per-km margin is there because a path's prediction is only as good
 /// as its speed tags: where OSM tags a fast line below its real speed
@@ -87,6 +94,9 @@ fn hybrid(cands: &[Cand], ev: &Evidence, cfg: &CanonConfig) -> Option<usize> {
     let Some(b) = production_gap_free(cands) else {
         return shortest(cands);
     };
+    if cfg.require_router_agreement && !ev.router_moved {
+        return Some(b);
+    }
     let legs: Vec<LegTime> = ev
         .legs
         .iter()
@@ -297,6 +307,7 @@ mod tests {
         let ev = Evidence {
             legs: l,
             ratio: &ONE,
+            router_moved: true,
         };
         best_for_canon(cands, &ev, &cfg)
     }
@@ -334,6 +345,53 @@ mod tests {
         assert_eq!(pick(&n, CanonMode::Production, &[], d()), Some(1));
         assert_eq!(pick(&n, HY, &legs(&[26.0]), d()), Some(1));
         assert_eq!(pick(&[], HY, &[], d()), None);
+    }
+
+    #[test]
+    fn hybrid_router_agreement_guard() {
+        // legs at 31: shortest beats production by 10, clearing every margin
+        let l = legs(&[31.0, 31.0]);
+        let run = |require: bool, moved: bool| {
+            let cfg = CanonConfig {
+                mode: HY,
+                require_router_agreement: require,
+                ..margins(1.0, 0.2, 1)
+            };
+            let ev = Evidence {
+                legs: &l,
+                ratio: &ONE,
+                router_moved: moved,
+            };
+            best_for_canon(&two(), &ev, &cfg)
+        };
+        // off (the default): the router's decisions do not matter
+        assert!(!CanonConfig::default().require_router_agreement);
+        assert_eq!(run(false, false), Some(1));
+        assert_eq!(run(false, true), Some(1));
+        // on: only a pair the router moved a leg of may leave production
+        assert_eq!(run(true, false), Some(0));
+        assert_eq!(run(true, true), Some(1));
+        // the guard never makes a pair move: no evidence, production stays
+        let cfg = CanonConfig {
+            mode: HY,
+            require_router_agreement: true,
+            ..margins(1.0, 0.2, 1)
+        };
+        let fits = legs(&[41.0]);
+        let ev = Evidence {
+            legs: &fits,
+            ratio: &ONE,
+            router_moved: true,
+        };
+        assert_eq!(best_for_canon(&two(), &ev, &cfg), Some(0));
+        // and gapped production still falls back to shortest
+        let g = vec![cand(90.0, 2.0, true, 25.0), cand(100.0, 0.0, false, 30.0)];
+        let ev = Evidence {
+            legs: &fits,
+            ratio: &ONE,
+            router_moved: false,
+        };
+        assert_eq!(best_for_canon(&g, &ev, &cfg), Some(1));
     }
 
     #[test]
@@ -475,11 +533,13 @@ mod tests {
         let ev = Evidence {
             legs: &only_g,
             ratio: &ratio,
+            router_moved: true,
         };
         assert_eq!(best_for_canon(&c, &ev, &cfg), Some(1));
         let ev1 = Evidence {
             legs: &only_g,
             ratio: &ONE,
+            router_moved: true,
         };
         // unscaled: production 41 (error 6.9) does not clear 10.9
         assert_eq!(best_for_canon(&c, &ev1, &cfg), Some(0));

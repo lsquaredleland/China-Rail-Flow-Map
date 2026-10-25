@@ -308,6 +308,11 @@ pub struct CanonConfig {
     pub margin_rel: f64,
     /// ...on at least this many timetabled legs.                 [1]
     pub min_legs: usize,
+    /// Hybrid: a pair may leave production only if the router's own
+    /// per-leg decision moved at least one of its legs off production
+    /// (`switched` / `filled` / `bridge-fix` onto a non-production
+    /// candidate; `canon::Evidence::router_moved`).           [false]
+    pub require_router_agreement: bool,
 }
 
 impl Default for CanonConfig {
@@ -320,6 +325,7 @@ impl Default for CanonConfig {
             longer_min_per_km: 0.1,
             margin_rel: 0.2,
             min_legs: 1,
+            require_router_agreement: false,
         }
     }
 }
