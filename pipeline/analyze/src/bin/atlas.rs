@@ -1,645 +1,20 @@
 use serde::Deserialize;
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-#[path = "../chains.rs"]
-mod chains;
+use analyze_rs::chains;
+use analyze_rs::cn::*;
+use analyze_rs::geo::*;
+use analyze_rs::inputs;
+use analyze_rs::legs::*;
+use analyze_rs::model::*;
+use analyze_rs::names::*;
+use analyze_rs::osm;
+use analyze_rs::polyline::*;
+use analyze_rs::timetable::*;
 
-const CORE: &[&str] = &[
-    "北京",
-    "天津",
-    "上海",
-    "重庆",
-    "石家庄",
-    "唐山",
-    "秦皇岛",
-    "邯郸",
-    "邢台",
-    "保定",
-    "张家口",
-    "承德",
-    "沧州",
-    "廊坊",
-    "衡水",
-    "太原",
-    "大同",
-    "阳泉",
-    "长治",
-    "晋城",
-    "朔州",
-    "晋中",
-    "运城",
-    "忻州",
-    "临汾",
-    "吕梁",
-    "呼和浩特",
-    "包头",
-    "乌海",
-    "赤峰",
-    "通辽",
-    "鄂尔多斯",
-    "呼伦贝尔",
-    "巴彦淖尔",
-    "乌兰察布",
-    "沈阳",
-    "大连",
-    "鞍山",
-    "抚顺",
-    "本溪",
-    "丹东",
-    "锦州",
-    "营口",
-    "阜新",
-    "辽阳",
-    "盘锦",
-    "铁岭",
-    "朝阳",
-    "葫芦岛",
-    "长春",
-    "吉林",
-    "四平",
-    "辽源",
-    "通化",
-    "白山",
-    "松原",
-    "白城",
-    "哈尔滨",
-    "齐齐哈尔",
-    "鸡西",
-    "鹤岗",
-    "双鸭山",
-    "大庆",
-    "伊春",
-    "佳木斯",
-    "七台河",
-    "牡丹江",
-    "黑河",
-    "绥化",
-    "南京",
-    "无锡",
-    "徐州",
-    "常州",
-    "苏州",
-    "南通",
-    "连云港",
-    "淮安",
-    "盐城",
-    "扬州",
-    "镇江",
-    "泰州",
-    "宿迁",
-    "杭州",
-    "宁波",
-    "温州",
-    "嘉兴",
-    "湖州",
-    "绍兴",
-    "金华",
-    "衢州",
-    "舟山",
-    "台州",
-    "丽水",
-    "合肥",
-    "芜湖",
-    "蚌埠",
-    "淮南",
-    "马鞍山",
-    "淮北",
-    "铜陵",
-    "安庆",
-    "黄山",
-    "滁州",
-    "阜阳",
-    "宿州",
-    "六安",
-    "亳州",
-    "池州",
-    "宣城",
-    "福州",
-    "厦门",
-    "莆田",
-    "三明",
-    "泉州",
-    "漳州",
-    "南平",
-    "龙岩",
-    "宁德",
-    "南昌",
-    "景德镇",
-    "萍乡",
-    "九江",
-    "新余",
-    "鹰潭",
-    "赣州",
-    "吉安",
-    "宜春",
-    "抚州",
-    "上饶",
-    "济南",
-    "青岛",
-    "淄博",
-    "枣庄",
-    "东营",
-    "烟台",
-    "潍坊",
-    "济宁",
-    "泰安",
-    "威海",
-    "日照",
-    "临沂",
-    "德州",
-    "聊城",
-    "滨州",
-    "菏泽",
-    "郑州",
-    "开封",
-    "洛阳",
-    "平顶山",
-    "安阳",
-    "鹤壁",
-    "新乡",
-    "焦作",
-    "濮阳",
-    "许昌",
-    "漯河",
-    "三门峡",
-    "南阳",
-    "商丘",
-    "信阳",
-    "周口",
-    "驻马店",
-    "武汉",
-    "黄石",
-    "十堰",
-    "宜昌",
-    "襄阳",
-    "鄂州",
-    "荆门",
-    "孝感",
-    "荆州",
-    "黄冈",
-    "咸宁",
-    "随州",
-    "长沙",
-    "株洲",
-    "湘潭",
-    "衡阳",
-    "邵阳",
-    "岳阳",
-    "常德",
-    "张家界",
-    "益阳",
-    "郴州",
-    "永州",
-    "怀化",
-    "娄底",
-    "广州",
-    "韶关",
-    "深圳",
-    "珠海",
-    "汕头",
-    "佛山",
-    "江门",
-    "湛江",
-    "茂名",
-    "肇庆",
-    "惠州",
-    "梅州",
-    "汕尾",
-    "河源",
-    "阳江",
-    "清远",
-    "东莞",
-    "中山",
-    "潮州",
-    "揭阳",
-    "云浮",
-    "南宁",
-    "柳州",
-    "桂林",
-    "梧州",
-    "北海",
-    "防城港",
-    "钦州",
-    "贵港",
-    "玉林",
-    "百色",
-    "贺州",
-    "河池",
-    "来宾",
-    "崇左",
-    "海口",
-    "三亚",
-    "成都",
-    "自贡",
-    "攀枝花",
-    "泸州",
-    "德阳",
-    "绵阳",
-    "广元",
-    "遂宁",
-    "内江",
-    "乐山",
-    "南充",
-    "眉山",
-    "宜宾",
-    "广安",
-    "达州",
-    "雅安",
-    "巴中",
-    "资阳",
-    "贵阳",
-    "六盘水",
-    "遵义",
-    "安顺",
-    "毕节",
-    "铜仁",
-    "昆明",
-    "曲靖",
-    "玉溪",
-    "保山",
-    "昭通",
-    "丽江",
-    "普洱",
-    "临沧",
-    "拉萨",
-    "日喀则",
-    "昌都",
-    "林芝",
-    "山南",
-    "那曲",
-    "西安",
-    "铜川",
-    "宝鸡",
-    "咸阳",
-    "渭南",
-    "延安",
-    "汉中",
-    "榆林",
-    "安康",
-    "商洛",
-    "兰州",
-    "嘉峪关",
-    "金昌",
-    "白银",
-    "天水",
-    "武威",
-    "张掖",
-    "平凉",
-    "酒泉",
-    "庆阳",
-    "定西",
-    "陇南",
-    "西宁",
-    "海东",
-    "银川",
-    "石嘴山",
-    "吴忠",
-    "固原",
-    "中卫",
-    "乌鲁木齐",
-    "克拉玛依",
-    "吐鲁番",
-    "哈密",
-    "雄安",
-    "香港",
-];
-
-const ALIAS: &[(&str, &str)] = &[
-    ("上海松江", "上海"),
-    ("安亭北", "上海"),
-    ("安亭西", "上海"),
-    ("金山北", "上海"),
-    ("练塘", "上海"),
-    ("南翔北", "上海"),
-    ("南翔", "上海"),
-    ("清河", "北京"),
-    ("大兴机场", "北京"),
-    ("密云", "北京"),
-    ("密云北", "北京"),
-    ("静海", "天津"),
-    ("宝坻", "天津"),
-    ("宝坻北", "天津"),
-    ("宝坻南", "天津"),
-    ("滨海", "天津"),
-    ("滨海北", "天津"),
-    ("滨海西", "天津"),
-    ("滨海港", "天津"),
-    ("武清", "天津"),
-    ("蓟州", "天津"),
-    ("蓟州北", "天津"),
-    ("塘沽", "天津"),
-    ("于家堡", "天津"),
-    ("沙坪坝", "重庆"),
-    ("江北机场", "重庆"),
-    ("璧山", "重庆"),
-    ("汉口", "武汉"),
-    ("武昌", "武汉"),
-    ("福田", "深圳"),
-    ("光明城", "深圳"),
-    ("增城", "广州"),
-    ("庆盛", "广州"),
-    ("天府机场", "成都"),
-    ("双流机场", "成都"),
-    ("安州", "绵阳"),
-    ("鄠邑", "西安"),
-    ("临潼", "西安"),
-    ("江宁", "南京"),
-    ("江宁西", "南京"),
-    ("溧水", "南京"),
-    ("富阳", "杭州"),
-    ("富阳西", "杭州"),
-    ("临安", "杭州"),
-    ("临平", "杭州"),
-    ("临平南", "杭州"),
-    ("阳澄湖", "苏州"),
-    ("花桥", "昆山"),
-    ("惠山", "无锡"),
-    ("金坛", "常州"),
-    ("武进", "常州"),
-    ("戚墅堰", "常州"),
-    ("红岛", "青岛"),
-    ("城阳", "青岛"),
-    ("即墨北", "青岛"),
-    ("即墨", "青岛"),
-    ("章丘", "济南"),
-    ("长清", "济南"),
-    ("偃师", "洛阳"),
-    ("正定机场", "石家庄"),
-    ("山海关", "秦皇岛"),
-    ("北戴河", "秦皇岛"),
-    ("徐水", "保定"),
-    ("白洋淀", "雄安"),
-    ("白沟", "雄安"),
-    ("辽中", "沈阳"),
-    ("金州", "大连"),
-    ("金普", "大连"),
-    ("普兰店", "大连"),
-    ("阿城", "哈尔滨"),
-    ("阿城北", "哈尔滨"),
-    ("双城堡", "哈尔滨"),
-    ("呼兰北", "哈尔滨"),
-    ("鲅鱼圈", "营口"),
-    ("辽宁朝阳", "朝阳"),
-    ("兖州", "济宁"),
-    ("泰山", "泰安"),
-    ("蓬莱", "烟台"),
-    ("牟平", "烟台"),
-    ("惠阳", "惠州"),
-    ("仲恺", "惠州"),
-    ("潮阳", "汕头"),
-    ("顺德", "佛山"),
-    ("顺德学院", "佛山"),
-    ("北滘", "佛山"),
-    ("陈村", "佛山"),
-    ("容桂", "佛山"),
-    ("三水", "佛山"),
-    ("三水南", "佛山"),
-    ("三水北", "佛山"),
-    ("高明", "佛山"),
-    ("新会", "江门"),
-    ("鼎湖东", "肇庆"),
-    ("鼎湖山", "肇庆"),
-    ("长乐", "福州"),
-    ("长乐东", "福州"),
-    ("涵江", "莆田"),
-    ("泉港", "泉州"),
-    ("延平", "南平"),
-    ("江都", "扬州"),
-    ("赣榆", "连云港"),
-    ("海门", "南通"),
-    ("奉化", "宁波"),
-    ("秦王川", "兰州"),
-    ("河东机场", "银川"),
-    ("龙洞堡", "贵阳"),
-    ("吴圩机场", "南宁"),
-    ("田阳", "百色"),
-    ("宜州", "河池"),
-    ("南溪", "宜宾"),
-    ("繁昌", "芜湖"),
-    ("繁昌西", "芜湖"),
-    // v2.1 (C-class intercity corridors, 2026-10-28): district / urban-area
-    // stations of the intercity networks folded into the city they serve.
-    ("番禺", "广州"),
-    ("花都", "广州"),
-    ("白云机场东", "广州"),
-    ("白云机场北", "广州"),
-    ("竹料", "广州"),
-    ("岑村", "广州"),
-    ("花城街", "广州"),
-    ("花山镇", "广州"),
-    ("乐同", "广州"),
-    ("神山", "广州"),
-    ("江高", "广州"),
-    ("白云湖", "广州"),
-    ("狮岭", "广州"),
-    ("龙洞", "广州"),
-    ("科韵路", "广州"),
-    ("琶洲", "广州"),
-    ("帽峰山", "广州"),
-    ("大源", "广州"),
-    ("九佛", "广州"),
-    ("新龙", "广州"),
-    ("镇龙", "广州"),
-    ("佛塱", "广州"),
-    ("深井", "广州"),
-    ("东环", "广州"),
-    ("大石", "广州"),
-    ("大石东", "广州"),
-    ("官桥", "广州"),
-    ("官桥北", "广州"),
-    ("钟落潭", "广州"),
-    ("钟落潭东", "广州"),
-    ("化龙", "广州"),
-    ("化龙南", "广州"),
-    ("新塘南", "广州"),
-    ("永宁北", "广州"),
-    ("永宁南", "广州"),
-    ("亦庄", "北京"),
-    ("平湖", "深圳"),
-    ("沙井西", "深圳"),
-    ("福海西", "深圳"),
-    ("狮山", "佛山"),
-    ("狮山北", "佛山"),
-    ("张槎", "佛山"),
-    ("北滘西", "佛山"),
-    ("云东海", "佛山"),
-    ("顺德北", "佛山"),
-    ("明珠", "珠海"),
-    ("前山", "珠海"),
-    ("唐家湾", "珠海"),
-    ("凤凰机场", "三亚"),
-    ("亚龙湾", "三亚"),
-    ("崖州", "三亚"),
-    ("美兰", "海口"),
-    ("惠环", "惠州"),
-    ("陈江", "惠州"),
-    ("陈江南", "惠州"),
-    ("沥林", "惠州"),
-    ("沥林北", "惠州"),
-    ("龙丰", "惠州"),
-    ("小金口", "惠州"),
-    ("云山", "惠州"),
-    ("西湖东", "惠州"),
-    ("清城", "清远"),
-    ("洲心", "清远"),
-    ("飞霞", "清远"),
-    ("燕湖", "清远"),
-    ("银盏", "清远"),
-    ("龙塘镇", "清远"),
-    ("端州", "肇庆"),
-    ("大旺", "四会"),
-    ("宋城路", "开封"),
-    ("孟庄", "郑州"),
-    ("南曹", "郑州"),
-    ("贾鲁河", "郑州"),
-    ("运粮河", "郑州"),
-    ("绿博园", "郑州"),
-    ("麓谷", "长沙"),
-    ("谷山", "长沙"),
-    ("观沙岭", "长沙"),
-    ("开福寺", "长沙"),
-    ("尖山", "长沙"),
-    ("八方山", "长沙"),
-    ("温江", "成都"),
-    ("郫县", "成都"),
-    ("犀浦", "成都"),
-    ("安德", "成都"),
-    ("羊马", "成都"),
-    ("西来", "成都"),
-    ("姚渡", "成都"),
-    ("三星堆", "广汉"),
-    ("离堆公园", "都江堰"),
-    ("福利区", "兰州"),
-    ("西固", "兰州"),
-    ("龙嘉", "长春"),
-    ("昆阳", "昆明"),
-    ("大洋", "兰溪"),
-    ("金月湾", "东方"),
-    ("迎宾路", "都江堰"),
-    // v2.2 (S-class stations): urban stations of the 长株潭 / 成灌 / 北京市郊 /
-    // 海南环岛 / 珠机 / 贵开 S-lines folded into the city they serve.
-    ("树木岭", "长沙"),
-    ("香樟路", "长沙"),
-    ("湘府路", "长沙"),
-    ("洞井", "长沙"),
-    ("先锋", "长沙"),
-    ("芙蓉南", "长沙"),
-    ("暮云", "长沙"),
-    ("昭山", "湘潭"),
-    ("荷塘", "湘潭"),
-    ("板塘", "湘潭"),
-    ("田心东", "株洲"),
-    ("大丰", "株洲"),
-    ("红光镇", "成都"),
-    ("郫县西", "成都"),
-    ("房山东", "北京"),
-    ("良乡", "北京"),
-    ("衙门口东", "北京"),
-    ("乔庄东", "北京"),
-    ("中仓", "北京"),
-    ("后吕村", "北京"),
-    ("长流", "海口"),
-    ("秀英", "海口"),
-    ("城西", "海口"),
-    ("天涯海角", "三亚"),
-    ("崖州湾", "三亚"),
-    ("南山北", "三亚"),
-    ("湾仔北", "珠海"),
-    ("横琴", "珠海"),
-    ("十字门", "珠海"),
-    ("三灶东", "珠海"),
-    ("花溪大学城", "贵阳"),
-    ("花溪南", "贵阳"),
-    ("洛湾三江", "贵阳"),
-    ("百宜", "贵阳"),
-    ("南江", "开阳"),
-    ("步行街", "彭州"),
-];
-
-fn clean(s: &str) -> String {
-    s.chars().filter(|c| !c.is_whitespace()).collect()
-}
-fn nchars(s: &str) -> usize {
-    s.chars().count()
-}
-fn drop_last(s: &str) -> String {
-    let mut v: Vec<char> = s.chars().collect();
-    v.pop();
-    v.into_iter().collect()
-}
-
-fn city2(name: &str) -> (String, &'static str) {
-    let mut n = clean(name);
-    if n.ends_with('站') {
-        n = drop_last(&n);
-    }
-    for (a, b) in ALIAS {
-        if n == *a {
-            return (b.to_string(), "alias");
-        }
-    }
-    let mut base = n;
-    if base.ends_with('市') && nchars(&base) >= 3 {
-        base = drop_last(&base);
-    }
-    if base.ends_with('县') && nchars(&base) >= 3 {
-        base = drop_last(&base);
-    }
-    let mut best: Option<&str> = None;
-    for core in CORE {
-        if base.starts_with(core)
-            && nchars(&base) > nchars(core)
-            && best.map(|b| nchars(core) > nchars(b)).unwrap_or(true)
-        {
-            best = Some(core);
-        }
-    }
-    if let Some(core) = best {
-        return (core.to_string(), "prefix");
-    }
-    if nchars(&base) >= 3 && ['东', '南', '西', '北'].contains(&base.chars().last().unwrap()) {
-        return (drop_last(&base), "suffix");
-    }
-    (base, "self")
-}
-
-fn median(v: &[f64]) -> f64 {
-    let mut s = v.to_vec();
-    s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let n = s.len();
-    if n % 2 == 1 {
-        s[n / 2]
-    } else {
-        (s[n / 2 - 1] + s[n / 2]) / 2.0
-    }
-}
-
-#[derive(Deserialize)]
-struct Deliverable {
-    // Part of the timetable file schema; not read by this builder.
-    #[allow(dead_code)]
-    date: Option<String>,
-    trains: Vec<Train>,
-}
-#[derive(Deserialize, Clone)]
-struct Train {
-    #[serde(default)]
-    train_no: String,
-    code: String,
-    #[serde(rename = "class")]
-    train_class: String,
-    stops: Vec<Stop>,
-}
-#[derive(Deserialize, Clone)]
-struct Stop {
-    name: String,
-    arrive: String,
-    depart: String,
-}
 /// One train in data/raw/stops*.jsonl (the 12306 stop-list dump).
 #[derive(Deserialize)]
 struct RawTrain {
@@ -656,49 +31,6 @@ struct RawStop {
 /// day offset of the call from the train's origin day, leg km from the
 /// previous stop (-1 = unknown)].
 type ScheduleRow = (i64, i64, i64, i64, f64);
-fn mins(s: &str) -> Option<i64> {
-    let t = s.trim();
-    if t == "----" || t.is_empty() {
-        return None;
-    }
-    let mut it = t.split(':');
-    let h: i64 = it.next()?.parse().ok()?;
-    let m: i64 = it.next()?.parse().ok()?;
-    Some(h * 60 + m)
-}
-
-/// Travel minutes from departing stop `from` to arriving at stop `to`,
-/// advancing the clock by whole days whenever a stop time wraps past midnight.
-#[allow(clippy::needless_range_loop)]
-fn travel_time(stops: &[Stop], from: usize, to: usize) -> Option<i64> {
-    let start = mins(&stops[from].depart)?;
-    let mut clock = start;
-    let mut prev_tod = start;
-    for j in (from + 1)..=to {
-        let arr = match mins(&stops[j].arrive) {
-            Some(a) => a,
-            None => continue,
-        };
-        let mut abs = clock - prev_tod + arr;
-        while abs < clock {
-            abs += 1440;
-        }
-        clock = abs;
-        prev_tod = arr;
-        if j == to {
-            return Some(clock - start);
-        }
-        if let Some(dep) = mins(&stops[j].depart) {
-            let mut dabs = clock - prev_tod + dep;
-            while dabs < clock {
-                dabs += 1440;
-            }
-            clock = dabs;
-            prev_tod = dep;
-        }
-    }
-    None
-}
 #[derive(Default, Clone)]
 struct DestStats {
     total: u64,
@@ -710,303 +42,8 @@ struct DestStats {
     first: usize,
 }
 
-/// city2 plus two adjudicated overrides for Chengdu-area name collisions:
-/// 朝阳湖 is the HSR station for 蒲江 county (Chengdu) — the v2 prefix rule
-/// misfires it into 朝阳, Liaoning. 沙湾南 is 沙湾 district of 乐山 — folding
-/// it into plain 沙湾 merges it with 沙湾, Xinjiang.
-fn city_of(station_name: &str) -> String {
-    match station_name {
-        "朝阳湖" => "蒲江".to_string(),
-        "沙湾南" => "乐山".to_string(),
-        "安靖" => "成都".to_string(),
-        _ => city2(station_name).0,
-    }
-}
-
-#[derive(Deserialize)]
-struct PPFile {
-    pairs: Vec<PPPair>,
-}
-#[derive(Deserialize)]
-struct PPPair {
-    from: String,
-    to: String,
-    status: String,
-    segments: Vec<Vec<i64>>,
-}
-
-#[allow(clippy::needless_range_loop)]
-fn dp_keep(pts: &[[f64; 2]], tol: f64) -> Vec<[f64; 2]> {
-    // Douglas-Peucker in raw degrees (tol ~ degrees). Endpoints always kept.
-    let n = pts.len();
-    if n <= 2 {
-        return pts.to_vec();
-    }
-    let mut keep = vec![false; n];
-    keep[0] = true;
-    keep[n - 1] = true;
-    let mut stack: Vec<(usize, usize)> = vec![(0, n - 1)];
-    while let Some((a, b)) = stack.pop() {
-        if b <= a + 1 {
-            continue;
-        }
-        let (ax, ay) = (pts[a][0], pts[a][1]);
-        let (bx, by) = (pts[b][0], pts[b][1]);
-        let dx = bx - ax;
-        let dy = by - ay;
-        let len2 = dx * dx + dy * dy;
-        let mut worst = 0.0f64;
-        let mut worst_i = a;
-        for i in (a + 1)..b {
-            let (px, py) = (pts[i][0], pts[i][1]);
-            let d = if len2 == 0.0 {
-                ((px - ax).powi(2) + (py - ay).powi(2)).sqrt()
-            } else {
-                let t = (((px - ax) * dx + (py - ay) * dy) / len2).clamp(0.0, 1.0);
-                let cx = ax + t * dx;
-                let cy = ay + t * dy;
-                ((px - cx).powi(2) + (py - cy).powi(2)).sqrt()
-            };
-            if d > worst {
-                worst = d;
-                worst_i = i;
-            }
-        }
-        if worst > tol {
-            keep[worst_i] = true;
-            stack.push((a, worst_i));
-            stack.push((worst_i, b));
-        }
-    }
-    pts.iter()
-        .zip(keep.iter())
-        .filter(|(_, k)| **k)
-        .map(|(p, _)| *p)
-        .collect()
-}
-
-/// English for a station name: curated specials, else base place EN from the
-/// city gazetteer plus a suffix word (East/South/West/North/Airport).
-fn station_en(name: &str, city_en: &HashMap<String, String>) -> String {
-    static STATION_EN: std::sync::LazyLock<HashMap<String, String>> =
-        std::sync::LazyLock::new(|| {
-            serde_json::from_str(include_str!("../../../../data/station_en.json"))
-                .unwrap_or_default()
-        });
-    if let Some(v) = STATION_EN.get(name) {
-        return v.clone();
-    }
-    let specials: &[(&str, &str)] = &[
-        ("广州白云", "Guangzhou Baiyun"),
-        ("广州南", "Guangzhou South"),
-        ("广州东", "Guangzhou East"),
-        ("广州北", "Guangzhou North"),
-        ("广州西", "Guangzhou West"),
-        ("广州新塘", "Guangzhou Xintang"),
-        ("广州", "Guangzhou"),
-        ("北京南", "Beijing South"),
-        ("北京西", "Beijing West"),
-        ("北京北", "Beijing North"),
-        ("北京东", "Beijing East"),
-        ("北京大兴", "Beijing Daxing"),
-        ("北京朝阳", "Beijing Chaoyang"),
-        ("北京丰台", "Beijing Fengtai"),
-        ("北京通州", "Beijing Tongzhou"),
-        ("北京", "Beijing"),
-        ("上海虹桥", "Shanghai Hongqiao"),
-        ("上海松江", "Shanghai Songjiang"),
-        ("上海南", "Shanghai South"),
-        ("上海西", "Shanghai West"),
-        ("上海", "Shanghai"),
-        ("深圳北", "Shenzhen North"),
-        ("深圳坪山", "Shenzhen Pingshan"),
-        ("深圳机场北", "Shenzhen Airport North"),
-        ("深圳机场", "Shenzhen Airport"),
-        ("深圳", "Shenzhen"),
-        ("香港西九龙", "Hong Kong West Kowloon"),
-        ("成都东", "Chengdu East"),
-        ("成都南", "Chengdu South"),
-        ("成都西", "Chengdu West"),
-        ("重庆北", "Chongqing North"),
-        ("重庆西", "Chongqing West"),
-        ("重庆东", "Chongqing East"),
-        ("重庆", "Chongqing"),
-        ("西安北", "Xi'an North"),
-        ("西安", "Xi'an"),
-        ("武汉", "Wuhan"),
-        ("汉口", "Hankou"),
-        ("武昌", "Wuchang"),
-        ("杭州东", "Hangzhou East"),
-        ("南京南", "Nanjing South"),
-        ("长沙南", "Changsha South"),
-        ("昆明南", "Kunming South"),
-        ("贵阳北", "Guiyang North"),
-        ("贵阳东", "Guiyang East"),
-        ("兰州西", "Lanzhou West"),
-        ("拉萨", "Lhasa"),
-        ("乌鲁木齐", "Urumqi"),
-        ("乌鲁木齐南", "Urumqi South"),
-        ("福田", "Futian"),
-        ("沙坪坝", "Shapingba"),
-        ("天府机场", "Tianfu Airport"),
-        ("双流机场", "Shuangliu Airport"),
-        ("江北机场", "Jiangbei Airport"),
-        ("天津", "Tianjin"),
-        ("天津西", "Tianjin West"),
-    ];
-    for (k, v) in specials {
-        if name == *k {
-            return v.to_string();
-        }
-    }
-    let base_en = |b: &str| -> Option<String> {
-        STATION_EN
-            .get(b)
-            .cloned()
-            .or_else(|| city_en.get(b).cloned())
-    };
-    if let Some(b) = name.strip_suffix("国际机场") {
-        if let Some(e) = base_en(b) {
-            return format!("{} International Airport", e);
-        }
-    }
-    if let Some(b) = name.strip_suffix("机场北") {
-        if let Some(e) = base_en(b) {
-            return format!("{} Airport North", e);
-        }
-    }
-    if let Some(b) = name.strip_suffix("机场南") {
-        if let Some(e) = base_en(b) {
-            return format!("{} Airport South", e);
-        }
-    }
-    if let Some(b) = name.strip_suffix("机场") {
-        if let Some(e) = base_en(b) {
-            return format!("{} Airport", e);
-        }
-    }
-    for (suf, word) in [
-        ("东", "East"),
-        ("南", "South"),
-        ("西", "West"),
-        ("北", "North"),
-    ] {
-        if let Some(b) = name.strip_suffix(suf) {
-            if let Some(e) = base_en(b) {
-                return format!("{} {}", e, word);
-            }
-        }
-    }
-    if let Some(b) = name.strip_suffix("站") {
-        if let Some(e) = base_en(b) {
-            return e;
-        }
-    }
-    base_en(name).unwrap_or_else(|| name.to_string())
-}
-
-/// Dijkstra over the corridor graph; returns the chain of pair keys and
-/// their total drawn length. Virtual (None) edges move the search between
-/// same-city stations but contribute no pair and no drawn length.
-fn dijkstra_chain(
-    adj: &CorridorAdj,
-    a: &str,
-    b: &str,
-    pair_len: &HashMap<(String, String), f64>,
-) -> Option<(Vec<(String, String)>, f64)> {
-    let mut dist: HashMap<String, f64> = HashMap::from([(a.to_string(), 0.0)]);
-    let mut prev: HashMap<String, (String, Option<(String, String)>)> = HashMap::new();
-    let mut visited: HashSet<String> = HashSet::new();
-    // min-heap on (cost bits, name): exact-cost ties pop in name order
-    let mut heap: BinaryHeap<Reverse<(u64, String)>> =
-        BinaryHeap::from([Reverse((0f64.to_bits(), a.to_string()))]);
-    loop {
-        let Reverse((dbits, u)) = heap.pop()?;
-        if visited.contains(&u) {
-            continue;
-        }
-        let du = f64::from_bits(dbits);
-        if u == b {
-            break;
-        }
-        visited.insert(u.clone());
-        if let Some(edges) = adj.get(&u) {
-            for (v, pk, w) in edges {
-                let nd = du + w;
-                if nd < *dist.get(v).unwrap_or(&f64::INFINITY) {
-                    dist.insert(v.clone(), nd);
-                    prev.insert(v.clone(), (u.clone(), pk.clone()));
-                    heap.push(Reverse((nd.to_bits(), v.clone())));
-                }
-            }
-        }
-    }
-    if !dist.contains_key(b) {
-        return None;
-    }
-    let mut pair_chain: Vec<(String, String)> = Vec::new();
-    let mut cur = b.to_string();
-    while cur != a {
-        let (p, pk) = prev.get(&cur)?;
-        if let Some(k) = pk {
-            pair_chain.push(k.clone());
-        }
-        cur = p.clone();
-    }
-    if pair_chain.is_empty() || pair_chain.len() > 40 {
-        return None;
-    }
-    pair_chain.reverse();
-    let drawn_total: f64 = pair_chain
-        .iter()
-        .map(|k| pair_len.get(k).copied().unwrap_or(0.0))
-        .sum();
-    Some((pair_chain, drawn_total))
-}
-
-fn hav_km_ll(p: [f64; 2], q: [f64; 2]) -> f64 {
-    let dx = (p[0] - q[0]) * 96.0;
-    let dy = (p[1] - q[1]) * 111.0;
-    (dx * dx + dy * dy).sqrt()
-}
-
-fn round_pt(p: [f64; 2], dp: i32) -> [f64; 2] {
-    let f = 10f64.powi(dp);
-    [(p[0] * f).round() / f, (p[1] * f).round() / f]
-}
-
-// ================= atlas types =================
-#[derive(serde::Serialize)]
-struct AtlasCity {
-    zh: String,
-    en: String,
-    pt: [f64; 2],
-}
-#[derive(serde::Serialize)]
-struct AtlasStation {
-    zh: String,
-    en: String,
-}
-#[derive(serde::Serialize)]
-struct AtlasTrainRef {
-    code: String,
-    class: String,
-}
 fn is_zero(v: &u8) -> bool {
     *v == 0
-}
-
-fn class_idx(c: &str) -> usize {
-    match c {
-        "G" => 0,
-        "D" => 1,
-        "C" => 2,
-        "S" => 3,
-        "Z" => 4,
-        "T" => 5,
-        "K" => 6,
-        _ => 7,
-    }
 }
 
 fn pack_flow_row(sec_idx: usize, n: usize, cls_counts: &[u32; 8]) -> Vec<usize> {
@@ -1049,11 +86,6 @@ type InCallList = Vec<(usize, String, String, i64, u8, i64, usize)>;
 type DepKey = (String, String, String);
 /// Join key for a train's arrival row: (code, origin station, depart time, dataset index).
 type ArrKey = (String, String, String, u8);
-/// Station-pair key used throughout the pipeline.
-type PairKey = (String, String);
-/// Routed track paths per station pair: (path id, vertex-id segments).
-type PathMap = HashMap<PairKey, (String, Vec<Vec<i64>>)>;
-
 #[derive(serde::Serialize)]
 struct AtlasDep {
     t: usize,
@@ -1167,333 +199,6 @@ struct InSrcStats {
     rail: Vec<f64>,
     calls: Vec<InCallRaw>,
     first: usize,
-}
-
-/// Google polyline encoding (1e5 precision); pts are [lon, lat].
-fn polyline_encode(pts: &[[f64; 2]]) -> String {
-    let mut out = String::new();
-    let mut last = [0i64; 2];
-    for p in pts {
-        let cur = [(p[1] * 1e5).round() as i64, (p[0] * 1e5).round() as i64];
-        for i in 0..2 {
-            let mut v = cur[i] - last[i];
-            v = if v < 0 { !(v << 1) } else { v << 1 };
-            while v >= 0x20 {
-                out.push((((0x20 | (v & 0x1f)) + 63) as u8) as char);
-                v >>= 5;
-            }
-            out.push(((v + 63) as u8) as char);
-        }
-        last = cur;
-    }
-    out
-}
-
-type CorridorAdj = HashMap<String, Vec<(String, Option<(String, String)>, f64)>>;
-
-/// Resolve one leg to track node sequences: direct pair geometry, else a
-/// corridor chain (cached). None = honest chord.
-#[allow(clippy::too_many_arguments)]
-fn resolve_leg(
-    key: &(String, String),
-    path_map: &PathMap,
-    adj_pure: &CorridorAdj,
-    adj: &CorridorAdj,
-    pair_len: &HashMap<(String, String), f64>,
-    station_pt: &dyn Fn(&str) -> Option<[f64; 2]>,
-    cache: &mut HashMap<(String, String), Option<Vec<Vec<i64>>>>,
-) -> Option<Vec<Vec<i64>>> {
-    if let Some(v) = cache.get(key) {
-        return v.clone();
-    }
-    let result = (|| {
-        if let Some((_, segs)) = path_map.get(key) {
-            if segs.iter().any(|s| s.len() >= 2) {
-                return Some(segs.clone());
-            }
-        }
-        let (a, b) = (&key.0, &key.1);
-        let chord_km = match (station_pt(a), station_pt(b)) {
-            (Some(p), Some(q)) => hav_km_ll([p[1], p[0]], [q[1], q[0]]),
-            _ => return None,
-        };
-        for adj_ref in [adj_pure, adj] {
-            if let Some((pair_chain, drawn_total)) = dijkstra_chain(adj_ref, a, b, pair_len) {
-                if drawn_total > chord_km * 1.6 + 20.0 {
-                    continue;
-                }
-                let mut seqs: Vec<Vec<i64>> = Vec::new();
-                for k in pair_chain.iter() {
-                    if let Some((_, ss)) = path_map.get(k) {
-                        for s in ss {
-                            if s.len() >= 2 {
-                                seqs.push(s.clone());
-                            }
-                        }
-                    }
-                }
-                if !seqs.is_empty() {
-                    return Some(seqs);
-                }
-            }
-        }
-        None
-    })();
-    cache.insert(key.clone(), result.clone());
-    result
-}
-
-/// One corridor-classification override from legclass: this train's
-/// nonstop leg from->to is drawn via the given waypoint chain instead
-/// of the pair's default geometry (see legclass.rs for the rule).
-#[derive(Deserialize)]
-struct LegOverride {
-    #[serde(default)]
-    train_no: String,
-    code: String,
-    from: String,
-    to: String,
-    via: Vec<String>,
-}
-
-/// Override lookup keyed (identity, from, to); identity is the train's
-/// internal train_no when the record carries one, else its code — both
-/// keys are inserted so lookup succeeds with whichever the train has.
-type OverrideMap = HashMap<(String, String, String), Vec<String>>;
-
-fn load_overrides(path: &PathBuf) -> OverrideMap {
-    let mut map: OverrideMap = HashMap::new();
-    if let Ok(txt) = fs::read_to_string(path) {
-        if let Ok(recs) = serde_json::from_str::<Vec<LegOverride>>(&txt) {
-            println!(
-                "leg overrides loaded: {} from {}",
-                recs.len(),
-                path.display()
-            );
-            for r in recs {
-                if !r.train_no.is_empty() {
-                    map.insert(
-                        (r.train_no.clone(), r.from.clone(), r.to.clone()),
-                        r.via.clone(),
-                    );
-                }
-                map.insert((r.code.clone(), r.from, r.to), r.via);
-            }
-        }
-    }
-    map
-}
-
-/// Per-train leg paths from the staging corridor router (env
-/// ATLAS_LEG_PATHS): each record names one train's directed leg and a
-/// track-path id ("#..."). The id becomes that leg's via token, and its
-/// segments and km are served from LEG_PATHS. Unset: no effect at all.
-#[derive(Deserialize)]
-struct LegPath {
-    #[serde(default)]
-    train_no: String,
-    code: String,
-    from: String,
-    to: String,
-    id: String,
-    km: f64,
-    segments: Vec<Vec<i64>>,
-}
-
-type LegPathMap = HashMap<String, (Vec<Vec<i64>>, f64)>;
-
-static LEG_PATHS: std::sync::OnceLock<LegPathMap> = std::sync::OnceLock::new();
-
-/// Load ATLAS_LEG_PATHS (or default corridor-v3 leg_paths) into the override map and LEG_PATHS.
-/// Keyed by train_no; by public code only when train_no is absent
-/// (codes are reused across physical trains).
-fn load_leg_paths(map: &mut OverrideMap, data_dir: &Path) {
-    let mut paths: LegPathMap = HashMap::new();
-    let p_path = env::var("ATLAS_LEG_PATHS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| data_dir.join("derived/corridor-v3/leg_paths.json"));
-    if p_path.exists() {
-        let recs: Vec<LegPath> =
-            serde_json::from_str(&fs::read_to_string(&p_path).unwrap()).unwrap();
-        println!("leg paths loaded: {} from {}", recs.len(), p_path.display());
-        for r in recs {
-            let key_id = if r.train_no.is_empty() {
-                r.code
-            } else {
-                r.train_no
-            };
-            map.insert((key_id, r.from, r.to), vec![r.id.clone()]);
-            paths.entry(r.id).or_insert((r.segments, r.km));
-        }
-    }
-    LEG_PATHS.set(paths).ok();
-}
-
-/// The router path behind a via token, if it is one.
-fn leg_path(via: &str) -> Option<&'static (Vec<Vec<i64>>, f64)> {
-    if via.starts_with('#') {
-        LEG_PATHS.get()?.get(via)
-    } else {
-        None
-    }
-}
-
-/// The via chain for train t's directed leg a->b, if an override exists.
-fn override_via<'m>(map: &'m OverrideMap, t: &Train, a: &str, b: &str) -> Option<&'m [String]> {
-    if !t.train_no.is_empty() {
-        if let Some(v) = map.get(&(t.train_no.clone(), a.to_string(), b.to_string())) {
-            return Some(v.as_slice());
-        }
-    }
-    map.get(&(t.code.clone(), a.to_string(), b.to_string()))
-        .map(|v| v.as_slice())
-}
-
-/// Leg key: unordered station pair plus the via chain (in key.0 -> key.1
-/// direction, ">"-joined; empty = the pair's default geometry).
-fn leg_key3(map: &OverrideMap, t: &Train, a: &str, b: &str) -> (String, String, String) {
-    let via = override_via(map, t, a, b);
-    if a < b {
-        (
-            a.to_string(),
-            b.to_string(),
-            via.map(|v| v.join(">")).unwrap_or_default(),
-        )
-    } else {
-        let mut rev: Vec<String> = via.map(|v| v.to_vec()).unwrap_or_default();
-        rev.reverse();
-        (b.to_string(), a.to_string(), rev.join(">"))
-    }
-}
-
-/// Track km for train t's directed leg a->b: the via tiling's summed
-/// pair lengths when overridden, else the pair's own length.
-fn leg_km(
-    map: &OverrideMap,
-    pair_len: &HashMap<(String, String), f64>,
-    t: &Train,
-    a: &str,
-    b: &str,
-) -> Option<f64> {
-    let base = |x: &str, y: &str| -> Option<f64> {
-        let key = if x < y {
-            (x.to_string(), y.to_string())
-        } else {
-            (y.to_string(), x.to_string())
-        };
-        pair_len.get(&key).copied()
-    };
-    if let Some([one]) = override_via(map, t, a, b) {
-        if let Some((_, km)) = leg_path(one) {
-            return Some(*km);
-        }
-    }
-    match override_via(map, t, a, b) {
-        Some(via) if !via.is_empty() => {
-            let mut pts: Vec<&str> = vec![a];
-            pts.extend(via.iter().map(|s| s.as_str()));
-            pts.push(b);
-            let mut total = 0.0;
-            for w in pts.windows(2) {
-                total += base(w[0], w[1])?;
-            }
-            Some(total)
-        }
-        _ => base(a, b),
-    }
-}
-
-type PairCache = HashMap<(String, String), Option<Vec<Vec<i64>>>>;
-type VariantCache = HashMap<(String, String, String), Option<Vec<Vec<i64>>>>;
-
-/// Resolve a leg key (pair + optional via chain) to track segments: a
-/// variant leg is the concatenation of its sub-pairs' resolved segment
-/// lists. If any sub-pair fails to resolve (e.g. its track geometry is
-/// absent from the extract — some are chord pairs even in the base
-/// build), the variant falls back to the base pair's own resolution,
-/// so an override can never make a leg less resolved than it was
-/// without overrides. `stats` counts (variant-resolved, fallback).
-#[allow(clippy::too_many_arguments)]
-fn resolve_leg3(
-    key: &(String, String, String),
-    path_map: &PathMap,
-    adj_pure: &CorridorAdj,
-    adj: &CorridorAdj,
-    pair_len: &HashMap<(String, String), f64>,
-    station_pt: &dyn Fn(&str) -> Option<[f64; 2]>,
-    cache: &mut PairCache,
-    vcache: &mut VariantCache,
-    stats: &mut (u64, u64),
-) -> Option<Vec<Vec<i64>>> {
-    if let Some((segs, _)) = leg_path(&key.2) {
-        return Some(segs.clone());
-    }
-    if key.2.is_empty() {
-        return resolve_leg(
-            &(key.0.clone(), key.1.clone()),
-            path_map,
-            adj_pure,
-            adj,
-            pair_len,
-            station_pt,
-            cache,
-        );
-    }
-    if let Some(v) = vcache.get(key) {
-        return v.clone();
-    }
-    let stitched = (|| {
-        let mut pts: Vec<&str> = vec![key.0.as_str()];
-        pts.extend(key.2.split('>').filter(|s| !s.is_empty()));
-        pts.push(key.1.as_str());
-        let mut seqs: Vec<Vec<i64>> = Vec::new();
-        for w in pts.windows(2) {
-            let sub = (w[0].to_string(), w[1].to_string());
-            let r = resolve_leg(&sub, path_map, adj_pure, adj, pair_len, station_pt, cache)?;
-            seqs.extend(r);
-        }
-        Some(seqs)
-    })();
-    let result = match stitched {
-        Some(s) => {
-            stats.0 += 1;
-            Some(s)
-        }
-        None => {
-            stats.1 += 1;
-            resolve_leg(
-                &(key.0.clone(), key.1.clone()),
-                path_map,
-                adj_pure,
-                adj,
-                pair_len,
-                station_pt,
-                cache,
-            )
-        }
-    };
-    vcache.insert(key.clone(), result.clone());
-    result
-}
-
-/// Geometry lookup for the section/chord passes: pair keys read the
-/// pair cache, variant keys the variant cache (populated by the outbound
-/// resolution loop and the inbound pass after it).
-fn leg_seqs<'c>(
-    key: &(String, String, String),
-    cache: &'c PairCache,
-    vcache: &'c VariantCache,
-) -> Option<&'c Vec<Vec<i64>>> {
-    if let Some((segs, _)) = leg_path(&key.2) {
-        return Some(segs);
-    }
-    if key.2.is_empty() {
-        cache
-            .get(&(key.0.clone(), key.1.clone()))
-            .and_then(|o| o.as_ref())
-    } else {
-        vcache.get(key).and_then(|o| o.as_ref())
-    }
 }
 
 /// Internal gap (km) above which a resolved leg counts as a chord leg:
@@ -1814,272 +519,26 @@ fn walk_edges(seqs: &[Vec<i64>], walk: &LegWalk, fwd: bool, mut f: impl FnMut(i6
 }
 
 fn main() {
-    let data_dir = if let Ok(d) = env::var("CRFM_DATA_DIR") {
-        PathBuf::from(d)
-    } else if PathBuf::from("data").exists() {
-        PathBuf::from("data")
-    } else {
-        PathBuf::from("../data")
-    };
-    let files = if let Ok(d) = env::var("CRFM_OUTPUT_DIR") {
-        PathBuf::from(d)
-    } else if PathBuf::from("output").exists() {
-        PathBuf::from("output")
-    } else {
-        PathBuf::from("../output")
-    };
+    let inp = inputs::load();
     let out_path = env::var("ATLAS_OUT")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| files.join("china-flow-atlas-data.json"));
-    let overrides_path = env::var("ATLAS_OVERRIDES")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| data_dir.join("leg_overrides.json"));
-    let mut override_map = load_overrides(&overrides_path);
-    load_leg_paths(&mut override_map, &data_dir);
-    let override_map = override_map;
+        .unwrap_or_else(|_| inp.paths.files.join("china-flow-atlas-data.json"));
+    let data_dir = inp.paths.data_dir.clone();
+    let override_map = &inp.override_map;
+    let trains = &inp.trains;
+    let d1_len = inp.d1_len;
+    let path_map = &inp.path_map;
+    let coords = &inp.coords;
+    let city_en = &inp.city_en;
+    let en = |c: &str| -> String { inp.en(c) };
+    let station_pt = |name: &str| -> Option<[f64; 2]> { inp.stations.point(name) };
 
-    let load = |p: &PathBuf| -> Deliverable {
-        serde_json::from_str(&fs::read_to_string(p).unwrap()).unwrap()
-    };
-    let d1 = load(&files.join("china-rail-timetables-2026-10-21.json"));
-    let d2 = load(&files.join("china-rail-intercity-2026-10-28.json"));
-    let d1_len = d1.trains.len();
-    let mut trains = d1.trains.clone();
-    trains.extend(d2.trains.iter().cloned());
-    println!("trains: {}", trains.len());
-
-    let city_en: HashMap<String, String> =
-        serde_json::from_str(&fs::read_to_string(data_dir.join("city_en.json")).unwrap()).unwrap();
-    let en = |c: &str| -> String { city_en.get(c).cloned().unwrap_or_else(|| c.to_string()) };
-    let osm: HashMap<String, Vec<[f64; 2]>> =
-        serde_json::from_str(&fs::read_to_string(data_dir.join("osm_stations.json")).unwrap())
-            .unwrap();
-    let mut gtfs_pt: HashMap<String, [f64; 2]> = HashMap::new();
-    for line in fs::read_to_string(files.join("gtfs-2026-10-21/stops.txt"))
-        .unwrap()
-        .lines()
-        .skip(1)
-    {
-        let f: Vec<&str> = line.split(',').collect();
-        if f.len() >= 4 {
-            if let (Ok(lat), Ok(lon)) = (f[2].parse::<f64>(), f[3].parse::<f64>()) {
-                gtfs_pt.insert(clean(f[1]), [lat, lon]);
-            }
-        }
-    }
-    let station_pt = |name: &str| -> Option<[f64; 2]> {
-        if let Some(p) = gtfs_pt.get(name) {
-            return Some(*p);
-        }
-        let cands = osm.get(name)?;
-        let lats: Vec<f64> = cands.iter().map(|c| c[0]).collect();
-        let lons: Vec<f64> = cands.iter().map(|c| c[1]).collect();
-        let m = [median(&lats), median(&lons)];
-        // nearest REAL candidate to the median point — independent lat/lon
-        // medians invent phantom points for homonym stations (e.g. 迎宾路).
-        cands
-            .iter()
-            .min_by(|x, y| {
-                let dx = (x[0] - m[0]).powi(2) + (x[1] - m[1]).powi(2);
-                let dy = (y[0] - m[0]).powi(2) + (y[1] - m[1]).powi(2);
-                dx.partial_cmp(&dy).unwrap()
-            })
-            .copied()
-    };
-
-    // ---- pair paths ----
-    let mut path_map: PathMap = HashMap::new();
-    // ATLAS_PAIR_PATHS (comma-separated files) replaces the production
-    // pair geometry. Defaults to canonical double-track paths + base pair geometry.
-    let pp_files: Vec<PathBuf> = match env::var("ATLAS_PAIR_PATHS") {
-        Ok(v) => v.split(',').map(PathBuf::from).collect(),
-        Err(_) => {
-            let canon = data_dir.join("derived/corridor-v3/pair_paths_canonical.json");
-            let mut list = Vec::new();
-            if canon.exists() {
-                list.push(canon);
-            }
-            list.push(data_dir.join("derived/pair_paths.json"));
-            list.push(data_dir.join("derived/cs_out/pair_paths.json"));
-            list
-        }
-    };
-    for pth in pp_files {
-        let pp: PPFile = serde_json::from_str(&fs::read_to_string(&pth).unwrap()).unwrap();
-        for p in pp.pairs {
-            let (a, b) = (clean(&p.from), clean(&p.to));
-            let key = if a < b { (a, b) } else { (b, a) };
-            path_map
-                .entry(key)
-                .or_insert((p.status.clone(), p.segments.clone()));
-        }
-    }
-    println!("pair path entries: {}", path_map.len());
-
-    // ---- needed node coords from china-rail.osm ----
-    let mut needed: HashSet<i64> = HashSet::new();
-    for (_, segs) in path_map.values() {
-        for s in segs {
-            for id in s {
-                needed.insert(*id);
-            }
-        }
-    }
-    // Router (#cv3) leg paths run over nodes outside the pair paths; without
-    // their coordinates those stretches carry no flow and become chords.
-    for (segs, _) in LEG_PATHS.get().into_iter().flat_map(|m| m.values()) {
-        for s in segs {
-            needed.extend(s.iter().copied());
-        }
-    }
-    println!("needed nodes: {}", needed.len());
-    let osm_path = env::var("CRFM_OSM_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| data_dir.join("osm/china-rail.osm"));
-    let data = fs::read(&osm_path).unwrap();
-    println!("osm bytes: {}", data.len());
-    let mut coords: HashMap<i64, [f64; 2]> = HashMap::with_capacity(needed.len());
-    {
-        let needle = b"<node ";
-        let mut i = 0usize;
-        let n = data.len();
-        while i + 6 < n {
-            if &data[i..i + 6] == needle {
-                // tag ends at next '>'
-                let mut end = i + 6;
-                while end < n && data[end] != b'>' {
-                    end += 1;
-                }
-                let tag = &data[i..end];
-                let get_f64 = |key: &[u8]| -> Option<f64> {
-                    let mut k = 0;
-                    while k + key.len() + 2 <= tag.len() {
-                        if &tag[k..k + key.len()] == key
-                            && tag[k + key.len()] == b'='
-                            && tag[k + key.len() + 1] == b'"'
-                        {
-                            let start = k + key.len() + 2;
-                            let len = tag[start..].iter().position(|&b| b == b'"')?;
-                            return std::str::from_utf8(&tag[start..start + len])
-                                .ok()?
-                                .parse()
-                                .ok();
-                        }
-                        k += 1;
-                    }
-                    None
-                };
-                if let (Some(idf), Some(lat), Some(lon)) =
-                    (get_f64(b"id"), get_f64(b"lat"), get_f64(b"lon"))
-                {
-                    let id = idf as i64;
-                    if needed.contains(&id) {
-                        coords.insert(id, [lon, lat]);
-                    }
-                }
-                i = end + 1;
-            } else {
-                i += 1;
-            }
-        }
-    }
-    println!("coords resolved: {}", coords.len());
-
-    // ---- HSR edges & nodes from china-rail.osm ways (highspeed=yes or maxspeed>=200) ----
-    let (hsr_edges, conv_edges, hsr_nodes) = {
-        use quick_xml::events::{BytesStart, Event};
-        use quick_xml::Reader;
-        let attr = |e: &BytesStart, key: &[u8]| -> String {
-            for a in e.attributes().flatten() {
-                if a.key.as_ref() == key {
-                    return a
-                        .unescape_value()
-                        .map(|c| c.into_owned())
-                        .unwrap_or_default();
-                }
-            }
-            String::new()
-        };
-        let parse_speed = |v: &str| -> Option<f64> {
-            let first = v.split([';', ',']).next()?.trim();
-            let num: String = first
-                .chars()
-                .take_while(|c| c.is_ascii_digit() || *c == '.')
-                .collect();
-            let x: f64 = num.parse().ok()?;
-            let x = if first.ends_with("mph") { x * 1.609 } else { x };
-            (5.0..=450.0).contains(&x).then_some(x)
-        };
-        let mut reader = Reader::from_reader(data.as_slice());
-        let mut buf: Vec<u8> = Vec::with_capacity(1 << 14);
-        let mut in_way = false;
-        let mut is_rail = false;
-        let mut highspeed = false;
-        let mut maxspeed: Option<f64> = None;
-        let mut refs: Vec<i64> = Vec::new();
-        let mut hsr_edges: HashSet<(i64, i64)> = HashSet::new();
-        let mut conv_edges: HashSet<(i64, i64)> = HashSet::new();
-        let mut hsr_nodes: HashSet<i64> = HashSet::new();
-        loop {
-            match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(e)) if e.name().as_ref() == b"way" => {
-                    in_way = true;
-                    is_rail = false;
-                    highspeed = false;
-                    maxspeed = None;
-                    refs.clear();
-                }
-                Ok(Event::Empty(e)) if in_way && e.name().as_ref() == b"nd" => {
-                    if let Ok(r) = attr(&e, b"ref").parse::<i64>() {
-                        refs.push(r);
-                    }
-                }
-                Ok(Event::Empty(e)) if in_way && e.name().as_ref() == b"tag" => {
-                    let k = attr(&e, b"k");
-                    let v = attr(&e, b"v");
-                    match k.as_str() {
-                        "railway" if v == "rail" || v == "ferry" => is_rail = true,
-                        "highspeed" if v == "yes" => highspeed = true,
-                        "maxspeed" => maxspeed = parse_speed(&v),
-                        _ => {}
-                    }
-                }
-                Ok(Event::End(e)) if e.name().as_ref() == b"way" => {
-                    in_way = false;
-                    if is_rail && refs.len() >= 2 {
-                        let is_hsr = highspeed || maxspeed.is_some_and(|s| s >= 200.0);
-                        if is_hsr {
-                            for &id in &refs {
-                                hsr_nodes.insert(id);
-                            }
-                            for w in refs.windows(2) {
-                                let e = if w[0] < w[1] {
-                                    (w[0], w[1])
-                                } else {
-                                    (w[1], w[0])
-                                };
-                                hsr_edges.insert(e);
-                            }
-                        } else {
-                            for w in refs.windows(2) {
-                                let e = if w[0] < w[1] {
-                                    (w[0], w[1])
-                                } else {
-                                    (w[1], w[0])
-                                };
-                                conv_edges.insert(e);
-                            }
-                        }
-                    }
-                }
-                Ok(Event::Eof) => break,
-                Err(_) => break,
-                _ => {}
-            }
-            buf.clear();
-        }
-        (hsr_edges, conv_edges, hsr_nodes)
-    };
+    // ---- HSR edges & nodes from the OSM ways (highspeed=yes or maxspeed>=200) ----
+    let osm::WayClasses {
+        hsr_edges,
+        conv_edges,
+        hsr_nodes,
+    } = osm::scan_ways(&inp.osm_data);
     let chain_hsr = |chain: &[i64]| -> u8 {
         let total = chain.len().saturating_sub(1);
         let hsr_n = chain
@@ -2338,7 +797,7 @@ fn main() {
             for k in cd_idx..(names.len() - 1) {
                 let (a, b) = (names[k].clone(), names[k + 1].clone());
                 if a != b {
-                    let key = leg_key3(&override_map, t, &a, &b);
+                    let key = leg_key3(override_map, t, &a, &b);
                     *leg_count.entry(key.clone()).or_insert(0) += 1;
                     legs.push(key);
                     leg_fwd.push(a < b);
@@ -2375,7 +834,7 @@ fn main() {
                 while last_k < j {
                     let (a, b) = (names[last_k].clone(), names[last_k + 1].clone());
                     if a != b {
-                        match leg_km(&override_map, &pair_len, t, &a, &b) {
+                        match leg_km(override_map, &pair_len, t, &a, &b) {
                             Some(l) => cum_km += l,
                             None => cum_ok = false,
                         }
@@ -2457,7 +916,7 @@ fn main() {
         for (k, n) in leg_count.iter() {
             let r = resolve_leg3(
                 k,
-                &path_map,
+                path_map,
                 &adj_pure,
                 &adj,
                 &pair_len,
@@ -2558,7 +1017,7 @@ fn main() {
                 pref_bad[k] = pref_bad[k - 1];
                 pref_km[k] = pref_km[k - 1];
                 if a != b {
-                    match leg_km(&override_map, &pair_len, t, &a, &b) {
+                    match leg_km(override_map, &pair_len, t, &a, &b) {
                         Some(l) => pref_km[k] += l,
                         None => pref_bad[k] += 1,
                     }
@@ -2575,7 +1034,7 @@ fn main() {
             for k in 0..cd_in {
                 let (a, b) = (names[k].clone(), names[k + 1].clone());
                 if a != b {
-                    legs.push(leg_key3(&override_map, t, &a, &b));
+                    legs.push(leg_key3(override_map, t, &a, &b));
                     leg_fwd.push(a < b);
                     leg_stop.push(k);
                 }
@@ -2698,7 +1157,7 @@ fn main() {
         in_throat_stations.insert(key.1.clone());
         resolve_leg3(
             key,
-            &path_map,
+            path_map,
             &adj_pure,
             &adj,
             &pair_len,
@@ -2837,12 +1296,12 @@ fn main() {
         let a_i = if a_nm.is_empty() {
             -1
         } else {
-            intern_station(&mut station_table, &mut station_idx, &a_nm, &city_en)
+            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
         };
         let b_i = if b_nm.is_empty() {
             -1
         } else {
-            intern_station(&mut station_table, &mut station_idx, &b_nm, &city_en)
+            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
         };
         sections.push(AtlasSection {
             a: a_i,
@@ -2929,12 +1388,12 @@ fn main() {
         let a_i = if a_nm.is_empty() {
             -1
         } else {
-            intern_station(&mut station_table, &mut station_idx, &a_nm, &city_en)
+            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
         };
         let b_i = if b_nm.is_empty() {
             -1
         } else {
-            intern_station(&mut station_table, &mut station_idx, &b_nm, &city_en)
+            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
         };
         in_sections.push(AtlasSection {
             a: a_i,
@@ -2992,7 +1451,7 @@ fn main() {
         };
         let st = orient_stats.entry(kind).or_default();
         let oriented = match (station_pt(&key.0), station_pt(&key.1)) {
-            (Some(p0), Some(p1)) => Some(orient_leg(seqs, &coords, [p0[1], p0[0]], [p1[1], p1[0]])),
+            (Some(p0), Some(p1)) => Some(orient_leg(seqs, coords, [p0[1], p0[0]], [p1[1], p1[0]])),
             _ => None,
         };
         let stored = || {
@@ -3010,7 +1469,7 @@ fn main() {
                 .collect::<Vec<_>>()
                 .windows(2)
                 .map(|w| hav_km_ll(w[0][1], w[1][0]))
-                .chain(seqs.iter().map(|s| seg_hole(s, &coords)))
+                .chain(seqs.iter().map(|s| seg_hole(s, coords)))
                 .fold(0.0, f64::max);
             LegWalk {
                 steps: (0..seqs.len()).map(|i| (i, false)).collect(),
@@ -3088,7 +1547,7 @@ fn main() {
                 &geom,
                 &edge_dir_to_sec,
                 &|p: &[f64; 2]| near_station(&station_grid, p),
-                &coords,
+                coords,
                 &mut throats,
                 sections.len(),
                 &mut throat_drops,
@@ -3122,7 +1581,7 @@ fn main() {
                 Some(p) => *p,
                 None => continue,
             };
-            let idx = intern_city(&mut city_table, &mut city_idx, zh, &city_en, &city_pt);
+            let idx = intern_city(&mut city_table, &mut city_idx, zh, city_en, &city_pt);
             let mut times = st.times.clone();
             times.sort();
             let fastest = times.first().copied().unwrap_or(-1);
@@ -3189,8 +1648,8 @@ fn main() {
                 continue;
             }
             if let (Some(p1), Some(p2)) = (station_pt(&key.0), station_pt(&key.1)) {
-                let a_i = intern_station(&mut station_table, &mut station_idx, &key.0, &city_en);
-                let b_i = intern_station(&mut station_table, &mut station_idx, &key.1, &city_en);
+                let a_i = intern_station(&mut station_table, &mut station_idx, &key.0, city_en);
+                let b_i = intern_station(&mut station_table, &mut station_idx, &key.1, city_en);
                 chords.push(AtlasChord {
                     a: a_i,
                     b: b_i,
@@ -3206,19 +1665,14 @@ fn main() {
                 &mut station_table,
                 &mut station_idx,
                 &d.from_station,
-                &city_en,
+                city_en,
             );
-            let ts_i = intern_station(
-                &mut station_table,
-                &mut station_idx,
-                &d.to_station,
-                &city_en,
-            );
+            let ts_i = intern_station(&mut station_table, &mut station_idx, &d.to_station, city_en);
             let tc_i = intern_city(
                 &mut city_table,
                 &mut city_idx,
                 &d.to_city,
-                &city_en,
+                city_en,
                 &city_pt,
             );
             deps.push(AtlasDep {
@@ -3251,7 +1705,7 @@ fn main() {
                 &geom,
                 &in_edge_dir_to_sec,
                 &|p: &[f64; 2]| near_station(&in_station_grid, p),
-                &coords,
+                coords,
                 &mut throats,
                 in_sections.len(),
                 &mut throat_drops,
@@ -3285,7 +1739,7 @@ fn main() {
                 Some(p) => *p,
                 None => continue,
             };
-            let idx = intern_city(&mut city_table, &mut city_idx, zh, &city_en, &city_pt);
+            let idx = intern_city(&mut city_table, &mut city_idx, zh, city_en, &city_pt);
             let mut times = st.times.clone();
             times.sort();
             let fastest = times.first().copied().unwrap_or(-1);
@@ -3324,7 +1778,7 @@ fn main() {
                         &mut station_table,
                         &mut station_idx,
                         &c.from_station,
-                        &city_en,
+                        city_en,
                     );
                     let sec_cnt = arr_leg_sec_cnt[*ai]
                         .get(c.leg_start)
@@ -3378,20 +1832,20 @@ fn main() {
                 &mut station_table,
                 &mut station_idx,
                 &a.from_station,
-                &city_en,
+                city_en,
             );
             let fc_i = intern_city(
                 &mut city_table,
                 &mut city_idx,
                 &a.from_city,
-                &city_en,
+                city_en,
                 &city_pt,
             );
             let ts_i = intern_station(
                 &mut station_table,
                 &mut station_idx,
                 &a.arr_station,
-                &city_en,
+                city_en,
             );
             arrs_out.push(AtlasArr {
                 t: t_i,
@@ -3499,7 +1953,7 @@ fn main() {
             let km = if j == 0 || names[j - 1] == names[j] {
                 0.0
             } else {
-                match leg_km(&override_map, &pair_len, t, &names[j - 1], &names[j]) {
+                match leg_km(override_map, &pair_len, t, &names[j - 1], &names[j]) {
                     Some(l) => (l * 10.0).round() / 10.0,
                     None => {
                         sched_km_unknown += 1;
@@ -3507,7 +1961,7 @@ fn main() {
                     }
                 }
             };
-            let st = intern_station(&mut station_table, &mut station_idx, &names[j], &city_en);
+            let st = intern_station(&mut station_table, &mut station_idx, &names[j], city_en);
             rows.push((
                 st,
                 arr.unwrap_or(-1),
@@ -3662,4 +2116,91 @@ fn intern_train(
     });
     idx.insert(k, i);
     i
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Nodes on the equator, 0.1 deg of lon (about 9.6 km) apart.
+    fn line_coords() -> HashMap<i64, [f64; 2]> {
+        (1..=4).map(|i| (i, [0.1 * (i - 1) as f64, 0.0])).collect()
+    }
+
+    #[test]
+    fn orient_leg_keeps_stored_order_when_it_matches_the_stations() {
+        let c = line_coords();
+        let (w, gap) = orient_leg(&[vec![1, 2], vec![3, 4]], &c, c[&1], c[&4]);
+        assert_eq!(w.steps, vec![(0, false), (1, false)]);
+        assert!(gap < 1e-9, "stations sit on the path ends: {gap}");
+    }
+
+    #[test]
+    fn orient_leg_flips_and_reorders_segments() {
+        let c = line_coords();
+        // segments stored backwards and out of order
+        let (w, _) = orient_leg(&[vec![4, 3], vec![2, 1]], &c, c[&1], c[&4]);
+        assert_eq!(w.steps, vec![(1, true), (0, true)]);
+        let (w, _) = orient_leg(&[vec![3, 4], vec![1, 2]], &c, c[&1], c[&4]);
+        assert_eq!(w.steps, vec![(1, false), (0, false)]);
+    }
+
+    #[test]
+    fn orient_leg_is_symmetric_in_the_stations() {
+        let c = line_coords();
+        let seqs = [vec![1, 2], vec![3, 4]];
+        let (w, _) = orient_leg(&seqs, &c, c[&4], c[&1]);
+        assert_eq!(w.steps, vec![(1, true), (0, true)]);
+    }
+
+    #[test]
+    fn orient_leg_skips_segments_without_coordinates() {
+        let c = line_coords();
+        let (w, _) = orient_leg(&[vec![1, 2], vec![98, 99], vec![3, 4]], &c, c[&1], c[&4]);
+        assert_eq!(w.steps, vec![(0, false), (2, false)]);
+    }
+
+    #[test]
+    fn orient_leg_reports_the_gap_between_segments() {
+        let c = line_coords();
+        let (w, _) = orient_leg(&[vec![1, 2], vec![3, 4]], &c, c[&1], c[&4]);
+        // 2 -> 3 is one 0.1 deg lon hop at 96 km/deg
+        assert!((w.max_gap - 9.6).abs() < 1e-6, "{}", w.max_gap);
+    }
+
+    #[test]
+    fn throats_intern_dedupes_either_direction() {
+        let c = line_coords();
+        let mut t = Throats::default();
+        assert_eq!(t.intern(&[1, 2, 3], &c), Some((0, false)));
+        // the same chain walked the other way is the same throat, flipped
+        assert_eq!(t.intern(&[3, 2, 1], &c), Some((0, true)));
+        assert_eq!(t.intern(&[2, 3, 4], &c), Some((1, false)));
+        assert_eq!(t.intern(&[1, 2, 3], &c), Some((0, false)));
+        assert_eq!(t.chains, vec![vec![1, 2, 3], vec![2, 3, 4]]);
+    }
+
+    #[test]
+    fn throats_intern_drops_slivers() {
+        let mut c = line_coords();
+        c.insert(10, [0.0, 0.0]);
+        c.insert(11, [0.0001, 0.0]); // about 9.6 m
+        let mut t = Throats::default();
+        assert_eq!(t.intern(&[10, 11], &c), None);
+        assert!(t.chains.is_empty());
+    }
+
+    #[test]
+    fn throats_flush_appends_signed_ids_and_clears_the_run() {
+        let c = line_coords();
+        let mut t = Throats::default();
+        let mut secs = Vec::new();
+        let mut run = vec![3, 2, 1];
+        t.flush(&mut run, &mut secs, &c, 100);
+        assert!(run.is_empty());
+        assert_eq!(secs, vec![!100i64]); // throat 0, walked against its stored order
+        let mut run = vec![1];
+        t.flush(&mut run, &mut secs, &c, 100);
+        assert_eq!(secs.len(), 1, "a single node is not a run");
+    }
 }
