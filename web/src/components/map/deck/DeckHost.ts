@@ -5,9 +5,8 @@
 
    DOM inside #mapwrap (host):
      canvas#deckcv   deck.gl, pointer-events: none, below
-     canvas#map      the Canvas renderer's element, transparent: label overlay
-                     and the pointer / wheel target (D17), never touched here
-                     except by labelsOverlay.
+     canvas#map      transparent: label overlay and the pointer / wheel target
+                     (D17), never touched here except by labelsOverlay.
    The camera stays S.current.view; deck is controlled (controller: false) and
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
@@ -74,8 +73,13 @@ interface PickerInternals {
    uses, and costs 16 B per device pixel (42 MB at DPR 2 and 95 MB at DPR 3, 1280x800). deck has
    no option to skip it, so its creation is declined by reporting rgba32float as non-renderable
    for the one call that would make it (deck guards every use with `if (this.depthFBO)`). */
-function dropDepthPickBuffer(picker: PickerInternals | null | undefined): void {
+export function dropDepthPickBuffer(picker: PickerInternals | null | undefined): void {
   if (!picker) return;
+  if (typeof picker._resizeBuffer !== "function") {
+    // A deck upgrade renamed or removed the private hook: keep deck's default buffers.
+    console.warn("deck picker has no _resizeBuffer; the pickZ depth buffer is not dropped");
+    return;
+  }
   const { device } = picker;
   const resize = picker._resizeBuffer.bind(picker);
   picker._resizeBuffer = (canvasContext) => {
@@ -91,11 +95,7 @@ function dropDepthPickBuffer(picker: PickerInternals | null | undefined): void {
 
 const NOTICE_TEXT = "Map paused — tap to resume";
 
-/* Debug query ?layers= (both renderers; removed in P1c.2): "backdrop" builds
-   only the backdrop; "flows" adds chords, flows, infra and the hover highlight
-   (no stations or trains). */
-const LAYERS = new URLSearchParams(location.search).get("layers");
-const GPU_TIME = new URLSearchParams(location.search).get("gputime") === "1";
+const GPU_TIME = typeof location !== "undefined" && new URLSearchParams(location.search).get("gputime") === "1";
 
 function buildLayers(M: MapCtx): Layer[] {
   const { P, S } = M;
@@ -109,7 +109,6 @@ function buildLayers(M: MapCtx): Layer[] {
     dark: P.current.dark,
     scale: S.current.view.scale,
   });
-  if (LAYERS === "backdrop") return layers;
   const set = M.flowsSet();
   const cur = P.current.cur;
   if (set && cur) {
@@ -136,7 +135,7 @@ function buildLayers(M: MapCtx): Layer[] {
       chords: cur.chords,
     });
     layers.push(...under);
-    if (st.animEnabled && LAYERS !== "flows") {
+    if (st.animEnabled) {
       const tl = M.activeTimeline();
       const active = tl ? M.activeTrainsAt(tl, st.animTime) : [];
       const iso = P.current.isolatedTrainCode;
@@ -153,40 +152,38 @@ function buildLayers(M: MapCtx): Layer[] {
       );
     }
     layers.push(...over);
-    if (LAYERS !== "flows") {
-      const sk = stationT(st.view, st.fitScale);
-      const dark = P.current.dark;
-      const pd = P.current.panelDest ?? null;
-      const hover = st.hover;
-      const states = stationStates(
-        {
-          points: M.points(),
-          panelDest: pd,
-          hoverIdx: hover && hover.kind === "station" ? hover.station.idx : -1,
-          dark,
-          animEnabled: st.animEnabled,
-          animTime: st.animTime,
-          totalMins: M.activeTimeline()?.totalMins,
-          sk,
-        },
-        getSelCache(P.current, st),
-      );
-      layers.push(
-        ...stationLayers({
-          states,
-          pal: palette(dark),
-          dark,
-          hasDest: !!pd,
-          originPt: [cur.o.pt[0], cur.o.pt[1]],
-          panelDest: pd,
-          hoverStation: hover && hover.kind === "station" ? hover.station : null,
-          hoverOrigin: !!hover && hover.kind === "origin",
-          sk,
-          key: [dark, Math.round(sk * 1000), st.animEnabled ? st.animTime : -1, pd?.idx, hover?.kind, hover && hover.kind === "station" ? hover.station.idx : -1, P.current.cur?.o.zh, P.current.direction].join("|"),
-          posKey: (cur.o.zh ?? "") + "|" + P.current.direction,
-        }),
-      );
-    }
+    const sk = stationT(st.view, st.fitScale);
+    const dark = P.current.dark;
+    const pd = P.current.panelDest ?? null;
+    const hover = st.hover;
+    const states = stationStates(
+      {
+        points: M.points(),
+        panelDest: pd,
+        hoverIdx: hover && hover.kind === "station" ? hover.station.idx : -1,
+        dark,
+        animEnabled: st.animEnabled,
+        animTime: st.animTime,
+        totalMins: M.activeTimeline()?.totalMins,
+        sk,
+      },
+      getSelCache(P.current, st),
+    );
+    layers.push(
+      ...stationLayers({
+        states,
+        pal: palette(dark),
+        dark,
+        hasDest: !!pd,
+        originPt: [cur.o.pt[0], cur.o.pt[1]],
+        panelDest: pd,
+        hoverStation: hover && hover.kind === "station" ? hover.station : null,
+        hoverOrigin: !!hover && hover.kind === "origin",
+        sk,
+        key: [dark, Math.round(sk * 1000), st.animEnabled ? st.animTime : -1, pd?.idx, hover?.kind, hover && hover.kind === "station" ? hover.station.idx : -1, P.current.cur?.o.zh, P.current.direction].join("|"),
+        posKey: (cur.o.zh ?? "") + "|" + P.current.direction,
+      }),
+    );
   }
   return layers;
 }
@@ -334,7 +331,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
       sigStreak = 0;
       stats.settled = false;
     }
-    // The Canvas renderer lays the world out in S.W x S.H (the #mapwrap rect, fractional, border
+    // The world is laid out in S.W x S.H (the #mapwrap rect, fractional, border
     // included) on a rounded bitmap that the browser stretches into the CSS box; deck's viewport is
     // the rounded drawing buffer. A per-axis zoom of viewport/(S.W, S.H) reproduces that mapping
     // exactly (P1b.5: removes the up to 0.5 px vertical offset). target is unchanged.
@@ -342,7 +339,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement): DeckHandle {
     const vp = deck.getViewports()[0];
     const zoom: number | [number, number] = vp ? [vs.zoom + Math.log2(vp.width / st.W), vs.zoom + Math.log2(vp.height / st.H)] : vs.zoom;
     deck.setProps({ viewState: { ...vs, zoom }, layers });
-    deck.redraw("render"); // synchronous, like draw(M) on Canvas (C22)
+    deck.redraw("render"); // synchronous (C22)
     drawLabelsOverlay(M);
     M.frameTail();
     if (!stats.settled) settleLoop(60);

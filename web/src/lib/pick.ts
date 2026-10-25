@@ -1,7 +1,6 @@
 /* Hit-test priority, pure. The deck renderer's GPU picking yields a handful of
    candidates near the cursor; this decides which one wins by recomputing the
-   exact screen distances, with the order and tie rules of the Canvas picker
-   (components/map/interaction.ts pickTrain / pickStation / pickSegment):
+   exact screen distances, with the order and tie rules of the former Canvas picker:
 
      train (14 px, paused only) > station (14·zoomK) / origin (15 px, origin
      wins ties) > section (10 px, a busier section wins within ±0.75 px) >

@@ -107,7 +107,7 @@ for (const o of chunkOuts) {
   console.log(`chunk ${o.rel}: min ${kb(b.length)}, gzip ${kb(gzipSync(b).length)}, brotli ${kb(br)}`);
   totalBr += br;
 }
-// DeckHost-*.js plus its shared chunks are all fetched with ?renderer=deck, so
+// DeckHost-*.js plus its shared chunks are all fetched at startup of the map, so
 // the budget applies to the whole lazy graph (only deck code lives in it).
 console.log(`lazy chunks total brotli: ${kb(totalBr)} (budget ${DECK_BROTLI_BUDGET / 1024} KB)`);
 if (totalBr > DECK_BROTLI_BUDGET) {

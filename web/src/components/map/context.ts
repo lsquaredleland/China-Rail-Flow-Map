@@ -76,8 +76,6 @@ export interface Props {
   isolatedTrainCode?: string | null;
   onSelectIsolatedTrain?: (code: string | null) => void;
   legendRef: RefObject<LegendHandle | null>;
-  /** Which renderer draws the map (App: ?renderer=, default deck). */
-  renderer?: "canvas" | "deck";
   initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
   onViewChange?: (view: {
     lon: number;
@@ -156,25 +154,6 @@ function createMapState() {
 }
 export type MapState = ReturnType<typeof createMapState>;
 
-/* Backdrop layer cache (paper + outline + graticule + network): see
-   drawBackdrop. `layer` is built on the second consecutive frame with
-   an unchanged key, so panning/zooming never pays for it. */
-export interface BackdropCache {
-  key: string;
-  atlas: unknown;
-  outline: unknown;
-  layer: HTMLCanvasElement | null;
-  state: {
-    lineWidth: number;
-    strokeStyle: string | CanvasGradient | CanvasPattern;
-    fillStyle: string | CanvasGradient | CanvasPattern;
-    lineCap: CanvasLineCap;
-    lineJoin: CanvasLineJoin;
-    lineDash: number[];
-    globalAlpha: number;
-  } | null;
-}
-
 /* Everything the layer modules share: the latest props (`P`), the engine
    state (`S`), the DOM refs and the camera / view-model helpers. One stable
    object per MapCanvas, so every layer is a plain function of `(M, ...)`
@@ -189,10 +168,6 @@ export interface MapCtx {
   scaleLabelRef: RefObject<HTMLDivElement | null>;
   scaleBarRef: RefObject<HTMLDivElement | null>;
   viewReportTimerRef: { current: number | null };
-  bgRef: { current: BackdropCache };
-  /* Motion-tail gradients, one per (colour, length), in the train's local
-     frame (see drawTrains). */
-  tailGradRef: { current: Map<string, CanvasGradient> };
   X: (lon: number) => number;
   Y: (lat: number) => number;
   toLon: (px: number) => number;
@@ -204,18 +179,18 @@ export interface MapCtx {
   activeTrainsAt: (tl: DayTimelineVM, t: number) => ActiveTrainVM[];
   isFilteredView: () => boolean;
   flowsSet: () => DecodedSet | null;
-  /* The single way to request a frame. The host installs the renderer
-     (MapCanvas: the Canvas 2D `draw`); until then it is a no-op. */
+  /* The single way to request a frame. MapCanvas installs it (the deck host's
+     render once mounted); until then it is a no-op. */
   render: () => void;
-  /* What every frame ends with, whichever renderer drew it: the Legend, the
-     scale bar and the debounced view report. Installed by MapCanvas; the
-     lazily loaded deck host calls it instead of importing map/ modules. */
+  /* What every frame ends with: the Legend, the scale bar and the debounced
+     view report. Installed by MapCanvas; the lazily loaded deck host calls it
+     instead of importing map/ modules. */
   frameTail: () => void;
-  /* Tells the active renderer the canvas size / DPR changed (resize() calls it
-     just before the render() that follows). Installed by MapCanvas. */
+  /* Tells the deck host the canvas size / DPR changed (resize() calls it just
+     before the render() that follows). Installed by MapCanvas. */
   syncRendererSize: () => void;
-  /* The deck renderer's handle while it is mounted (MapCanvas sets and clears
-     it); interaction.ts pick() asks it for GPU candidates. Absent on Canvas. */
+  /* The deck renderer's handle while it is mounted (the host sets and clears
+     it); interaction.ts pick() asks it for GPU candidates. */
   deck?: DeckHandle;
 }
 
@@ -239,8 +214,6 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     render: () => {},
     frameTail: () => {},
     syncRendererSize: () => {},
-    bgRef: { current: { key: "", atlas: null, outline: null, layer: null, state: null } },
-    tailGradRef: { current: new Map() },
     /* ---------- camera helpers ---------- */
     X: (lon) => lon * S.current.view.scale + S.current.view.tx,
     Y: (lat) => -lat * S.current.view.scale + S.current.view.ty,

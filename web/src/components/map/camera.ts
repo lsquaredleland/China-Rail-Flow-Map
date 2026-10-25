@@ -1,11 +1,12 @@
-/* Camera: fit/zoom maths, the distance scale bar, canvas resize and the
-   debounced view report. */
+/* Camera: fit/zoom maths, the distance scale bar, canvas resize, the
+   debounced view report and the per-frame tail. */
 import type { MapCtx } from "./context";
 import {
   fitCountryView,
   fitExtentView,
   fitGuangzhouInitialView,
   fitHomeView,
+  palette as makePalette,
   stationT as stationTOf,
   zoomBounds,
 } from "../../lib";
@@ -188,4 +189,40 @@ export function resize(M: MapCtx) {
   }
   M.syncRendererSize();
   M.render();
+}
+
+
+/* The end of every frame: Legend, scale bar, view report. */
+export function frameTail(M: MapCtx) {
+  const { S, P } = M;
+  const st = S.current;
+  const pal = makePalette(P.current.dark);
+  if (P.current.legendRef.current)
+    P.current.legendRef.current.draw(
+      pal,
+      st.view.scale / st.fitScale,
+      true,
+      P.current.showInfra,
+      st.animEnabled,
+      stationT(M),
+    );
+  updateScaleBar(M);
+  // Only a moved view re-arms the debounce: the animation loop draws
+  // every frame and would otherwise keep postponing the URL update.
+  const vk = st.view.scale + "|" + st.view.tx + "|" + st.view.ty;
+  if (vk !== st.viewKey) {
+    st.viewKey = vk;
+    scheduleViewReport(M);
+  }
+}
+
+export function scheduleDraw(M: MapCtx) {
+  const { S } = M;
+  const st = S.current;
+  if (st.rafPending) return;
+  st.rafPending = true;
+  requestAnimationFrame(() => {
+    st.rafPending = false;
+    M.render();
+  });
 }

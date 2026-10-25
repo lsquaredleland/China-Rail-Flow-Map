@@ -24,7 +24,7 @@ for (const playing of [false, true]) {
   const pg = await ctx.newPage();
   pg.on("pageerror", (e) => { errors++; console.log("  pageerror", e.message); });
   await pg.setViewport({ width: 1280, height: 800, deviceScaleFactor: dpr });
-  await pg.goto(`${url}/?theme=light&renderer=deck`, { waitUntil: "networkidle0" });
+  await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
   await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
   await sleep(3000);
   await pg.evaluate(() => document.querySelector('button[title^="Expand 24h"]')?.click());

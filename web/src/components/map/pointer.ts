@@ -1,8 +1,7 @@
 /* Pointer input: drag-pan, pinch-zoom, hover picking and tap selection. */
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { MapCtx, Pt } from "./context";
-import { scheduleDraw } from "./render";
-import { zoomAt } from "./camera";
+import { scheduleDraw, zoomAt } from "./camera";
 import { hideTooltip, pick, sameHit, showTooltip } from "./interaction";
 
 function localPos(M: MapCtx, e: ReactPointerEvent): Pt {
