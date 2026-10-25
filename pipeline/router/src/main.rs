@@ -22,6 +22,7 @@
 // Usage: corridor-router [--project <dir>] [--files <dir>] [--out <dir>]
 //                        [--limit <n pairs>] [--pair "A,B"] [--threads <n>]
 //                        [--station-fixes <station_resolution-format json>]
+//                        [--canonical-production]
 mod graph;
 mod inputs;
 mod model;
@@ -905,12 +906,22 @@ fn main() {
     // (two rounds, so "busiest" is judged on already-merged usage), then
     // every chosen non-production corridor is redrawn the same way ----
     let weight = |pi: usize| pair_legs[&pairs[pi].key].len() as u32;
+    // Default: the shortest gap-free candidate. With --canonical-production:
+    // production's own path when gap-free, else the shortest gap-free one.
+    let canon_production = std::env::args().any(|a| a == "--canonical-production");
     let best_for_canon = |pi: usize| -> Option<&Cand> {
-        cands[pi]
-            .iter()
-            .filter(|c| c.gap_km == 0.0)
-            .min_by(|a, b| a.km.total_cmp(&b.km))
-            .or_else(|| cands[pi].iter().find(|c| c.is_base))
+        let shortest = || {
+            cands[pi]
+                .iter()
+                .filter(|c| c.gap_km == 0.0)
+                .min_by(|a, b| a.km.total_cmp(&b.km))
+        };
+        let prod = cands[pi].iter().find(|c| c.is_base);
+        if canon_production {
+            prod.filter(|c| c.gap_km == 0.0).or_else(shortest).or(prod)
+        } else {
+            shortest().or(prod)
+        }
     };
     let mut usage = edge_usage(
         cands
