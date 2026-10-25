@@ -216,6 +216,8 @@ it sits above the deck canvas and below `#tooltip`.
 
 ## 2. Data flow: pack to layers
 
+Pack format evolution beyond fmt 6 (manifest, binary columnar, what the client may compute): `docs/THIN_CLIENT.md`.
+
 ### 2.1 What the pack provides (fmt 6, `lib/decode.ts DATA_FMT = 6`)
 
 | Pack (size, br) | Decoded into | Used by |
