@@ -12,16 +12,18 @@
 //!   distances by the `virt` / `virtStop` rule.
 //! - Times: `buildNational` (web/src/lib/national.ts) puts a train's stops in
 //!   its boarding day's frame (absolute minutes from the first stop's day);
-//!   `natState` moves the dot leg by leg with the `trainEase` ramp and holds
-//!   it at a stop between arrival and departure. [`Motion::time_at`] is the
-//!   exact inverse of [`Motion::dist_at`] (the port of `natState`).
+//!   `natState` moves the dot at constant speed along each leg between stops
+//!   (a leg shorter than a minute stretched to one) and holds it at a stop
+//!   between arrival and departure. [`Motion::time_at`] is the exact inverse
+//!   of [`Motion::dist_at`] (the port of `natState`).
 //! - Wrap (D7): the shipped minute is the absolute minute mod 1440, since the
 //!   client shows a train at display minute m when m + 1440k lies in its run.
 //!   Each train counts once per section, at its first entry, so the counts at
 //!   24:00 are the national table's exactly.
 //!
-//! The ease is a presentation choice ported from the client (`trainEase`);
-//! changing it there means rebuilding this file (the oracle compares them).
+//! No presentation function is involved (no easing), but the dwell rule,
+//! the day frame and the short-leg stretch must match the client's
+//! `natState` / `buildNational`; the oracle compares them.
 
 use serde_json::Value;
 
@@ -36,46 +38,6 @@ pub fn haversine_km(a: [f64; 2], b: [f64; 2]) -> f64 {
     let s = (d_lat / 2.0).sin() * (d_lat / 2.0).sin()
         + (a[1] * rad).cos() * (b[1] * rad).cos() * (d_lon / 2.0).sin() * (d_lon / 2.0).sin();
     2.0 * 6371.0 * s.sqrt().min(1.0).asin()
-}
-
-/// The client's `trainEase` (lib/timeline.ts): fraction of a leg's distance
-/// covered at time fraction `tau` of a `dur`-minute leg.
-pub fn ease(tau: f64, dur: f64) -> f64 {
-    if tau <= 0.0 {
-        return 0.0;
-    }
-    if tau >= 1.0 {
-        return 1.0;
-    }
-    let accel = (3.0f64).min(dur * 0.25);
-    let a = (0.01f64).max((0.35f64).min(accel / dur));
-    let denom = 1.0 - a;
-    let ramp = |t: f64| {
-        (0.5 * t - (a / (2.0 * std::f64::consts::PI)) * (std::f64::consts::PI * t / a).sin())
-            / denom
-    };
-    if tau <= a {
-        return ramp(tau);
-    }
-    if tau >= 1.0 - a {
-        return 1.0 - ramp(1.0 - tau);
-    }
-    (0.5 * a + (tau - a)) / denom
-}
-
-/// Smallest `tau` in [0, 1] with `ease(tau, dur) >= frac` (to f64 bisection
-/// precision; `ease` is non-decreasing).
-fn ease_inv(frac: f64, dur: f64) -> f64 {
-    let (mut lo, mut hi) = (0.0f64, 1.0f64);
-    for _ in 0..60 {
-        let mid = (lo + hi) / 2.0;
-        if ease(mid, dur) < frac {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    hi
 }
 
 /// Path pieces (sections, then throats, then extra pieces) as the client
@@ -255,11 +217,11 @@ impl Motion {
         }
         let dur = (t1 - t0).max(1.0);
         let tau = ((a - t0) / dur).clamp(0.0, 1.0);
-        d0 + ease(tau, dur) * (d1 - d0)
+        d0 + tau * (d1 - d0)
     }
 
     /// First absolute minute at which the dot has reached distance `d`: the
-    /// first leg ending at or beyond `d`, inverted through the ease. A leg
+    /// first leg ending at or beyond `d`, inverted linearly. A leg
     /// shorter than a minute is stretched to one by the client, so its dot
     /// jumps to the stop at the arrival time: the result is capped there.
     pub fn time_at(&self, d: f64) -> f64 {
@@ -280,14 +242,8 @@ fn leg_time(d: f64, d0: f64, t0: f64, d1: f64, t1: f64) -> f64 {
         return t0;
     }
     let dur = (t1 - t0).max(1.0);
-    // the ease is flat at the leg end: ease(1 - 1e-8) == 1.0 in f64, so the
-    // leg end itself is the arrival exactly, not a bisection result
-    let frac = (d - d0) / (d1 - d0);
-    let tau = if frac >= 1.0 {
-        1.0
-    } else {
-        ease_inv(frac, dur)
-    };
+    // the leg end itself is the arrival exactly
+    let tau = ((d - d0) / (d1 - d0)).min(1.0);
     let a = t0 + tau * dur;
     if t1 >= t0 {
         a.min(t1)
@@ -431,21 +387,6 @@ pub fn by_class(trains: &[TrainEntries], n_sec: usize, ticks_per_min: u32) -> Ve
 mod tests {
     use super::*;
 
-    #[test]
-    fn ease_is_monotone_and_inverts() {
-        for dur in [0.5, 1.0, 4.0, 12.0, 90.0] {
-            let mut prev = 0.0;
-            for k in 0..=1000 {
-                let e = ease(k as f64 / 1000.0, dur);
-                assert!(e >= prev - 1e-15);
-                prev = e;
-            }
-            for f in [0.0, 0.01, 0.3, 0.5, 0.97, 1.0] {
-                assert!((ease(ease_inv(f, dur), dur) - f).abs() < 1e-9);
-            }
-        }
-    }
-
     /// Pieces of 10, 20 and 5 km (lengths set directly); piece 1 runs from
     /// [0, 0] to [1, 0], piece 2 sits at [1, 0].
     fn pieces() -> Pieces {
@@ -486,6 +427,8 @@ mod tests {
         assert_eq!(m.time_at(0.0), 600.0);
         assert_eq!(m.time_at(10.0), 610.0); // arrives at the stop
         assert_eq!(m.dist_at(612.0), 10.0); // dwell
+        assert_eq!(m.time_at(5.0), 605.0); // constant speed along the leg
+        assert_eq!(m.time_at(22.5), 627.5);
         for d in [0.5, 3.0, 9.99, 10.01, 22.0, 34.9, 35.0] {
             let a = m.time_at(d);
             assert!((m.dist_at(a) - d).abs() < 1e-6, "d {d} a {a}");

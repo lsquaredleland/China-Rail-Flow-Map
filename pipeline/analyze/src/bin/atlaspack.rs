@@ -159,7 +159,7 @@
 //! class `c` first reaches section `s` (its first path entry on `s`, an
 //! `on_sec` piece included), in ticks of `1 / ticks_per_min` minute, in
 //! `[0, 1440 * ticks_per_min)`. The minute is the client animation's
-//! (`entries.rs`: same distance space, stop times, dwell, ease), taken mod
+//! (`entries.rs`: same distance space, stop times, dwell, linear legs), taken mod
 //! 1440 (D7 wrap) and rounded up to the tick. So `by_class[c][s].len()` is
 //! `atlas-v2-national`'s `by_class[c][s]`, and "trains entered by minute m
 //! under classes C" is `sum_{c in C} upper_bound(by_class[c][s], m *

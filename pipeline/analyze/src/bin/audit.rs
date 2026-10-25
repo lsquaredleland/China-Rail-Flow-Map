@@ -961,7 +961,7 @@ fn audit_national_trains(
 /// shipped arrays exactly; every entry lies between the times of the stops
 /// that bracket it on the path (the last stop at or before the entry: its
 /// arrival, or the departure at the first stop; the next stop: its
-/// arrival), a check independent of the ease. Counters: entries past
+/// arrival), a check independent of the interpolation. Counters: entries past
 /// midnight of the boarding day (wrapped) and the trains they belong to.
 fn audit_national_entries(
     dir: &Path,
