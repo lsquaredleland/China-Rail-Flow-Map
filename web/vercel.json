@@ -3,7 +3,7 @@
   "installCommand": "bun install",
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
-  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != main ] && [ \"$VERCEL_GIT_COMMIT_REF\" != deckgl ]; then exit 0; fi; git diff --quiet HEAD^ HEAD -- .",
+  "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in main) git diff --quiet HEAD^ HEAD -- . ;; deckgl) if git log -1 --pretty=%B | grep -qF \"[deploy]\"; then exit 1; fi; exit 0 ;; *) exit 0 ;; esac",
   "headers": [
     {
       "source": "/",
