@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { RefObject } from "react";
 import type { CityPointVM, Direction, DistUnit, OriginVM, RawOrigin } from "../types";
 import { FLOW_CLASSES } from "../lib";
@@ -29,6 +30,7 @@ export default function Toolbar({
   onSetDark,
   national,
   onToggleNational,
+  activeFilterCount,
 }: {
   origins: RawOrigin[];
   originIdx: number;
@@ -55,7 +57,14 @@ export default function Toolbar({
   /** National mode (D11: "National · beta", D13 map-only). */
   national: boolean;
   onToggleNational: () => void;
+  /** Filters in force (class + histogram + train-code filters), for the narrow-screen badge. */
+  activeFilterCount: number;
 }) {
+  // Narrow screens (CSS, <= 640px): the filters and the map / display
+  // controls fold into two dropdown panels; wider screens show them inline
+  // (the panels are `display: contents` there).
+  const [panel, setPanel] = useState<"filters" | "more" | null>(null);
+  const toggle = (p: "filters" | "more") => setPanel((v) => (v === p ? null : p));
   return (
     <div className="toolbar">
       {!national && (
@@ -88,6 +97,29 @@ export default function Toolbar({
       </div>
       </>
       )}
+      <button
+        id="filtersBtn"
+        type="button"
+        className="tb-mob-btn"
+        aria-expanded={panel === "filters" ? "true" : "false"}
+        aria-controls="tbFilters"
+        onClick={() => toggle("filters")}
+      >
+        Filters
+        {activeFilterCount > 0 && <span className="tb-badge">{activeFilterCount}</span>}
+        <span aria-hidden="true"> ▾</span>
+      </button>
+      <button
+        id="moreBtn"
+        type="button"
+        className="tb-mob-btn"
+        aria-expanded={panel === "more" ? "true" : "false"}
+        aria-controls="tbMore"
+        onClick={() => toggle("more")}
+      >
+        Map options<span aria-hidden="true"> ▾</span>
+      </button>
+      <div id="tbFilters" className={"tb-panel" + (panel === "filters" ? " open" : "")}>
       <div
         className="group cls-filter"
         role="group"
@@ -127,6 +159,8 @@ export default function Toolbar({
           );
         })}
       </div>
+      </div>
+      <div id="tbMore" className={"tb-panel" + (panel === "more" ? " open" : "")}>
       <div className="group">
         <button
           id="btnCountry"
@@ -246,6 +280,7 @@ export default function Toolbar({
         >
           National &middot; beta
         </button>
+      </div>
       </div>
     </div>
   );

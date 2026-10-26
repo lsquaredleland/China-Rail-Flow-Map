@@ -7,9 +7,27 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .stats { gap: 3px 16px; font-size: 11.5px; }
-  .stats > div b { font-size: 18px; }
+  .stats { flex-wrap: nowrap; gap: 8px; font-size: 11.5px; }
+  .stats > div { flex: 1 1 0; min-width: 0; }
+  .stats > div b { font-size: 17px; }
+  .stats > div span { display: block; font-size: 9.5px; letter-spacing: 0.03em; }
   .toolbar { padding: 8px 14px; }
+  /* Filters and map options fold into two dropdown panels. */
+  .tb-mob-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    flex: 1 1 0; min-width: 0;
+  }
+  .tb-badge {
+    min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--rust); color: #fff; font-size: 11px; line-height: 1;
+  }
+  .tb-panel { display: none; flex: 1 1 100%; flex-wrap: wrap; gap: 8px 6px; align-items: center; }
+  .tb-panel.open { display: flex; }
+  .tb-panel .spacer { display: none; }
+  .toolbar .units[aria-label="Direction"] { flex: 1 1 100%; }
+  .toolbar .units[aria-label="Direction"] button { flex: 1 1 0; }
+  .toolbar button { min-width: 44px; }
   footer { padding: 8px 14px; }
   #departures { padding: 18px 14px 24px; }
   .hist-strip { flex-direction: column; gap: 14px; margin-top: 12px; }
@@ -26,16 +44,35 @@
   #legendCol { left: 10px; bottom: 10px; width: min(216px, calc(100vw - 20px)); }
   #scalebar { right: 10px; bottom: 10px; }
   /* National note wraps to two rows here: sit above the scale bar (~38 px tall), not under it. */
-  .nat-note { left: 10px; bottom: 56px; max-width: calc(100% - 20px); }
+  .nat-note {
+    top: 8px; left: 8px; right: 8px; bottom: auto; max-width: none;
+    flex-wrap: nowrap; justify-content: space-between; gap: 6px; padding: 4px 6px; font-size: 11px;
+  }
+  .nat-note > span:first-child { flex: 1 1 auto; min-width: 0; }
+  .stats:empty { display: none; }
+  /* The animation entry sits above the legend button and scale bar, not on them. */
+  .tl-expand-wrap { bottom: 66px; }
+  .tl-expand-btn.is-over-map { min-height: 44px; white-space: nowrap; }
+  #depTable .train-cell.is-link { display: inline-flex; align-items: center; min-height: 44px; }
+  .nat-layers { flex: 0 0 auto; }
+  .nat-layers button { min-height: 44px; min-width: 44px; }
+  /* The filter pills sit under the note. */
+  #mapwrap:has(.nat-note) .active-filter-bar { top: 70px; }
   #legend { padding: 8px 10px; }
   #legendBody.collapsed { display: none; }
   #legendToggle {
     display: inline-block;
     margin-top: 6px;
-    font-size: 11px;
-    padding: 3px 8px;
+    font-size: 12px;
+    min-height: 44px;
+    padding: 6px 12px;
   }
   #legend h2 { margin-bottom: 0; }
+  /* Collapsed: just the one 44 px button. */
+  #legend:has(#legendBody.collapsed) { padding: 0; border: 0; background: none; box-shadow: none; }
+  #legend:has(#legendBody.collapsed) h2 { display: none; }
+  #legend:has(#legendBody.collapsed) #legendToggle { margin-top: 0; background: var(--panel); box-shadow: var(--shadow-panel); }
+  .cls-btn { min-height: 44px; min-width: 44px; }
   .city-picker { flex: 1 1 100%; }
   .city-picker .combo { flex: 1; }
   .city-picker label { flex: 0 0 auto; }
