@@ -247,6 +247,24 @@ export default function App() {
     if (mapRef.current) mapRef.current.refreshTooltip();
   };
 
+  const timelineOpen = (direction === "out" || national) && showTimeline && !isTimelineCollapsed;
+  const timelineRef = useRef<HTMLDivElement | null>(null);
+  // Opening the panel scrolls the page just far enough that its bottom edge
+  // meets the viewport bottom (instantly under reduced motion); closing it
+  // leaves the scroll position alone.
+  const wasOpen = useRef(timelineOpen);
+  useEffect(() => {
+    const was = wasOpen.current;
+    wasOpen.current = timelineOpen;
+    if (!timelineOpen || was) return;
+    const el = timelineRef.current;
+    if (!el) return;
+    const dy = el.getBoundingClientRect().bottom - window.innerHeight;
+    if (dy <= 0) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    window.scrollBy({ top: dy, behavior: still ? "auto" : "smooth" });
+  }, [timelineOpen]);
+
   const origins = atlas ? atlas.data.origins : [];
   // The schedule window ("23 Oct – 6 Nov") of a train-export pack.
   const calendarSpan = atlas ? fmtCalendarSpan(atlas.data.calendar) : undefined;
@@ -403,7 +421,12 @@ export default function App() {
           )}
         </MapCanvas>
 
-        {(direction === "out" || national) && showTimeline && !isTimelineCollapsed && (
+      </div>
+
+      {/* The animation panel sits in the page flow under the map (outside
+          the stage, so the map keeps its height), above the section below. */}
+      {timelineOpen && (
+        <div ref={timelineRef}>
           <TimelineScrubber
             mapRef={mapRef}
             dark={dark}
@@ -411,8 +434,8 @@ export default function App() {
             originZh={cur?.o.zh}
             onCollapse={national ? () => natAnimate(false) : collapseTimeline}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {national && atlas && (
         <NationalSection
