@@ -153,7 +153,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
             aria-sort={iAriaSort("board")}
             onClick={() => onInCallSort("board")}
           >
-            Departs {srcFilter.en}{" "}
+            Departs{" "}
             <span className="arrow">{iArrow("board")}</span>
           </th>
           <th
@@ -163,7 +163,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
             aria-sort={iAriaSort("arr")}
             onClick={() => onInCallSort("arr")}
           >
-            Arrives {cur.en}{" "}
+            Arrives{" "}
             <span className="arrow">{iArrow("arr")}</span>
           </th>
           <th
