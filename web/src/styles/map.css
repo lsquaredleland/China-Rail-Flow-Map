@@ -106,18 +106,27 @@
 }
 :root[data-theme="dark"] #legend .lg-dot { fill: var(--ink); fill-opacity: 1; stroke: var(--ink); }
 :root[data-theme="light"] #legend .lg-dot { fill-opacity: 0.3; }
+/* The page's closing text (the about line and the OSM attribution): one
+   style, so the two read as one block. */
+#pageFooter {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 18px 24px 4px;
+}
 #legendNotes {
   max-width: 1240px;
   margin: 0 auto;
   padding: 2px 24px 28px;
 }
+#pageFooter,
 #legendNotes .note {
-  margin: 0 0 5px;
   max-width: 880px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-soft);
 }
+#pageFooter { max-width: 1240px; }
+#legendNotes .note { margin: 0 0 5px; }
 #legendNotes .note:last-child { margin-bottom: 0; }
 :root[data-theme="dark"] .lg-band-label { fill: #111214 !important; }
 @media (prefers-color-scheme: dark) {
