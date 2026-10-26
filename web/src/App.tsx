@@ -25,7 +25,7 @@ import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
 import { CityCard, MapCardSlot, cardBand, cardStName } from "./components/MapCards";
-import { IsolationChip, NationalNote, TimelineExpandButton } from "./components/MapOverlays";
+import { IsolationChip, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
 
@@ -40,11 +40,12 @@ export default function App() {
   const [showTimeline] = useState<boolean>(true);
   // National mode (D11 / D13): every national train on one 24h clock, map-only.
   const [national, setNational] = useState<boolean>(initialNational);
-  // What national mode draws: flows (with the city circles) and / or the
-  // trains' animation. Default: flows only, no animation.
-  const [natLayer, setNatLayer] = useState<NatLayer>(initialNatLayer);
-  const natFlowsOn = natLayer === "flows" || natLayer === "both";
-  const natTrainsOn = natLayer === "trains" || natLayer === "both";
+  // National flows (with the city circles): a map toggle, on by default
+  // (?natLayer=trains | none starts with them off).
+  const [natFlowsOn, setNatFlowsOn] = useState<boolean>(() => {
+    const v = initialNatLayer();
+    return v === "flows" || v === "both";
+  });
 
   const prefs = usePrefs();
   const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
@@ -155,7 +156,9 @@ export default function App() {
   });
 
   const { isTimelineCollapsed, expandTimeline, collapseTimeline } =
-    useAnimationClock(mapRef, direction, national, natTrainsOn);
+    useAnimationClock(mapRef, direction, national);
+  // The animation is the origin view's: its bar is open while it plays.
+  const natTrainsOn = national && !isTimelineCollapsed;
   // The isolated train belongs to the outbound animation.
   useEffect(() => {
     if (direction === "in" && !national) setIsolatedTrainCode(null);
@@ -195,15 +198,21 @@ export default function App() {
     ensureNationalFlows();
     if (natTrainsOn) ensureNationalEntries();
   }, [national, natFlowsOn, natTrainsOn, ensureNationalFlows, ensureNationalEntries]);
-  const chooseNatLayer = (flows: boolean, trains: boolean) => {
-    const v: NatLayer = flows ? (trains ? "both" : "flows") : trains ? "trains" : "none";
-    setNatLayer(v);
-    writeNatLayerParam(v);
+  const toggleNatFlows = () => {
+    setNatFlowsOn(!natFlowsOn);
+    writeNatLayerParam(natFlowsOn ? "none" : "flows");
   };
-  // A flows file that failed leaves the trains drawn (the note says why).
-  const natLayerDrawn: NatLayer = nationalFlowsFailed ? (natTrainsOn ? "trains" : "none") : natLayer;
-  // The animation button and the timeline bar are one switch in national mode.
-  const natAnimate = (on: boolean) => chooseNatLayer(natFlowsOn, on);
+  // What the map draws; a flows file that failed leaves the trains drawn.
+  const flowsDrawn = natFlowsOn && !nationalFlowsFailed;
+  const natLayerDrawn: NatLayer = flowsDrawn ? (natTrainsOn ? "both" : "flows") : natTrainsOn ? "trains" : "none";
+  // A load failure is reported where the origin view reports one.
+  const natLoadError = !national
+    ? null
+    : nationalFlowsFailed && natFlowsOn
+      ? "The national flow data could not be loaded."
+      : nationalTrainsFailed && natTrainsOn
+        ? "The national train data could not be loaded."
+        : null;
 
   /* ---------- actions ---------- */
   const selectOrigin = (idx: number) => {
@@ -343,6 +352,8 @@ export default function App() {
           dark={dark}
           onSetDark={setDark}
           national={national}
+          showFlows={natFlowsOn}
+          onToggleFlows={toggleNatFlows}
           activeFilterCount={
             selectedClasses.length +
             [filters.hours, filters.distBins, filters.durBins, filters.selectedTrainCodes].filter((a) => a && a.length > 0).length
@@ -363,7 +374,7 @@ export default function App() {
           showInfra={showInfra}
           distUnit={distUnit}
           panelDest={panelCity}
-          loadError={loadError}
+          loadError={loadError ?? natLoadError}
           inLoading={direction === "in" && inMapLoading && !national}
           national={national}
           nationalTrains={nationalTrains}
@@ -434,18 +445,6 @@ export default function App() {
               onClose={() => setNatCity(null)}
             />
           )}
-          {national && (
-            <NationalNote
-              trains={atlas ? atlas.data.train_table.length : 0}
-              span={calendarSpan}
-              failed={nationalTrainsFailed && natTrainsOn}
-              flows={natFlowsOn}
-              animate={natTrainsOn}
-              onFlows={() => chooseNatLayer(!natFlowsOn, natTrainsOn)}
-              onAnimate={() => natAnimate(!natTrainsOn)}
-              flowsFailed={nationalFlowsFailed && natFlowsOn}
-            />
-          )}
           <div id="legendCol">
             <Legend
               ref={legendRef}
@@ -460,7 +459,7 @@ export default function App() {
             />
           </div>
 
-          {direction === "out" && !national && isTimelineCollapsed && (
+          {(direction === "out" || national) && isTimelineCollapsed && (
             <TimelineExpandButton onExpand={expandTimeline} />
           )}
         </MapCanvas>
@@ -476,7 +475,7 @@ export default function App() {
             dark={dark}
             direction={direction}
             originZh={cur?.o.zh}
-            onCollapse={national ? () => natAnimate(false) : collapseTimeline}
+            onCollapse={collapseTimeline}
           />
         </div>
       )}
