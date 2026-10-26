@@ -1,8 +1,7 @@
 /* ---------- train schedule modal and its minimized HUD ----------
    Colours are variables on the two roots so the dark theme is one block
    instead of a ternary at every use. */
-.tsm-backdrop,
-.tsm-hud {
+.tsm-backdrop {
   --tsm-bg: #FFFFFF;
   --tsm-ink: #111827;
   --tsm-muted: #64748B;
@@ -25,11 +24,8 @@
   --tsm-chip-ink: #1D4ED8;
   --tsm-origin-time: rgba(59, 130, 246, 0.18);
   --tsm-transit: rgba(245, 158, 11, 0.08);
-  --tsm-hud-bg: rgba(255, 255, 255, 0.96);
-  --tsm-hud-edge: rgba(0, 0, 0, 0.12);
 }
-:root[data-theme="dark"] .tsm-backdrop,
-:root[data-theme="dark"] .tsm-hud {
+:root[data-theme="dark"] .tsm-backdrop {
   --tsm-bg: #111827;
   --tsm-ink: #F3F4F6;
   --tsm-muted: #9CA3AF;
@@ -52,8 +48,6 @@
   --tsm-chip-ink: #93C5FD;
   --tsm-origin-time: rgba(59, 130, 246, 0.28);
   --tsm-transit: rgba(245, 158, 11, 0.12);
-  --tsm-hud-bg: rgba(17, 24, 39, 0.94);
-  --tsm-hud-edge: rgba(255, 255, 255, 0.15);
 }
 
 .tsm-backdrop {
@@ -67,60 +61,7 @@
   backdrop-filter: blur(4px);
   padding: 16px;
 }
-/* the floating pill the modal minimizes to */
-.tsm-hud {
-  position: fixed;
-  bottom: 90px;
-  right: 24px;
-  z-index: 200;
-  background: var(--tsm-hud-bg);
-  color: var(--tsm-ink);
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--tsm-hud-edge);
-  backdrop-filter: blur(12px);
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 460px;
-}
-.tsm-hud.is-isolated { border-color: #F59E0B; }
-.tsm-hud-main,
 .tsm-head-main { min-width: 0; flex: 1; }
-.tsm-hud-route {
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tsm-hud-status {
-  font-size: 11px;
-  color: var(--tsm-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tsm-hud.is-isolated .tsm-hud-status { color: #F59E0B; }
-.tsm-hud-expand {
-  background: var(--tsm-btn-strong);
-  border: none;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
-}
-.tsm-hud-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--tsm-muted);
-  font-size: 14px;
-  padding: 2px 4px;
-}
 
 /* class chip: amber for high-speed (G/D/C), blue for conventional */
 .tsm-code {

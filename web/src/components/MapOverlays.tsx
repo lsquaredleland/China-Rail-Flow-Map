@@ -1,36 +1,35 @@
 /* Floating controls drawn over the map canvas. */
+import { TrainCard } from "./MapCards";
 
-/** "Isolated: K9217 [Timetable] [x]" pill while one train is isolated. */
+/** The isolated train as a train card while one train is isolated (hidden
+    while its timetable is open: the modal's own card covers it). */
 export function IsolationChip({
   code,
+  route,
+  band,
   onTimetable,
   onExit,
 }: {
   code: string;
+  route: string;
+  band: string;
   onTimetable: () => void;
   onExit: () => void;
 }) {
   return (
     <div className="iso-chip">
-      <span className="iso-chip-dot" />
-      <span>
-        Isolated: <strong className="iso-chip-code">{code}</strong>
-      </span>
-      <button
-        type="button"
-        className="iso-chip-timetable"
-        onClick={() => onTimetable()}
-      >
-        Timetable
-      </button>
-      <button
-        type="button"
-        className="iso-chip-exit"
-        onClick={() => onExit()}
-        title="Exit single train isolation"
-      >
-        ✕
-      </button>
+      <TrainCard
+        code={code}
+        route={route || code}
+        state="isolated"
+        leg="Only this train is shown"
+        band={band}
+        isolated
+        onTimetable={onTimetable}
+        onClose={onExit}
+        closeLabel="Exit single train isolation"
+        ariaLabel={`Train ${code} isolated`}
+      />
     </div>
   );
 }

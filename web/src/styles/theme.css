@@ -24,6 +24,9 @@
   --tooltip-ink: #F6F5F1;
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.08), 0 6px 16px rgba(0, 0, 0, 0.05);
   --shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.12), 0 16px 36px rgba(0, 0, 0, 0.12);
+  --card-frame: #111111;
+  --card-time: #E3A63F;
+  --card-live: #C8302A;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -51,6 +54,9 @@
     --tooltip-ink: #EDEDEA;
     --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.5);
     --shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.7), 0 16px 36px rgba(0, 0, 0, 0.6);
+  --card-frame: #EDEDEA;
+  --card-time: #F0B85A;
+  --card-live: #F07A63;
   }
 }
 :root[data-theme="dark"] {
@@ -78,4 +84,7 @@
   --tooltip-ink: #EDEDEA;
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.5);
   --shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.7), 0 16px 36px rgba(0, 0, 0, 0.6);
+  --card-frame: #EDEDEA;
+  --card-time: #F0B85A;
+  --card-live: #F07A63;
 }

@@ -24,6 +24,8 @@ import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
+import { cardStName } from "./components/MapCards";
+import { palette, rampColor } from "./lib/palette";
 import { IsolationChip, NationalNote, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
@@ -116,6 +118,16 @@ export default function App() {
     const list = direction === "out" ? cur.deps : cur.arrs;
     return list.find((t) => t.code === selectedTrainCode) || null;
   }, [selectedTrainCode, cur, direction, national]);
+
+  // The isolated train's card text (its route and fastest-time band colour).
+  const isolatedVM = useMemo(
+    () => (isolatedTrainCode && cur ? cur.deps.find((t) => t.code === isolatedTrainCode) ?? null : null),
+    [isolatedTrainCode, cur],
+  );
+  const isolatedRoute = isolatedVM
+    ? `${cardStName(isolatedVM.fsZh, isolatedVM.fsEn)} → ${cardStName(isolatedVM.tsZh, isolatedVM.tsEn)}`
+    : "";
+  const isolatedBand = rampColor(isolatedVM ? isolatedVM.dur : 0, palette(dark));
 
   // National mode: the dot's train is not in the origin's departures, so the
   // schedule key is found by code in the shared train table (codes are unique).
@@ -363,9 +375,11 @@ export default function App() {
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
-          {(direction === "out" || national) && isolatedTrainCode && (
+          {(direction === "out" || national) && isolatedTrainCode && isolatedTrainCode !== selectedTrainCode && (
             <IsolationChip
               code={isolatedTrainCode}
+              route={isolatedRoute}
+              band={isolatedBand}
               onTimetable={() => setSelectedTrainCode(isolatedTrainCode)}
               onExit={() => setIsolatedTrainCode(null)}
             />
