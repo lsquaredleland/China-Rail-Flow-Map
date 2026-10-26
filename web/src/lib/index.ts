@@ -63,6 +63,20 @@ export {
 export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
 export { natTrainVM } from "./natTrain";
 export {
+  NAT_DIST_BINS,
+  NAT_DIST_SIZE,
+  NAT_DUR_BINS,
+  NAT_HOUR_BINS,
+  natFilterKey,
+  natFlowCounts,
+  natCityCounts,
+  natHistogram,
+  natIndexActive,
+  natSelect,
+  requireNationalIndex,
+} from "./nationalIndex";
+export type { NatFilter } from "./nationalIndex";
+export {
   nationalCounts,
   nationalCountsAt,
   nationalFlowPasses,

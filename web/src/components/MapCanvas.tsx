@@ -247,7 +247,8 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     props.nationalLayer,
     props.nationalFlows,
     props.nationalEntries,
-    props.nationalClasses,
+    props.nationalFilter,
+    props.nationalIndex,
   ]);
 
   // The scale bar's round distance follows the km/mi switcher.

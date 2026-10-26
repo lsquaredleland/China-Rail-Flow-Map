@@ -9,6 +9,7 @@ import type {
   InTablesPack,
   NationalEntriesPack,
   NationalFlowsPack,
+  NationalIndexPack,
   OutMapData,
   OutTablesData,
   OutTablesPack,
@@ -26,6 +27,7 @@ import {
   requireFmt,
   requireNationalEntries,
   requireNationalFlows,
+  requireNationalIndex,
   requireNationalTrains,
 } from "../lib";
 import {
@@ -34,6 +36,7 @@ import {
   IN_TABLES_URL,
   NATIONAL_ENTRIES_URL,
   NATIONAL_FLOWS_URL,
+  NATIONAL_INDEX_URL,
   NATIONAL_TRAINS_URL,
   OUTLINE_URL,
   OUT_TABLES_URL,
@@ -73,6 +76,9 @@ export function useAtlasData({
   const [nationalFlows, setNationalFlows] = useState<NationalFlowsPack | null>(null);
   // Their entry ticks (P3.3): only national Trains + flows asks for them.
   const [nationalEntries, setNationalEntries] = useState<NationalEntriesPack | null>(null);
+  // The per-train index (hour / distance / duration / code filters): optional.
+  const [nationalIndex, setNationalIndex] = useState<NationalIndexPack | null>(null);
+  const [nationalIndexFailed, setNationalIndexFailed] = useState(false);
   // Either flows file failed to load or to check: national mode says so and
   // keeps its trains (the origin view never uses these files).
   const [nationalFlowsFailed, setNationalFlowsFailed] = useState(false);
@@ -93,13 +99,14 @@ export function useAtlasData({
     const nationalFlowsRef: { current: NationalFlowsPack | null } = { current: null };
     const nationalEntriesRef: { current: NationalEntriesPack | null } = { current: null };
     const nationalTrainsRef: { current: NationalTrainsData | null } = { current: null };
+    const nationalIndexRef: { current: NationalIndexPack | null } = { current: null };
     // The schedules asset (O16): not part of first paint. It is fetched once, in
     // parallel with the out tables, which wait for it so every timeline is
     // built with station-level stops (null if it failed to load); an opened
     // schedule modal also requests it.
     let schedulesPromise: Promise<SchedulesData | null> | null = null;
     let schedData: SchedulesData | null = null;
-    const flights = { outTables: false, inMap: false, inTables: false, nationalFlows: false, nationalEntries: false, nationalTrains: false };
+    const flights = { outTables: false, inMap: false, inTables: false, nationalFlows: false, nationalIndex: false, nationalEntries: false, nationalTrains: false };
 
     const loadSchedules = () => {
       if (!schedulesPromise) {
@@ -225,6 +232,40 @@ export function useAtlasData({
           setNationalFlowsFailed(true);
         });
     };
+    // The per-train index: on request (a national filter), checked against the
+    // atlas; a missing or mismatched file only turns those filters off.
+    const applyNationalIndex = () => {
+      const d = nationalIndexRef.current;
+      const at = atlasRef.current;
+      if (!d || !at) return;
+      try {
+        requireNationalIndex(d, at.data.sections.length, at.data.train_table.length, NATIONAL_INDEX_URL);
+      } catch {
+        nationalIndexRef.current = null;
+        setNationalIndexFailed(true);
+        return;
+      }
+      setNationalIndex(d);
+    };
+    const ensureNationalIndex = () => {
+      if (nationalIndexRef.current) {
+        applyNationalIndex();
+        return;
+      }
+      if (flights.nationalIndex) return;
+      flights.nationalIndex = true;
+      fetchData<NationalIndexPack>(NATIONAL_INDEX_URL)
+        .then((d) => {
+          nationalIndexRef.current = d;
+          flights.nationalIndex = false;
+          applyNationalIndex();
+        })
+        .catch((err: Error) => {
+          flights.nationalIndex = false;
+          console.warn("Failed to load the national index:", err);
+          setNationalIndexFailed(true);
+        });
+    };
     const applyNationalEntries = () => {
       const d = nationalEntriesRef.current;
       const at = atlasRef.current;
@@ -332,6 +373,7 @@ export function useAtlasData({
       ensureNationalFlows,
       ensureNationalEntries,
       ensureNationalTrains,
+      ensureNationalIndex,
       /** Phase 1 finished: merge any staged file that beat the atlas. */
       mergeEarly(inMap: InMapData | null) {
         if (inMap) {
@@ -342,6 +384,7 @@ export function useAtlasData({
         if (inTablesRef.current) applyInTables();
         if (nationalFlowsRef.current) applyNationalFlows();
         if (nationalEntriesRef.current) applyNationalEntries();
+        if (nationalIndexRef.current) applyNationalIndex();
         if (nationalTrainsRef.current) applyNationalTrains();
       },
       hasInMap: () => !!inMapDataRef.current,
@@ -442,6 +485,9 @@ export function useAtlasData({
     nationalFlowsFailed,
     nationalTrains,
     nationalTrainsFailed,
+    nationalIndex,
+    nationalIndexFailed,
+    ensureNationalIndex: loader.ensureNationalIndex,
     ensureOutTables: loader.ensureOutTables,
     ensureInMap: loader.ensureInMap,
     ensureNationalFlows: loader.ensureNationalFlows,

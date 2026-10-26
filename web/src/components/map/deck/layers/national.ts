@@ -22,16 +22,19 @@ import type {
   DecodedAtlas,
   NationalEntriesPack,
   NationalFlowsPack,
+  NationalIndexPack,
   NationalTimeline,
   NationalTrainsData,
 } from "../../../../types";
 import {
   NAT_WIDTH_FACTOR,
   buildNational,
-  classIndex,
   natPositions,
-  nationalCityCounts,
-  nationalCounts,
+  natCityCounts,
+  natFilterKey,
+  natFlowCounts,
+  natIndexActive,
+  natSelect,
   nationalCountsAt,
   nationalFlowPasses,
   palette,
@@ -39,6 +42,7 @@ import {
   stationR,
   stationZoomK,
 } from "../../../../lib";
+import type { NatFilter } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
 import type { PassData } from "./flows";
 import { buildPassData, passDataLayers, recountPassData } from "./flows";
@@ -121,18 +125,42 @@ export function maxDots(tl: NationalTimeline): number {
   return c;
 }
 
-/** Per-train 0/1 flag for the class filter (null = all): the train's
-    `train_table` class is among `classes`. Memoised per (timeline, filter). */
-let keepMemo: { tl: NationalTimeline; atlas: DecodedAtlas; key: string; keep: Uint8Array } | null = null;
-export function nationalKeep(atlas: DecodedAtlas, tl: NationalTimeline, classes: readonly string[]): Uint8Array | null {
-  if (!classes.length) return null;
-  const key = [...new Set(classes)].sort().join(",");
-  if (keepMemo && keepMemo.tl === tl && keepMemo.atlas === atlas && keepMemo.key === key) return keepMemo.keep;
-  const want = new Set(classes.map(classIndex));
-  const tt = atlas.data.train_table;
+/** The national filters resolved once per (atlas, index, filter): the selected
+    `train_table` rows (null = every train), the flow counts and, with the
+    pack's `cities`, the city counts. */
+export interface NatView {
+  key: string;
+  sel: Uint8Array | null;
+  counts: Uint32Array;
+  cities: { idx: number[]; dep: Uint32Array; arr: Uint32Array };
+  /** An index filter (hour / distance / duration / code) is applied. */
+  indexed: boolean;
+}
+let viewMemo: { atlas: DecodedAtlas; nf: NationalFlowsPack | null; ix: NationalIndexPack | null; key: string; v: NatView } | null = null;
+export function natView(atlas: DecodedAtlas, nf: NationalFlowsPack | null, ix: NationalIndexPack | null, f: NatFilter): NatView {
+  const key = natFilterKey(f) + (ix ? "|i" : "");
+  if (viewMemo && viewMemo.atlas === atlas && viewMemo.nf === nf && viewMemo.ix === ix && viewMemo.key === key) return viewMemo.v;
+  const sel = natSelect(atlas.data.train_table, ix, f);
+  const v: NatView = {
+    key,
+    sel,
+    counts: nf ? natFlowCounts(nf, ix, f, sel) : new Uint32Array(0),
+    cities: nf ? natCityCounts(nf, ix, f, sel) : { idx: [], dep: new Uint32Array(0), arr: new Uint32Array(0) },
+    indexed: !!ix && natIndexActive(f),
+  };
+  viewMemo = { atlas, nf, ix, key, v };
+  return v;
+}
+
+/** Per-timeline-train 0/1 flag from the selected `train_table` rows (null =
+    all). Memoised per (timeline, selection). */
+let keepMemo: { tl: NationalTimeline; sel: Uint8Array; keep: Uint8Array } | null = null;
+export function nationalKeep(tl: NationalTimeline, sel: Uint8Array | null): Uint8Array | null {
+  if (!sel) return null;
+  if (keepMemo && keepMemo.tl === tl && keepMemo.sel === sel) return keepMemo.keep;
   const keep = new Uint8Array(tl.n);
-  for (let q = 0; q < tl.n; q++) keep[q] = want.has(classIndex(tt[tl.tIdx[q]].class)) ? 1 : 0;
-  keepMemo = { tl, atlas, key, keep };
+  for (let q = 0; q < tl.n; q++) keep[q] = sel[tl.tIdx[q]];
+  keepMemo = { tl, sel, keep };
   return keep;
 }
 
@@ -286,7 +314,9 @@ export interface NationalFlowsInput {
   ne: NationalEntriesPack | null;
   /** Whole minute of the day, 0..1440 (A+B), or null for the day's totals (B). */
   minute: number | null;
+  /** The class filter (the entry ticks are per class) and the resolved filter view. */
   classes: readonly string[];
+  view: NatView;
   dark: boolean;
   scale: number;
   fitScale: number;
@@ -309,13 +339,13 @@ let atMemo: { day: PassData; ne: NationalEntriesPack; minute: number; pd: PassDa
     the same paths with each section's trains entered by `minute`, recounted
     only when the minute, class filter, theme or file changes. */
 export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
-  const { atlas, nf, ne, minute, classes, dark, scale, fitScale } = inp;
+  const { atlas, nf, ne, minute, classes, view, dark, scale, fitScale } = inp;
   const pal = palette(dark);
-  const cls = [...new Set(classes)].sort().join(",");
+  const cls = view.key;
   let updateMs = 0;
   if (!dayMemo || dayMemo.nf !== nf || dayMemo.cls !== cls || dayMemo.dark !== dark) {
     const t0 = performance.now();
-    const pass = nationalFlowPasses(nationalCounts(nf, classes))[0];
+    const pass = nationalFlowPasses(view.counts)[0];
     const pd = buildPassData(atlas.sec, pass.items, pal, 1, pass.maxN);
     dayMemo = { nf, cls, dark, pd, maxN: pass.maxN, sections: pass.items.length };
     updateMs = performance.now() - t0;
@@ -353,9 +383,13 @@ export interface NationalCityDots {
 /** A circle per city sized by departures + arrivals under the class filter,
     on the origin dots' radius scale and zoom growth (`stationT`). Cities with
     no trains are left out. Null when the pack carries no `cities`. */
-export function nationalCityDots(atlas: DecodedAtlas, nf: NationalFlowsPack, classes: readonly string[], stationT: number): NationalCityDots | null {
+export function nationalCityDots(
+  atlas: DecodedAtlas,
+  nf: NationalFlowsPack,
+  c: { idx: number[]; dep: Uint32Array; arr: Uint32Array },
+  stationT: number,
+): NationalCityDots | null {
   if (!nf.cities) return null;
-  const c = nationalCityCounts(nf, classes);
   const out: NationalCityDots = { idx: [], pos: [], dep: new Uint32Array(c.idx.length), arr: new Uint32Array(c.idx.length), r: [] };
   let k = 0;
   for (let i = 0; i < c.idx.length; i++) {

@@ -11,6 +11,7 @@ import type {
   NatLayer,
   NationalEntriesPack,
   NationalFlowsPack,
+  NationalIndexPack,
   NationalTimeline,
   NationalTrainsData,
   FlowVM,
@@ -19,7 +20,7 @@ import type {
   PrepTrain,
 } from "../../types";
 import { flowWidth, isFilteredView as isFilteredViewOf } from "../../lib";
-import type { DestWindow } from "../../lib";
+import type { DestWindow, NatFilter } from "../../lib";
 import type { LegendHandle } from "../Legend";
 import type { DeckHandle } from "./deck/DeckHost";
 import type { NationalCityDots } from "./deck/layers/national";
@@ -89,8 +90,11 @@ export interface Props {
   /** The national flows file (B) and its entry ticks (A+B), once loaded. */
   nationalFlows?: NationalFlowsPack | null;
   nationalEntries?: NationalEntriesPack | null;
-  /** The toolbar's class filter, which national flows follow (empty = all). */
-  nationalClasses?: string[];
+  /** The national filters (class, hour, distance, duration, train code) that
+      the flows, city circles and dots follow; `nationalIndex` answers all but
+      the class filter once loaded. */
+  nationalFilter?: NatFilter;
+  nationalIndex?: NationalIndexPack | null;
   onSelectDest: (d: CityPointVM | null) => void;
   selectedTrainCode?: string | null;
   onSelectTrain?: (code: string | null) => void;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import type { CityPointVM, Direction, DistUnit, OriginVM, RawOrigin } from "../types";
 import { FLOW_CLASSES } from "../lib";
 import CityPicker from "./CityPicker";
@@ -31,6 +31,7 @@ export default function Toolbar({
   national,
   onToggleNational,
   activeFilterCount,
+  extraFilters,
 }: {
   origins: RawOrigin[];
   originIdx: number;
@@ -59,6 +60,8 @@ export default function Toolbar({
   onToggleNational: () => void;
   /** Filters in force (class + histogram + train-code filters), for the narrow-screen badge. */
   activeFilterCount: number;
+  /** More filters under the class buttons (national mode: histograms, train code). */
+  extraFilters?: ReactNode;
 }) {
   // Narrow screens (CSS, <= 640px): the filters and the map / display
   // controls fold into two dropdown panels; wider screens show them inline
@@ -159,6 +162,7 @@ export default function Toolbar({
           );
         })}
       </div>
+      {extraFilters}
       </div>
       <div id="tbMore" className={"tb-panel" + (panel === "more" ? " open" : "")}>
       <div className="group">
