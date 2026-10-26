@@ -53,6 +53,13 @@ export default function App() {
   const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
   const { selectedTrainCode, setSelectedTrainCode, isolatedTrainCode, setIsolatedTrainCode } =
     useTrainSelection();
+  // Each click on a train opens a fresh timetable (expanded), even the same
+  // train or one picked while another's card was minimised: the key remounts it.
+  const [trainOpenSeq, setTrainOpenSeq] = useState(0);
+  const openTrain = (code: string | null) => {
+    setSelectedTrainCode(code);
+    if (code) setTrainOpenSeq((n) => n + 1);
+  };
 
   const { initialCamera, syncUrl, handleViewChange } = useUrlSync({
     atlasRef,
@@ -398,7 +405,7 @@ export default function App() {
           nationalIndex={nationalIndex}
           onSelectDest={handleSelectDest}
           selectedTrainCode={selectedTrainCode}
-          onSelectTrain={setSelectedTrainCode}
+          onSelectTrain={openTrain}
           isolatedTrainCode={isolatedTrainCode}
           onSelectIsolatedTrain={setIsolatedTrainCode}
           onSelectNatCity={setNatCity}
@@ -412,7 +419,7 @@ export default function App() {
               code={isolatedTrainCode}
               route={isolatedRoute}
               band={isolatedBand}
-              onTimetable={() => setSelectedTrainCode(isolatedTrainCode)}
+              onTimetable={() => openTrain(isolatedTrainCode)}
               onExit={() => setIsolatedTrainCode(null)}
             />
           )}
@@ -510,7 +517,7 @@ export default function App() {
           closePanel();
           filters.setSelectedTrainCodes([]);
         }}
-        onSelectTrain={setSelectedTrainCode}
+        onSelectTrain={openTrain}
         isolatedTrainCode={isolatedTrainCode}
         onClearTrainIsolation={() => setIsolatedTrainCode(null)}
         onSelectCity={(c) => handleSelectDest(c)}
@@ -539,7 +546,9 @@ export default function App() {
       <Footnote cur={cur} direction={direction} />
 
       <TrainScheduleModal
+        key={trainOpenSeq}
         code={selectedTrainCode}
+        timelineOpen={timelineOpen}
         trainT={selectedTrainVM ? selectedTrainVM.t : nationalTrainT}
         trainRow={(() => {
           const t = selectedTrainVM ? selectedTrainVM.t : nationalTrainT;

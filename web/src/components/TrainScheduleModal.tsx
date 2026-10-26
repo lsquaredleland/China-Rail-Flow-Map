@@ -30,6 +30,8 @@ interface Props {
   /** National mode: no origin; the train's own first stop anchors the times and
       the clock wraps every 24 h, so the live time is folded into the train's run. */
   national?: boolean;
+  /** The 24h animation bar is open; closing it removes a minimised card. */
+  timelineOpen?: boolean;
 }
 
 interface AlignedStop extends ScheduleStop {
@@ -69,10 +71,18 @@ export default function TrainScheduleModal({
   originCityEn,
   direction,
   national = false,
+  timelineOpen,
   trainVM: trainVMProp,
 }: Props) {
   const titleId = useId();
   const [minimized, setMinimized] = useState(false);
+  // Closing the animation bar closes a minimised card (it tracks the clock).
+  const prevTimelineOpen = useRef(timelineOpen);
+  useEffect(() => {
+    const was = prevTimelineOpen.current;
+    prevTimelineOpen.current = timelineOpen;
+    if (was && !timelineOpen && minimized) onClose();
+  }, [timelineOpen, minimized, onClose]);
   const [rawTime, setLiveTime] = useState<number>(() => currentTime ?? 360);
 
   // Subscribe to live simulation ticks
