@@ -112,10 +112,10 @@ export default function App() {
   const natData = useNationalTable(national, atlas, schedulesData, nationalIndex, natFilter);
 
   const selectedTrainVM = useMemo(() => {
-    if (!selectedTrainCode || !cur) return null;
+    if (!selectedTrainCode || !cur || national) return null;
     const list = direction === "out" ? cur.deps : cur.arrs;
     return list.find((t) => t.code === selectedTrainCode) || null;
-  }, [selectedTrainCode, cur, direction]);
+  }, [selectedTrainCode, cur, direction, national]);
 
   // National mode: the dot's train is not in the origin's departures, so the
   // schedule key is found by code in the shared train table (codes are unique).
@@ -140,8 +140,8 @@ export default function App() {
     useAnimationClock(mapRef, direction, national, natTrainsOn);
   // The isolated train belongs to the outbound animation.
   useEffect(() => {
-    if (direction === "in") setIsolatedTrainCode(null);
-  }, [direction, setIsolatedTrainCode]);
+    if (direction === "in" && !national) setIsolatedTrainCode(null);
+  }, [direction, national, setIsolatedTrainCode]);
 
   // National mode closes the city panel; its trains file loads only when the
   // animation is turned on (never in the origin view).
@@ -150,8 +150,9 @@ export default function App() {
     setPanelCity(null);
   }, [national, setPanelCity]);
   useEffect(() => {
-    if (national && natTrainsOn) ensureNationalTrains();
-  }, [national, natTrainsOn, ensureNationalTrains]);
+    // The trains file also gives an isolated train its path.
+    if (national && (natTrainsOn || isolatedTrainCode)) ensureNationalTrains();
+  }, [national, natTrainsOn, isolatedTrainCode, ensureNationalTrains]);
   // The per-train index (hour / distance / duration / code filters): national mode only.
   useEffect(() => {
     if (national) ensureNationalIndex();
@@ -162,6 +163,9 @@ export default function App() {
   }, [national, ensureSchedules]);
   const setNationalMode = (v: boolean) => {
     if (v === national) return;
+    // A selected or isolated train belongs to the mode it was picked in.
+    setSelectedTrainCode(null);
+    setIsolatedTrainCode(null);
     setNational(v);
     writeNationalParam(v);
   };
@@ -360,7 +364,7 @@ export default function App() {
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
-          {direction === "out" && !national && isolatedTrainCode && (
+          {(direction === "out" || national) && isolatedTrainCode && (
             <IsolationChip
               code={isolatedTrainCode}
               onTimetable={() => setSelectedTrainCode(isolatedTrainCode)}
@@ -506,18 +510,20 @@ export default function App() {
         stationTable={atlas ? atlas.data.station_table : []}
         dark={dark}
         unit={distUnit}
-        trainVM={national ? null : selectedTrainVM}
+        trainVM={selectedTrainVM}
+        national={national}
         isIsolated={isolatedTrainCode === selectedTrainCode}
-        onToggleIsolate={national ? undefined : (c) => {
+        onToggleIsolate={(c) => {
           setIsolatedTrainCode((prev) => (prev === c ? null : c));
         }}
         onJumpToTime={(mins) => {
-          mapRef.current?.setTime(mins);
+          // The national clock is one day.
+          mapRef.current?.setTime(national ? ((mins % 1440) + 1440) % 1440 : mins);
         }}
         mapRef={mapRef}
-        originCityZh={cur?.o.zh}
-        originCityEn={cur?.en}
-        direction={direction}
+        originCityZh={national ? undefined : cur?.o.zh}
+        originCityEn={national ? undefined : cur?.en}
+        direction={national ? "out" : direction}
       />
     </>
   );

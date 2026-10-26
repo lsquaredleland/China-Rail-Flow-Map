@@ -24,6 +24,9 @@ interface Props {
   originCityZh?: string;
   originCityEn?: string;
   direction?: string;
+  /** National mode: no origin; the train's own first stop anchors the times and
+      the clock wraps every 24 h, so the live time is folded into the train's run. */
+  national?: boolean;
 }
 
 interface AlignedStop extends ScheduleStop {
@@ -48,7 +51,6 @@ export default function TrainScheduleModal({
   stationTable,
   dark,
   unit = "km",
-  trainVM,
   currentTime,
   isIsolated = false,
   onToggleIsolate,
@@ -57,10 +59,12 @@ export default function TrainScheduleModal({
   originCityZh,
   originCityEn,
   direction,
+  national = false,
+  trainVM: trainVMProp,
 }: Props) {
   const titleId = useId();
   const [minimized, setMinimized] = useState(false);
-  const [liveTime, setLiveTime] = useState<number>(() => currentTime ?? 360);
+  const [rawTime, setLiveTime] = useState<number>(() => currentTime ?? 360);
 
   // Subscribe to live simulation ticks
   useEffect(() => {
@@ -84,6 +88,39 @@ export default function TrainScheduleModal({
     return formatScheduleStops(schedulesData, stationTable, trainT);
   }, [code, trainT, schedulesData, stationTable]);
 
+  // National mode has no origin row: the train's own first and last stops stand
+  // in for it (the same fields the origin row gives the header, the route line
+  // and the jump button).
+  const trainVM = useMemo<DepVM | ArrVM | null | undefined>(() => {
+    if (trainVMProp || !national || !stops || stops.length < 2 || !code) return trainVMProp;
+    const first = stops[0], last = stops[stops.length - 1];
+    let day = 0;
+    let prev = first.depMins >= 0 ? first.depMins : first.arrMins;
+    let arrAbs = prev;
+    for (const s of stops) {
+      for (const m of [s.arrMins, s.depMins]) {
+        if (m < 0) continue;
+        if (m < prev) day++;
+        prev = m;
+      }
+      if (s === last) arrAbs = day * 1440 + (last.arrMins >= 0 ? last.arrMins : prev);
+    }
+    const dep = first.depMins >= 0 ? first.depMins : 0;
+    return {
+      code,
+      cls: trainRow?.class ?? code.charAt(0),
+      dep: first.dep,
+      arr: last.arr,
+      depMins: dep,
+      arrMins: arrAbs,
+      dur: Math.max(0, arrAbs - dep),
+      fsZh: first.stZh,
+      fsEn: first.stEn,
+      tsZh: last.stZh,
+      tsEn: last.stEn,
+    } as unknown as DepVM;
+  }, [trainVMProp, national, stops, code, trainRow]);
+
   // Identify the station corresponding to the currently selected city (e.g. Guangzhou, Wuhan, Beijing)
   const originStationZh = trainVM
     ? (trainVM.fsZh || trainVM.tsZh || "")
@@ -97,7 +134,7 @@ export default function TrainScheduleModal({
     : "";
 
   const originStop = useMemo(() => {
-    if (!stops) return null;
+    if (!stops || national) return null; // national mode has no selected origin
     return (
       stops.find(
         (s) =>
@@ -108,7 +145,7 @@ export default function TrainScheduleModal({
               s.stEn.toLowerCase().startsWith(originCityEn.toLowerCase()))),
       ) || null
     );
-  }, [stops, originStationZh, originCityZh, originCityEn]);
+  }, [stops, national, originStationZh, originCityZh, originCityEn]);
 
   // Align schedule stops chronologically and anchor to the selected trainVM's simulation departure/arrival
   const alignedStops = useMemo<AlignedStop[] | null>(() => {
@@ -175,6 +212,16 @@ export default function TrainScheduleModal({
       simDepMins: s.unrolledDep >= 0 ? s.unrolledDep + timeShift : -1,
     }));
   }, [stops, trainVM, originStationZh, originCityZh, originCityEn]);
+
+  // The national clock wraps every 24 h: take the run's occurrence at or after
+  // its start (a run past midnight is then still on the line after 00:00);
+  // between the end and the next start the train waits for tomorrow's departure.
+  const liveTime = useMemo(() => {
+    if (!national || !alignedStops || alignedStops.length === 0) return rawTime;
+    const first = alignedStops[0].simDepMins, last = alignedStops[alignedStops.length - 1].simArrMins;
+    const t = rawTime + 1440 * Math.ceil((first - rawTime) / 1440);
+    return t > last ? t - 1440 : t;
+  }, [national, alignedStops, rawTime]);
 
   // Determine current active trip status
   const currentStatus = useMemo(() => {
