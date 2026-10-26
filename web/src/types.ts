@@ -564,7 +564,7 @@ export type DistUnit = "km" | "mi";
 export type Direction = "out" | "in";
 /** What national mode draws: the trains (A), the day's flows (B), or the
     trains over the flows built up to the clock's minute (A+B). */
-export type NatLayer = "trains" | "flows" | "both";
+export type NatLayer = "trains" | "flows" | "both" | "none";
 
 /** What the pointer is over on the map. */
 export type Hit =
@@ -572,7 +572,8 @@ export type Hit =
   | { kind: "station"; station: CityPointVM }
   | { kind: "seg"; s: number; n: number; subN?: number }
   | { kind: "chord"; chord: ChordVM }
-  | { kind: "train"; train: ActiveTrainVM };
+  | { kind: "train"; train: ActiveTrainVM }
+  | { kind: "natCity"; idx: number; dep: number; arr: number };
 
 export type RampStop = [number, [number, number, number]];
 
@@ -639,15 +640,14 @@ export interface NationalFlowsPack {
   trains: number;
   total: number[];
   by_class: number[][];
-  /** Per-city national counts; absent in packs built before they existed. */
+  /** Trains starting / ending at each city (optional: older packs lack it). */
   cities?: NationalCities;
 }
 
-/** `atlas-v2-national.json` `cities`: parallel arrays over the cities with
-    a departure or arrival (`idx` = shared `city_table` index, ascending).
-    `dep` / `arr` = distinct trains that stop at the city and run on / stop
-    there after their first stop (an origin's `outbound` / `inbound`); the 8
-    class rows (FLOW_CLASSES order) sum to them. */
+/** Per-city departures and arrivals of the national flows file: `idx[i]` is a
+    `city_table` index; `dep[i]` / `arr[i]` the day's totals and
+    `dep_by_class[c][i]` / `arr_by_class[c][i]` their split over the 8 class
+    buckets (FLOW_CLASSES order, as `by_class`). */
 export interface NationalCities {
   idx: number[];
   dep: number[];

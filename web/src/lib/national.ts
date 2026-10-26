@@ -235,10 +235,12 @@ export function natXY(
 /** All trains on the line at display minute m (0..1440), wrap-around:
     a train is shown if any m + 1440k lies in [start, end]. Writes 6 floats
     per dot (lon, lat, ux, uy, speed, cls | dwell<<4) and returns the count.
-    `qOut`, if given, receives each dot's train index (non-decreasing). */
-export function natPositions(tl: NationalTimeline, atlas: DecodedAtlas, m: number, out: Float32Array, qOut?: Int32Array): number {
+    `qOut`, if given, receives each dot's train index (non-decreasing).
+    `keep`, if given, is a per-train flag: trains with 0 are skipped. */
+export function natPositions(tl: NationalTimeline, atlas: DecodedAtlas, m: number, out: Float32Array, qOut?: Int32Array, keep?: Uint8Array | null): number {
   let c = 0;
   for (let q = 0; q < tl.n; q++) {
+    if (keep && !keep[q]) continue;
     const s = tl.start[q], e = tl.end[q];
     let k = Math.ceil((s - m) / 1440);
     for (; m + 1440 * k <= e; k++) {

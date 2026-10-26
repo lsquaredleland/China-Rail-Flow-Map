@@ -45,20 +45,21 @@ export function writeNationalParam(on: boolean): void {
   }
 }
 
-/* What national mode draws (P3.2 / P3.3): ?natLayer=flows | both, absent =
-   trains; URL only, like ?national. */
+/* What national mode draws: ?natLayer=trains | both | none, absent = flows
+   (the default view: flows and city circles, no animation); the Flows and
+   Animation toggles are its two halves. URL only, like ?national. */
 export function initialNatLayer(): NatLayer {
   try {
     const v = new URLSearchParams(window.location.search).get("natLayer");
-    return v === "flows" || v === "both" ? v : "trains";
+    return v === "trains" || v === "both" || v === "none" ? v : "flows";
   } catch {
-    return "trains";
+    return "flows";
   }
 }
 
 export function writeNatLayerParam(v: NatLayer): void {
   const params = new URLSearchParams(window.location.search);
-  if (v === "trains") params.delete("natLayer");
+  if (v === "flows") params.delete("natLayer");
   else params.set("natLayer", v);
   const search = params.toString();
   if (window.location.search !== (search ? "?" + search : "")) {

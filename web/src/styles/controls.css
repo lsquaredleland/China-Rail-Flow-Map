@@ -28,6 +28,10 @@ button:disabled {
   pointer-events: none;
   transform: none;
 }
+/* Toolbar panels: inline (display: contents) on wide screens; narrow screens
+   fold them behind the Filters / Map options buttons (responsive.css). */
+.tb-panel { display: contents; }
+.tb-mob-btn { display: none; }
 /* Segmented km | mi switcher */
 .toolbar .units { display: inline-flex; gap: 0; }
 .units button { min-width: 42px; }

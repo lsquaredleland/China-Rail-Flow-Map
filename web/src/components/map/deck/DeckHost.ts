@@ -17,7 +17,15 @@ import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
 import { PICK_PREFIX, flowLayers } from "./layers/flows";
 import { stationLayers } from "./layers/stations";
-import { nationalFlowLayers, nationalFrame, nationalLayers, nationalTimeline } from "./layers/national";
+import {
+  nationalCityDots,
+  nationalCityLayers,
+  nationalFlowLayers,
+  nationalFrame,
+  nationalKeep,
+  nationalLayers,
+  nationalTimeline,
+} from "./layers/national";
 import { shownTrains, trainLayers } from "./layers/trains";
 
 export interface PickRectOptions {
@@ -134,10 +142,14 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     // D13 map-only mode: the backdrop, the national flows (B / A+B) and every
     // national train; no origin flows, stations, selection or isolation.
     const st = S.current;
-    const mode = P.current.nationalLayer ?? "trains";
+    const mode = P.current.nationalLayer ?? "flows";
+    const withFlows = mode === "flows" || mode === "both";
+    const withTrains = mode === "trains" || mode === "both";
     const nf = P.current.nationalFlows;
+    const classes = P.current.nationalClasses ?? [];
     stats.natFlows = 0;
-    if (mode !== "trains" && nf && (mode === "flows" || P.current.nationalEntries)) {
+    st.natCities = null;
+    if (withFlows && nf && (mode === "flows" || P.current.nationalEntries)) {
       // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
       const minute = mode === "both" ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
       const fl = nationalFlowLayers({
@@ -145,7 +157,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         nf,
         ne: P.current.nationalEntries ?? null,
         minute,
-        classes: P.current.nationalClasses ?? [],
+        classes,
         dark: P.current.dark,
         scale: st.view.scale,
         fitScale: st.fitScale,
@@ -157,22 +169,27 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         stats.natFlowsUpdates++;
       }
     }
-    const built = nationalTimeline(atlas, P.current.nationalTrains);
+    if (withFlows && nf) {
+      // The city circles ride with the flows (day totals, whatever the clock).
+      st.natCities = nationalCityDots(atlas, nf, classes, stationT(st.view, st.fitScale));
+      if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark));
+    }
+    const built = withTrains ? nationalTimeline(atlas, P.current.nationalTrains) : null;
     if (!built) {
       st.natN = st.natRunning = stats.natDots = 0;
       st.natPick = null;
       return layers;
     }
-    const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale);
-    st.natN = built.tl.n;
+    const keep = nationalKeep(atlas, built.tl, classes);
+    const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep);
+    let kept = built.tl.n;
+    if (keep) {
+      kept = 0;
+      for (let q = 0; q < keep.length; q++) kept += keep[q];
+    }
+    st.natN = kept;
     st.natRunning = f.running;
     stats.natBuildMs = built.ms;
-    if (mode === "flows") {
-      // B alone: no dots (the counters still run with the clock).
-      stats.natDots = 0;
-      st.natPick = null;
-      return layers;
-    }
     stats.natDots = f.count;
     st.natPick = { tl: built.tl, count: f.count, buf: f.buf, qOf: f.qOf, m: ((st.animTime % 1440) + 1440) % 1440 };
     layers.push(...nationalLayers(f, !st.animPlaying));

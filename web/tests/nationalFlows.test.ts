@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import {
   DATA_FMT,
   FLOW_CLASSES,
+  NAT_WIDTH_FACTOR,
   flowWidth,
   nationalCityCounts,
   nationalCounts,
@@ -58,28 +59,18 @@ describe("national flows", () => {
     expect(Array.from(a, (n, s) => n + b[s])).toEqual(total);
   });
 
-  test("city counts sum the selected class rows; absent without cities", () => {
-    expect(nationalCityCounts(nf, [])).toBeNull();
-    const rows = (a: number[]) => FLOW_CLASSES.map((_, c) => (c === 0 ? a : a.map(() => 0)));
-    const withCities: NationalFlowsPack = {
-      ...nf,
-      cities: { idx: [2, 7], dep: [3, 1], arr: [2, 4], dep_by_class: rows([3, 0]).map((r, c) => (c === 7 ? [0, 1] : r)), arr_by_class: rows([2, 1]).map((r, c) => (c === 4 ? [0, 3] : r)) },
-    };
-    const all = nationalCityCounts(withCities, [])!;
-    expect(Array.from(all.dep)).toEqual([3, 1]);
-    expect(Array.from(all.arr)).toEqual([2, 4]);
-    expect(Array.from(nationalCityCounts(withCities, ["G"])!.arr)).toEqual([2, 1]);
-    // every class selected equals the unfiltered total
-    const every = nationalCityCounts(withCities, [...FLOW_CLASSES])!;
-    expect([Array.from(every.dep), Array.from(every.arr)]).toEqual([[3, 1], [2, 4]]);
-  });
-
-  test("widths use the origin flows' width scale", () => {
+  test("widths are the origin flows' width scale times the national factor", () => {
+    expect(NAT_WIDTH_FACTOR).toBe(0.5);
     const counts = nationalCounts(nf, []);
     for (const [scale, fit] of [[100, 100], [350, 100], [40, 100]]) {
       const w = nationalWidths(counts, scale, fit);
-      expect(Array.from(w)).toEqual(total.map((n) => Math.fround(flowWidth(n, scale, fit))));
+      expect(Array.from(w)).toEqual(
+        total.map((n) => Math.fround(Math.max(0.5, flowWidth(n, scale, fit) * NAT_WIDTH_FACTOR))),
+      );
     }
+    // 10 trains at the fit: 10 x 0.08 x 0.5 = 0.4 px, so the 0.5 px floor wins; 100 trains: 4 px, half of 8
+    expect(nationalWidths(Uint32Array.of(100), 100, 100)[0]).toBeCloseTo(4, 5);
+    expect(flowWidth(100, 100, 100)).toBeCloseTo(8, 5);
     // the hairline floor applies to empty sections too (they are not drawn)
     expect(nationalWidths(counts, 100, 100)[3]).toBe(0.5);
   });
@@ -247,5 +238,27 @@ describe("national flows by minute (A+B)", () => {
       }
       expect(Array.from(per)).toEqual(Array.from(all));
     }
+  });
+});
+
+describe("national city counts", () => {
+  const cities = {
+    idx: [3, 7],
+    dep: [10, 4],
+    arr: [9, 5],
+    dep_by_class: [[4, 0], [6, 1], [0, 0], [0, 0], [0, 3], [0, 0], [0, 0], [0, 0]],
+    arr_by_class: [[1, 1], [8, 0], [0, 0], [0, 0], [0, 4], [0, 0], [0, 0], [0, 0]],
+  };
+  const withCities: NationalFlowsPack = { ...nf, cities };
+  test("no cities field: nothing, no crash", () => {
+    expect(nationalCityCounts(nf, ["G"]).idx).toEqual([]);
+  });
+  test("no filter is the totals; a filter sums the class rows", () => {
+    const all = nationalCityCounts(withCities, []);
+    expect([all.idx, Array.from(all.dep), Array.from(all.arr)]).toEqual([[3, 7], [10, 4], [9, 5]]);
+    const g = nationalCityCounts(withCities, ["G"]);
+    expect([Array.from(g.dep), Array.from(g.arr)]).toEqual([[4, 0], [1, 1]]);
+    const gd = nationalCityCounts(withCities, ["G", "D", "G"]);
+    expect([Array.from(gd.dep), Array.from(gd.arr)]).toEqual([[10, 1], [9, 1]]);
   });
 });

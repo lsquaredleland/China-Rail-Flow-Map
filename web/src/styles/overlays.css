@@ -58,12 +58,12 @@
 /* National mode coverage note (in the legend's place, which national mode hides) */
 .nat-note {
   position: absolute;
-  left: 14px;
+  left: 246px; /* clear of the legend card */
   bottom: 14px;
   z-index: 4;
   display: flex;
   flex-wrap: wrap;
-  max-width: calc(100% - 28px);
+  max-width: calc(100% - 262px);
   box-sizing: border-box;
   align-items: center;
   gap: 8px;
@@ -79,11 +79,9 @@
   background: rgba(17, 24, 39, 0.9);
   color: #F3F4F6;
 }
-/* Trains | Flows | Trains + flows: the toolbar's segmented buttons, compact */
-.nat-layers { display: inline-flex; pointer-events: auto; }
-.nat-layers button { padding: 3px 9px; font-size: 12px; border-radius: 0; margin-left: -1.5px; }
-.nat-layers button:first-child { border-radius: 3px 0 0 3px; margin-left: 0; }
-.nat-layers button:last-child { border-radius: 0 3px 3px 0; }
+/* Flows and Animation: two independent toggles, compact */
+.nat-layers { display: inline-flex; gap: 6px; pointer-events: auto; }
+.nat-layers button { padding: 3px 9px; font-size: 12px; }
 .nat-note-tag {
   font-weight: 700;
   font-size: 11px;

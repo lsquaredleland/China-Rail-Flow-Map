@@ -63,11 +63,12 @@ export {
 export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
 export { natTrainVM } from "./natTrain";
 export {
-  nationalCityCounts,
   nationalCounts,
   nationalCountsAt,
   nationalFlowPasses,
   nationalWidths,
+  nationalCityCounts,
+  NAT_WIDTH_FACTOR,
   requireNationalEntries,
   requireNationalFlows,
 } from "./nationalFlows";
