@@ -49,7 +49,7 @@ describe("isolated train dwelling at a station", () => {
     const f = {
       count: 1,
       qOf: Int32Array.of(0),
-      buf: Float32Array.of(113, 23, 1, 0, 0, 16), // flags: class 0, dwell bit
+      pos: Float32Array.of(113, 23, 1, 0, 0, 16), // flags: class 0, dwell bit
     } as never;
     const tl = { tIdx: Int32Array.of(0), cls: Uint8Array.of(0) } as never;
     const atlas = { data: { train_table: [{ code: "G1" }] } } as never;
