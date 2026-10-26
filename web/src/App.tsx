@@ -9,7 +9,7 @@ import {
   useUrlSync,
   writeNationalParam,
 } from "./hooks/useUrlState";
-import { useFilters, useCityPanel, useTrainSelection } from "./hooks/useSelection";
+import { clearOriginSelection, useFilters, useCityPanel, useTrainSelection } from "./hooks/useSelection";
 import { useAnimationClock } from "./hooks/useAnimationClock";
 import { useNationalMode } from "./hooks/useNationalMode";
 import MapCanvas, { type MapApi } from "./components/MapCanvas";
@@ -173,9 +173,7 @@ export default function App() {
   // A new origin starts clean: the selected / isolated train and the selected
   // destination belonged to the previous one (filters reset in selectOrigin).
   useEffect(() => {
-    setSelectedTrainCode(null);
-    setIsolatedTrainCode(null);
-    setPanelCity(null);
+    clearOriginSelection({ setSelectedTrainCode, setIsolatedTrainCode, setPanelCity });
   }, [originIdx, setSelectedTrainCode, setIsolatedTrainCode, setPanelCity]);
 
   // National mode closes the city panel.
