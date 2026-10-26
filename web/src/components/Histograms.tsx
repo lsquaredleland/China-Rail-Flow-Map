@@ -9,11 +9,15 @@ import type {
   OriginVM,
   SrcVM,
 } from "../types";
+import type { HistRow } from "../lib";
 
 export type { DistBinFilter, DurBinFilter };
 
 interface Props {
-  cur: OriginVM;
+  /** The origin city (omitted in national mode, which passes `rows`). */
+  cur?: OriginVM;
+  /** The trains to bin when there is no origin: every national train. */
+  rows?: HistRow[];
   unit: DistUnit;
   direction: Direction;
   panelCity?: CityPointVM | null;
@@ -260,6 +264,7 @@ function trainsWord(n: number): string {
 
 export default function Histograms({
   cur,
+  rows: givenRows,
   unit,
   direction,
   panelCity,
@@ -325,13 +330,17 @@ export default function Histograms({
     durTicks,
     durTitles,
   } = useMemo(() => {
-    const fullCity = panelCity
+    const fullCity = cur && panelCity
       ? (inbound
           ? cur.srcs.find((s) => s.idx === panelCity.idx)
           : cur.dests.find((d) => d.idx === panelCity.idx)) || panelCity
       : null;
 
-    const rows = inbound
+    const rows: HistRow[] = givenRows
+      ? givenRows
+      : !cur
+      ? []
+      : inbound
       ? cur.arrs.map((a) => ({
           time: a.arr,
           distKm: a.distKm,
@@ -611,6 +620,7 @@ export default function Histograms({
     };
   }, [
     cur,
+    givenRows,
     unit,
     inbound,
     panelCity,
@@ -622,7 +632,9 @@ export default function Histograms({
     activeDurBins,
   ]);
 
-  if ((inbound ? cur.arrs.length : cur.deps.length) === 0) return null;
+  const rowCount = givenRows ? givenRows.length : !cur ? 0 : inbound ? cur.arrs.length : cur.deps.length;
+  if (rowCount === 0) return null;
+  const where = cur ? cur.en : "China";
 
   const hourTicks: Tick[] = [0, 6, 12, 18, 23].map((h) => ({
     x: PAD_L + ((h + 0.5) / 24) * PLOT_W,
@@ -792,7 +804,7 @@ export default function Histograms({
             (inbound ? "arrivals" : "departures") +
             " by hour of day " +
             (inbound ? "in " : "from ") +
-            cur.en +
+            where +
             (panelCity
               ? " with " +
                 (inbound ? "arrivals from " : "calls at ") +
@@ -834,7 +846,7 @@ export default function Histograms({
           ariaLabel={
             "Histogram of trains " +
             (inbound ? "arriving in " : "from ") +
-            cur.en +
+            where +
             " by journey distance " +
             (inbound ? "from their origin" : "to their final destination") +
             (panelCity
@@ -890,7 +902,7 @@ export default function Histograms({
           ariaLabel={
             "Histogram of trains " +
             (inbound ? "arriving in " : "from ") +
-            cur.en +
+            where +
             " by journey duration in 1-hour bins"
           }
         />

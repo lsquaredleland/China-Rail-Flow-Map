@@ -1,6 +1,7 @@
 @media (max-width: 640px) {
   #mapwrap { height: 68vh; height: 68dvh; min-height: 400px; }
   header { padding: 12px 16px 10px; }
+  .mode-switch button { min-height: 44px; }
   .subtitle {
     display: -webkit-box;
     -webkit-line-clamp: 3;

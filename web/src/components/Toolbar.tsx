@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ReactNode, RefObject } from "react";
+import type { RefObject } from "react";
 import type { CityPointVM, Direction, DistUnit, OriginVM, RawOrigin } from "../types";
 import { FLOW_CLASSES } from "../lib";
 import CityPicker from "./CityPicker";
@@ -29,9 +29,7 @@ export default function Toolbar({
   dark,
   onSetDark,
   national,
-  onToggleNational,
   activeFilterCount,
-  extraFilters,
 }: {
   origins: RawOrigin[];
   originIdx: number;
@@ -57,11 +55,8 @@ export default function Toolbar({
   onSetDark: (d: boolean) => void;
   /** National mode (D11: "National · beta", D13 map-only). */
   national: boolean;
-  onToggleNational: () => void;
   /** Filters in force (class + histogram + train-code filters), for the narrow-screen badge. */
   activeFilterCount: number;
-  /** More filters under the class buttons (national mode: histograms, train code). */
-  extraFilters?: ReactNode;
 }) {
   // Narrow screens (CSS, <= 640px): the filters and the map / display
   // controls fold into two dropdown panels; wider screens show them inline
@@ -162,7 +157,6 @@ export default function Toolbar({
           );
         })}
       </div>
-      {extraFilters}
       </div>
       <div id="tbMore" className={"tb-panel" + (panel === "more" ? " open" : "")}>
       <div className="group">
@@ -273,18 +267,6 @@ export default function Toolbar({
         Drag to pan &middot; scroll or pinch to zoom
         {national ? " · hover a city for its trains" : " · click a city for its distances"}
       </span>
-      {/* Last, so it takes free space at the row's end and moves nothing else. */}
-      <div className="group">
-        <button
-          id="tglNational"
-          type="button"
-          aria-pressed={national ? "true" : "false"}
-          onClick={() => onToggleNational()}
-          title="Every covered train in China on one 24h clock (beta)"
-        >
-          National &middot; beta
-        </button>
-      </div>
       </div>
     </div>
   );
