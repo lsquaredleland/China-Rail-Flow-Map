@@ -6,7 +6,11 @@ import { launch, resolveBase, parseArgs, sleep } from "./common.mjs";
 
 const { pos } = parseArgs(process.argv.slice(2));
 const { url, close } = await resolveBase(pos[0] || "dist");
-const browser = await launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+// A fresh browser per case: pages after the first in one software-GL browser
+// load 5x slower. rAF is throttled to 4 fps (layout only; the DOM is what is
+// measured), and every wait is on a concrete condition, not a fixed sleep.
+const newBrowser = () => launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+const until = (pg, fn, timeout = 30000) => pg.waitForFunction(fn, { timeout, polling: 100 });
 const fails = [];
 const click = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (e) e.click(); return !!e; }, sel);
 for (const [w, h, expanded] of [
@@ -16,25 +20,28 @@ for (const [w, h, expanded] of [
   [1280, 800, true],
   [390, 844, true],
 ]) {
+  const browser = await newBrowser();
   const pg = await browser.newPage();
+  await pg.evaluateOnNewDocument(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
   await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
   await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
   await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
-  await sleep(3000);
+  await until(pg, "window.__deckStats && window.__deckStats.settled", 60000);
   await pg.evaluate(() => window.__mapApi.selectDestByZh("深圳"));
-  await sleep(1500);
+  await until(pg, "document.querySelector('#destPanel')");
   // a class filter, so the active-filter bar is in the stack too
   await pg.evaluate(() => {
     const g = [...document.querySelectorAll(".cls-filter .cls-btn")].find((e) => e.textContent.trim() === "G");
     if (g) g.click();
   });
-  await sleep(500);
+  await until(pg, "document.querySelector('.active-filter-bar')", 5000).catch(() => {});
   if (!expanded) await click(pg, "#destMin");
   await sleep(300);
   await click(pg, 'button[title^="View full schedule"]');
-  await sleep(1200);
+  await until(pg, "document.querySelector('button[aria-label=\"Minimize timetable\"]')", 10000).catch(() => {});
   await pg.evaluate(() => { const b = document.querySelector('button[aria-label="Minimize timetable"]'); b && b.click(); });
-  await sleep(600);
+  await until(pg, "!document.querySelector('button[aria-label=\"Minimize timetable\"]')", 10000).catch(() => {});
+  await sleep(400); // CSS transitions
   const boxes = await pg.evaluate(() => {
     const r = (e) => { const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
     const one = (sel) => [...document.querySelectorAll(sel)].map(r).filter(Boolean).map((b, i) => ({ sel: `${sel}#${i}`, ...b }));
@@ -56,9 +63,8 @@ for (const [w, h, expanded] of [
     for (let j = i + 1; j < boxes.cards.length; j++)
       if (hit(boxes.cards[i], boxes.cards[j])) fails.push(`${w}x${h}: cards ${i} and ${j} overlap`);
   console.log(`${w}x${h}${expanded ? " expanded-panel" : ""}: ${boxes.cards.length} cards, ${boxes.others.length} other boxes checked`);
-  await pg.close();
+  await browser.close();
 }
-await browser.close();
 await close();
 if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
 console.log("CARDS LAYOUT OK");
