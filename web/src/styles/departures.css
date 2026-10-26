@@ -176,6 +176,7 @@
   display: flex; align-items: center; justify-content: center;
 }
 .dep-chip button:hover { border-color: transparent; background: rgba(128, 128, 128, 0.25); }
+.dep-swipe { margin: 0 0 6px; font-size: 12px; color: var(--ink-soft); font-style: italic; }
 .dep-scroll { overflow-x: auto; overflow-y: auto; max-height: 50dvh; -webkit-overflow-scrolling: touch; border: 1px solid var(--rule); }
 #depTable {
   border-collapse: collapse;

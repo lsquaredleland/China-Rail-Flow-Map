@@ -350,6 +350,20 @@ export default function DeparturesTable({
     setInCallSort({ key: "arr", dir: 1 });
   }, [srcFilter]);
 
+  // The swipe hint shows only when the table is wider than its box.
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [overflowsX, setOverflowsX] = useState(false);
+  const measureOverflow = () => {
+    const el = wrapRef.current?.querySelector<HTMLElement>(".dep-scroll");
+    const over = !!el && el.scrollWidth > el.clientWidth + 1;
+    setOverflowsX((v) => (v === over ? v : over));
+  };
+  useEffect(measureOverflow);
+  useEffect(() => {
+    window.addEventListener("resize", measureOverflow);
+    return () => window.removeEventListener("resize", measureOverflow);
+  }, []);
+
   const tablesReady = direction === "out" ? outTablesReady : inTablesReady;
   // The histograms bin the origin's departures (outbound) or arrivals (inbound);
   // in national mode every national train. A pinned city adds its own calls.
@@ -495,8 +509,8 @@ export default function DeparturesTable({
         showingNote={view.showingNote}
         allClasses={!!national}
       />
-      <p className="dep-swipe">Swipe sideways for all columns &rarr;</p>
-      <div className="dep-scrollwrap">
+      {overflowsX && <p className="dep-swipe">Swipe sideways for all columns &rarr;</p>}
+      <div className="dep-scrollwrap" ref={wrapRef}>
         {view.scrollSelf ? view.tableNode : <div className="dep-scroll">{view.tableNode}</div>}
         <div className="dep-fade" aria-hidden="true"></div>
       </div>
