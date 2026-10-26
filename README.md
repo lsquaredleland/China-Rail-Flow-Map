@@ -45,7 +45,7 @@ China-Rail-Flow-Map/
 
 ### 1. Run the Web Application Locally
 
-Requires [Bun](https://bun.sh/) and Node.js 20+ (the build and the dev tools run on Node):
+Requires [Bun](https://bun.sh/) and Node.js 22+ (the build and the dev tools run on Node):
 
 ```bash
 cd web
