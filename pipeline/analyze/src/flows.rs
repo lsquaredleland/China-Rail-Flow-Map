@@ -140,6 +140,24 @@ pub struct NationalIndex {
     pub secs: Vec<Vec<u32>>,
     pub dep: Vec<Vec<i64>>,
     pub arr: Vec<Vec<i64>>,
+    /// Aligned with `dep` / `arr`: the minute of day (0..1439) of the
+    /// train's departure from / arrival at that city, at the stop that
+    /// defines the membership ([`departs_from`] / [`arrives_at`]); see
+    /// [`event_minute`].
+    pub dep_min: Vec<Vec<u16>>,
+    pub arr_min: Vec<Vec<u16>>,
+}
+
+/// Minute of day (0..1439) of a stop event, the clock the national
+/// animation uses (`entries.rs`: absolute minute mod 1440): the timetable
+/// minute of `primary` ("HH:MM"; the stop's departure for a departure, its
+/// arrival for an arrival), else of `other`, else 0.
+pub fn event_minute(primary: &str, other: &str) -> u16 {
+    use crate::timetable::mins;
+    mins(primary)
+        .or_else(|| mins(other))
+        .unwrap_or(0)
+        .rem_euclid(1440) as u16
 }
 
 /// Hour bucket of a "HH:MM" departure (the origin filter's `slice(0,2)`).

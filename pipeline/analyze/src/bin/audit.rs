@@ -546,7 +546,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     ok &= audit_national(dir, &shared, &out_map, &out_t, &mut g);
     ok &= audit_national_trains(dir, &shared, &out_t, &in_t, &sch, &mut g);
     ok &= audit_national_entries(dir, &shared, &sch, &mut g);
-    ok &= audit_national_cities(dir, &shared, &out_map, &mut g);
+    ok &= audit_national_cities(dir, &shared, &out_map, &sch, &mut g);
     // Chengdu goldens (PIPELINE.md section 7 shape)
     let cities: Vec<String> = arr(&shared["city_table"])
         .iter()
@@ -725,6 +725,7 @@ fn audit_national_cities(
     dir: &Path,
     shared: &Value,
     out_map: &Value,
+    sch: &Value,
     g: &mut BTreeMap<String, i64>,
 ) -> bool {
     let (nat_name, ix_name) = ("atlas-v2-national.json", "atlas-v2-national-index.json");
@@ -889,11 +890,93 @@ fn audit_national_cities(
     );
     ok &= range_bad == 0 && sec_bad == 0 && dep_bad == 0 && arr_bad == 0 && city_bad == 0;
     g.insert("national_index_trains".into(), n as i64);
+    if ix.get("dep_min").is_some() || ix.get("arr_min").is_some() {
+        ok &= audit_national_event_minutes(&ix, &idep, &iarr, &idx, (&dep, &arr), sch, g);
+    }
     println!(
         "AUDIT national cities+index checks: {}",
         if ok { "PASS" } else { "FAIL" }
     );
     ok
+}
+
+/// The index's optional event minutes (`dep_min` / `arr_min`): aligned with
+/// `dep` / `arr`, all in 0..1439; per city the events are exactly
+/// `cities.dep` / `cities.arr` (so the count with minute <= 1439 is the
+/// total); and every minute is a minute of the train's schedule rows:
+/// a departure's is a departure minute of a row but the last, an arrival's
+/// an arrival minute of a row but the first (mod 1440). Counts the
+/// departures / arrivals whose minute is not there (`minute_bad`).
+fn audit_national_event_minutes(
+    ix: &Value,
+    idep: &[Vec<i64>],
+    iarr: &[Vec<i64>],
+    idx: &[i64],
+    (dep, arr): (&[i64], &[i64]),
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let mins = |k: &str| -> Option<Vec<Vec<i64>>> {
+        ix[k].as_array().map(|a| {
+            a.iter()
+                .map(|r| {
+                    r.as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|x| x.as_i64().unwrap())
+                        .collect()
+                })
+                .collect()
+        })
+    };
+    let (Some(dm), Some(am)) = (mins("dep_min"), mins("arr_min")) else {
+        println!("AUDIT national index minutes FAIL: only one of dep_min / arr_min");
+        return false;
+    };
+    let n = idep.len();
+    let schedules = sch["schedules"].as_array().unwrap();
+    let (mut shape_bad, mut range_bad, mut minute_bad, mut events) = (0u64, 0u64, 0u64, 0i64);
+    let mut per_city = [vec![0i64; idx.len()], vec![0i64; idx.len()]];
+    if dm.len() != n || am.len() != n || schedules.len() != n {
+        println!("AUDIT national index minutes FAIL: shape for {n} trains");
+        return false;
+    }
+    for t in 0..n {
+        shape_bad += (dm[t].len() != idep[t].len() || am[t].len() != iarr[t].len()) as u64;
+        if shape_bad > 0 {
+            continue;
+        }
+        let rows = schedules[t].as_array().unwrap();
+        let col = |r: &Value, c: usize| r[c].as_i64().unwrap();
+        let tod = |v: i64| (v >= 0).then_some(v.rem_euclid(1440));
+        let deps: HashSet<i64> = rows[..rows.len().saturating_sub(1)]
+            .iter()
+            .filter_map(|r| tod(col(r, 2)))
+            .collect();
+        let arrs: HashSet<i64> = rows.iter().skip(1).filter_map(|r| tod(col(r, 1))).collect();
+        for (k, (ids, ms, set)) in [(&idep[t], &dm[t], &deps), (&iarr[t], &am[t], &arrs)]
+            .into_iter()
+            .enumerate()
+        {
+            for (&id, &m) in ids.iter().zip(ms.iter()) {
+                events += 1;
+                range_bad += !(0..1440).contains(&m) as u64;
+                minute_bad += !set.contains(&m) as u64;
+                if let Ok(j) = idx.binary_search(&id) {
+                    per_city[k][j] += 1;
+                }
+            }
+        }
+    }
+    let city_bad = (0..idx.len())
+        .filter(|&j| per_city[0][j] != dep[j] || per_city[1][j] != arr[j])
+        .count();
+    println!(
+        "AUDIT national index minutes: {events} events; {shape_bad} rows misaligned, {range_bad} outside 0..1439, {minute_bad} not a schedule minute of the train; {city_bad} cities whose event count differs from dep/arr"
+    );
+    g.insert("national_index_events".into(), events);
+    g.insert("national_index_minute_bad".into(), minute_bad as i64);
+    shape_bad == 0 && range_bad == 0 && minute_bad == 0 && city_bad == 0
 }
 
 /// P2.2 national trains (`atlas-v2-national-trains.json`; skipped while a

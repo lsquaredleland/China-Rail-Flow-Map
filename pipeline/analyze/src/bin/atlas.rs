@@ -2619,19 +2619,35 @@ fn main() {
                 .get(&ti)
                 .map_or(Vec::new(), |v| v.iter().map(|&s| s as u32).collect()),
         );
-        let ids = |f: &dyn Fn(&[String], &str) -> Option<usize>| -> Vec<i64> {
-            let mut v: Vec<i64> = cities
-                .iter()
-                .filter(|c| f(cities, c).is_some())
-                .filter_map(|c| city_idx.get(c).copied())
-                .filter(|i| nc.idx.binary_search(i).is_ok())
-                .collect();
-            v.sort_unstable();
-            v.dedup();
-            v
-        };
-        national_index.dep.push(ids(&flows::departs_from));
-        national_index.arr.push(ids(&flows::arrives_at));
+        // (city id, event minute) per distinct city, ascending id; the
+        // stop is the one `f` finds, which also decides the membership.
+        let ids =
+            |f: &dyn Fn(&[String], &str) -> Option<usize>, dep: bool| -> (Vec<i64>, Vec<u16>) {
+                let mut v: Vec<(i64, u16)> = cities
+                    .iter()
+                    .filter_map(|c| {
+                        let k = f(cities, c)?;
+                        let i = *city_idx.get(c)?;
+                        nc.idx.binary_search(&i).ok()?;
+                        let s = &tr.stops[k];
+                        let m = if dep {
+                            flows::event_minute(&s.depart, &s.arrive)
+                        } else {
+                            flows::event_minute(&s.arrive, &s.depart)
+                        };
+                        Some((i, m))
+                    })
+                    .collect();
+                v.sort_unstable();
+                v.dedup_by_key(|e| e.0);
+                v.into_iter().unzip()
+            };
+        let (ids_d, min_d) = ids(&flows::departs_from, true);
+        let (ids_a, min_a) = ids(&flows::arrives_at, false);
+        national_index.dep.push(ids_d);
+        national_index.dep_min.push(min_d);
+        national_index.arr.push(ids_a);
+        national_index.arr_min.push(min_a);
     }
     let out = AtlasOut {
         build: provenance::build_block(&inp),

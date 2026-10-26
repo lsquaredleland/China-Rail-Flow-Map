@@ -176,6 +176,13 @@
 //! ascending and delta-coded (first id, then gaps). Selecting trains and
 //! summing their rows gives flows and city counts under any filter; with
 //! every train selected: `total`, `cities.dep`, `cities.arr` exactly.
+//! Optional `dep_min` / `arr_min` (absent in older packs): per train, aligned
+//! with its `dep` / `arr` ids (so NOT delta-coded and not time-ordered), the
+//! minute of day 0..1439 (clock minute mod 1440, as `national-entries`) of
+//! the train's departure from / arrival at that city, at the stop that
+//! defines the membership (`flows::departs_from` / `arrives_at`). Counting
+//! the events with minute <= t per city gives the city's dep + arr by t;
+//! all of them (t = 1439) are `cities.dep` + `cities.arr`.
 //!
 //! National entries (`atlas-v2-national-entries.json`, P3.3 A+B; written
 //! with the national trains file): `{fmt, n_sec, trains, ticks_per_min,
@@ -788,7 +795,7 @@ fn pack_national_index(ix: &Value, perm: &[usize], n_trains: usize) -> Value {
         .collect();
     let lists =
         |k: &str| -> Vec<Vec<i64>> { arr(get(ix, k)).iter().map(|r| delta(ints(r))).collect() };
-    json!({
+    let mut out = json!({
         "fmt": FMT,
         "n_sec": perm.len(),
         "n_train": n,
@@ -799,7 +806,13 @@ fn pack_national_index(ix: &Value, perm: &[usize], n_trains: usize) -> Value {
         "secs": secs,
         "dep": lists("dep"),
         "arr": lists("arr"),
-    })
+    });
+    for k in ["dep_min", "arr_min"] {
+        if let Some(v) = ix.get(k) {
+            out[k] = v.clone();
+        }
+    }
+    out
 }
 
 /// The national table in the shared file's section order (see the header).
