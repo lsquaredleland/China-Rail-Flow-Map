@@ -11,29 +11,13 @@
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import type { NatFilter } from "../../../lib";
 import { getSelCache, isTrainShown, palette, stationStates, stationT, viewToViewState } from "../../../lib";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
 import { PICK_PREFIX, flowLayers } from "./layers/flows";
 import { stationLayers } from "./layers/stations";
-import {
-  nationalCityDots,
-  natViewEvents,
-  nationalCityLayers,
-  nationalFlowLayers,
-  nationalFrame,
-  nationalHighlight,
-  nationalInfraLayers,
-  nationalIsolated,
-  nationalCorridor,
-  nationalKeep,
-  nationalLayers,
-  nationalRings,
-  nationalTimeline,
-  natView,
-} from "./layers/national";
+import { nationalBuildLayers } from "./layers/national";
 import { shownTrains, trainLayers } from "./layers/trains";
 
 export interface PickRectOptions {
@@ -120,8 +104,6 @@ export function dropDepthPickBuffer(picker: PickerInternals | null | undefined):
   };
 }
 
-const NO_FILTER: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
-
 const NOTICE_TEXT = "Map paused — tap to resume";
 
 const GPU_TIME = typeof location !== "undefined" && new URLSearchParams(location.search).get("gputime") === "1";
@@ -148,94 +130,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     dark: P.current.dark,
     scale: S.current.view.scale,
   });
-  if (P.current.national) {
-    // D13 map-only mode: the backdrop, the national flows (B / A+B) and every
-    // national train; no origin flows, stations, selection or isolation.
-    const st = S.current;
-    const mode = P.current.nationalLayer ?? "flows";
-    const withFlows = mode === "flows" || mode === "both";
-    const withTrains = mode === "trains" || mode === "both";
-    const nf = P.current.nationalFlows;
-    const filter = P.current.nationalFilter ?? NO_FILTER;
-    const view = natView(atlas, nf ?? null, P.current.nationalIndex ?? null, filter);
-    stats.natFlows = 0;
-    st.natCities = null;
-    st.natCounts = null;
-    // An isolated train: only its run and its dot (flows and circles step aside).
-    const isoCode = P.current.isolatedTrainCode;
-    const tlAll = isoCode ? nationalTimeline(atlas, P.current.nationalTrains) : null;
-    const iso = isoCode && tlAll ? nationalIsolated(atlas, tlAll.tl, isoCode) : null;
-    if (iso && tlAll) {
-      layers.push(...nationalCorridor(tlAll.tl, atlas, iso.q));
-      if (!withTrains) {
-        st.natN = st.natRunning = stats.natDots = 0;
-        st.natPick = null;
-        return layers;
-      }
-    }
-    if (!iso && withFlows && nf && (mode === "flows" || P.current.nationalEntries)) {
-      // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
-      // The entry ticks know only the class, so an index filter draws the day's totals.
-      const minute = mode === "both" && !view.indexed ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
-      const fl = nationalFlowLayers({
-        atlas,
-        nf,
-        ne: P.current.nationalEntries ?? null,
-        minute,
-        classes: filter.classes,
-        view,
-        dark: P.current.dark,
-        scale: st.view.scale,
-        fitScale: st.fitScale,
-      });
-      layers.push(...fl.layers);
-      stats.natFlows = fl.sections;
-      st.natCounts = fl.counts;
-      if (fl.updateMs > 0) {
-        stats.natFlowsMs = fl.updateMs;
-        stats.natFlowsUpdates++;
-      }
-    }
-    // The infrastructure overlay over the flows (as in the origin view), under the circles.
-    if (!iso && withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark));
-    if (!iso && withFlows && nf) {
-      // The city circles ride with the flows (day totals, whatever the clock).
-      // With the clock running (flows + trains) the circles grow as the trains stop there.
-      const ev = mode === "both" ? natViewEvents(view, nf, P.current.nationalIndex ?? null) : null;
-      const growth = ev ? { ev, t: Math.min(1440, Math.max(0, st.animTime)) } : null;
-      st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale), st.view.scale / st.fitScale, growth);
-      const hv = st.hover;
-      if (hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, P.current.dark));
-      if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark, hv && hv.kind === "natCity" ? hv.idx : -1));
-    }
-    const built = withTrains ? nationalTimeline(atlas, P.current.nationalTrains) : null;
-    if (!built) {
-      st.natN = st.natRunning = stats.natDots = 0;
-      st.natPick = null;
-      return layers;
-    }
-    const keep = iso ? iso.keep : nationalKeep(built.tl, view.sel);
-    const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep);
-    let kept = built.tl.n;
-    if (keep) {
-      kept = 0;
-      for (let q = 0; q < keep.length; q++) kept += keep[q];
-    }
-    st.natN = kept;
-    st.natRunning = f.running;
-    stats.natBuildMs = built.ms;
-    stats.natDots = f.count;
-    st.natPick = { tl: built.tl, count: f.count, buf: f.buf, qOf: f.qOf, m: ((st.animTime % 1440) + 1440) % 1440 };
-    layers.push(...nationalLayers(f, !st.animPlaying, !!iso));
-    layers.push(
-      ...nationalRings(f, built.tl, atlas, {
-        hover: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
-        selected: P.current.selectedTrainCode,
-        isolated: iso ? isoCode : null,
-      }),
-    );
-    return layers;
-  }
+  if (P.current.national) return [...layers, ...nationalBuildLayers(M, stats)];
   const set = M.flowsSet();
   const cur = P.current.cur;
   if (set && cur) {
