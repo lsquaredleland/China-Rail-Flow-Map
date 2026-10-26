@@ -2,7 +2,7 @@
 // dwell positions, final-step flows == static flows (with and without
 // filters), animated trains subset of the filter, no teleporting dots.
 import { describe, expect, test } from "bun:test";
-import { filterOrigin, trainDistAt } from "../src/lib";
+import { filterOrigin, getSelCache, trainDistAt } from "../src/lib";
 import { animLoop, getAnimState, setAnimEnabled, setPlaying, setTime } from "../src/components/map/anim";
 import { createMapCtx } from "../src/components/map/context";
 import type { MapCtx, Props } from "../src/components/map/context";
@@ -254,6 +254,18 @@ describe("national clock (P2.2)", () => {
     setPlaying(M, true);
     expect(st.animTime).toBe(Math.floor(first));
     setPlaying(M, false);
+
+    // a selected destination: the first of the trains to it, not the origin's first
+    const D = ctx(false);
+    const dest = origin("广州").dests.find((d) => d.zh === "北京")!;
+    (D.P.current as any).panelDest = dest;
+    const sel = getSelCache(D.P.current, D.S.current)!;
+    expect(sel.allowedCodes!.size).toBeGreaterThan(0);
+    const tlD = D.activeTimeline()!;
+    const firstToDest = Math.min(...[...sel.allowedCodes!].map((c) => tlD.getPrepTrain(c)?.depMins ?? Infinity));
+    expect(firstToDest).toBeGreaterThan(first);
+    setAnimEnabled(D, true);
+    expect(D.S.current.animTime).toBe(Math.floor(firstToDest));
   });
 
   test("origin view keeps its multi-day clock", () => {

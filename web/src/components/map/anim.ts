@@ -5,12 +5,23 @@ import { getSelCache } from "../../lib";
 
 /* ---------- 24h timeline animation controls ---------- */
 
-/** Where the clock starts (and wraps back to): midnight in national mode,
-    the first departure of the trains on show for an origin. */
+/** Where the clock starts (and wraps back to): midnight in national mode;
+    for an origin, the first departure of the trains on show: those to the
+    selected city when one is selected, else the whole (filtered) timeline. */
 function animStartMins(M: MapCtx): number {
   if (M.P.current.national) return 0;
   const tl = M.activeTimeline();
-  return tl ? Math.floor(tl.firstDepMins) : 0;
+  if (!tl) return 0;
+  const allowed = getSelCache(M.P.current, M.S.current)?.allowedCodes;
+  if (allowed && allowed.size) {
+    let first = Infinity;
+    for (const code of allowed) {
+      const pt = tl.getPrepTrain(code);
+      if (pt && pt.depMins < first) first = pt.depMins;
+    }
+    if (isFinite(first)) return Math.floor(first);
+  }
+  return Math.floor(tl.firstDepMins);
 }
 
 export function getAnimState(M: MapCtx): AnimState {
