@@ -46,6 +46,7 @@ button:disabled {
 .theme-toggle button:first-child { border-radius: 3px 0 0 3px; }
 .theme-toggle button:last-child { border-radius: 0 3px 3px 0; margin-left: -1.5px; }
 .city-picker { display: flex; align-items: center; gap: 7px; }
+.lb-short { display: none; }
 .city-picker label { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
 .combo { position: relative; }
 #originSearch {

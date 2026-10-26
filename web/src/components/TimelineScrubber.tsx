@@ -6,6 +6,7 @@ import {
   type RefObject,
 } from "react";
 import type { MapApi, AnimState } from "./MapHost";
+import SpeedSelect from "./SpeedSelect";
 import type { Direction } from "../types";
 
 export interface TimelineScrubberProps {
@@ -415,6 +416,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         <div className="tb-right">
           <span className="tb-speed-caption">A DAY IN</span>
 
+          <SpeedSelect speed={speed} onSetSpeed={handleSetSpeed} />
           <div className="tb-speed-group">
             <button
               type="button"
@@ -563,7 +565,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             onClick={() => handleSliderInput(750)}
             title="Day 1 24:00 (Day 1 departures complete)"
           >
-            24:00 · Day 1 ends
+            24:00<span className="tb-tick-long"> · Day 1 ends</span>
           </button>
           {!isNational && (
             <button

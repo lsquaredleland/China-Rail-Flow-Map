@@ -95,7 +95,7 @@ export default function AppHeader({
             </div>
             <div>
               <b>{national.maxFlow?.toLocaleString("en-US") ?? "…"}</b>{" "}
-              <span>trains/day on the busiest corridor</span>
+              <span data-short="trains/day, busiest">trains/day on the busiest corridor</span>
             </div>
           </>
         )}
@@ -120,7 +120,7 @@ export default function AppHeader({
                       : cur.o.outbound
                     ).toLocaleString("en-US")}
                   </b>{" "}
-                  <span>
+                  <span data-short={selectedClasses.length || hasHistFilter ? undefined : "trains depart daily"}>
                     {hasHistFilter
                       ? filterLabel
                       : selectedClasses.length > 0
@@ -135,11 +135,11 @@ export default function AppHeader({
                 </div>
                 <div>
                   <b>{viewCur.dests.length}</b>{" "}
-                  <span>cities with a direct connection</span>
+                  <span data-short="direct cities">cities with a direct connection</span>
                 </div>
                 <div>
                   <b>{viewCur.maxFlow}</b>{" "}
-                  <span>trains/day on the busiest corridors</span>
+                  <span data-short="trains/day, busiest">trains/day on the busiest corridors</span>
                 </div>
               </>
             ) : (
@@ -151,7 +151,7 @@ export default function AppHeader({
                       : cur.o.inbound
                     ).toLocaleString("en-US")}
                   </b>{" "}
-                  <span>
+                  <span data-short={selectedClasses.length || hasHistFilter ? undefined : "trains arrive daily"}>
                     {hasHistFilter
                       ? filterLabel
                       : selectedClasses.length > 0
@@ -166,11 +166,11 @@ export default function AppHeader({
                 </div>
                 <div>
                   <b>{viewCur.srcs.length}</b>{" "}
-                  <span>cities with a direct connection</span>
+                  <span data-short="direct cities">cities with a direct connection</span>
                 </div>
                 <div>
                   <b>{viewCur.maxInFlow}</b>{" "}
-                  <span>trains/day on the busiest corridors</span>
+                  <span data-short="trains/day, busiest">trains/day on the busiest corridors</span>
                 </div>
               </>
             );

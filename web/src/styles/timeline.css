@@ -171,6 +171,7 @@
   font-weight: 800;
   letter-spacing: 0.6px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .tb-badge-icon {
   font-size: 7px;
@@ -415,4 +416,27 @@
   width: 8px;
   height: 8px;
   box-shadow: 0 0 8px #C8302A;
+}
+
+/* The phone speed dropdown (SpeedSelect); the segmented control is for desktop. */
+.tb-speed-select { display: none; }
+/* Phones: the collapse button is pinned top-right and always reachable; the
+   speed switch and Finish wrap onto a second line; the day-end tick label is
+   short so it cannot run into its neighbours. */
+@media (max-width: 640px) {
+  .timeline-bar-dock { padding: 8px 12px 6px; }
+  .tb-row { flex-wrap: wrap; gap: 8px 10px; padding-right: 40px; }
+  .tb-right { display: contents; }
+  .tb-right .tb-speed-group, .tb-right .tb-btn-action.is-text { order: 2; }
+  .tb-right .tb-btn-action.is-icon { position: absolute; top: 0; right: 0; width: 36px; height: 36px; }
+  .tb-tick-long { display: none; }
+  .tb-zone-label, .tb-left .tb-badge { display: none; }
+  .tb-speed-group { display: none; }
+  .tb-right .tb-speed-select {
+    display: inline-block; order: 2;
+    height: 28px; padding: 0 6px;
+    border: 1.5px solid var(--tl-line); border-radius: 0;
+    background: transparent; color: var(--tl-ink);
+    font-size: 12px; font-weight: 700;
+  }
 }
