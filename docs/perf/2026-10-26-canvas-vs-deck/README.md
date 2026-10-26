@@ -40,7 +40,7 @@ Viewport 1280×800, `?theme=light`, DPR 1 and 2, CPU throttle 1× and 4×
   in the 2 s after each call.
 - national (deck only): `?national=1`, the 24h bar expanded (the dots exist only then), paused,
   sweep 1095 → 1155 (0.2 min per frame, the `national.mjs` sweep) on the opening camera, the
-  national fit and city ×10; `trains` = A (`&natLayer=trains`), `both` = A+B (default).
+  national fit and city ×10; `trains` = A (`&natLayer=none` today; it was `&natLayer=trains` when measured), `both` = A+B (default).
 - `load`: a fresh context, navigate, record FCP, "map ready" (`__mapApi` and `__M` present,
   `#loading` gone; on deck this is after the lazy chunk mounted), the first deck frame, bytes
   before ready and total (Resource Timing `transferSize`), then a warm reload in the same context.

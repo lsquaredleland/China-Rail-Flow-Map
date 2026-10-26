@@ -1,5 +1,19 @@
 # Pre-main audit of `deckgl` (2026-10-26)
 
+> **Status after follow-ups (2026-10-26).** The findings below are the historical record and are
+> not edited. Done since, into `deckgl`: security headers #93 (§11.1), esbuild pin and `engines`
+> #94 (§11.8), stale root `vercel.json` removed #95 (§9), stale comments and `NatData` move #96
+> (§1.3), caller-side logging #98 (§1.6), docs refresh and national footnote #99 (§8),
+> `atlas` `main()` split #100 (S7), one `stationName` / `fmtDurationWords` #101 (§1.5), national
+> builder out of `DeckHost` and layers split into `layers/national/{timeline,trains,flows,cities,index}.ts`
+> #102 (S2, S3), timetable modal unroll and `lib/tripStatus` #103 (S4), `audit_pack` split #104
+> (S8), one dot/ring builder and honest label points #105 (R10, R12), Zoom clarity as a parameter
+> instead of `globalThis` #107 (§1.4), cards-layout in CI #108 (§6), `shared.about` carries the
+> source sentence and window #109 (§11.5), `Histograms` takes rows only #110 (S5, R5),
+> `NatLayer` as `{flows, trains}` with only `?natLayer=none` #111 (§1.4), `useNationalMode` out of
+> `App` #112 (S1). Still open: the ref-ui items (modal, `DestinationPanel`, `MapHost`, windowed
+> tables) and the §1.2 export trimming.
+
 Audit of the long-lived integration branch `deckgl` before it merges into `main`. Read-only
 review of the tree at `4c2dde4` (merge of PR #87) plus four cleanup PRs merged during the audit
 (#88–#91, table in §12); every claim is tied to a file and line on that tree. Owner rules
