@@ -37,6 +37,9 @@ button:disabled {
 .units button { min-width: 42px; }
 .units button:first-child { border-radius: 3px 0 0 3px; }
 .units button:last-child { border-radius: 0 3px 3px 0; margin-left: -1.5px; }
+/* Segmented Origin City | National Beta switcher, top right of the header */
+.mode-switch { display: inline-flex; flex: 0 0 auto; }
+.mode-switch button { min-width: 0; padding: 6px 14px; white-space: nowrap; }
 /* Segmented Day | Night switcher */
 .toolbar .theme-toggle { display: inline-flex; gap: 0; }
 .theme-toggle button { min-width: 44px; }

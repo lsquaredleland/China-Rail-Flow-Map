@@ -4,9 +4,9 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { brotliDecompressSync } from "node:zlib";
-import { buildNatRows, natSelect, selectNatRows, sortNatRows } from "../src/lib";
+import { buildNatRows, natHistRows, natSelect, selectNatRows, sortNatRows } from "../src/lib";
 import type { NatFilter } from "../src/lib";
-import { natWindow, NAT_ROW_H } from "../src/components/NationalTable";
+import { natWindow, NAT_ROW_H } from "../src/components/departures/NatTable";
 import { ASSETS } from "./fixture";
 
 const none: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
@@ -67,5 +67,31 @@ describe("national table", () => {
     // A sampled train: first / last stop come from the schedule.
     const r = rows[0];
     expect(r.dep).toBe(sched.schedules[0][0][2]);
+    // km is the legs added up (the last stop's own leg alone would be tiny).
+    expect(r.km).toBeGreaterThan(sched.schedules[0][sched.schedules[0].length - 1][4]);
+    // Search: by train code and by an end station's name.
+    expect(rows.filter((x) => x.hay.indexOf(tt[5].code.toLowerCase()) !== -1).length).toBeGreaterThan(0);
+    expect(rows.filter((x) => x.hay.indexOf("guangzhou") !== -1).length).toBeGreaterThan(100);
+  });
+
+  test.skipIf(!have)("real pack: histogram rows fall in the index's bins, so a bar counts what a click selects", () => {
+    const shared = rd("atlas-v2-shared.json");
+    const sched = rd("atlas-v2-schedules.json");
+    const ix = rd("atlas-v2-national-index.json");
+    const rows = buildNatRows(shared.train_table, shared.station_table, sched);
+    for (const unit of ["km", "mi"] as const) {
+      const hr = natHistRows(rows, ix, unit);
+      expect(hr.length).toBe(rows.length);
+      const size = unit === "km" ? 100 : 50;
+      const bins = unit === "km" ? ix.dist_km : ix.dist_mi;
+      const nb = unit === "km" ? 31 : 41;
+      hr.forEach((h, i) => {
+        const v = unit === "km" ? h.distKm : h.distKm * 0.621371;
+        expect(Math.min(nb - 1, Math.floor(v / size))).toBe(bins[rows[i].t]);
+        expect(Number(h.time.slice(0, 2))).toBe(ix.hour[rows[i].t]);
+        expect(Math.min(24, Math.floor(h.dur / 60))).toBe(ix.dur[rows[i].t]);
+      });
+    }
+    expect(natHistRows(rows, null, "km")).toEqual([]);
   });
 });

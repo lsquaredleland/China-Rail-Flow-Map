@@ -12,6 +12,9 @@ export default function AppHeader({
   inTablesReady,
   trainCount,
   calendarSpan,
+  national,
+  isNational,
+  onSetNational,
 }: {
   cur: OriginVM | null;
   viewCur: OriginVM | null;
@@ -27,9 +30,15 @@ export default function AppHeader({
   trainCount: number;
   /** The pack's schedule window, e.g. "23 Oct – 6 Nov" (export packs). */
   calendarSpan: string | undefined;
+  /** National mode: the pack-wide numbers the stat row shows (null while the flows load). */
+  national?: { cities: number | null; maxFlow: number | null } | null;
+  /** National mode is on; `onSetNational` switches between it and the origin view. */
+  isNational: boolean;
+  onSetNational: (on: boolean) => void;
 }) {
   return (
     <header>
+      <div className="head-row">
       <h1>
         <span className="cr-logo-wrap">
           <svg
@@ -47,6 +56,26 @@ export default function AppHeader({
           China Rail Flow Map <span className="zh">· 铁路客流图</span>
         </span>
       </h1>
+      <div className="group units mode-switch" role="group" aria-label="View">
+        <button
+          id="modeOrigin"
+          type="button"
+          aria-pressed={isNational ? "false" : "true"}
+          onClick={() => onSetNational(false)}
+        >
+          Origin City
+        </button>
+        <button
+          id="tglNational"
+          type="button"
+          aria-pressed={isNational ? "true" : "false"}
+          onClick={() => onSetNational(true)}
+          title="Every covered train in China on one 24h clock (beta)"
+        >
+          National Beta
+        </button>
+      </div>
+      </div>
       <p className="subtitle">
         Flow diagram of trains departing and arriving across China&rsquo;s
         top rail cities. The width of each line refers to the number of
@@ -59,6 +88,21 @@ export default function AppHeader({
         total track).
       </p>
       <div className="stats" id="stats">
+        {national && (
+          <>
+            <div>
+              <b>{trainCount ? trainCount.toLocaleString("en-US") : "…"}</b>{" "}
+              <span>trains running{calendarSpan ? " " + calendarSpan : ""}</span>
+            </div>
+            <div>
+              <b>{national.cities ?? "…"}</b> <span>cities connected</span>
+            </div>
+            <div>
+              <b>{national.maxFlow ?? "…"}</b>{" "}
+              <span>trains/day on the busiest corridor</span>
+            </div>
+          </>
+        )}
         {cur &&
           viewCur &&
           (() => {

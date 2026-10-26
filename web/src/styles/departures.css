@@ -288,18 +288,6 @@
 }
 .dep-chip.is-isolated b { margin-left: 4px; color: #FFFFFF; }
 .dep-chip.is-isolated button { color: #FFFFFF; }
-/* National mode: histograms and train-code box in the toolbar's Filters panel */
-.nat-filters { flex: 1 1 100%; min-width: 0; }
-.nat-filters .hist-strip { margin: 6px 0 4px; }
-.nat-filters-loading { font-size: 12px; color: var(--ink-soft); font-style: italic; }
-.nat-code { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.nat-code label { font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; }
-.nat-code input { font: inherit; font-size: 13px; padding: 4px 8px; width: 9em; border: 1.5px solid var(--panel-edge); border-radius: 3px; background: var(--btn-bg); color: var(--ink); }
-.nat-code input[aria-invalid="true"] { border-color: var(--rust); }
-.nat-code-bad { font-size: 12px; color: var(--rust); }
-@media (max-width: 640px) {
-  .nat-code input { min-height: 44px; font-size: 16px; flex: 1 1 auto; }
-}
 /* ---------- run days + national table ---------- */
 .c-runs { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .runs-label { color: var(--ink-soft); }

@@ -18,7 +18,6 @@ import Legend, { type LegendHandle } from "./components/Legend";
 import DestinationPanel from "./components/DestinationPanel";
 import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
-import NationalSection from "./components/NationalSection";
 import TimelineScrubber from "./components/TimelineScrubber";
 import TrainScheduleModal from "./components/TrainScheduleModal";
 import AnimAnnouncer from "./components/AnimAnnouncer";
@@ -27,6 +26,7 @@ import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
 import { IsolationChip, NationalNote, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
+import { useNationalTable } from "./hooks/useNationalTable";
 
 export default function App() {
   const atlasRef = useRef<DecodedAtlas | null>(null);
@@ -109,6 +109,8 @@ export default function App() {
     [selectedClasses, hours, distBins, durBins, selectedTrainCodes, distUnit],
   );
 
+  const natData = useNationalTable(national, atlas, schedulesData, nationalIndex, natFilter);
+
   const selectedTrainVM = useMemo(() => {
     if (!selectedTrainCode || !cur) return null;
     const list = direction === "out" ? cur.deps : cur.arrs;
@@ -158,8 +160,8 @@ export default function App() {
   useEffect(() => {
     if (national) ensureSchedules();
   }, [national, ensureSchedules]);
-  const toggleNational = () => {
-    const v = !national;
+  const setNationalMode = (v: boolean) => {
+    if (v === national) return;
     setNational(v);
     writeNationalParam(v);
   };
@@ -284,6 +286,16 @@ export default function App() {
           inTablesReady={inTablesReady}
           trainCount={atlas ? atlas.data.train_table.length : 0}
           calendarSpan={calendarSpan}
+          isNational={national}
+          onSetNational={setNationalMode}
+          national={
+            national
+              ? {
+                  cities: nationalFlows?.cities ? nationalFlows.cities.idx.length : null,
+                  maxFlow: nationalFlows ? nationalFlows.total.reduce((m, v) => (v > m ? v : m), 0) : null,
+                }
+              : null
+          }
         />
 
         <Toolbar
@@ -310,7 +322,6 @@ export default function App() {
           dark={dark}
           onSetDark={setDark}
           national={national}
-          onToggleNational={toggleNational}
           activeFilterCount={
             selectedClasses.length +
             [filters.hours, filters.distBins, filters.durBins, filters.selectedTrainCodes].filter((a) => a && a.length > 0).length
@@ -437,28 +448,10 @@ export default function App() {
         </div>
       )}
 
-      {national && atlas && (
-        <NationalSection
-          index={nationalIndex}
-          indexFailed={nationalIndexFailed}
-          trainTable={atlas.data.train_table}
-          stationTable={atlas.data.station_table}
-          calendar={atlas.data.calendar}
-          schedules={schedulesData}
-          filter={natFilter}
-          unit={distUnit}
-          onHours={filters.setSelectedHours}
-          onDistBins={filters.setSelectedDistBins}
-          onDurBins={filters.setSelectedDurBins}
-          onTrainCodes={filters.setSelectedTrainCodes}
-          onSelectTrain={setSelectedTrainCode}
-        />
-      )}
-      {!national && (
       <DeparturesTable
-        key={direction}
-        cur={cur}
-        national={national}
+        key={national ? "national" : direction}
+        cur={national ? null : cur}
+        national={natData}
         unit={distUnit}
         direction={direction}
         panelCity={panelCity}
@@ -491,7 +484,6 @@ export default function App() {
         selectedTrainCodes={filters.selectedTrainCodes}
         onSelectTrainCodes={filters.setSelectedTrainCodes}
       />
-      )}
 
       <AnimAnnouncer mapRef={mapRef} national={national} />
 

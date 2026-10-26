@@ -2,6 +2,7 @@ import type { MouseEvent, ReactNode } from "react";
 import type { DecodedAtlas, DistUnit, OriginVM } from "../../types";
 import type { StationCount } from "../../stationBreakdown";
 import type { EmptyProps } from "./EmptyMessage";
+import type { NatSortKey } from "../../lib";
 
 export type SortDir = 1 | -1;
 export type SortKey = "dep" | "dur" | "km" | "runs";
@@ -28,6 +29,8 @@ export interface ModeView {
   total: number;
   showingNote: string;
   tableNode: ReactNode;
+  /** The table node brings its own scroller (the windowed national table). */
+  scrollSelf?: boolean;
 }
 
 /** Everything the mode builders read from the DeparturesTable shell. */
@@ -57,6 +60,8 @@ export interface DepCtx {
   onSelectTrain?: (code: string) => void;
   handleClearChip: () => void;
   emptyProps: EmptyProps;
+  natSort: SortState<NatSortKey>;
+  setNatSort: (f: (s: SortState<NatSortKey>) => SortState<NatSortKey>) => void;
   sort: SortState<SortKey>;
   setSort: (f: (s: SortState<SortKey>) => SortState<SortKey>) => void;
   callSort: SortState<CallSortKey>;
