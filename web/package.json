@@ -8,6 +8,7 @@
     "shots:cmp": "node tools/shots/cmp.mjs",
     "perf": "node tools/perf/national.mjs",
     "perf:origin": "node tools/perf/origin.mjs",
+    "perf:compare": "node tools/perf/compare.mjs",
     "bench": "bun tools/bench/parse.ts"
   },
   "dependencies": {
