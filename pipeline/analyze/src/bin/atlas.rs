@@ -170,6 +170,8 @@ struct AtlasOut {
     /// P2.2 national trains (A): every national train's whole run, after
     /// `national` for the same reason.
     national_trains: NationalTrains,
+    /// Per-train national facts for filtering (section numbering as `national`).
+    national_index: flows::NationalIndex,
     /// Train-export builds only: the export's dates, which each train_table
     /// row's `days` indexes.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2529,11 +2531,11 @@ fn main() {
     // Interned after every other city so existing city_table indices keep
     // their values; a city with no coordinates is not drawable and left out.
     let mut national = national;
+    // over the pack's trains (train_table), the same set as the sections
     let counts = flows::city_counts(
-        trains
+        train_ti
             .iter()
-            .zip(train_cities.iter())
-            .map(|(t, c)| (class_idx(&t.train_class), c.as_slice())),
+            .map(|&ti| (class_idx(&trains[ti].train_class), train_cities[ti].as_slice())),
     );
     let mut rows: Vec<(i64, [u32; 8], [u32; 8])> = Vec::new();
     let mut no_pt = 0usize;
@@ -2578,6 +2580,54 @@ fn main() {
         origins.len()
     );
     stats.insert("city_table".into(), city_table.len() as i64);
+    // ---- per-train national index (see flows::NationalIndex) ----
+    let secs_of: HashMap<usize, &Vec<usize>> =
+        national.train_secs.iter().map(|(ti, v)| (*ti, v)).collect();
+    let mut national_index = flows::NationalIndex::default();
+    for &ti in train_ti.iter() {
+        let (tr, names, cities) = (&trains[ti], &train_names[ti], &train_cities[ti]);
+        let last = tr.stops.len() - 1;
+        national_index.hour.push(flows::hour_bin(&tr.stops[0].depart));
+        national_index
+            .dur
+            .push(flows::dur_bin(travel_time(&tr.stops, 0, last)));
+        let (mut km, mut ok) = (0f64, true);
+        for k in 0..last {
+            if names[k] != names[k + 1] {
+                match leg_km(override_map, &pair_len, tr, &names[k], &names[k + 1]) {
+                    Some(l) => km += l,
+                    None => ok = false,
+                }
+            }
+        }
+        let km = if ok && km > 0.0 {
+            km.round()
+        } else {
+            match (city_pt.get(&cities[0]), city_pt.get(&cities[last])) {
+                (Some(a), Some(b)) => hav_km_ll([a[1], a[0]], [b[1], b[0]]),
+                _ => -1.0,
+            }
+        };
+        let (dk, dm) = flows::dist_bins(km);
+        national_index.dist_km.push(dk);
+        national_index.dist_mi.push(dm);
+        national_index
+            .secs
+            .push(secs_of.get(&ti).map_or(Vec::new(), |v| v.iter().map(|&s| s as u32).collect()));
+        let ids = |f: &dyn Fn(&[String], &str) -> Option<usize>| -> Vec<i64> {
+            let mut v: Vec<i64> = cities
+                .iter()
+                .filter(|c| f(cities, c).is_some())
+                .filter_map(|c| city_idx.get(c).copied())
+                .filter(|i| nc.idx.binary_search(i).is_ok())
+                .collect();
+            v.sort_unstable();
+            v.dedup();
+            v
+        };
+        national_index.dep.push(ids(&flows::departs_from));
+        national_index.arr.push(ids(&flows::arrives_at));
+    }
     let out = AtlasOut {
         build: provenance::build_block(&inp),
         about,
@@ -2593,6 +2643,7 @@ fn main() {
         schedules,
         national,
         national_trains,
+        national_index,
         calendar,
     };
     let txt = serde_json::to_string(&out).unwrap();
