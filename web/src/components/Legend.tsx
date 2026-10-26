@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import type { Palette } from "../types";
-import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, rampColor, stationR, stationZoomK } from "../lib";
+import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, flowUnits, rampColor, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
     the stepped width bar's heights depend on the live zoom ratio. The
@@ -128,7 +128,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         const { steps, samples, k } = scaleRef.current;
         let maxH = 0.5;
         for (let i = 0; i < steps.length; i++) {
-          const h = Math.max(0.5, steps[i] * k * ratio);
+          const h = Math.max(0.5, flowUnits(steps[i]) * k * ratio);
           if (h > maxH) maxH = h;
           const rect = stepRefs.current[i];
           if (rect) {
@@ -221,7 +221,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const circD = stationR(SAMPLES_NOW[SAMPLES_NOW.length - 1]) * 2;
   // Initial geometry at zoom ratio 1 with the band bar shown; the first
   // map draw corrects it (palette + live zoom) before anything is read.
-  const initMaxH = Math.max(0.5, STEPS_NOW[STEPS_NOW.length - 1] * scaleRef.current.k * 1);
+  const initMaxH = Math.max(0.5, flowUnits(STEPS_NOW[STEPS_NOW.length - 1]) * scaleRef.current.k * 1);
   const initBase = TIMESEC_H + 15 + initMaxH;
   const initCbase = initBase + 24 + 8 + circD;
   const initH = Math.round(TIMESEC_H + 15 + initMaxH + 14 + 24 + 8 + circD + 14);
@@ -307,9 +307,9 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
                 <rect
                   key={s}
                   x={4 + i * ((W - 8) / STEPS_NOW.length)}
-                  y={-Math.max(0.5, s * scaleRef.current.k * 1)}
+                  y={-Math.max(0.5, flowUnits(s) * scaleRef.current.k * 1)}
                   width={(W - 8) / STEPS_NOW.length}
-                  height={Math.max(0.5, s * scaleRef.current.k * 1)}
+                  height={Math.max(0.5, flowUnits(s) * scaleRef.current.k * 1)}
                   className="lg-steps"
                   ref={(el) => {
                     stepRefs.current[i] = el;

@@ -365,7 +365,7 @@ export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
     pd = atMemo.pd;
     sections = atMemo.sections;
   }
-  // Width = n * WIDTH_K / fitScale, so the national factor rides on fitScale.
+  // Width = flowUnits(n) * WIDTH_K / fitScale, so the national factor rides on fitScale.
   return { layers: passDataLayers("national", pd, 1, false, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR), sections, updateMs };
 }
 

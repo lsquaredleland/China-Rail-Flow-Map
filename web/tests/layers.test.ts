@@ -1,6 +1,6 @@
 // Deck flow layers: buildPassData / layer props, no GPU.
 import { describe, expect, test } from "bun:test";
-import { WIDTH_K, flowColor, flowPasses, getSelCache, isFerrySection, isTrainShown, newModelCaches, palette, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
+import { WIDTH_K, WIDTH_KNEE, flowColor, flowUnits, flowPasses, getSelCache, isFerrySection, isTrainShown, newModelCaches, palette, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
 import type { SelCache, SelInput } from "../src/lib";
 import type { ModelState } from "../src/lib";
 import { buildPassData, flowPassLayers } from "../src/components/map/deck/layers/flows";
@@ -76,7 +76,16 @@ describe("buildPassData", () => {
     expect(faded.rgba[3]).toBe(255);
   });
 
-  test("layer width = n * WIDTH_K / fitScale, ids per role, pickable only for focus", () => {
+  test("flowUnits: linear to the knee, then √-compressed, continuous and increasing", () => {
+    expect(flowUnits(10)).toBe(10);
+    expect(flowUnits(WIDTH_KNEE)).toBe(WIDTH_KNEE);
+    expect(flowUnits(WIDTH_KNEE + 1e-6)).toBeCloseTo(WIDTH_KNEE, 4);
+    expect(flowUnits(100)).toBeCloseTo(86.49, 2);
+    expect(flowUnits(360)).toBeLessThan(205);
+    for (let n = 1; n < 600; n++) expect(flowUnits(n + 1)).toBeGreaterThan(flowUnits(n));
+  });
+
+  test("layer width = flowUnits(n) * WIDTH_K / fitScale, ids per role, pickable only for focus", () => {
     const passes = flowPasses(st({ panelDest: dest }), newModelCaches());
     expect(passes.map((p) => p.role)).toEqual(["context", "focus"]);
     const layers = flowPassLayers(set, passes, pal, false, 100, 12.5);
@@ -90,7 +99,7 @@ describe("buildPassData", () => {
     expect((proxies[0].props as any).idxToSec).toBe(buildPassData(set, passes[1].items, pal, 1, passes[1].maxN).idxToSec);
     const l: any = flows[1];
     const pdf = buildPassData(set, passes[1].items, pal, 1, passes[1].maxN);
-    expect(l.props.getWidth(undefined, { index: 0 })).toBeCloseTo((pdf.n[0] * WIDTH_K) / 12.5, 9);
+    expect(l.props.getWidth(undefined, { index: 0 })).toBeCloseTo((flowUnits(pdf.n[0]) * WIDTH_K) / 12.5, 9);
     expect(l.props.data).toBe(pdf.data);
   });
 });

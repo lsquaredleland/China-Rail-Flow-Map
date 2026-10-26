@@ -16,6 +16,7 @@ import { PathLayer } from "@deck.gl/layers";
 import type { ActiveTrainVM, ChordVM, DayTimelineVM, DecodedSet, Hit, Palette } from "../../../../types";
 import {
   WIDTH_K,
+  flowUnits,
   activeTimeline,
   animStep,
   chordPlan,
@@ -282,7 +283,7 @@ export interface FlowLayersInput {
 
 const ferryBlue = (dark: boolean) => rgba(dark ? "#38BDF8" : "#0284C7");
 /** Canvas flowWidth in CSS px. */
-const widthPx = (n: number, scale: number, fitScale: number) => Math.max(0.5, n * WIDTH_K * (scale / fitScale));
+const widthPx = (n: number, scale: number, fitScale: number) => Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale));
 
 function flowPassLayer(role: string, pd: PassData, fitScale: number, dark: boolean) {
   return new PathLayer({
@@ -293,7 +294,7 @@ function flowPassLayer(role: string, pd: PassData, fitScale: number, dark: boole
     widthMinPixels: 0.5,
     capRounded: true,
     jointRounded: true,
-    getWidth: (_: unknown, { index }: { index: number }) => (pd.n[index] * WIDTH_K) / fitScale,
+    getWidth: (_: unknown, { index }: { index: number }) => (flowUnits(pd.n[index]) * WIDTH_K) / fitScale,
     getColor: (_: unknown, { index, target }: { index: number; target?: number[] }) => {
       const t = target ?? [0, 0, 0, 0];
       t[0] = pd.rgba[index * 4];
@@ -342,7 +343,7 @@ function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: numbe
     positionFormat: "XY",
     widthUnits: "common",
     widthMinPixels: 0.5,
-    getWidth: (d: DashPiece) => (d.n * WIDTH_K) / fitScale,
+    getWidth: (d: DashPiece) => (flowUnits(d.n) * WIDTH_K) / fitScale,
     getColor: colour,
     capRounded: false,
     jointRounded: true,
@@ -509,7 +510,7 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
       positionFormat: "XY",
       widthUnits: plan.isolated ? "pixels" : "common",
       widthMinPixels: plan.isolated ? 0 : 0.5,
-      getWidth: plan.isolated ? 1.5 : (d: ChordItem) => (d.ch.n * WIDTH_K) / fitScale,
+      getWidth: plan.isolated ? 1.5 : (d: ChordItem) => (flowUnits(d.ch.n) * WIDTH_K) / fitScale,
       getColor: colour,
       capRounded: false,
       jointRounded: true,

@@ -90,12 +90,19 @@ export function palette(dark: boolean): Palette {
 
 /* ---------- scales & formatting ---------- */
 
-// Minard width scale: strictly proportional to trains/day at every zoom —
-// width = k(zoom) * trains, k = 0.08 px per train at national-fit scale,
-// with only a 0.5 px hairline floor so 1-train sections stay visible.
-export const WIDTH_K = 0.08;
+// Width scale: width = k(zoom) * flowUnits(trains/day), k = 0.06 px per
+// unit at national-fit scale, with a 0.5 px hairline floor so 1-train
+// sections stay visible. flowUnits is the train count itself up to
+// WIDTH_KNEE, then grows with its square root (same value and slope at the
+// knee), so the busiest corridors don't swamp the map.
+export const WIDTH_K = 0.06;
+export const WIDTH_KNEE = 40;
+const SQRT_KNEE = Math.sqrt(WIDTH_KNEE);
+export function flowUnits(n: number): number {
+  return n <= WIDTH_KNEE ? n : WIDTH_KNEE + 2 * SQRT_KNEE * (Math.sqrt(n) - SQRT_KNEE);
+}
 export function flowWidth(n: number, scale: number, fitScale: number): number {
-  return Math.max(0.5, n * WIDTH_K * (scale / fitScale));
+  return Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale));
 }
 
 function rgbStr(c: [number, number, number]): string {
