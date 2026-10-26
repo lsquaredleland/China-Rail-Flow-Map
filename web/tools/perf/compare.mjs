@@ -272,7 +272,7 @@ try {
           const mem = await memory(pg, cdp);
           const row = {
             label: LABEL, rep, dpr, throttle: thr, view: name, national: NATIONAL, renderer, frames: FR, sweep: [start, end],
-            W: r.W, H: r.H, DPR: r.DPR, view: r.view, fitScale: r.fitScale, zoomRatio: +(r.view.scale / r.fitScale).toFixed(2),
+            W: r.W, H: r.H, DPR: r.DPR, camera: r.view, fitScale: r.fitScale, zoomRatio: +(r.view.scale / r.fitScale).toFixed(2),
             rafIntervalMs: stat(r.a.iv),
             droppedPct: +((100 * r.a.iv.filter((x) => x > 20).length) / r.a.iv.length).toFixed(1),
             drawJsMs: stat(r.a.dr),

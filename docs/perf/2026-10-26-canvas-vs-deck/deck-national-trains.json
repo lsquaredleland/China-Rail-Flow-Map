@@ -1,0 +1,4606 @@
+{
+ "label": "deck",
+ "base": "http://127.0.0.1:55119",
+ "national": "trains",
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+ "machine": {
+  "cpu": "Apple M4 Max",
+  "cores": 14,
+  "memGB": 36,
+  "platform": "Darwin 25.6.0",
+  "loadavg": [
+   4.52,
+   3.89,
+   3.71
+  ],
+  "node": "v22.23.0"
+ },
+ "browser": "Chrome/155.0.8059.85",
+ "frames": 300,
+ "reps": 3,
+ "dprs": [
+  1,
+  2
+ ],
+ "throttles": [
+  1,
+  4
+ ],
+ "startedAt": "2026-10-26T08:50:18.211Z",
+ "durationS": 458,
+ "rows": [
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 2.12,
+    "p50": 2.1,
+    "p95": 2.6,
+    "max": 3.2
+   },
+   "drawPlusRasterMs": {
+    "mean": 7.28,
+    "p50": 7.6,
+    "p95": 9.4,
+    "max": 13.1
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.97763545505748,
+    "setPropsTime": 0.3999999761581421,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.200000107288361,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 49.90000033378601,
+    "cpuTimePerFrame": 0.8316666722297669,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 90321092,
+    "jsHeapTotal": 92274688,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.97763545505748,
+     "setPropsTime": 0.3999999761581421,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.200000107288361,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 49.90000033378601,
+     "cpuTimePerFrame": 0.8316666722297669,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 59.97763545505748,
+     "setPropsTime": 0.3999999761581421,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.200000107288361,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 49.90000033378601,
+     "cpuTimePerFrame": 0.8316666722297669,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.89,
+    "p50": 1.9,
+    "p95": 2.4,
+    "max": 2.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.32,
+    "p50": 9.9,
+    "p95": 11.9,
+    "max": 20.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.8802395202336,
+    "setPropsTime": 0.2999998927116394,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.199999928474426,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 50.00000023841858,
+    "cpuTimePerFrame": 0.8333333373069763,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90507380,
+    "jsHeapTotal": 92274688,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.8802395202336,
+     "setPropsTime": 0.2999998927116394,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.199999928474426,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 50.00000023841858,
+     "cpuTimePerFrame": 0.8333333373069763,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 59.8802395202336,
+     "setPropsTime": 0.2999998927116394,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.199999928474426,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 50.00000023841858,
+     "cpuTimePerFrame": 0.8333333373069763,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.85,
+    "p50": 1.8,
+    "p95": 2.3,
+    "max": 2.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.43,
+    "p50": 6.5,
+    "p95": 7.4,
+    "max": 11.8
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.7226439901449,
+    "setPropsTime": 0.6000000834465027,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 6.900000035762787,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 54.90000021457672,
+    "cpuTimePerFrame": 0.9150000035762786,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90672912,
+    "jsHeapTotal": 92798976,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.7226439901449,
+     "setPropsTime": 0.6000000834465027,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.900000035762787,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 54.90000021457672,
+     "cpuTimePerFrame": 0.9150000035762786,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 59.7226439901449,
+     "setPropsTime": 0.6000000834465027,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.900000035762787,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 54.90000021457672,
+     "cpuTimePerFrame": 0.9150000035762786,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.46,
+    "p50": 5.2,
+    "p95": 7.4,
+    "max": 9.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 10.12,
+    "p50": 10.5,
+    "p95": 12.3,
+    "max": 15.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.93498577596156,
+    "setPropsTime": 1.8000000715255737,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 11.500000178813934,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 109.90000009536743,
+    "cpuTimePerFrame": 1.8316666682561238,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 90136776,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.93498577596156,
+     "setPropsTime": 1.8000000715255737,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 11.500000178813934,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 109.90000009536743,
+     "cpuTimePerFrame": 1.8316666682561238,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 59.93498577596156,
+     "setPropsTime": 1.8000000715255737,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 11.500000178813934,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 109.90000009536743,
+     "cpuTimePerFrame": 1.8316666682561238,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.04,
+    "p50": 4.9,
+    "p95": 6.4,
+    "max": 8
+   },
+   "drawPlusRasterMs": {
+    "mean": 11.23,
+    "p50": 11.1,
+    "p95": 14.7,
+    "max": 18.4
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.934985779590576,
+    "setPropsTime": 0.10000002384185791,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 19.09999978542328,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 123.00000005960464,
+    "cpuTimePerFrame": 2.050000000993411,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90110352,
+    "jsHeapTotal": 92012544,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.934985779590576,
+     "setPropsTime": 0.10000002384185791,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 19.09999978542328,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 123.00000005960464,
+     "cpuTimePerFrame": 2.050000000993411,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 59.934985779590576,
+     "setPropsTime": 0.10000002384185791,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 19.09999978542328,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 123.00000005960464,
+     "cpuTimePerFrame": 2.050000000993411,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.25,
+    "p50": 5.1,
+    "p95": 6.8,
+    "max": 11.2
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.86,
+    "p50": 8.8,
+    "p95": 10.6,
+    "max": 14
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.95934958986397,
+    "setPropsTime": 0,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 8.699999868869781,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 97.59999972581863,
+    "cpuTimePerFrame": 1.6266666620969772,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90487548,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.95934958986397,
+     "setPropsTime": 0,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.699999868869781,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 97.59999972581863,
+     "cpuTimePerFrame": 1.6266666620969772,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 59.95934958986397,
+     "setPropsTime": 0,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.699999868869781,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 97.59999972581863,
+     "cpuTimePerFrame": 1.6266666620969772,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 2.01,
+    "p50": 2,
+    "p95": 2.4,
+    "max": 3.5
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.13,
+    "p50": 7.5,
+    "p95": 11.5,
+    "max": 26.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.02645233274319,
+    "setPropsTime": 0.3999999165534973,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 8.300000011920929,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 58.999999940395355,
+    "cpuTimePerFrame": 0.9833333323399226,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 89451868,
+    "jsHeapTotal": 92012544,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 60.02645233274319,
+     "setPropsTime": 0.3999999165534973,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.300000011920929,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 58.999999940395355,
+     "cpuTimePerFrame": 0.9833333323399226,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 60.02645233274319,
+     "setPropsTime": 0.3999999165534973,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.300000011920929,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 58.999999940395355,
+     "cpuTimePerFrame": 0.9833333323399226,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.92,
+    "p50": 1.9,
+    "p95": 2.4,
+    "max": 2.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.69,
+    "p50": 8.5,
+    "p95": 12.3,
+    "max": 13.7
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.93498577596156,
+    "setPropsTime": 0.5999999046325684,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 6.300000011920929,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 53.19999998807907,
+    "cpuTimePerFrame": 0.8866666664679845,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 89879352,
+    "jsHeapTotal": 92012544,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.93498577596156,
+     "setPropsTime": 0.5999999046325684,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.300000011920929,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.19999998807907,
+     "cpuTimePerFrame": 0.8866666664679845,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 59.93498577596156,
+     "setPropsTime": 0.5999999046325684,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.300000011920929,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.19999998807907,
+     "cpuTimePerFrame": 0.8866666664679845,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.85,
+    "p50": 1.9,
+    "p95": 2.2,
+    "max": 2.6
+   },
+   "drawPlusRasterMs": {
+    "mean": 7.64,
+    "p50": 8,
+    "p95": 8.9,
+    "max": 11.9
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.79527718730395,
+    "setPropsTime": 0.5000000596046448,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 6.500000178813934,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 52.99999988079071,
+    "cpuTimePerFrame": 0.8833333313465118,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90038000,
+    "jsHeapTotal": 92798976,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.79527718730395,
+     "setPropsTime": 0.5000000596046448,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.500000178813934,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 52.99999988079071,
+     "cpuTimePerFrame": 0.8833333313465118,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 59.79527718730395,
+     "setPropsTime": 0.5000000596046448,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.500000178813934,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 52.99999988079071,
+     "cpuTimePerFrame": 0.8833333313465118,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.32,
+    "p50": 5.2,
+    "p95": 6.8,
+    "max": 8.2
+   },
+   "drawPlusRasterMs": {
+    "mean": 10.23,
+    "p50": 9.7,
+    "p95": 13.9,
+    "max": 16.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.13601283021445,
+    "setPropsTime": 0.5999999642372131,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 13.700000047683716,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 128.9000000357628,
+    "cpuTimePerFrame": 2.1483333339293798,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 90576324,
+    "jsHeapTotal": 92798976,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.13601283021445,
+     "setPropsTime": 0.5999999642372131,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 13.700000047683716,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 128.9000000357628,
+     "cpuTimePerFrame": 2.1483333339293798,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 59.13601283021445,
+     "setPropsTime": 0.5999999642372131,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 13.700000047683716,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 128.9000000357628,
+     "cpuTimePerFrame": 2.1483333339293798,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.28,
+    "p50": 5.1,
+    "p95": 6.7,
+    "max": 10.1
+   },
+   "drawPlusRasterMs": {
+    "mean": 11,
+    "p50": 10.4,
+    "p95": 15.2,
+    "max": 22.8
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 58.46794173232681,
+    "setPropsTime": 1.100000023841858,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 13.500000357627869,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 124.30000013113022,
+    "cpuTimePerFrame": 2.07166666885217,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90764240,
+    "jsHeapTotal": 92012544,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 58.46794173232681,
+     "setPropsTime": 1.100000023841858,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 13.500000357627869,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 124.30000013113022,
+     "cpuTimePerFrame": 2.07166666885217,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 58.46794173232681,
+     "setPropsTime": 1.100000023841858,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 13.500000357627869,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 124.30000013113022,
+     "cpuTimePerFrame": 2.07166666885217,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.23,
+    "p50": 5.1,
+    "p95": 6.6,
+    "max": 11.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.95,
+    "p50": 8.7,
+    "p95": 11.6,
+    "max": 12.9
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.124324874435196,
+    "setPropsTime": 1.3999999165534973,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 13.600000262260437,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 118.39999997615814,
+    "cpuTimePerFrame": 1.973333332935969,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90938368,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 60.124324874435196,
+     "setPropsTime": 1.3999999165534973,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 13.600000262260437,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 118.39999997615814,
+     "cpuTimePerFrame": 1.973333332935969,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 60.124324874435196,
+     "setPropsTime": 1.3999999165534973,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 13.600000262260437,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 118.39999997615814,
+     "cpuTimePerFrame": 1.973333332935969,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.95,
+    "p50": 1.9,
+    "p95": 2.4,
+    "max": 2.7
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.19,
+    "p50": 8.4,
+    "p95": 9.4,
+    "max": 10.8
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.898477157360404,
+    "setPropsTime": 0.3999999761581421,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 8.100000023841858,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 53.99999976158142,
+    "cpuTimePerFrame": 0.899999996026357,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 89445176,
+    "jsHeapTotal": 91226112,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.898477157360404,
+     "setPropsTime": 0.3999999761581421,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.100000023841858,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.99999976158142,
+     "cpuTimePerFrame": 0.899999996026357,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 59.898477157360404,
+     "setPropsTime": 0.3999999761581421,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.100000023841858,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.99999976158142,
+     "cpuTimePerFrame": 0.899999996026357,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.9,
+    "p50": 1.9,
+    "p95": 2.2,
+    "max": 2.7
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.41,
+    "p50": 8.9,
+    "p95": 10.9,
+    "max": 14.2
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.026452336383294,
+    "setPropsTime": 0.3999999165534973,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 6.199999988079071,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 47.499999940395355,
+    "cpuTimePerFrame": 0.7916666656732559,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 89872952,
+    "jsHeapTotal": 91750400,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 60.026452336383294,
+     "setPropsTime": 0.3999999165534973,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.199999988079071,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 47.499999940395355,
+     "cpuTimePerFrame": 0.7916666656732559,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 60.026452336383294,
+     "setPropsTime": 0.3999999165534973,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.199999988079071,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 47.499999940395355,
+     "cpuTimePerFrame": 0.7916666656732559,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.9,
+    "p50": 1.9,
+    "p95": 2.3,
+    "max": 2.5
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.38,
+    "p50": 6.4,
+    "p95": 7.2,
+    "max": 11.6
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.88631749608648,
+    "setPropsTime": 0.30000001192092896,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 8.00000011920929,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 50.70000010728836,
+    "cpuTimePerFrame": 0.8450000017881394,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90032788,
+    "jsHeapTotal": 91750400,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.88631749608648,
+     "setPropsTime": 0.30000001192092896,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.00000011920929,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 50.70000010728836,
+     "cpuTimePerFrame": 0.8450000017881394,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 59.88631749608648,
+     "setPropsTime": 0.30000001192092896,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.00000011920929,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 50.70000010728836,
+     "cpuTimePerFrame": 0.8450000017881394,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.16,
+    "p50": 5,
+    "p95": 6.3,
+    "max": 11.2
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.74,
+    "p50": 9.9,
+    "p95": 12.8,
+    "max": 24.6
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.90455883991089,
+    "setPropsTime": 0.9000000357627869,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 10.999999940395355,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 100.10000020265579,
+    "cpuTimePerFrame": 1.6683333367109299,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 90019208,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 54.7716301528527,
+     "setPropsTime": 0.7999999523162842,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 16.899999618530273,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 112.8999999165535,
+     "cpuTimePerFrame": 1.8816666652758915,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 54.7716301528527,
+     "setPropsTime": 0.7999999523162842,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 16.899999618530273,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 112.8999999165535,
+     "cpuTimePerFrame": 1.8816666652758915,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 4.96,
+    "p50": 4.9,
+    "p95": 5.9,
+    "max": 6.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.8,
+    "p50": 9.2,
+    "p95": 13.2,
+    "max": 16.8
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.08146639511202,
+    "setPropsTime": 1.899999976158142,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 8.5,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 84.89999997615814,
+    "cpuTimePerFrame": 1.4149999996026357,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 89981376,
+    "jsHeapTotal": 92012544,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 60.08146639511202,
+     "setPropsTime": 1.899999976158142,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.5,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 84.89999997615814,
+     "cpuTimePerFrame": 1.4149999996026357,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 60.08146639511202,
+     "setPropsTime": 1.899999976158142,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 8.5,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 84.89999997615814,
+     "cpuTimePerFrame": 1.4149999996026357,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 4.99,
+    "p50": 4.9,
+    "p95": 6.1,
+    "max": 8.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.13,
+    "p50": 8.8,
+    "p95": 11.2,
+    "max": 12.8
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.28405027150163,
+    "setPropsTime": 2,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 12.100000143051147,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 123.39999997615814,
+    "cpuTimePerFrame": 2.0566666662693023,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90354556,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 60.28405027150163,
+     "setPropsTime": 2,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 12.100000143051147,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 123.39999997615814,
+     "cpuTimePerFrame": 2.0566666662693023,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 60.28405027150163,
+     "setPropsTime": 2,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 12.100000143051147,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 123.39999997615814,
+     "cpuTimePerFrame": 2.0566666662693023,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 2.17,
+    "p50": 2.2,
+    "p95": 2.6,
+    "max": 3
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.28,
+    "p50": 7.8,
+    "p95": 11.8,
+    "max": 14.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.10594946879275,
+    "setPropsTime": 0.20000004768371582,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.599999904632568,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 55.500000298023224,
+    "cpuTimePerFrame": 0.9250000049670537,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 89902016,
+    "jsHeapTotal": 93061120,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 60.10594946879275,
+     "setPropsTime": 0.20000004768371582,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.599999904632568,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 55.500000298023224,
+     "cpuTimePerFrame": 0.9250000049670537,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 60.10594946879275,
+     "setPropsTime": 0.20000004768371582,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.599999904632568,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 55.500000298023224,
+     "cpuTimePerFrame": 0.9250000049670537,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.93,
+    "p50": 1.9,
+    "p95": 2.3,
+    "max": 2.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.15,
+    "p50": 8.5,
+    "p95": 13.1,
+    "max": 16.6
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.03256003183186,
+    "setPropsTime": 0.8000000715255737,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.099999666213989,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 54.500000059604645,
+    "cpuTimePerFrame": 0.9083333343267441,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90111736,
+    "jsHeapTotal": 91750400,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 60.03256003183186,
+     "setPropsTime": 0.8000000715255737,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.099999666213989,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 54.500000059604645,
+     "cpuTimePerFrame": 0.9083333343267441,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 60.03256003183186,
+     "setPropsTime": 0.8000000715255737,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.099999666213989,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 54.500000059604645,
+     "cpuTimePerFrame": 0.9083333343267441,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.94,
+    "p50": 1.9,
+    "p95": 2.3,
+    "max": 2.6
+   },
+   "drawPlusRasterMs": {
+    "mean": 7.46,
+    "p50": 7.7,
+    "p95": 8.8,
+    "max": 19.4
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.758938522079944,
+    "setPropsTime": 0.7000001072883606,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.999999761581421,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 51.900000154972076,
+    "cpuTimePerFrame": 0.8650000025828679,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90264044,
+    "jsHeapTotal": 92274688,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.758938522079944,
+     "setPropsTime": 0.7000001072883606,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.999999761581421,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 51.900000154972076,
+     "cpuTimePerFrame": 0.8650000025828679,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 59.758938522079944,
+     "setPropsTime": 0.7000001072883606,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.999999761581421,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 51.900000154972076,
+     "cpuTimePerFrame": 0.8650000025828679,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.45,
+    "p50": 5.4,
+    "p95": 6.8,
+    "max": 8.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 10.14,
+    "p50": 9.7,
+    "p95": 13.9,
+    "max": 16.5
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 58.386937159821876,
+    "setPropsTime": 1.3000000715255737,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 18.399999916553497,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 118.39999985694885,
+    "cpuTimePerFrame": 1.9733333309491476,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 89808028,
+    "jsHeapTotal": 93323264,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 58.386937159821876,
+     "setPropsTime": 1.3000000715255737,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 18.399999916553497,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 118.39999985694885,
+     "cpuTimePerFrame": 1.9733333309491476,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 58.386937159821876,
+     "setPropsTime": 1.3000000715255737,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 18.399999916553497,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 118.39999985694885,
+     "cpuTimePerFrame": 1.9733333309491476,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.03,
+    "p50": 4.9,
+    "p95": 6.1,
+    "max": 7.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 11.11,
+    "p50": 10.5,
+    "p95": 15.4,
+    "max": 19.2
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.32629462041226,
+    "setPropsTime": 1.5,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.299999713897705,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 105.40000003576279,
+    "cpuTimePerFrame": 1.7566666672627131,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 89992136,
+    "jsHeapTotal": 91750400,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.32629462041226,
+     "setPropsTime": 1.5,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.299999713897705,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 105.40000003576279,
+     "cpuTimePerFrame": 1.7566666672627131,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 59.32629462041226,
+     "setPropsTime": 1.5,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.299999713897705,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 105.40000003576279,
+     "cpuTimePerFrame": 1.7566666672627131,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.17,
+    "p50": 5.1,
+    "p95": 6.4,
+    "max": 8.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.31,
+    "p50": 9.7,
+    "p95": 11.2,
+    "max": 12.1
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.8802395202336,
+    "setPropsTime": 0,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 16.400000154972076,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 106.99999988079071,
+    "cpuTimePerFrame": 1.7833333313465118,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90396124,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.8802395202336,
+     "setPropsTime": 0,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 16.400000154972076,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 106.99999988079071,
+     "cpuTimePerFrame": 1.7833333313465118,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 59.8802395202336,
+     "setPropsTime": 0,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 16.400000154972076,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 106.99999988079071,
+     "cpuTimePerFrame": 1.7833333313465118,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.97,
+    "p50": 2,
+    "p95": 2.3,
+    "max": 2.7
+   },
+   "drawPlusRasterMs": {
+    "mean": 7.93,
+    "p50": 8.4,
+    "p95": 9.2,
+    "max": 11.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.60800161577028,
+    "setPropsTime": 1.0000000596046448,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.800000071525574,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 59.20000022649765,
+    "cpuTimePerFrame": 0.9866666704416275,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 90228724,
+    "jsHeapTotal": 92012544,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.60800161577028,
+     "setPropsTime": 1.0000000596046448,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.800000071525574,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 59.20000022649765,
+     "cpuTimePerFrame": 0.9866666704416275,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 59.60800161577028,
+     "setPropsTime": 1.0000000596046448,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.800000071525574,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 59.20000022649765,
+     "cpuTimePerFrame": 0.9866666704416275,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.95,
+    "p50": 1.9,
+    "p95": 2.5,
+    "max": 3.5
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.32,
+    "p50": 9.1,
+    "p95": 11.2,
+    "max": 13.1
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.02034587995931,
+    "setPropsTime": 0.40000003576278687,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 6.899999558925629,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 50.200000047683716,
+    "cpuTimePerFrame": 0.8366666674613953,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90400708,
+    "jsHeapTotal": 92012544,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 60.02034587995931,
+     "setPropsTime": 0.40000003576278687,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.899999558925629,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 50.200000047683716,
+     "cpuTimePerFrame": 0.8366666674613953,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 60.02034587995931,
+     "setPropsTime": 0.40000003576278687,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.899999558925629,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 50.200000047683716,
+     "cpuTimePerFrame": 0.8366666674613953,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.86,
+    "p50": 1.9,
+    "p95": 2.2,
+    "max": 3.6
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.57,
+    "p50": 6.7,
+    "p95": 7.4,
+    "max": 16.8
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.96544364046699,
+    "setPropsTime": 0.5999999642372131,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 7.200000047683716,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 49.50000011920929,
+    "cpuTimePerFrame": 0.8250000019868214,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90564608,
+    "jsHeapTotal": 92274688,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.96544364046699,
+     "setPropsTime": 0.5999999642372131,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.200000047683716,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 49.50000011920929,
+     "cpuTimePerFrame": 0.8250000019868214,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 59.96544364046699,
+     "setPropsTime": 0.5999999642372131,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 7.200000047683716,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 49.50000011920929,
+     "cpuTimePerFrame": 0.8250000019868214,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.08,
+    "p50": 5,
+    "p95": 6.1,
+    "max": 10.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 10.63,
+    "p50": 10.7,
+    "p95": 12.8,
+    "max": 14.5
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.069232336302264,
+    "setPropsTime": 0.9999999403953552,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 13.899999678134918,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 106.70000004768372,
+    "cpuTimePerFrame": 1.7783333341280618,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 90348568,
+    "jsHeapTotal": 92798976,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 53.97987191216834,
+     "setPropsTime": 1.2000000476837158,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 10.499999821186066,
+     "framesRedrawn": 119,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 113.99999988079071,
+     "cpuTimePerFrame": 1.8999999980131785,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 53.97987191216834,
+     "setPropsTime": 1.2000000476837158,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 10.499999821186066,
+     "framesRedrawn": 119,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 113.99999988079071,
+     "cpuTimePerFrame": 1.8999999980131785,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.04,
+    "p50": 5,
+    "p95": 5.9,
+    "max": 7.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 10.24,
+    "p50": 9.8,
+    "p95": 13.7,
+    "max": 17.1
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.25326797458974,
+    "setPropsTime": 1.399999976158142,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 12.400000154972076,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 88.00000035762787,
+    "cpuTimePerFrame": 1.4666666726271311,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90770800,
+    "jsHeapTotal": 92274688,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 60.25326797458974,
+     "setPropsTime": 1.399999976158142,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 12.400000154972076,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 88.00000035762787,
+     "cpuTimePerFrame": 1.4666666726271311,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 60.25326797458974,
+     "setPropsTime": 1.399999976158142,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 12.400000154972076,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 88.00000035762787,
+     "cpuTimePerFrame": 1.4666666726271311,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 1,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 4.99,
+    "p50": 4.9,
+    "p95": 6.1,
+    "max": 8.1
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.41,
+    "p50": 8.6,
+    "p95": 10.1,
+    "max": 16.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.427880744191924,
+    "setPropsTime": 0.9000000953674316,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 14.600000202655792,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 105.799999833107,
+    "cpuTimePerFrame": 1.7633333305517833,
+    "bufferMemory": 2092274,
+    "textureMemory": 3379205,
+    "renderbufferMemory": 0,
+    "gpuMemory": 5471479
+   },
+   "memory": {
+    "jsHeapUsed": 90705560,
+    "jsHeapTotal": 93061120,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     },
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 528,
+      "bytes": 2703360
+     }
+    ],
+    "canvasBytes": 5406720,
+    "deckPre": {
+     "fps": 59.427880744191924,
+     "setPropsTime": 0.9000000953674316,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 14.600000202655792,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 105.799999833107,
+     "cpuTimePerFrame": 1.7633333305517833,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    },
+    "deckPost": {
+     "fps": 59.427880744191924,
+     "setPropsTime": 0.9000000953674316,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 14.600000202655792,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 105.799999833107,
+     "cpuTimePerFrame": 1.7633333305517833,
+     "bufferMemory": 2092274,
+     "textureMemory": 3379205,
+     "renderbufferMemory": 0,
+     "gpuMemory": 5471479
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.88,
+    "p50": 1.9,
+    "p95": 2.2,
+    "max": 2.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.37,
+    "p50": 8.2,
+    "p95": 12,
+    "max": 13.7
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 60.069232336302264,
+    "setPropsTime": 0.30000007152557373,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 6.200000107288361,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 53.799999833106995,
+    "cpuTimePerFrame": 0.8966666638851166,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 90255964,
+    "jsHeapTotal": 93323264,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 60.069232336302264,
+     "setPropsTime": 0.30000007152557373,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.200000107288361,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.799999833106995,
+     "cpuTimePerFrame": 0.8966666638851166,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 60.069232336302264,
+     "setPropsTime": 0.30000007152557373,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.200000107288361,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.799999833106995,
+     "cpuTimePerFrame": 0.8966666638851166,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.87,
+    "p50": 1.9,
+    "p95": 2.2,
+    "max": 2.5
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.12,
+    "p50": 7.6,
+    "p95": 12.6,
+    "max": 16.3
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.86808726534753,
+    "setPropsTime": 0.19999998807907104,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 5.699999988079071,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 53.400000274181366,
+    "cpuTimePerFrame": 0.8900000045696894,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90467540,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.86808726534753,
+     "setPropsTime": 0.19999998807907104,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 5.699999988079071,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.400000274181366,
+     "cpuTimePerFrame": 0.8900000045696894,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 59.86808726534753,
+     "setPropsTime": 0.19999998807907104,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 5.699999988079071,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 53.400000274181366,
+     "cpuTimePerFrame": 0.8900000045696894,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.89,
+    "p50": 1.9,
+    "p95": 2.3,
+    "max": 3.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 7.73,
+    "p50": 8,
+    "p95": 8.8,
+    "max": 11.2
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 59.96544364046699,
+    "setPropsTime": 0.3999999761581421,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 6.399999916553497,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 48.70000010728836,
+    "cpuTimePerFrame": 0.8116666684548061,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90603076,
+    "jsHeapTotal": 93061120,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 59.96544364046699,
+     "setPropsTime": 0.3999999761581421,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.399999916553497,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 48.70000010728836,
+     "cpuTimePerFrame": 0.8116666684548061,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 59.96544364046699,
+     "setPropsTime": 0.3999999761581421,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 6.399999916553497,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 48.70000010728836,
+     "cpuTimePerFrame": 0.8116666684548061,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 31.695000000000007,
+    "tx": -2917.763750000001,
+    "ty": 1176.9410000000003
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 2.29,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.81,
+    "p50": 5.5,
+    "p95": 7.9,
+    "max": 9.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 11.83,
+    "p50": 11.3,
+    "p95": 16.7,
+    "max": 25.9
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 58.04230201672406,
+    "setPropsTime": 2.800000011920929,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 12.700000286102295,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 141.19999992847443,
+    "cpuTimePerFrame": 2.3533333321412404,
+    "bufferMemory": 2092274,
+    "textureMemory": 0,
+    "renderbufferMemory": 0,
+    "gpuMemory": 2092274
+   },
+   "memory": {
+    "jsHeapUsed": 89763540,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 58.04230201672406,
+     "setPropsTime": 2.800000011920929,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 12.700000286102295,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 141.19999992847443,
+     "cpuTimePerFrame": 2.3533333321412404,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    },
+    "deckPost": {
+     "fps": 58.04230201672406,
+     "setPropsTime": 2.800000011920929,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 12.700000286102295,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 141.19999992847443,
+     "cpuTimePerFrame": 2.3533333321412404,
+     "bufferMemory": 2092274,
+     "textureMemory": 0,
+     "renderbufferMemory": 0,
+     "gpuMemory": 2092274
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 13.846844415718838,
+    "tx": -817.2141982539658,
+    "ty": 755.7087582228044
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 1,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.97,
+    "p50": 5.6,
+    "p95": 7.9,
+    "max": 12.5
+   },
+   "drawPlusRasterMs": {
+    "mean": 12.53,
+    "p50": 12.3,
+    "p95": 17.6,
+    "max": 24.5
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 43.26464765015455,
+    "setPropsTime": 5.100000023841858,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 30.000000298023224,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 218.20000034570694,
+    "cpuTimePerFrame": 3.636666672428449,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 89985120,
+    "jsHeapTotal": 91750400,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 43.26464765015455,
+     "setPropsTime": 5.100000023841858,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 30.000000298023224,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 218.20000034570694,
+     "cpuTimePerFrame": 3.636666672428449,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 43.26464765015455,
+     "setPropsTime": 5.100000023841858,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 30.000000298023224,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 218.20000034570694,
+     "cpuTimePerFrame": 3.636666672428449,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  },
+  {
+   "label": "deck",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 138.46844415718837,
+    "tx": -15042.935985243155,
+    "ty": 3466.9001133557667
+   },
+   "national": "trains",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1095,
+    1155
+   ],
+   "W": 1280,
+   "H": 528.25,
+   "DPR": 2,
+   "fitScale": 13.846844415718838,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 5.73,
+    "p50": 5.4,
+    "p95": 8.3,
+    "max": 9.7
+   },
+   "drawPlusRasterMs": {
+    "mean": 11.1,
+    "p50": 11,
+    "p95": 14.1,
+    "max": 16
+   },
+   "natDots": 3601,
+   "natFlows": 0,
+   "deckMetrics": {
+    "fps": 47.18490083038431,
+    "setPropsTime": 3.1000001430511475,
+    "layersCount": 10,
+    "drawLayersCount": 10,
+    "updateLayersCount": 180,
+    "updateAttributesCount": 0,
+    "updateAttributesTime": 19.099999964237213,
+    "framesRedrawn": 120,
+    "pickTime": 0,
+    "pickCount": 0,
+    "pickLayersCount": 0,
+    "gpuTime": 0,
+    "gpuTimePerFrame": 0,
+    "cpuTime": 210.19999980926514,
+    "cpuTimePerFrame": 3.503333330154419,
+    "bufferMemory": 2092274,
+    "textureMemory": 13516805,
+    "renderbufferMemory": 0,
+    "gpuMemory": 15609079
+   },
+   "memory": {
+    "jsHeapUsed": 90132124,
+    "jsHeapTotal": 92536832,
+    "nodes": 1559,
+    "canvases": [
+     {
+      "id": "deckcv",
+      "w": 2560,
+      "h": 1056,
+      "bytes": 10813440
+     },
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1057,
+      "bytes": 10823680
+     }
+    ],
+    "canvasBytes": 21637120,
+    "deckPre": {
+     "fps": 47.18490083038431,
+     "setPropsTime": 3.1000001430511475,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 19.099999964237213,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 210.19999980926514,
+     "cpuTimePerFrame": 3.503333330154419,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    },
+    "deckPost": {
+     "fps": 47.18490083038431,
+     "setPropsTime": 3.1000001430511475,
+     "layersCount": 10,
+     "drawLayersCount": 10,
+     "updateLayersCount": 180,
+     "updateAttributesCount": 0,
+     "updateAttributesTime": 19.099999964237213,
+     "framesRedrawn": 120,
+     "pickTime": 0,
+     "pickCount": 0,
+     "pickLayersCount": 0,
+     "gpuTime": 0,
+     "gpuTimePerFrame": 0,
+     "cpuTime": 210.19999980926514,
+     "cpuTimePerFrame": 3.503333330154419,
+     "bufferMemory": 2092274,
+     "textureMemory": 13516805,
+     "renderbufferMemory": 0,
+     "gpuMemory": 15609079
+    }
+   }
+  }
+ ],
+ "loads": []
+}

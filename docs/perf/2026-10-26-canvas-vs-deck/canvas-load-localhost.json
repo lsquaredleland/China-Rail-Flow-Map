@@ -1,0 +1,1078 @@
+{
+ "label": "canvas",
+ "base": "http://127.0.0.1:55671",
+ "national": null,
+ "renderer": "",
+ "machine": {
+  "cpu": "Apple M4 Max",
+  "cores": 14,
+  "memGB": 36,
+  "platform": "Darwin 25.6.0",
+  "loadavg": [
+   4.73,
+   3.9,
+   3.73
+  ],
+  "node": "v22.23.0"
+ },
+ "browser": "Chrome/155.0.8059.85",
+ "frames": 300,
+ "reps": 3,
+ "dprs": [
+  1,
+  2
+ ],
+ "throttles": [
+  1,
+  4
+ ],
+ "startedAt": "2026-10-26T09:05:54.390Z",
+ "durationS": 66,
+ "rows": [],
+ "loads": [
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 1334,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 760,
+    "loadEvent": 1239,
+    "firstPaint": 716,
+    "firstContentfulPaint": 792,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587240,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 762
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 768
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 777
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 813
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 863
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 98,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 15,
+    "loadEvent": 18,
+    "firstPaint": 36,
+    "firstContentfulPaint": 48,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 33
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 38
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 54
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 86
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 127
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 2003,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 477,
+    "loadEvent": 792,
+    "firstPaint": 316,
+    "firstContentfulPaint": 480,
+    "bytesBeforeReady": 3586940,
+    "bytesTotal": 3587540,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 476
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 482
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 496
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 884
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 617
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 350,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 39,
+    "loadEvent": 67,
+    "firstPaint": 48,
+    "firstContentfulPaint": 80,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 69
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 77
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 107
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 215
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 354
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 891,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 325,
+    "loadEvent": 795,
+    "firstPaint": 292,
+    "firstContentfulPaint": 340,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587240,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 325
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 331
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 341
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 420
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 374
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 100,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 15,
+    "loadEvent": 18,
+    "firstPaint": 56,
+    "firstContentfulPaint": 56,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 35
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 41
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 53
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 86
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 128
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 2313,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 480,
+    "loadEvent": 798,
+    "firstPaint": 340,
+    "firstContentfulPaint": 484,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587540,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 479
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 484
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 504
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 626
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 876
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 362,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 39,
+    "loadEvent": 67,
+    "firstPaint": 36,
+    "firstContentfulPaint": 84,
+    "bytesBeforeReady": 1484496,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 70
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 74
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 120
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 366
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 226
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 1149,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 307,
+    "loadEvent": 1055,
+    "firstPaint": 276,
+    "firstContentfulPaint": 320,
+    "bytesBeforeReady": 3586940,
+    "bytesTotal": 3586940,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 307
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 312
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 323
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 356
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 404
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 88,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 12,
+    "loadEvent": 14,
+    "firstPaint": 24,
+    "firstContentfulPaint": 36,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 27
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 32
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 46
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 115
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 77
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 2285,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 500,
+    "loadEvent": 817,
+    "firstPaint": 348,
+    "firstContentfulPaint": 500,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587540,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 500
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 504
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 523
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 898
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 640
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 366,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 39,
+    "loadEvent": 67,
+    "firstPaint": 52,
+    "firstContentfulPaint": 80,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 69
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 73
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 120
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 218
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 370
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 893,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 319,
+    "loadEvent": 796,
+    "firstPaint": 276,
+    "firstContentfulPaint": 332,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587240,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 320
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 326
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 335
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 418
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 369
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 102,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 15,
+    "loadEvent": 18,
+    "firstPaint": 40,
+    "firstContentfulPaint": 40,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 34
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 40
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 55
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 88
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 128
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 2279,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 485,
+    "loadEvent": 800,
+    "firstPaint": 320,
+    "firstContentfulPaint": 496,
+    "bytesBeforeReady": 3586940,
+    "bytesTotal": 3587540,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 472
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 477
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 520
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 625
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 886
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 359,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 38,
+    "loadEvent": 66,
+    "firstPaint": 36,
+    "firstContentfulPaint": 80,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 69
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 73
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 118
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 364
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 225
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 1060,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 301,
+    "loadEvent": 965,
+    "firstPaint": 256,
+    "firstContentfulPaint": 312,
+    "bytesBeforeReady": 3586940,
+    "bytesTotal": 3586940,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 302
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 307
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 318
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 351
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 398
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 97,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 17,
+    "loadEvent": 20,
+    "firstPaint": 56,
+    "firstContentfulPaint": 56,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 36
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 41
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 53
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 126
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 85
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 2270,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 485,
+    "loadEvent": 804,
+    "firstPaint": 324,
+    "firstContentfulPaint": 496,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587540,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 471
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 477
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 503
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 884
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 632
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 363,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 32,
+    "loadEvent": 64,
+    "firstPaint": 92,
+    "firstContentfulPaint": 92,
+    "bytesBeforeReady": 3125009,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 73
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 82
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 85
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 212
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 344
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 880,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 305,
+    "loadEvent": 781,
+    "firstPaint": 272,
+    "firstContentfulPaint": 320,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587240,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 306
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 311
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 321
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 354
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 403
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 97,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 15,
+    "loadEvent": 18,
+    "firstPaint": 36,
+    "firstContentfulPaint": 48,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 33
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 39
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 51
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 84
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 124
+     }
+    ]
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "net": "localhost",
+   "cold": {
+    "kind": "cold",
+    "mapReadyMs": 2284,
+    "firstFrameMs": null,
+    "docBytes": 113830,
+    "domContentLoaded": 481,
+    "loadEvent": 799,
+    "firstPaint": 324,
+    "firstContentfulPaint": 484,
+    "bytesBeforeReady": 3587240,
+    "bytesTotal": 3587540,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32870,
+      "end": 480
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507806,
+      "end": 486
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527909,
+      "end": 506
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415611,
+      "end": 627
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640813,
+      "end": 877
+     }
+    ]
+   },
+   "warm": {
+    "kind": "warm",
+    "mapReadyMs": 402,
+    "firstFrameMs": null,
+    "docBytes": 300,
+    "domContentLoaded": 41,
+    "loadEvent": 80,
+    "firstPaint": 48,
+    "firstContentfulPaint": 96,
+    "bytesBeforeReady": 1484196,
+    "bytesTotal": 3125609,
+    "jsBytes": 0,
+    "packs": [
+     {
+      "name": "china-outline.3d684211.json.br",
+      "bytes": 32570,
+      "end": 83
+     },
+     {
+      "name": "atlas-v2-shared.4aa8a58e.json.br",
+      "bytes": 507506,
+      "end": 87
+     },
+     {
+      "name": "atlas-v2-out-map.10fcdcbd.json.br",
+      "bytes": 527609,
+      "end": 137
+     },
+     {
+      "name": "atlas-v2-schedules.24581ec1.json.br",
+      "bytes": 415311,
+      "end": 250
+     },
+     {
+      "name": "atlas-v2-out-tables.d5d50a36.json.br",
+      "bytes": 1640513,
+      "end": 406
+     }
+    ]
+   }
+  }
+ ]
+}
