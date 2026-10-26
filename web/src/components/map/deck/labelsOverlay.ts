@@ -3,7 +3,7 @@
    the former Canvas renderer, so placement is unchanged;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
-import { isTrainShown, natCityR, palette, placeLabels, stationT } from "../../../lib";
+import { isTrainShown, nat, natCityR, natState, palette, placeLabels, stationT } from "../../../lib";
 import type { MapCtx } from "../context";
 import { nationalLabelPoints, LABEL_TRAINS_PER_UNIT } from "./layers/national";
 import { glowOf, shownTrains } from "./layers/trains";
@@ -33,9 +33,9 @@ export function drawLabelsOverlay(M: MapCtx) {
   ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
   ctx.clearRect(0, 0, st.W, st.H);
   const national = P.current.national;
-  if (national && (!P.current.showLabels || !st.natCities)) return; // nothing to name
   ctx.textBaseline = "middle";
-  const labels = placeLabels(
+  const nothingToName = national && (!P.current.showLabels || !st.natCities);
+  const labels = nothingToName ? [] : placeLabels(
     national
       ? nationalLabelPoints(P.current.atlas, st.natCities!)
       : st.unlitCities
@@ -80,7 +80,10 @@ export function drawLabelsOverlay(M: MapCtx) {
     ctx.textAlign = align;
     ctx.fillText(text, x, y);
   }
-  if (national) return;
+  if (national) {
+    drawNationalTags(M, ctx);
+    return;
+  }
   drawTrainTags(M, ctx);
   // The origin's diamond; its disc is a deck layer (P1b.3).
   const cx = M.X(cur.o.pt[0]);
@@ -112,24 +115,61 @@ function drawTrainTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
     const px = M.X(tr.lon);
     const py = M.Y(tr.lat);
     if (px < -20 || px > st.W + 20 || py < -20 || py > st.H + 20) continue;
-    const g = glowOf(tr.cls);
-    const glow = `rgb(${g[0]},${g[1]},${g[2]})`;
-    ctx.font = "bold 10px monospace";
-    const tagText = isIsolated ? `${tr.code} · ${tr.progressPct}%` : tr.code;
-    const tagW = ctx.measureText(tagText).width + 8;
-    const tagH = 16;
-    const tagX = px - tagW / 2;
-    const tagY = py - 18;
-    ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
-    ctx.beginPath();
-    ctx.roundRect(tagX, tagY, tagW, tagH, 3);
-    ctx.fill();
-    ctx.strokeStyle = glow;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = "#FFFFFF";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(tagText, px, tagY + tagH / 2);
+    paintTag(ctx, px, py, isIsolated ? `${tr.code} · ${tr.progressPct}%` : tr.code, tr.cls);
+  }
+}
+
+/* The code tag above a dot, in its class colour. */
+function paintTag(ctx: CanvasRenderingContext2D, px: number, py: number, tagText: string, cls: string) {
+  const g = glowOf(cls);
+  const glow = `rgb(${g[0]},${g[1]},${g[2]})`;
+  ctx.font = "bold 10px monospace";
+  const tagW = ctx.measureText(tagText).width + 8;
+  const tagH = 16;
+  const tagX = px - tagW / 2;
+  const tagY = py - 18;
+  ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+  ctx.beginPath();
+  ctx.roundRect(tagX, tagY, tagW, tagH, 3);
+  ctx.fill();
+  ctx.strokeStyle = glow;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(tagText, px, tagY + tagH / 2);
+}
+
+/* National mode: the same tag on the hovered / selected / isolated train's dot
+   (the last frame's dots, `natPick`); the isolated one also shows its progress. */
+function drawNationalTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
+  const { S, P } = M;
+  const st = S.current;
+  const f = st.natPick;
+  const atlas = P.current.atlas;
+  if (!f || !atlas) return;
+  const iso = P.current.isolatedTrainCode;
+  const hov = st.hover && st.hover.kind === "train" ? st.hover.train.code : null;
+  const sel = P.current.selectedTrainCode;
+  if (!iso && !hov && !sel) return;
+  const tt = atlas.data.train_table;
+  for (let i = 0; i < f.count; i++) {
+    const q = f.qOf[i];
+    const row = tt[f.tl.tIdx[q]];
+    if (!row || !(row.code === iso || row.code === hov || row.code === sel)) continue;
+    const px = M.X(f.buf[i * 6]);
+    const py = M.Y(f.buf[i * 6 + 1]);
+    if (px < -20 || px > st.W + 20 || py < -20 || py > st.H + 20) continue;
+    // The dot's distance along the run, for the isolated train's progress.
+    const total = f.tl.total[q];
+    let pct = "";
+    if (row.code === iso && total > 0) {
+      let j = i;
+      while (j > 0 && f.qOf[j - 1] === q) j--;
+      natState(f.tl, q, f.m + 1440 * (Math.ceil((f.tl.start[q] - f.m) / 1440) + (i - j)));
+      pct = ` · ${Math.round((nat.dist / total) * 100)}%`;
+    }
+    paintTag(ctx, px, py, row.code + pct, row.class);
   }
 }

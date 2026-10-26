@@ -26,8 +26,11 @@ import {
   nationalFrame,
   nationalHighlight,
   nationalInfraLayers,
+  nationalIsolated,
+  nationalCorridor,
   nationalKeep,
   nationalLayers,
+  nationalRings,
   nationalTimeline,
   natView,
 } from "./layers/national";
@@ -158,9 +161,19 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     stats.natFlows = 0;
     st.natCities = null;
     st.natCounts = null;
-    // The infrastructure overlay sits under the flows and the circles.
-    if (withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark));
-    if (withFlows && nf && (mode === "flows" || P.current.nationalEntries)) {
+    // An isolated train: only its run and its dot (flows and circles step aside).
+    const isoCode = P.current.isolatedTrainCode;
+    const tlAll = isoCode ? nationalTimeline(atlas, P.current.nationalTrains) : null;
+    const iso = isoCode && tlAll ? nationalIsolated(atlas, tlAll.tl, isoCode) : null;
+    if (iso && tlAll) {
+      layers.push(...nationalCorridor(tlAll.tl, atlas, iso.q));
+      if (!withTrains) {
+        st.natN = st.natRunning = stats.natDots = 0;
+        st.natPick = null;
+        return layers;
+      }
+    }
+    if (!iso && withFlows && nf && (mode === "flows" || P.current.nationalEntries)) {
       // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
       // The entry ticks know only the class, so an index filter draws the day's totals.
       const minute = mode === "both" && !view.indexed ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
@@ -183,7 +196,9 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         stats.natFlowsUpdates++;
       }
     }
-    if (withFlows && nf) {
+    // The infrastructure overlay over the flows (as in the origin view), under the circles.
+    if (!iso && withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark));
+    if (!iso && withFlows && nf) {
       // The city circles ride with the flows (day totals, whatever the clock).
       // With the clock running (flows + trains) the circles grow as the trains stop there.
       const ev = mode === "both" ? natViewEvents(view, nf, P.current.nationalIndex ?? null) : null;
@@ -199,7 +214,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       st.natPick = null;
       return layers;
     }
-    const keep = nationalKeep(built.tl, view.sel);
+    const keep = iso ? iso.keep : nationalKeep(built.tl, view.sel);
     const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep);
     let kept = built.tl.n;
     if (keep) {
@@ -211,7 +226,14 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     stats.natBuildMs = built.ms;
     stats.natDots = f.count;
     st.natPick = { tl: built.tl, count: f.count, buf: f.buf, qOf: f.qOf, m: ((st.animTime % 1440) + 1440) % 1440 };
-    layers.push(...nationalLayers(f, !st.animPlaying));
+    layers.push(...nationalLayers(f, !st.animPlaying, !!iso));
+    layers.push(
+      ...nationalRings(f, built.tl, atlas, {
+        hover: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
+        selected: P.current.selectedTrainCode,
+        isolated: iso ? isoCode : null,
+      }),
+    );
     return layers;
   }
   const set = M.flowsSet();

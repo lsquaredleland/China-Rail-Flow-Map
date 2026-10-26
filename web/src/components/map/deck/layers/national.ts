@@ -32,6 +32,7 @@ import {
   flowUnits,
   buildNational,
   natPositions,
+  natXY,
   natCityCounts,
   natCityEvents,
   natCityEventsAt,
@@ -258,7 +259,7 @@ export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: numb
 /** Tails under dots under dwell rings; new `data` objects every frame, so deck
     re-uploads the pooled buffers. Only the dots are pickable, and only while
     the clock is paused (P2.3 picks them). */
-export function nationalLayers(f: NationalFrame, pickable: boolean): Layer[] {
+export function nationalLayers(f: NationalFrame, pickable: boolean, isolated = false): Layer[] {
   return [
     new TailLayer({
       id: "nat-tails",
@@ -271,7 +272,7 @@ export function nationalLayers(f: NationalFrame, pickable: boolean): Layer[] {
         },
       },
       widthUnits: "pixels",
-      getWidth: 2.5,
+      getWidth: isolated ? 3.5 : 2.5,
       pickable: false,
     }),
     new ScatterplotLayer({
@@ -310,6 +311,104 @@ export function nationalLayers(f: NationalFrame, pickable: boolean): Layer[] {
       getLineWidth: 1.3,
       pickable: false,
     }),
+  ];
+}
+
+/** The origin view's emphasis rings on the hovered / selected / isolated
+    train's dot: white for hover and selection, the class colour (bigger,
+    thicker) for the isolated one. */
+export function nationalRings(
+  f: NationalFrame,
+  tl: NationalTimeline,
+  atlas: DecodedAtlas,
+  codes: { hover: string | null; selected: string | null | undefined; isolated: string | null | undefined },
+): Layer[] {
+  if (!codes.hover && !codes.selected && !codes.isolated) return [];
+  const tt = atlas.data.train_table;
+  const rings: { pos: [number, number]; r: number; w: number; col: [number, number, number, number] }[] = [];
+  for (let i = 0; i < f.count; i++) {
+    const q = f.qOf[i];
+    const code = tt[tl.tIdx[q]]?.code;
+    if (!code || !(code === codes.hover || code === codes.selected || code === codes.isolated)) continue;
+    const iso = code === codes.isolated;
+    const g = GLOW[tl.cls[q]] || GLOW[2];
+    rings.push({
+      pos: [f.buf[i * 6], f.buf[i * 6 + 1]],
+      r: iso ? 9 : 7,
+      w: iso ? 2.5 : 2,
+      col: iso ? [g[0], g[1], g[2], 255] : [255, 255, 255, 255],
+    });
+  }
+  if (!rings.length) return [];
+  return [
+    new ScatterplotLayer({
+      id: "nat-train-rings",
+      data: rings,
+      getPosition: (d: (typeof rings)[number]) => d.pos,
+      getRadius: (d: (typeof rings)[number]) => d.r,
+      getLineWidth: (d: (typeof rings)[number]) => d.w,
+      getLineColor: (d: (typeof rings)[number]) => d.col,
+      radiusUnits: "pixels",
+      lineWidthUnits: "pixels",
+      stroked: true,
+      filled: false,
+      pickable: false,
+      updateTriggers: { getPosition: [f.buf, f.count], getRadius: [f.count] },
+    }),
+  ];
+}
+
+/* ---------- one isolated train ---------- */
+
+/** The timeline row of the train with this code (null if it has no run) and a
+    keep mask holding only it. Memoised per (timeline, code). */
+let isoMemo: { tl: NationalTimeline; code: string; v: { q: number; keep: Uint8Array } | null } | null = null;
+export function nationalIsolated(atlas: DecodedAtlas, tl: NationalTimeline, code: string): { q: number; keep: Uint8Array } | null {
+  if (isoMemo && isoMemo.tl === tl && isoMemo.code === code) return isoMemo.v;
+  const t = atlas.data.train_table.findIndex((r) => r.code === code);
+  let v: { q: number; keep: Uint8Array } | null = null;
+  for (let q = 0; t >= 0 && q < tl.n; q++) {
+    if (tl.tIdx[q] !== t) continue;
+    const keep = new Uint8Array(tl.n);
+    keep[q] = 1;
+    v = { q, keep };
+    break;
+  }
+  isoMemo = { tl, code, v };
+  return v;
+}
+
+/** The isolated train's whole run as a line in its class colour (the origin
+    view's corridor): sampled along the run with natXY. */
+const corridorMemo = new WeakMap<NationalTimeline, Map<number, number[]>>();
+export function nationalCorridor(tl: NationalTimeline, atlas: DecodedAtlas, q: number): Layer[] {
+  let m = corridorMemo.get(tl);
+  if (!m) corridorMemo.set(tl, (m = new Map()));
+  let path = m.get(q);
+  if (!path) {
+    const total = tl.total[q];
+    const n = Math.max(2, Math.min(600, Math.ceil(total / 5)));
+    const o = new Float32Array(4);
+    path = [];
+    for (let i = 0; i <= n; i++) {
+      natXY(tl, atlas, q, (total * i) / n, o, 0);
+      path.push(o[0], o[1]);
+    }
+    m.set(q, path);
+  }
+  const g = GLOW[tl.cls[q]] || GLOW[2];
+  return [
+    new PathLayer<number[]>({
+      id: "nat-corridor",
+      data: [path],
+      getPath: (d: number[]) => d,
+      positionFormat: "XY",
+      widthUnits: "pixels",
+      getWidth: 2.5,
+      getColor: [g[0], g[1], g[2], 255],
+      capRounded: true,
+      jointRounded: true,
+    } as object),
   ];
 }
 
@@ -561,11 +660,12 @@ export function nationalCityLayers(d: NationalCityDots, dark: boolean, hoverIdx 
       lineWidthUnits: "pixels",
       stroked: true,
       filled: true,
+      // The city view's dot colours and edge rule (1.5 px day, 3 px night), thinner on the smallest circles.
       getFillColor: rgba(pal.dot, dark ? 0.4 : 0.35),
-      getLineColor: rgba(pal.dotEdge, 0.9),
-      getLineWidth: 0.8,
+      getLineColor: rgba(pal.dotEdge),
+      getLineWidth: (i: number) => Math.min(dark ? 3 : 1.5, 0.3 * d.r[i]),
       pickable: false,
-      updateTriggers: { getPosition: [d], getRadius: [d] },
+      updateTriggers: { getPosition: [d], getRadius: [d], getLineWidth: [d, dark] },
     }),
   ];
   const rip: Ripple[] = [];
