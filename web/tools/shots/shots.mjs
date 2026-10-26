@@ -135,11 +135,13 @@ for (const dpr of dprs) {
     await pg.goto(`${url}/?theme=light${process.env.SHOTS_QUERY || ""}`, { waitUntil: "networkidle0" });
     await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
     await sleep(3000); // origin fade-in + staged pack loading settle
+    await pg.evaluate(() => document.fonts.ready);
     await settled(pg);
     await run(pg);
     await pg.mouse.move(2, 2);
     await sleep(400);
     await settled(pg);
+    await pg.evaluate(() => document.fonts.ready);
     const file = path.join(outDir, `${name}@${dpr}x.png`);
     await pg.screenshot({ path: file });
     written++;
