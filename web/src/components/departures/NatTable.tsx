@@ -1,4 +1,3 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { DistUnit, RawTrain } from "../../types";
 import { fmtClock, fmtDist, fmtTime } from "../../lib";
 import type { NatRow, NatSortKey } from "../../lib";
@@ -7,21 +6,10 @@ import TrainCell from "./TrainCell";
 import { RunsLabel } from "./RunsCell";
 import { ariaSort, sortArrow } from "./sorting";
 import type { SortState } from "./types";
+import WindowedTable, { NAT_ROW_H } from "./WindowedTable";
 
 /* The national trains table, in the origin table's look. 11k rows are
-   windowed: rows have a fixed height (CSS .nat-table), only the ones in view
-   plus a margin are in the DOM, and two spacer rows stand in for the rest, so
-   the scroller keeps its full height and scrollbar. The rows arrive filtered
-   and sorted. */
-
-export const NAT_ROW_H = 46;
-const OVERSCAN = 8;
-
-export function natWindow(scrollTop: number, viewH: number, n: number): [number, number] {
-  const first = Math.min(n, Math.max(0, Math.floor(scrollTop / NAT_ROW_H) - OVERSCAN));
-  const last = Math.min(n, Math.ceil((scrollTop + viewH) / NAT_ROW_H) + OVERSCAN);
-  return [first, Math.max(first, last)];
-}
+   windowed (WindowedTable). The rows arrive filtered and sorted. */
 
 export default function NatTable({
   list,
@@ -43,26 +31,6 @@ export default function NatTable({
   loaded: boolean;
   onSelectTrain?: (code: string) => void;
 }) {
-  const [scrollTop, setScrollTop] = useState(0);
-  const [viewH, setViewH] = useState(400);
-  const scroller = useRef<HTMLDivElement>(null);
-
-  // A new filter or sort starts from the top.
-  useEffect(() => {
-    if (scroller.current) scroller.current.scrollTop = 0;
-    setScrollTop(0);
-  }, [list]);
-
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const measure = () => setViewH(el.clientHeight || 400);
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  const [first, last] = natWindow(scrollTop, viewH, list.length);
   const th = (k: NatSortKey, label: string, cls?: string) => (
     <th
       scope="col"
@@ -76,8 +44,10 @@ export default function NatTable({
   );
 
   return (
-    <div className="dep-scroll" ref={scroller} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
-      <table id="depTable" className="nat-table">
+    // A new filter or sort starts from the top.
+    <WindowedTable n={list.length} rowH={NAT_ROW_H} cols={7} className="nat-table" resetKey={list}>
+      {(w) => (
+        <>
         <thead>
           <tr>
             {th("code", "Train")}
@@ -104,15 +74,11 @@ export default function NatTable({
             </tr>
           ) : (
             <>
-              {first > 0 && (
-                <tr className="nat-spacer" aria-hidden="true" style={{ height: first * NAT_ROW_H }}>
-                  <td colSpan={7} />
-                </tr>
-              )}
-              {list.slice(first, last).map((r) => {
+              {w.top}
+              {list.slice(w.first, w.last).map((r, k) => {
                 const tr = trainTable[r.t];
                 return (
-                  <tr key={r.t} onClick={onSelectTrain ? () => onSelectTrain(r.code) : undefined}>
+                  <tr key={r.t} {...w.tr(w.first + k)} onClick={onSelectTrain ? () => onSelectTrain(r.code) : undefined}>
                     <td className="c-train">
                       <TrainCell d={{ code: r.code, cls: r.cls }} onClick={onSelectTrain ? () => onSelectTrain(r.code) : undefined} />
                     </td>
@@ -137,15 +103,12 @@ export default function NatTable({
                   </tr>
                 );
               })}
-              {last < list.length && (
-                <tr className="nat-spacer" aria-hidden="true" style={{ height: (list.length - last) * NAT_ROW_H }}>
-                  <td colSpan={7} />
-                </tr>
-              )}
+              {w.bottom}
             </>
           )}
         </tbody>
-      </table>
-    </div>
+        </>
+      )}
+    </WindowedTable>
   );
 }

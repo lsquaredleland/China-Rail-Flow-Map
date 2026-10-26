@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { brotliDecompressSync } from "node:zlib";
 import { buildNatRows, natHistRows, natSelect, selectNatRows, sortNatRows } from "../src/lib";
 import type { NatFilter } from "../src/lib";
-import { natWindow, NAT_ROW_H } from "../src/components/departures/NatTable";
+import { NAT_ROW_H, rowWindow } from "../src/components/departures/WindowedTable";
 import { ASSETS } from "./fixture";
 
 const none: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
@@ -36,11 +36,11 @@ describe("national table", () => {
   });
 
   test("windowing renders a bounded slice", () => {
-    expect(natWindow(0, 400, 11248)[0]).toBe(0);
-    const [a, b] = natWindow(5000 * NAT_ROW_H, 400, 11248);
+    expect(rowWindow(0, 400, 11248, NAT_ROW_H)[0]).toBe(0);
+    const [a, b] = rowWindow(5000 * NAT_ROW_H, 400, 11248, NAT_ROW_H);
     expect(a).toBeGreaterThan(4900);
     expect(b - a).toBeLessThan(40);
-    expect(natWindow(1e9, 400, 10)).toEqual([10, 10]);
+    expect(rowWindow(1e9, 400, 10, NAT_ROW_H)).toEqual([10, 10]);
   });
 
   test.skipIf(!have)("real pack: rows == filtered train count", () => {

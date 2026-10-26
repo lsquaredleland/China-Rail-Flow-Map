@@ -511,7 +511,7 @@ export default function DeparturesTable({
       />
       {overflowsX && <p className="dep-swipe">Swipe sideways for all columns &rarr;</p>}
       <div className="dep-scrollwrap" ref={wrapRef}>
-        {view.scrollSelf ? view.tableNode : <div className="dep-scroll">{view.tableNode}</div>}
+        {view.tableNode}
         <div className="dep-fade" aria-hidden="true"></div>
       </div>
     </section>

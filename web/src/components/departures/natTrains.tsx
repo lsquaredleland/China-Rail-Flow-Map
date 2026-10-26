@@ -51,5 +51,5 @@ export function natTrainsMode(ctx: DepCtx, nat: NatData, list: NatRow[]): ModeVi
       onSelectTrain={onSelectTrain}
     />
   );
-  return { heading, depNote, stations: null, count: total, total, showingNote, tableNode, scrollSelf: true };
+  return { heading, depNote, stations: null, count: total, total, showingNote, tableNode };
 }
