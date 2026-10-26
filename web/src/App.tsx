@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, NatLayer, OriginVM } from "./types";
-import { buildOrigin, fmtCalendarSpan } from "./lib";
+import { buildOrigin } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
@@ -316,8 +316,6 @@ export default function App() {
   }, [timelineOpen]);
 
   const origins = atlas ? atlas.data.origins : [];
-  // The schedule window ("23 Oct – 6 Nov") of a train-export pack.
-  const calendarSpan = atlas ? fmtCalendarSpan(atlas.data.calendar) : undefined;
 
   return (
     <>
@@ -543,7 +541,7 @@ export default function App() {
         {atlas ? atlas.data.about : ""}
       </footer>
 
-      <Footnote cur={cur} direction={direction} />
+      <Footnote />
 
       <TrainScheduleModal
         key={trainOpenSeq}
