@@ -6,10 +6,16 @@ import { launch, resolveBase, parseArgs, sleep } from "./common.mjs";
 
 const { pos } = parseArgs(process.argv.slice(2));
 const { url, close } = await resolveBase(pos[0] || "dist");
-const browser = await launch();
+const browser = await launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
 const fails = [];
 const click = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (e) e.click(); return !!e; }, sel);
-for (const [w, h, expanded] of [[1280, 800, false], [390, 844, false], [1280, 800, true], [390, 844, true]]) {
+for (const [w, h, expanded] of [
+  [1280, 800, false],
+  [390, 844, false],
+  [390, 664, false],
+  [1280, 800, true],
+  [390, 844, true],
+]) {
   const pg = await browser.newPage();
   await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
   await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
