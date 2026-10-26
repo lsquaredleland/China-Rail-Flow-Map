@@ -3,7 +3,7 @@ import type { RefObject } from "react";
 import type { CityPointVM, Direction, DistUnit, OriginVM, RawOrigin } from "../types";
 import { FLOW_CLASSES } from "../lib";
 import CityPicker from "./CityPicker";
-import type { MapApi } from "./MapCanvas";
+import type { MapApi } from "./MapHost";
 
 export default function Toolbar({
   origins,

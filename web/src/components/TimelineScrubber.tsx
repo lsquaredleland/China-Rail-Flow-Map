@@ -5,7 +5,7 @@ import {
   type FC,
   type RefObject,
 } from "react";
-import type { MapApi, AnimState } from "./MapCanvas";
+import type { MapApi, AnimState } from "./MapHost";
 import type { Direction } from "../types";
 
 export interface TimelineScrubberProps {
@@ -91,7 +91,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   const [isNational, setIsNational] = useState(false);
   const currentNationalRef = useRef(false);
 
-  // Subscribe to MapCanvas animation ticks with direct DOM updates (0% React re-render overhead)
+  // Subscribe to MapHost animation ticks with direct DOM updates (0% React re-render overhead)
   useEffect(() => {
     const handleAnimUpdate = (state: AnimState) => {
       const totM = state.totalMins || 1440;

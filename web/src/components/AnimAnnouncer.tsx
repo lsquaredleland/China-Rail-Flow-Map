@@ -4,7 +4,7 @@
    while playing, and on pause or seek (after a short settle, so a dragged
    scrubber says one thing and the map's frame has landed). Origin view: silent. */
 import { useEffect, useRef, type RefObject } from "react";
-import type { MapApi } from "./MapCanvas";
+import type { MapApi } from "./MapHost";
 import { fmtClock } from "../lib";
 
 const ANNOUNCE_GAP_MS = 30000;

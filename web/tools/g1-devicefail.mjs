@@ -1,7 +1,7 @@
 // Driver: deck / luma device creation fails after the page's WebGL2 probe passed (P1c.2 review
 // item (b), fixed in P1c.3). The probe canvas has no id and keeps its context; the deck canvas
 // (#deckcv) gets none, so `onError` fires before the first `onLoad`. Expects the "map renderer
-// could not be loaded" notice (MapCanvas `deckState === "error"`), not a blank map.
+// could not be loaded" notice (MapHost `deckState === "error"`), not a blank map.
 // usage: node tools/g1-devicefail.mjs [base=dist]   (exit 1 when the notice is missing)
 import { launch, parseArgs, resolveBase, sleep } from "./common.mjs";
 

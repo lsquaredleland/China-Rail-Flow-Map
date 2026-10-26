@@ -3,7 +3,7 @@ import type { RefObject } from "react";
 import { local as localStore, session as sessionStore } from "../storage";
 import type { DecodedAtlas, Direction, DistUnit } from "../types";
 import { enName } from "../lib";
-import type { MapApi } from "../components/MapCanvas";
+import type { MapApi } from "../components/MapHost";
 
 /* URL and persisted state: the ?city/lat/lon/z/theme/national query, and the
    direction, unit, infrastructure and theme choices kept in storage. */

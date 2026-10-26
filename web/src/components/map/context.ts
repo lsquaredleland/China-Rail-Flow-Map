@@ -196,7 +196,7 @@ export type MapState = ReturnType<typeof createMapState>;
 
 /* Everything the layer modules share: the latest props (`P`), the engine
    state (`S`), the DOM refs and the camera / view-model helpers. One stable
-   object per MapCanvas, so every layer is a plain function of `(M, ...)`
+   object per MapHost, so every layer is a plain function of `(M, ...)`
    and nothing closes over a stale render. */
 export interface MapCtx {
   P: { current: Props };
@@ -219,15 +219,15 @@ export interface MapCtx {
   activeTrainsAt: (tl: DayTimelineVM, t: number) => ActiveTrainVM[];
   isFilteredView: () => boolean;
   flowsSet: () => DecodedSet | null;
-  /* The single way to request a frame. MapCanvas installs it (the deck host's
+  /* The single way to request a frame. MapHost installs it (the deck host's
      render once mounted); until then it is a no-op. */
   render: () => void;
   /* What every frame ends with: the Legend, the scale bar and the debounced
-     view report. Installed by MapCanvas; the lazily loaded deck host calls it
+     view report. Installed by MapHost; the lazily loaded deck host calls it
      instead of importing map/ modules. */
   frameTail: () => void;
   /* Tells the deck host the canvas size / DPR changed (resize() calls it just
-     before the render() that follows). Installed by MapCanvas. */
+     before the render() that follows). Installed by MapHost. */
   syncRendererSize: () => void;
   /* The deck renderer's handle while it is mounted (the host sets and clears
      it); interaction.ts pick() asks it for GPU candidates. */

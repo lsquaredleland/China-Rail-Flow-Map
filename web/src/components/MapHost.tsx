@@ -35,7 +35,7 @@ function hasWebGL2(): boolean {
    (./map/context), and drawing is imperative: the lazily loaded deck.gl host
    (./map/deck/DeckHost, mounted below) renders one frame per request.
    <canvas id="map"> is the labels overlay and the pointer / wheel target. */
-const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
+const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -320,4 +320,4 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
   );
 });
 
-export default MapCanvas;
+export default MapHost;

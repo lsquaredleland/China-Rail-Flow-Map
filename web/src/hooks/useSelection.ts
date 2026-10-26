@@ -11,7 +11,7 @@ import type {
   SrcVM,
 } from "../types";
 import { FLOW_CLASSES, classIndex, filterOrigin } from "../lib";
-import type { MapApi } from "../components/MapCanvas";
+import type { MapApi } from "../components/MapHost";
 
 /* Selection state: the selected / isolated train, the class + histogram
    filters, and the pinned city panel. */

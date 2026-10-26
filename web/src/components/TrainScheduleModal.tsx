@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { DepVM, ArrVM, DistUnit, RawTrain, SchedulesData } from "../types";
 import { RunsLabel } from "./departures/RunsCell";
-import type { MapApi } from "./MapCanvas";
+import type { MapApi } from "./MapHost";
 import { fmtDurationWords, formatScheduleStops, stationName, tripStatus, unrollStops } from "../lib";
 import type { AlignedStop } from "../lib";
 import { TrainCard, cardBand, type TrainCardState } from "./MapCards";
