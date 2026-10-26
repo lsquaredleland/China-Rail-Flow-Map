@@ -10,7 +10,7 @@ import { createMapCtx } from "./map/context";
 import type { MapApi, Props } from "./map/context";
 import { createMapApi } from "./map/api";
 import { notifyAnimListeners } from "./map/anim";
-import { frameTail, resize, updateScaleBar, zoomAt } from "./map/camera";
+import { fitCountryCalc, frameTail, resize, updateScaleBar, zoomAt } from "./map/camera";
 import { hideTooltip } from "./map/interaction";
 import { endPointer, onPointerDown, onPointerLeave, onPointerMove } from "./map/pointer";
 import { loadDeck } from "./map/deck/load";
@@ -217,6 +217,24 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     );
     return () => cancelAnimationFrame(raf);
   }, [M, props.cur]);
+
+  // Entering national mode fits the country (the flows and city circles are
+  // sized against that fit), unless the view was set by the URL or by the
+  // user; once per entry, when the atlas and the first origin exist.
+  const natFitted = useRef(false);
+  useEffect(() => {
+    if (!props.national) {
+      natFitted.current = false;
+      return;
+    }
+    if (natFitted.current || !props.atlas || !props.cur) return;
+    natFitted.current = true;
+    if (M.S.current.interacted) return;
+    // Later resizes then keep the country fit instead of the opening regional view.
+    M.S.current.initialViewApplied = true;
+    fitCountryCalc(M);
+    M.render();
+  }, [M, props.national, props.atlas, props.cur]);
 
   // Entering / leaving national mode keeps the camera (S.current.view); the
   // national clock is one day, so a day-2 origin time folds into it, and a
