@@ -8,6 +8,7 @@ import {
   DATA_FMT,
   FLOW_CLASSES,
   flowWidth,
+  nationalCityCounts,
   nationalCounts,
   nationalCountsAt,
   nationalFlowPasses,
@@ -55,6 +56,22 @@ describe("national flows", () => {
     const a = nationalCounts(nf, ["G", "S", "Z", "plain"]);
     const b = nationalCounts(nf, ["D", "C", "T", "K"]);
     expect(Array.from(a, (n, s) => n + b[s])).toEqual(total);
+  });
+
+  test("city counts sum the selected class rows; absent without cities", () => {
+    expect(nationalCityCounts(nf, [])).toBeNull();
+    const rows = (a: number[]) => FLOW_CLASSES.map((_, c) => (c === 0 ? a : a.map(() => 0)));
+    const withCities: NationalFlowsPack = {
+      ...nf,
+      cities: { idx: [2, 7], dep: [3, 1], arr: [2, 4], dep_by_class: rows([3, 0]).map((r, c) => (c === 7 ? [0, 1] : r)), arr_by_class: rows([2, 1]).map((r, c) => (c === 4 ? [0, 3] : r)) },
+    };
+    const all = nationalCityCounts(withCities, [])!;
+    expect(Array.from(all.dep)).toEqual([3, 1]);
+    expect(Array.from(all.arr)).toEqual([2, 4]);
+    expect(Array.from(nationalCityCounts(withCities, ["G"])!.arr)).toEqual([2, 1]);
+    // every class selected equals the unfiltered total
+    const every = nationalCityCounts(withCities, [...FLOW_CLASSES])!;
+    expect([Array.from(every.dep), Array.from(every.arr)]).toEqual([[3, 1], [2, 4]]);
   });
 
   test("widths use the origin flows' width scale", () => {

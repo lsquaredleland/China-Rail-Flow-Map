@@ -639,6 +639,42 @@ export interface NationalFlowsPack {
   trains: number;
   total: number[];
   by_class: number[][];
+  /** Per-city national counts; absent in packs built before they existed. */
+  cities?: NationalCities;
+}
+
+/** `atlas-v2-national.json` `cities`: parallel arrays over the cities with
+    a departure or arrival (`idx` = shared `city_table` index, ascending).
+    `dep` / `arr` = distinct trains that stop at the city and run on / stop
+    there after their first stop (an origin's `outbound` / `inbound`); the 8
+    class rows (FLOW_CLASSES order) sum to them. */
+export interface NationalCities {
+  idx: number[];
+  dep: number[];
+  arr: number[];
+  dep_by_class: number[][];
+  arr_by_class: number[][];
+}
+
+/** atlas-v2-national-index.json (optional): per-train facts the national
+    view filters and sums over, every array one row per `shared.train_table`
+    train. `hour` (0-23), `dist_km` / `dist_mi` / `dur` are the origin
+    filters' bin indices over the train's whole run (-1 = unknown). `secs`,
+    `dep`, `arr` = the train's distinct section ids / departure city ids /
+    arrival city ids, each ascending and delta-coded (first id, then gaps).
+    Summing the selected trains' rows gives flows and city counts; all trains
+    selected = `total` / `cities.dep` / `cities.arr`. */
+export interface NationalIndexPack {
+  fmt: number;
+  n_sec: number;
+  n_train: number;
+  hour: number[];
+  dist_km: number[];
+  dist_mi: number[];
+  dur: number[];
+  secs: number[][];
+  dep: number[][];
+  arr: number[][];
 }
 
 /** atlas-v2-national-entries.json (P3.3), as shipped: when each national

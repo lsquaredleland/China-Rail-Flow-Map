@@ -91,6 +91,28 @@ export function nationalCounts(nf: NationalFlowsPack, classes: readonly string[]
   return out;
 }
 
+/** Departures and arrivals per city of `nf.cities` (parallel to its `idx`)
+    under the class filter (as nationalCounts; empty = all classes). Null
+    when the pack has no city counts. */
+export function nationalCityCounts(
+  nf: NationalFlowsPack,
+  classes: readonly string[],
+): { idx: readonly number[]; dep: Uint32Array; arr: Uint32Array } | null {
+  const c = nf.cities;
+  if (!c) return null;
+  if (!classes.length) return { idx: c.idx, dep: Uint32Array.from(c.dep), arr: Uint32Array.from(c.arr) };
+  const dep = new Uint32Array(c.idx.length);
+  const arr = new Uint32Array(c.idx.length);
+  for (const ci of new Set(classes.map(classIndex))) {
+    const [d, a] = [c.dep_by_class[ci], c.arr_by_class[ci]];
+    for (let i = 0; i < dep.length; i++) {
+      dep[i] += d[i];
+      arr[i] += a[i];
+    }
+  }
+  return { idx: c.idx, dep, arr };
+}
+
 /** Stroke width (CSS px) per section, on the origin flows' scale. */
 export function nationalWidths(counts: Uint32Array, scale: number, fitScale: number): Float32Array {
   const w = new Float32Array(counts.length);
