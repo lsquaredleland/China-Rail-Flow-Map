@@ -105,23 +105,20 @@ export function flowWidth(n: number, scale: number, fitScale: number): number {
   return Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale) * zoomWidthScale(scale / fitScale));
 }
 
-// Owner trial (removable): with `?zoomwidth=sqrt`, flow widths grow with the
+// "Zoom clarity" (owner trial, removable): when on, flow widths grow with the
 // zoom only up to ZOOM_WIDTH_KNEE x the national fit, then with its square
-// root, so busy hubs don't balloon when zoomed in. Off by default. To remove:
-// delete this block, its exports and its call sites.
-// The switch is read from the URL on first use rather than set from main.tsx:
-// the lazily loaded deck chunk carries its own copy of this module.
+// root, so busy hubs don't balloon when zoomed in. Off by default; the Toolbar
+// button (or ?zoomwidth=sqrt) turns it on. The switch lives on globalThis
+// because the lazily loaded deck chunk carries its own copy of this module.
+// To remove: delete this block, its exports, its call sites, the Toolbar
+// button and the zoomClarity state in App / MapCanvas.
 export const ZOOM_WIDTH_KNEE = 3;
-let zoomWidthDamped: boolean | null = null;
+const ZOOM_CLARITY_KEY = "__crfmZoomClarity";
 export function setZoomWidthDamped(on: boolean): void {
-  zoomWidthDamped = on;
+  (globalThis as Record<string, unknown>)[ZOOM_CLARITY_KEY] = on;
 }
 function isZoomWidthDamped(): boolean {
-  if (zoomWidthDamped === null) {
-    zoomWidthDamped =
-      typeof location !== "undefined" && new URLSearchParams(location.search).get("zoomwidth") === "sqrt";
-  }
-  return zoomWidthDamped;
+  return (globalThis as Record<string, unknown>)[ZOOM_CLARITY_KEY] === true;
 }
 /** Multiplier on a zoom-proportional width at zoom ratio `r` (scale / fitScale): 1 when off or up to the knee. */
 export function zoomWidthScale(r: number): number {

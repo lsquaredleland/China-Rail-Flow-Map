@@ -24,6 +24,8 @@ export default function Toolbar({
   onToggleLabels,
   showInfra,
   onToggleInfra,
+  zoomClarity,
+  onToggleZoomClarity,
   distUnit,
   onSetDistUnit,
   dark,
@@ -51,6 +53,8 @@ export default function Toolbar({
   onToggleLabels: () => void;
   showInfra: boolean;
   onToggleInfra: () => void;
+  zoomClarity: boolean;
+  onToggleZoomClarity: () => void;
   distUnit: DistUnit;
   onSetDistUnit: (u: DistUnit) => void;
   dark: boolean;
@@ -218,6 +222,15 @@ export default function Toolbar({
           onClick={onToggleInfra}
         >
           Infrastructure
+        </button>
+        <button
+          id="tglZoomClarity"
+          type="button"
+          aria-pressed={zoomClarity ? "true" : "false"}
+          title="When zoomed in past ×3, lines widen more slowly so busy hubs stay readable"
+          onClick={onToggleZoomClarity}
+        >
+          Zoom clarity
         </button>
         <button
           id="btnOut"
