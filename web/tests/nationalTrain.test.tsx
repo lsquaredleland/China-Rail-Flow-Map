@@ -61,7 +61,7 @@ describe("national train modal", () => {
     expect(h).toContain("→");
     expect(h).toContain(`<b>${first.dep}</b>`);
     expect(h).toContain("Isolate on map");
-    expect(h).toContain("Jump to departure");
+    expect(h).toContain("Play from origin");
   });
   test("the isolated train offers to show all again", () => {
     expect(modal(t, { isIsolated: true })).toContain("Show all trains");

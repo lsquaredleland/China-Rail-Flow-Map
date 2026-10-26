@@ -155,7 +155,7 @@ export default function App() {
     national,
   });
 
-  const { isTimelineCollapsed, expandTimeline, collapseTimeline } =
+  const { isTimelineCollapsed, expandTimeline, collapseTimeline, playFrom } =
     useAnimationClock(mapRef, direction, national);
   // The animation is the origin view's: its bar is open while it plays.
   const natTrainsOn = national && !isTimelineCollapsed;
@@ -552,6 +552,7 @@ export default function App() {
         onToggleIsolate={(c) => {
           setIsolatedTrainCode((prev) => (prev === c ? null : c));
         }}
+        onPlayFrom={(mins) => playFrom(national ? ((mins % 1440) + 1440) % 1440 : mins)}
         onJumpToTime={(mins) => {
           // The national clock is one day.
           mapRef.current?.setTime(national ? ((mins % 1440) + 1440) % 1440 : mins);

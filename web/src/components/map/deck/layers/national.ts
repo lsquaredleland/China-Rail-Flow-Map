@@ -56,7 +56,7 @@ import type { PassData } from "./flows";
 import { buildPassData, infraLayers, passDataLayers, recountPassData, wholePath } from "./flows";
 import { rippleRing } from "./stations";
 import type { Ripple } from "./stations";
-import { glowOf } from "./trains";
+import { glowOf, isoDwellRings } from "./trains";
 
 /** Glow colour per NationalTimeline class: 0 G/D/C, 1 Z/T/K/S, 2 other. */
 const GLOW = [glowOf("G"), glowOf("K"), glowOf("")];
@@ -333,6 +333,11 @@ export function nationalRings(
     if (!code || !(code === codes.hover || code === codes.selected || code === codes.isolated)) continue;
     const iso = code === codes.isolated;
     const g = GLOW[tl.cls[q]] || GLOW[2];
+    if (iso && (f.buf[i * 6 + 5] & 16) !== 0) {
+      // Dwelling at a station: the same stop rings as the origin view.
+      rings.push(...isoDwellRings([f.buf[i * 6], f.buf[i * 6 + 1]], g));
+      continue;
+    }
     rings.push({
       pos: [f.buf[i * 6], f.buf[i * 6 + 1]],
       r: iso ? 9 : 7,

@@ -51,7 +51,19 @@ export function shownTrains(
   return out;
 }
 
-interface Disc {
+/** What an isolated train shows while it dwells at a station: its isolation
+    ring fades back and two stop rings, a solid inner and a wide soft outer one,
+    are drawn above it, so the stop reads at the default zoom (not only when
+    zoomed in). Shared by the origin and national views. */
+export function isoDwellRings(pos: [number, number], g: readonly number[]): Disc[] {
+  return [
+    { pos, r: 9, w: 2.5, col: [g[0], g[1], g[2], 90] },
+    { pos, r: 15, w: 3, col: [g[0], g[1], g[2], 255] },
+    { pos, r: 24, w: 2, col: [g[0], g[1], g[2], 120] },
+  ];
+}
+
+export interface Disc {
   pos: [number, number];
   r: number;
   w: number;
@@ -133,7 +145,9 @@ export function buildTrainBuffers(
     if (tr.isDwelling) {
       dwell.push({ pos: [tr.lon, tr.lat], r: iso ? 8.5 : 6.5, w: 1.3, col: [g[0], g[1], g[2], 217] });
     }
-    if (hoveredCode === tr.code || selectedCode === tr.code || iso) {
+    if (iso && tr.isDwelling) {
+      rings.push(...isoDwellRings([tr.lon, tr.lat], g));
+    } else if (hoveredCode === tr.code || selectedCode === tr.code || iso) {
       rings.push({
         pos: [tr.lon, tr.lat],
         r: iso ? 9 : 7,
