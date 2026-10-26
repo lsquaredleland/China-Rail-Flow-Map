@@ -36,9 +36,9 @@ export function useAnimationClock(
 
   const expandTimeline = () => {
     setIsTimelineCollapsed(false);
+    // Turning the animation on sets its start time (anim.ts animStartMins).
     mapRef.current?.setAnimEnabled?.(true);
     mapRef.current?.setSpeed?.(30);
-    mapRef.current?.setTime?.(360);
     mapRef.current?.setPlaying?.(true);
   };
 
