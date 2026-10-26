@@ -58,10 +58,10 @@ describe("national train modal", () => {
     const h = modal(t, { currentTime: 0 });
     expect(h).toContain(first.stZh);
     expect(h).toContain(last.stZh);
-    expect(h).toContain("➔");
-    expect(h).toContain(`Dep ${first.dep}`);
-    expect(h).toContain("Isolate on Map");
-    expect(h).toContain("Jump to dep");
+    expect(h).toContain("→");
+    expect(h).toContain(`<b>${first.dep}</b>`);
+    expect(h).toContain("Isolate on map");
+    expect(h).toContain("Jump to departure");
   });
   test("the isolated train offers to show all again", () => {
     expect(modal(t, { isIsolated: true })).toContain("Show all trains");
@@ -69,13 +69,13 @@ describe("national train modal", () => {
   test("a run past midnight is still en route just after 00:00 (no off-by-a-day)", () => {
     // after midnight, before the run's end: the clock reads small minutes while the run's times are > 1440
     const h = modal(t, { currentTime: 5 });
-    expect(h).toMatch(/En route|Stopped at/);
-    expect(h).not.toContain("Departs " + first.stZh);
+    expect(h).toMatch(/En route|At station/);
+    expect(h).not.toContain("Not yet departed");
   });
   test("outside its run the train waits for the next departure (not 'completed')", () => {
     // one minute before the first departure, wrapped: a day before
     const h = modal(t, { currentTime: first.depMins - 1 });
-    expect(h).toContain("Departs");
+    expect(h).toContain("Not yet departed");
   });
 });
 
