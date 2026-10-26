@@ -16,6 +16,18 @@ import type { MapApi } from "../components/MapCanvas";
 /* Selection state: the selected / isolated train, the class + histogram
    filters, and the pinned city panel. */
 
+/** What a new origin clears: the selected / isolated train and the selected
+    destination belong to the previous origin (filters reset separately). */
+export function clearOriginSelection(s: {
+  setSelectedTrainCode: (c: string | null) => void;
+  setIsolatedTrainCode: (c: string | null) => void;
+  setPanelCity: (c: null) => void;
+}): void {
+  s.setSelectedTrainCode(null);
+  s.setIsolatedTrainCode(null);
+  s.setPanelCity(null);
+}
+
 export function useTrainSelection() {
   const [selectedTrainCode, setSelectedTrainCode] = useState<string | null>(null);
   const [isolatedTrainCode, setIsolatedTrainCode] = useState<string | null>(null);
