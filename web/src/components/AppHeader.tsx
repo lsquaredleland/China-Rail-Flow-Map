@@ -95,10 +95,10 @@ export default function AppHeader({
               <span>trains running{calendarSpan ? " " + calendarSpan : ""}</span>
             </div>
             <div>
-              <b>{national.cities ?? "…"}</b> <span>cities connected</span>
+              <b>{national.cities?.toLocaleString("en-US") ?? "…"}</b> <span>cities connected</span>
             </div>
             <div>
-              <b>{national.maxFlow ?? "…"}</b>{" "}
+              <b>{national.maxFlow?.toLocaleString("en-US") ?? "…"}</b>{" "}
               <span>trains/day on the busiest corridor</span>
             </div>
           </>
