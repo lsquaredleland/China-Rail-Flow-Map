@@ -11,6 +11,7 @@
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
+import type { NatFilter } from "../../../lib";
 import { getSelCache, isTrainShown, palette, stationStates, stationT, viewToViewState } from "../../../lib";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
@@ -25,6 +26,7 @@ import {
   nationalKeep,
   nationalLayers,
   nationalTimeline,
+  natView,
 } from "./layers/national";
 import { shownTrains, trainLayers } from "./layers/trains";
 
@@ -112,6 +114,8 @@ export function dropDepthPickBuffer(picker: PickerInternals | null | undefined):
   };
 }
 
+const NO_FILTER: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
+
 const NOTICE_TEXT = "Map paused — tap to resume";
 
 const GPU_TIME = typeof location !== "undefined" && new URLSearchParams(location.search).get("gputime") === "1";
@@ -146,18 +150,21 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     const withFlows = mode === "flows" || mode === "both";
     const withTrains = mode === "trains" || mode === "both";
     const nf = P.current.nationalFlows;
-    const classes = P.current.nationalClasses ?? [];
+    const filter = P.current.nationalFilter ?? NO_FILTER;
+    const view = natView(atlas, nf ?? null, P.current.nationalIndex ?? null, filter);
     stats.natFlows = 0;
     st.natCities = null;
     if (withFlows && nf && (mode === "flows" || P.current.nationalEntries)) {
       // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
-      const minute = mode === "both" ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
+      // The entry ticks know only the class, so an index filter draws the day's totals.
+      const minute = mode === "both" && !view.indexed ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
       const fl = nationalFlowLayers({
         atlas,
         nf,
         ne: P.current.nationalEntries ?? null,
         minute,
-        classes,
+        classes: filter.classes,
+        view,
         dark: P.current.dark,
         scale: st.view.scale,
         fitScale: st.fitScale,
@@ -171,7 +178,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     }
     if (withFlows && nf) {
       // The city circles ride with the flows (day totals, whatever the clock).
-      st.natCities = nationalCityDots(atlas, nf, classes, stationT(st.view, st.fitScale));
+      st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale));
       if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark));
     }
     const built = withTrains ? nationalTimeline(atlas, P.current.nationalTrains) : null;
@@ -180,7 +187,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       st.natPick = null;
       return layers;
     }
-    const keep = nationalKeep(atlas, built.tl, classes);
+    const keep = nationalKeep(built.tl, view.sel);
     const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep);
     let kept = built.tl.n;
     if (keep) {

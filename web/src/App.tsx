@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, NatLayer, OriginVM } from "./types";
 import { buildOrigin, fmtCalendarSpan } from "./lib";
+import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
   initialNatLayer,
@@ -17,6 +18,7 @@ import Legend, { type LegendHandle } from "./components/Legend";
 import DestinationPanel from "./components/DestinationPanel";
 import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
+import NationalFilters from "./components/NationalFilters";
 import TimelineScrubber from "./components/TimelineScrubber";
 import TrainScheduleModal from "./components/TrainScheduleModal";
 import AnimAnnouncer from "./components/AnimAnnouncer";
@@ -75,6 +77,9 @@ export default function App() {
     nationalFlows,
     nationalEntries,
     nationalFlowsFailed,
+    nationalIndex,
+    nationalIndexFailed,
+    ensureNationalIndex,
     ensureNationalFlows,
     ensureNationalEntries,
   } = useAtlasData({
@@ -96,6 +101,12 @@ export default function App() {
 
   const filters = useFilters(cur, distUnit);
   const { viewCur, selectedClasses, setSelectedClasses, clearFilters } = filters;
+  // National mode's filters: class plus the index-answered ones.
+  const { hours, distBins, durBins, selectedTrainCodes } = filters;
+  const natFilter: NatFilter = useMemo(
+    () => ({ classes: selectedClasses, hours, distBins, durBins, trainCodes: selectedTrainCodes, unit: distUnit }),
+    [selectedClasses, hours, distBins, durBins, selectedTrainCodes, distUnit],
+  );
 
   const selectedTrainVM = useMemo(() => {
     if (!selectedTrainCode || !cur) return null;
@@ -138,6 +149,10 @@ export default function App() {
   useEffect(() => {
     if (national && natTrainsOn) ensureNationalTrains();
   }, [national, natTrainsOn, ensureNationalTrains]);
+  // The per-train index (hour / distance / duration / code filters): national mode only.
+  useEffect(() => {
+    if (national) ensureNationalIndex();
+  }, [national, ensureNationalIndex]);
   const toggleNational = () => {
     const v = !national;
     setNational(v);
@@ -273,6 +288,21 @@ export default function App() {
           onSetDark={setDark}
           national={national}
           onToggleNational={toggleNational}
+          extraFilters={
+            national && atlas ? (
+              <NationalFilters
+                index={nationalIndex}
+                failed={nationalIndexFailed}
+                trainTable={atlas.data.train_table}
+                filter={natFilter}
+                unit={distUnit}
+                onHours={filters.setSelectedHours}
+                onDistBins={filters.setSelectedDistBins}
+                onDurBins={filters.setSelectedDurBins}
+                onTrainCodes={filters.setSelectedTrainCodes}
+              />
+            ) : null
+          }
           activeFilterCount={
             selectedClasses.length +
             [filters.hours, filters.distBins, filters.durBins, filters.selectedTrainCodes].filter((a) => a && a.length > 0).length
@@ -300,7 +330,8 @@ export default function App() {
           nationalLayer={natLayerDrawn}
           nationalFlows={nationalFlows}
           nationalEntries={nationalEntries}
-          nationalClasses={selectedClasses}
+          nationalFilter={natFilter}
+          nationalIndex={nationalIndex}
           onSelectDest={handleSelectDest}
           selectedTrainCode={selectedTrainCode}
           onSelectTrain={setSelectedTrainCode}

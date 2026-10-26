@@ -47,6 +47,9 @@ export const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
 export const NATIONAL_FLOWS_URL = "assets/atlas-v2-national.json";
 // National flow entry ticks (P3.3): fetched only for national Trains + flows.
 export const NATIONAL_ENTRIES_URL = "assets/atlas-v2-national-entries.json";
+// National per-train index (optional): the hour / distance / duration / code
+// filters and their histograms; fetched only when national mode asks for it.
+export const NATIONAL_INDEX_URL = "assets/atlas-v2-national-index.json";
 // National trains (P2.2): every national train's whole run, fetched only on
 // entering national mode, never for the origin view.
 export const NATIONAL_TRAINS_URL = "assets/atlas-v2-national-trains.json";
