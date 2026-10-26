@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import type { Palette } from "../types";
-import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, flowUnits, rampColor, stationR, stationZoomK } from "../lib";
+import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, flowUnits, rampColor, natCityR, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
     the stepped width bar's heights depend on the live zoom ratio. The
@@ -90,8 +90,9 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const national = !!props.national;
   const STEPS_NOW = national ? NAT_STEPS : STEPS;
   const SAMPLES_NOW = national ? NAT_SAMPLES : SAMPLES;
-  const scaleRef = useRef({ steps: STEPS_NOW, samples: SAMPLES_NOW, k: WIDTH_K });
-  scaleRef.current = { steps: STEPS_NOW, samples: SAMPLES_NOW, k: national ? WIDTH_K * NAT_WIDTH_FACTOR : WIDTH_K };
+  const scaleRef = useRef({ steps: STEPS_NOW, samples: SAMPLES_NOW, k: WIDTH_K, nat: national });
+  scaleRef.current = { steps: STEPS_NOW, samples: SAMPLES_NOW, k: national ? WIDTH_K * NAT_WIDTH_FACTOR : WIDTH_K, nat: national };
+  const rOf = (n: number) => (scaleRef.current.nat ? natCityR(n) : stationR(n));
   const [collapsed, setCollapsed] = useState<boolean>(
     () =>
       typeof window !== "undefined" &&
@@ -157,7 +158,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         // with the same spacing; the largest sets the row height.
         let cxp = 6;
         for (let i = 0; i < samples.length; i++) {
-          const r0 = stationR(samples[i]);
+          const r0 = rOf(samples[i]);
           const rr = r0 * stationZoomK(r0, stationT);
           const ccx = cxp + rr;
           circleRefs.current[i]?.setAttribute("cx", String(ccx));
@@ -167,7 +168,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           cxp = ccx + rr + 18;
         }
         const big = samples[samples.length - 1];
-        const circD = stationR(big) * stationZoomK(stationR(big), stationT) * 2;
+        const circD = rOf(big) * stationZoomK(rOf(big), stationT) * 2;
         const cbase = base + 24 + 8 + circD;
         circleHeadRef.current?.setAttribute("y", String(-(8 + circD)));
         if (circleGroupRef.current)
@@ -212,13 +213,13 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   {
     let cxp = 4 + 2;
     for (let i = 0; i < SAMPLES_NOW.length; i++) {
-      const rr = stationR(SAMPLES_NOW[i]);
+      const rr = rOf(SAMPLES_NOW[i]);
       const ccx = cxp + rr;
       circles.push({ cx: ccx, r: rr, label: String(SAMPLES_NOW[i]) });
       cxp = ccx + rr + 18;
     }
   }
-  const circD = stationR(SAMPLES_NOW[SAMPLES_NOW.length - 1]) * 2;
+  const circD = rOf(SAMPLES_NOW[SAMPLES_NOW.length - 1]) * 2;
   // Initial geometry at zoom ratio 1 with the band bar shown; the first
   // map draw corrects it (palette + live zoom) before anything is read.
   const initMaxH = Math.max(0.5, flowUnits(STEPS_NOW[STEPS_NOW.length - 1]) * scaleRef.current.k * 1);

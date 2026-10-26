@@ -174,6 +174,8 @@ function createMapState() {
     natRunning: 0,
     /* The last national frame's dots for picking (CPU scan, P2.3). */
     natPick: null as { tl: NationalTimeline; count: number; buf: Float32Array; qOf: Int32Array; m: number } | null,
+    /* The last national frame's flow counts per section, for hover. */
+    natCounts: null as ArrayLike<number> | null,
     /* The last national frame's city circles, for hover. */
     natCities: null as NationalCityDots | null,
     animPlaying: false,
