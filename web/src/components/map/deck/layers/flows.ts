@@ -583,7 +583,7 @@ function partialPath(set: DecodedSet, s: number, endLon: number, endLat: number,
   return out;
 }
 
-function wholePath(set: DecodedSet, s: number, rev: boolean): number[] {
+export function wholePath(set: DecodedSet, s: number, rev: boolean): number[] {
   const { pts, off, len } = set;
   const o = off[s];
   const out: number[] = [];

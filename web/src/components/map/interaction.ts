@@ -85,7 +85,30 @@ function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
    only. The candidate index is the dot's index; the view-model is built for the
    winner only. */
 function pickNational(M: MapCtx, px: number, py: number): Hit | null {
-  return pickNationalTrain(M, px, py) ?? pickNationalCity(M, px, py);
+  return pickNationalTrain(M, px, py) ?? pickNationalCity(M, px, py) ?? pickNationalFlow(M, px, py);
+}
+
+/* A national flow line near the pointer: the busiest section whose hairline
+   pick proxy is within SEC_RADIUS (the origin view's rule: busier wins). */
+function pickNationalFlow(M: MapCtx, px: number, py: number): Hit | null {
+  const { S, deck } = M;
+  const counts = S.current.natCounts;
+  if (!deck || !counts) return null;
+  const infos = deck.pickRect({
+    x: px - SEC_RADIUS,
+    y: py - SEC_RADIUS,
+    width: 2 * SEC_RADIUS + 1,
+    height: 2 * SEC_RADIUS + 1,
+    layerIds: ["pick-flows-national"],
+  });
+  let best: Hit | null = null;
+  for (const info of infos) {
+    if (!info.layer || info.index < 0) continue;
+    const s = (info.layer.props as unknown as LayerProps).idxToSec?.[info.index];
+    const n = s === undefined ? 0 : counts[s] ?? 0;
+    if (n > 0 && (!best || (best.kind === "seg" && n > best.n))) best = { kind: "seg", s: s!, n };
+  }
+  return best;
 }
 
 /* A city circle under the pointer (the smallest, as it is drawn on top). */

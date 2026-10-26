@@ -17,7 +17,7 @@
    +37 min shift until there are about N. No module state shared with the
    entry bundle (C23): the cache and the pool are private to this chunk. */
 import type { Layer } from "@deck.gl/core";
-import { ScatterplotLayer } from "@deck.gl/layers";
+import { PathLayer, ScatterplotLayer } from "@deck.gl/layers";
 import type {
   DecodedAtlas,
   NationalEntriesPack,
@@ -28,6 +28,8 @@ import type {
 } from "../../../../types";
 import {
   NAT_WIDTH_FACTOR,
+  WIDTH_K,
+  flowUnits,
   buildNational,
   natPositions,
   natCityCounts,
@@ -39,13 +41,13 @@ import {
   nationalFlowPasses,
   palette,
   rgba,
-  stationR,
+  natCityR,
   stationZoomK,
 } from "../../../../lib";
 import type { NatFilter } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
 import type { PassData } from "./flows";
-import { buildPassData, passDataLayers, recountPassData } from "./flows";
+import { buildPassData, passDataLayers, recountPassData, wholePath } from "./flows";
 import { glowOf } from "./trains";
 
 /** Glow colour per NationalTimeline class: 0 G/D/C, 1 Z/T/K/S, 2 other. */
@@ -326,6 +328,8 @@ export interface NationalFlows {
   layers: Layer[];
   /** Sections drawn (count > 0). */
   sections: number;
+  /** Trains per section as drawn (the day's totals, or entered by the clock's minute). */
+  counts: Uint32Array | number[];
   /** ms of this call's count update (B pass build or A+B recount); 0 when cached. */
   updateMs: number;
 }
@@ -333,7 +337,7 @@ export interface NationalFlows {
 /* B's pass per (file, class filter, theme). Its paint order (widest first by
    the day's counts) is also A+B's, so A+B keeps the geometry and recounts. */
 let dayMemo: { nf: NationalFlowsPack; cls: string; dark: boolean; pd: PassData; maxN: number; sections: number } | null = null;
-let atMemo: { day: PassData; ne: NationalEntriesPack; minute: number; pd: PassData; sections: number } | null = null;
+let atMemo: { day: PassData; ne: NationalEntriesPack; minute: number; pd: PassData; sections: number; counts: Uint32Array } | null = null;
 
 /** The national flow layers (under the dots): B draws the day's totals; A+B
     the same paths with each section's trains entered by `minute`, recounted
@@ -353,20 +357,42 @@ export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
   const day = dayMemo;
   let pd = day.pd;
   let sections = day.sections;
+  let drawnCounts: Uint32Array | number[] = view.counts;
   if (minute !== null && ne) {
     if (!atMemo || atMemo.day !== day.pd || atMemo.ne !== ne || atMemo.minute !== minute) {
       const t0 = performance.now();
       const counts = nationalCountsAt(ne, classes, minute);
       let drawn = 0;
       for (let s = 0; s < counts.length; s++) if (counts[s] > 0) drawn++;
-      atMemo = { day: day.pd, ne, minute, pd: recountPassData(day.pd, counts, pal, day.maxN), sections: drawn };
+      atMemo = { day: day.pd, ne, minute, pd: recountPassData(day.pd, counts, pal, day.maxN), sections: drawn, counts };
       updateMs = performance.now() - t0;
     }
     pd = atMemo.pd;
     sections = atMemo.sections;
+    drawnCounts = atMemo.counts;
   }
   // Width = flowUnits(n) * WIDTH_K / fitScale, so the national factor rides on fitScale.
-  return { layers: passDataLayers("national", pd, 1, false, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR), sections, updateMs };
+  return { layers: passDataLayers("national", pd, 1, true, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR), sections, counts: drawnCounts, updateMs };
+}
+
+/** The hovered section's highlight, as the origin view draws it: the whole
+    section a little wider than its flow. */
+export function nationalHighlight(atlas: DecodedAtlas, s: number, n: number, scale: number, fitScale: number, dark: boolean): Layer[] {
+  const hw = Math.max(0.5, flowUnits(n) * WIDTH_K * NAT_WIDTH_FACTOR * (scale / fitScale)) + 1.6;
+  return [
+    new PathLayer<number[]>({
+      id: "nat-seg-highlight",
+      data: [wholePath(atlas.sec, s, false)],
+      getPath: (d: number[]) => d,
+      positionFormat: "XY",
+      widthUnits: "pixels",
+      getWidth: hw,
+      getColor: rgba(palette(dark).flowHi),
+      capRounded: true,
+      jointRounded: true,
+      updateTriggers: { getWidth: hw },
+    } as object),
+  ];
 }
 
 /* ---------- national city circles ---------- */
@@ -394,8 +420,9 @@ export function nationalCityDots(
   let k = 0;
   for (let i = 0; i < c.idx.length; i++) {
     const n = c.dep[i] + c.arr[i];
-    if (n <= 0) continue;
-    const r0 = stationR(n);
+    const pt = atlas.data.city_table[c.idx[i]].pt;
+    if (n <= 0 || (pt[0] === 0 && pt[1] === 0)) continue; // unplaced cities are not drawn
+    const r0 = natCityR(n);
     out.idx.push(c.idx[i]);
     out.pos.push(atlas.data.city_table[c.idx[i]].pt);
     out.dep[k] = c.dep[i];

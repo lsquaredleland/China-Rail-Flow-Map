@@ -30,6 +30,8 @@ export {
   rampColor,
   rgba,
   stationR,
+  NAT_CITY_R_MIN,
+  natCityR,
   stationZoomK,
 } from "./palette";
 export type { PaletteRGBA, RGBA } from "./palette";

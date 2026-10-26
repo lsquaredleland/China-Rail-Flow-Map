@@ -1,12 +1,13 @@
 // National-mode deck layers (P2.2): the frame buffers from natPositions, the
 // layer props, and the ?natSynth load. No GPU.
 import { describe, expect, test } from "bun:test";
-import { DATA_FMT, classIndex, natCityCounts, natPositions, natSelect, natTrainVM, tooltipHtml } from "../src/lib";
+import { DATA_FMT, NAT_WIDTH_FACTOR, NAT_CITY_R_MIN, WIDTH_K, classIndex, flowUnits, natCityCounts, natCityR, natPositions, natSelect, natTrainVM, stationR, tooltipHtml } from "../src/lib";
+import { nationalFlowsPair } from "./fixture";
 import type { NatFilter } from "../src/lib";
 
 const NOF: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
 import type { NationalTrainsData } from "../src/types";
-import { maxDots, nationalCityDots, nationalFrame, nationalKeep, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
+import { maxDots, natView, nationalCityDots, nationalFlowLayers, nationalFrame, nationalHighlight, nationalKeep, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
 import { glowOf } from "../src/components/map/deck/layers/trains";
 import { nationalTrains, pack } from "./fixture";
 
@@ -157,5 +158,43 @@ describe("national city circles", () => {
     expect(html).toContain(c.zh);
     expect(html).toContain("1,234 departures");
     expect(html).toContain("1 arrival");
+  });
+});
+
+describe("national flow picking and circle size", () => {
+  const pair = nationalFlowsPair();
+  const nfReal = pair.flows;
+  const view = natView(atlas, nfReal, null, NOF);
+  const out = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, dark: false, scale: 100, fitScale: 100 });
+  test("the flows come with a hairline pick proxy mapping paths to sections", () => {
+    const pick = out.layers.find((l) => l.id === "pick-flows-national")!;
+    expect(pick).toBeDefined();
+    expect(pick.props.pickable).toBe(true);
+    const idxToSec = (pick.props as unknown as { idxToSec: Int32Array }).idxToSec;
+    expect(idxToSec.length).toBeGreaterThan(0);
+    for (let i = 0; i < idxToSec.length; i++) expect(out.counts[idxToSec[i]]).toBeGreaterThan(0);
+    // widest first: the first path belongs to the busiest section
+    expect(out.counts[idxToSec[0]]).toBe(Math.max(...Array.from(out.counts)));
+  });
+  test("the hover highlight is one wider path on the hovered section", () => {
+    const n = 40;
+    const [h] = nationalHighlight(atlas, 0, n, 100, 100, false);
+    expect(h.id).toBe("nat-seg-highlight");
+    expect(h.props.getWidth).toBeCloseTo(Math.max(0.5, flowUnits(n) * WIDTH_K * NAT_WIDTH_FACTOR) + 1.6, 9);
+  });
+  test("natCityR: ~11 px for the busiest hubs, ~2 px for the smallest, monotone, never above the origin's", () => {
+    expect(natCityR(3000)).toBeGreaterThan(10);
+    expect(natCityR(3000)).toBeLessThan(12);
+    expect(natCityR(2)).toBeLessThanOrEqual(2);
+    expect(natCityR(0)).toBe(NAT_CITY_R_MIN);
+    // well under half the origin radius at the busy end
+    expect(natCityR(2000)).toBeLessThan(stationR(2000) / 2);
+    let prev = 0;
+    for (let n = 0; n <= 20000; n += 25) {
+      const r = natCityR(n);
+      expect(r).toBeGreaterThanOrEqual(prev);
+      expect(r).toBeLessThanOrEqual(stationR(n));
+      prev = r;
+    }
   });
 });
