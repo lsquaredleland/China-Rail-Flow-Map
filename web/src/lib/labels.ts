@@ -38,7 +38,11 @@ export interface PlacedLabel {
 }
 
 export interface LabelOptions {
-  origin: { zh: string; en: string; pt: [number, number] };
+  /** The origin city (always labelled); null in national mode, which has none. */
+  origin: { zh: string; en: string; pt: [number, number] } | null;
+  /** Radius (px, at the national fit) of the circle drawn for a point of `trains`;
+      the origin dots' stationR when omitted. */
+  radius?: (trains: number) => number;
   panelDest: { zh: string; en: string; pt: [number, number]; trains: number } | null;
   /** Destination labels on; off leaves only the origin (and selected city). */
   showDest: boolean;
@@ -138,12 +142,13 @@ export function placeLabels(
     }
     return false;
   }
+  const radius = opts.radius ?? stationR;
   const off = (t: { trains: number }, extra: number) =>
-    stationR(t.trains) * stationZoomK(stationR(t.trains), sk) + extra;
+    radius(t.trains) * stationZoomK(radius(t.trains), sk) + extra;
 
   // The origin first, so its label always wins a spot — and it is the
   // only label drawn while destination labels are toggled off.
-  place(origin, { fs: 13, weight: "700", pad: 5, off: 13, isBoxed: true });
+  if (origin) place(origin, { fs: 13, weight: "700", pad: 5, off: 13, isBoxed: true });
   if (panelDest) {
     place(panelDest, { fs: 12.5, weight: "700", pad: 5, off: off(panelDest, 5), isBoxed: true });
   }

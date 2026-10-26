@@ -3,8 +3,9 @@
    the former Canvas renderer, so placement is unchanged;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
-import { isTrainShown, palette, placeLabels, stationT } from "../../../lib";
+import { isTrainShown, natCityR, palette, placeLabels, stationT } from "../../../lib";
 import type { MapCtx } from "../context";
+import { nationalLabelPoints, LABEL_TRAINS_PER_UNIT } from "./layers/national";
 import { glowOf, shownTrains } from "./layers/trains";
 
 const fontOf = (fs: number, weight: string) =>
@@ -31,10 +32,11 @@ export function drawLabelsOverlay(M: MapCtx) {
   const pal = palette(dark);
   ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
   ctx.clearRect(0, 0, st.W, st.H);
-  if (P.current.national) return; // D13: national mode draws no labels
+  const national = P.current.national;
+  if (national && (!P.current.showLabels || !st.natCities)) return; // nothing to name
   ctx.textBaseline = "middle";
   const labels = placeLabels(
-    points(),
+    national ? nationalLabelPoints(P.current.atlas, st.natCities!) : points(),
     st.view,
     st.W,
     st.H,
@@ -49,7 +51,8 @@ export function drawLabelsOverlay(M: MapCtx) {
       return tw;
     },
     {
-      origin: { zh: cur.o.zh, en: cur.en, pt: cur.o.pt },
+      origin: national ? null : { zh: cur.o.zh, en: cur.en, pt: cur.o.pt },
+      radius: national ? (n) => natCityR(n * LABEL_TRAINS_PER_UNIT) : undefined,
       panelDest: P.current.panelDest ?? null,
       showDest: P.current.showLabels,
       fitScale: st.fitScale,
@@ -73,6 +76,7 @@ export function drawLabelsOverlay(M: MapCtx) {
     ctx.textAlign = align;
     ctx.fillText(text, x, y);
   }
+  if (national) return;
   drawTrainTags(M, ctx);
   // The origin's diamond; its disc is a deck layer (P1b.3).
   const cx = M.X(cur.o.pt[0]);

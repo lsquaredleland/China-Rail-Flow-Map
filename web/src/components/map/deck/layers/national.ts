@@ -42,12 +42,14 @@ import {
   palette,
   rgba,
   natCityR,
+  natCityTier,
   stationZoomK,
 } from "../../../../lib";
-import type { NatFilter } from "../../../../lib";
+import type { CityPointVM } from "../../../../types";
+import type { InfraPass, NatFilter } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
 import type { PassData } from "./flows";
-import { buildPassData, passDataLayers, recountPassData, wholePath } from "./flows";
+import { buildPassData, infraLayers, passDataLayers, recountPassData, wholePath } from "./flows";
 import { glowOf } from "./trains";
 
 /** Glow colour per NationalTimeline class: 0 G/D/C, 1 Z/T/K/S, 2 other. */
@@ -406,38 +408,100 @@ export interface NationalCityDots {
   r: number[];
 }
 
-/** A circle per city sized by departures + arrivals under the class filter,
-    on the origin dots' radius scale and zoom growth (`stationT`). Cities with
-    no trains are left out. Null when the pack carries no `cities`. */
+/* The cities with trains, busiest first (ties by city id), per counts object. */
+const rankMemo = new WeakMap<object, number[]>();
+function ranked(c: { idx: number[]; dep: Uint32Array; arr: Uint32Array }): number[] {
+  let r = rankMemo.get(c);
+  if (!r) {
+    r = [];
+    for (let i = 0; i < c.idx.length; i++) if (c.dep[i] + c.arr[i] > 0) r.push(i);
+    r.sort((a, b) => c.dep[b] + c.arr[b] - (c.dep[a] + c.arr[a]) || c.idx[a] - c.idx[b]);
+    rankMemo.set(c, r);
+  }
+  return r;
+}
+
+/** A circle per city sized by departures + arrivals under the filters, on
+    the radius scale `natCityR` and the origin dots' zoom growth (`stationT`).
+    Only the busiest `natCityTier(.., zoom)` cities are drawn (and so pickable).
+    Cities with no trains are left out. Null when the pack carries no `cities`. */
 export function nationalCityDots(
   atlas: DecodedAtlas,
   nf: NationalFlowsPack,
   c: { idx: number[]; dep: Uint32Array; arr: Uint32Array },
   stationT: number,
+  zoom: number,
 ): NationalCityDots | null {
   if (!nf.cities) return null;
-  const out: NationalCityDots = { idx: [], pos: [], dep: new Uint32Array(c.idx.length), arr: new Uint32Array(c.idx.length), r: [] };
-  let k = 0;
-  for (let i = 0; i < c.idx.length; i++) {
-    const n = c.dep[i] + c.arr[i];
-    const pt = atlas.data.city_table[c.idx[i]].pt;
-    if (n <= 0 || (pt[0] === 0 && pt[1] === 0)) continue; // unplaced cities are not drawn
-    const r0 = natCityR(n);
+  const order = ranked(c);
+  const k = natCityTier(order.length, zoom);
+  const out: NationalCityDots = { idx: [], pos: [], dep: new Uint32Array(k), arr: new Uint32Array(k), r: [] };
+  for (let j = 0; j < k; j++) {
+    const i = order[j];
+    const r0 = natCityR(c.dep[i] + c.arr[i]);
     out.idx.push(c.idx[i]);
     out.pos.push(atlas.data.city_table[c.idx[i]].pt);
-    out.dep[k] = c.dep[i];
-    out.arr[k] = c.arr[i];
+    out.dep[j] = c.dep[i];
+    out.arr[j] = c.arr[i];
     out.r.push(r0 * stationZoomK(r0, stationT));
-    k++;
   }
   return out;
 }
 
-/** The city circles, biggest first so small ones stay on top. */
-export function nationalCityLayers(d: NationalCityDots, dark: boolean): Layer[] {
+/** The label layout was tuned on an origin's per-city train counts (size
+    tiers at 50 / 20 / 5 trains); a national city's departures + arrivals are
+    about this many times larger, so labels see its count divided by this. */
+export const LABEL_TRAINS_PER_UNIT = 10;
+
+/** The drawn cities as label candidates, busiest first (same tiering as the
+    circles, so only visible cities are named). Memoised per circle set. */
+const labelMemo = new WeakMap<NationalCityDots, CityPointVM[]>();
+export function nationalLabelPoints(atlas: DecodedAtlas | null | undefined, d: NationalCityDots): CityPointVM[] {
+  let pts = labelMemo.get(d);
+  if (!pts && atlas) {
+    pts = d.idx.map((idx, i) => {
+      const c = atlas.data.city_table[idx];
+      return {
+        idx,
+        zh: c.zh,
+        en: c.en,
+        pt: c.pt,
+        trains: Math.round((d.dep[i] + d.arr[i]) / LABEL_TRAINS_PER_UNIT),
+        fast: 0,
+        endpoint: 0,
+        fastest: 0,
+        median: 0,
+        crow: 0,
+        rail: -1,
+        nn: 0,
+      };
+    });
+    labelMemo.set(d, pts);
+  }
+  return pts ?? [];
+}
+
+/** The infrastructure overlay for the sections the national flows draw
+    (those with trains under the filters), memoised per counts array. */
+const infraMemo = new WeakMap<object, InfraPass[]>();
+export function nationalInfraLayers(atlas: DecodedAtlas, counts: ArrayLike<number>, dark: boolean): Layer[] {
+  let passes = infraMemo.get(counts);
+  if (!passes) {
+    const sections: { s: number }[] = [];
+    for (let s = 0; s < counts.length; s++) if (counts[s] > 0) sections.push({ s });
+    passes = [{ alpha: 1, sections: sections as InfraPass["sections"] }];
+    infraMemo.set(counts, passes);
+  }
+  return infraLayers(atlas.sec, passes, palette(dark), dark);
+}
+
+/** The city circles, biggest first so small ones stay on top: a translucent
+    fill (so the flows show through) and a thin stroke; the hovered city
+    (`hoverIdx`, a `city_table` index) is opaque with a ring. */
+export function nationalCityLayers(d: NationalCityDots, dark: boolean, hoverIdx = -1): Layer[] {
   const pal = palette(dark);
   const order = d.idx.map((_, i) => i).sort((a, b) => d.r[b] - d.r[a]);
-  return [
+  const layers: Layer[] = [
     new ScatterplotLayer<number>({
       id: "nat-cities",
       data: order,
@@ -447,11 +511,32 @@ export function nationalCityLayers(d: NationalCityDots, dark: boolean): Layer[] 
       lineWidthUnits: "pixels",
       stroked: true,
       filled: true,
-      getFillColor: rgba(pal.dot, 0.85),
-      getLineColor: rgba(pal.dotEdge),
-      getLineWidth: dark ? 2 : 1.2,
+      getFillColor: rgba(pal.dot, dark ? 0.4 : 0.35),
+      getLineColor: rgba(pal.dotEdge, 0.9),
+      getLineWidth: 0.8,
       pickable: false,
       updateTriggers: { getPosition: [d], getRadius: [d] },
     }),
   ];
+  const h = hoverIdx >= 0 ? d.idx.indexOf(hoverIdx) : -1;
+  if (h >= 0) {
+    layers.push(
+      new ScatterplotLayer<number>({
+        id: "nat-city-hover",
+        data: [h],
+        getPosition: (i: number) => d.pos[i],
+        getRadius: (i: number) => d.r[i],
+        radiusUnits: "pixels",
+        lineWidthUnits: "pixels",
+        stroked: true,
+        filled: true,
+        getFillColor: rgba(pal.dot, 1),
+        getLineColor: rgba(pal.dotEdge),
+        getLineWidth: 2,
+        pickable: false,
+        updateTriggers: { getPosition: [d], getRadius: [d] },
+      }),
+    );
+  }
+  return layers;
 }

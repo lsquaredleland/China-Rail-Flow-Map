@@ -1,13 +1,14 @@
 // National-mode deck layers (P2.2): the frame buffers from natPositions, the
 // layer props, and the ?natSynth load. No GPU.
 import { describe, expect, test } from "bun:test";
-import { DATA_FMT, NAT_WIDTH_FACTOR, NAT_CITY_R_MIN, WIDTH_K, classIndex, flowUnits, natCityCounts, natCityR, natPositions, natSelect, natTrainVM, stationR, tooltipHtml } from "../src/lib";
+import { pickNationalCity } from "../src/components/map/interaction";
+import { DATA_FMT, NAT_CITY_ALL_ZOOM, NAT_CITY_TOP, NAT_WIDTH_FACTOR, natCityTier, placeLabels, NAT_CITY_R_MIN, WIDTH_K, classIndex, flowUnits, natCityCounts, natCityR, natPositions, natSelect, natTrainVM, stationR, tooltipHtml } from "../src/lib";
 import { nationalFlowsPair } from "./fixture";
 import type { NatFilter } from "../src/lib";
 
 const NOF: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
 import type { NationalTrainsData } from "../src/types";
-import { maxDots, natView, nationalCityDots, nationalFlowLayers, nationalFrame, nationalHighlight, nationalKeep, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
+import { LABEL_TRAINS_PER_UNIT, maxDots, natView, nationalCityDots, nationalInfraLayers, nationalLabelPoints, nationalFlowLayers, nationalFrame, nationalHighlight, nationalKeep, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
 import { glowOf } from "../src/components/map/deck/layers/trains";
 import { nationalTrains, pack } from "./fixture";
 
@@ -139,18 +140,18 @@ describe("national city circles", () => {
     },
   };
   test("a pack without cities draws none", () => {
-    expect(nationalCityDots(atlas, { ...nf, cities: undefined }, natCityCounts(nf, null, { ...NOF, classes: [] }, null), 0)).toBeNull();
+    expect(nationalCityDots(atlas, { ...nf, cities: undefined }, natCityCounts(nf, null, { ...NOF, classes: [] }, null), 0, 4)).toBeNull();
   });
   test("radius from departures + arrivals, empty cities left out, class filter applied", () => {
-    const d = nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: [] }, null), 0)!;
+    const d = nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: [] }, null), 0, 4)!;
     expect(d.idx).toEqual([0]);
     expect([d.dep[0], d.arr[0]]).toEqual([100, 50]);
     expect(d.pos[0]).toEqual(atlas.data.city_table[0].pt);
-    const g = nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: ["G"] }, null), 0)!;
+    const g = nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: ["G"] }, null), 0, 4)!;
     expect([g.dep[0], g.arr[0]]).toEqual([100, 20]);
     expect(g.r[0]).toBeLessThan(d.r[0]);
-    expect(nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: ["D"] }, null), 0)!.idx).toEqual([0]);
-    expect(nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: ["C"] }, null), 0)!.idx).toEqual([]);
+    expect(nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: ["D"] }, null), 0, 4)!.idx).toEqual([0]);
+    expect(nationalCityDots(atlas, nf, natCityCounts(nf, null, { ...NOF, classes: ["C"] }, null), 0, 4)!.idx).toEqual([]);
   });
   test("tooltip: city name, departures and arrivals", () => {
     const html = tooltipHtml({ kind: "natCity", idx: 0, dep: 1234, arr: 1 }, { data: atlas.data } as never);
@@ -196,5 +197,75 @@ describe("national flow picking and circle size", () => {
       expect(r).toBeLessThanOrEqual(stationR(n));
       prev = r;
     }
+  });
+});
+
+describe("national city tiers, labels and infrastructure", () => {
+  const n = atlas.data.city_table.length;
+  const idx = Array.from({ length: n }, (_, i) => i);
+  // city i has (i + 1) departures and none arriving: strictly ranked, all with trains
+  const counts = { idx, dep: Uint32Array.from(idx, (i) => i + 1), arr: new Uint32Array(n) };
+  const nf = { fmt: DATA_FMT, trains: 0, total: [], by_class: [], cities: { idx, dep: [], arr: [], dep_by_class: [], arr_by_class: [] } };
+  const shown = (zoom: number) => nationalCityDots(atlas, nf, counts, 0, zoom)!;
+
+  test("tier: the top 120 at the fit, monotone in zoom, every city by x4", () => {
+    expect(natCityTier(1894, 1)).toBe(NAT_CITY_TOP);
+    expect(natCityTier(1894, 0.5)).toBe(NAT_CITY_TOP);
+    let prev = 0;
+    for (let z = 1; z <= 6; z += 0.05) {
+      const k = natCityTier(1894, z);
+      expect(k).toBeGreaterThanOrEqual(prev);
+      prev = k;
+    }
+    expect(natCityTier(1894, NAT_CITY_ALL_ZOOM)).toBe(1894);
+    expect(natCityTier(1894, 9)).toBe(1894);
+    expect(natCityTier(80, 1)).toBe(80); // fewer cities than the top: all of them
+  });
+  test("the circles are the busiest cities, nested as the zoom grows", () => {
+    const a = shown(1), b = shown(2), c = shown(NAT_CITY_ALL_ZOOM);
+    expect(a.idx.length).toBe(Math.min(n, NAT_CITY_TOP));
+    expect(c.idx.length).toBe(n);
+    expect(a.idx[0]).toBe(n - 1); // the busiest first
+    expect(a.idx.every((i) => b.idx.includes(i))).toBe(true);
+    expect(b.idx.every((i) => c.idx.includes(i))).toBe(true);
+    // the smallest drawn at the fit is busier than every hidden city
+    expect(Math.min(...a.idx)).toBeGreaterThan(n - 1 - a.idx.length);
+  });
+  test("picking ignores circles that are not drawn", () => {
+    const d = shown(1);
+    const hidden = 0; // the least busy city
+    expect(d.idx.includes(hidden)).toBe(false);
+    const at = (i: number) => atlas.data.city_table[i].pt;
+    const M = {
+      S: { current: { natCities: d } },
+      X: (lon: number) => lon * 10,
+      Y: (lat: number) => -lat * 10,
+    } as never;
+    const over = (i: number) => pickNationalCity(M, at(i)[0] * 10, -at(i)[1] * 10);
+    const vis = d.idx[0];
+    expect(over(vis)).toMatchObject({ kind: "natCity", idx: expect.any(Number) });
+    // wherever the hidden city is, no hit names it
+    const h = over(hidden);
+    expect(h === null || (h.kind === "natCity" && h.idx !== hidden)).toBe(true);
+  });
+  test("labels name only the drawn cities, and only when asked for", () => {
+    const d = shown(1);
+    const pts = nationalLabelPoints(atlas, d);
+    expect(pts.length).toBe(d.idx.length);
+    expect(pts.map((p) => p.idx)).toEqual(d.idx);
+    const view = { scale: 10, tx: 0, ty: 500 };
+    const place = (showDest: boolean) =>
+      placeLabels(pts, view, 5000, 5000, (t) => t.length * 6, { origin: null, panelDest: null, showDest, fitScale: 10, sk: 0, radius: (t) => natCityR(t * LABEL_TRAINS_PER_UNIT) });
+    expect(place(false)).toEqual([]);
+    const on = place(true);
+    expect(on.length).toBeGreaterThan(0);
+    for (const l of on) expect(pts.some((p) => l.text === p.en + " · " + p.zh)).toBe(true);
+  });
+  test("the infrastructure overlay draws the track under the flowing sections", () => {
+    const flowsCounts = Uint32Array.from({ length: atlas.sec.len.length }, (_, s) => (s % 7 === 0 ? 3 : 0));
+    const layers = nationalInfraLayers(atlas, flowsCounts, false);
+    expect(layers.length).toBeGreaterThan(0);
+    expect(layers.every((l) => l.id.startsWith("infra-"))).toBe(true);
+    expect(nationalInfraLayers(atlas, flowsCounts, false)).toHaveLength(layers.length);
   });
 });

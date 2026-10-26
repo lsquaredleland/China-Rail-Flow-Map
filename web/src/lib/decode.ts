@@ -129,7 +129,6 @@ export function prepAtlas(data: AtlasData): DecodedAtlas {
   }
   for (let i = 0; i < data.city_table.length; i++) {
     const p = data.city_table[i].pt;
-    if (p[0] === 0 && p[1] === 0) continue; // an unplaced city (万象 in the current pack) must not stretch the fit
     if (p[0] < e.lon0) e.lon0 = p[0];
     if (p[0] > e.lon1) e.lon1 = p[0];
     if (p[1] < e.lat0) e.lat0 = p[1];
