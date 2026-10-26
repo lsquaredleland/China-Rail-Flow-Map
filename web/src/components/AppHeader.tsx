@@ -11,7 +11,6 @@ export default function AppHeader({
   outTablesReady,
   inTablesReady,
   trainCount,
-  calendarSpan,
   national,
   isNational,
   onSetNational,
@@ -28,8 +27,6 @@ export default function AppHeader({
   inTablesReady: boolean;
   /** Trains in the pack (train_table rows); 0 until the pack loads. */
   trainCount: number;
-  /** The pack's schedule window, e.g. "23 Oct – 6 Nov" (export packs). */
-  calendarSpan: string | undefined;
   /** National mode: the pack-wide numbers the stat row shows (null while the flows load). */
   national?: { cities: number | null; maxFlow: number | null } | null;
   /** National mode is on; `onSetNational` switches between it and the origin view. */
@@ -81,8 +78,7 @@ export default function AppHeader({
         top rail cities. The width of each line refers to the number of
         daily trains along that particular piece of track &mdash; spanning{" "}
         <b>{trainCount ? trainCount.toLocaleString("en-US") : "…"}</b>{" "}
-        scheduled passenger services
-        {calendarSpan ? ` (running ${calendarSpan})` : ""} across China&rsquo;s{" "}
+        scheduled passenger services across China&rsquo;s{" "}
         <b>{distUnit === "mi" ? "30,000 mi" : "48,000 km"}</b> high-speed
         rail network ({distUnit === "mi" ? "100,000 mi" : "162,000 km"} of
         total track).
@@ -92,7 +88,7 @@ export default function AppHeader({
           <>
             <div>
               <b>{trainCount ? trainCount.toLocaleString("en-US") : "…"}</b>{" "}
-              <span>trains running{calendarSpan ? " " + calendarSpan : ""}</span>
+              <span>trains running</span>
             </div>
             <div>
               <b>{national.cities?.toLocaleString("en-US") ?? "…"}</b> <span>cities connected</span>
