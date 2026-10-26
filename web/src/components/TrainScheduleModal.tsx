@@ -21,6 +21,8 @@ interface Props {
   isIsolated?: boolean;
   onToggleIsolate?: (code: string) => void;
   onJumpToTime?: (mins: number) => void;
+  /** "Play from origin": the clock at the train's departure, the animation open and running. */
+  onPlayFrom?: (mins: number) => void;
   mapRef?: RefObject<MapApi | null>;
   originCityZh?: string;
   originCityEn?: string;
@@ -61,6 +63,7 @@ export default function TrainScheduleModal({
   isIsolated = false,
   onToggleIsolate,
   onJumpToTime,
+  onPlayFrom,
   mapRef,
   originCityZh,
   originCityEn,
@@ -490,21 +493,26 @@ export default function TrainScheduleModal({
         </div>
       </header>
 
-      {(onToggleIsolate || (trainVM && onJumpToTime)) && direction !== "in" && (
+      {(onToggleIsolate || (trainVM && (onPlayFrom || onJumpToTime))) && direction !== "in" && (
         <div className="sg-actions">
           {onToggleIsolate && (
             <button type="button" className={"sg-btn" + (isIsolated ? " is-on" : "")} onClick={() => onToggleIsolate(code)}>
               {isIsolated ? "✕ Show all trains" : "◎ Isolate on map"}
             </button>
           )}
-          {trainVM && onJumpToTime && (
+          {trainVM && (onPlayFrom || onJumpToTime) && (
             <button
               type="button"
               className="sg-btn is-primary"
-              onClick={() => onJumpToTime(trainVM.depMins)}
-              title={`Jump the simulation clock to ${trainVM.dep}`}
+              onClick={() => {
+                if (onPlayFrom) {
+                  onPlayFrom(trainVM.depMins);
+                  setMinimized(true); // the train card; the map stays unobscured
+                } else onJumpToTime?.(trainVM.depMins);
+              }}
+              title={`Start the clock at ${trainVM.dep} and play`}
             >
-              ▶ Jump to departure · {trainVM.dep}
+              ▶ Play from origin · {trainVM.dep}
             </button>
           )}
         </div>
