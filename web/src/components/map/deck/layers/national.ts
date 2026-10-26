@@ -30,6 +30,7 @@ import {
   NAT_WIDTH_FACTOR,
   WIDTH_K,
   flowUnits,
+  flowWidth,
   buildNational,
   natPositions,
   natXY,
@@ -483,7 +484,7 @@ export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
 /** The hovered section's highlight, as the origin view draws it: the whole
     section a little wider than its flow. */
 export function nationalHighlight(atlas: DecodedAtlas, s: number, n: number, scale: number, fitScale: number, dark: boolean): Layer[] {
-  const hw = Math.max(0.5, flowUnits(n) * WIDTH_K * NAT_WIDTH_FACTOR * (scale / fitScale)) + 1.6;
+  const hw = Math.max(0.5, flowWidth(n, scale, fitScale) * NAT_WIDTH_FACTOR) + 1.6;
   return [
     new PathLayer<number[]>({
       id: "nat-seg-highlight",

@@ -17,6 +17,8 @@ import type { ActiveTrainVM, ChordVM, DayTimelineVM, DecodedSet, Hit, Palette } 
 import {
   WIDTH_K,
   flowUnits,
+  flowWidth,
+  zoomWidthScale,
   activeTimeline,
   animStep,
   chordPlan,
@@ -283,14 +285,15 @@ export interface FlowLayersInput {
 
 const ferryBlue = (dark: boolean) => rgba(dark ? "#38BDF8" : "#0284C7");
 /** Canvas flowWidth in CSS px. */
-const widthPx = (n: number, scale: number, fitScale: number) => Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale));
+const widthPx = (n: number, scale: number, fitScale: number) => flowWidth(n, scale, fitScale);
 
-function flowPassLayer(role: string, pd: PassData, fitScale: number, dark: boolean) {
+function flowPassLayer(role: string, pd: PassData, scale: number, fitScale: number, dark: boolean) {
   return new PathLayer({
     id: "flows-" + role,
     data: pd.data,
     _pathType: "open",
     widthUnits: "common",
+    widthScale: zoomWidthScale(scale / fitScale),
     widthMinPixels: 0.5,
     capRounded: true,
     jointRounded: true,
@@ -342,6 +345,7 @@ function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: numbe
     getPath: (d: DashPiece) => d.path,
     positionFormat: "XY",
     widthUnits: "common",
+    widthScale: zoomWidthScale(scale / fitScale),
     widthMinPixels: 0.5,
     getWidth: (d: DashPiece) => (flowUnits(d.n) * WIDTH_K) / fitScale,
     getColor: colour,
@@ -368,7 +372,7 @@ export function passDataLayers(
   scale: number,
   fitScale: number,
 ): Layer[] {
-  const L: Layer[] = [flowPassLayer(role, pd, fitScale, dark)];
+  const L: Layer[] = [flowPassLayer(role, pd, scale, fitScale, dark)];
   if (pickable) L.push(flowPickLayer(role, pd));
   if (pd.ferry.length) {
     const blue = ferryBlue(dark);
@@ -509,6 +513,7 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
       getPath: (d: ChordItem) => d.path,
       positionFormat: "XY",
       widthUnits: plan.isolated ? "pixels" : "common",
+      widthScale: plan.isolated ? 1 : zoomWidthScale(scale / fitScale),
       widthMinPixels: plan.isolated ? 0 : 0.5,
       getWidth: plan.isolated ? 1.5 : (d: ChordItem) => (flowUnits(d.ch.n) * WIDTH_K) / fitScale,
       getColor: colour,
