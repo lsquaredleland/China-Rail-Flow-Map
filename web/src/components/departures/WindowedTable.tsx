@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
    full height and scrollbar. The mode builds the rows (already filtered and
    sorted) for the window it is given. */
 
-export const WIN_OVERSCAN = 8;
+const WIN_OVERSCAN = 8;
 /** Row heights: the origin tables' two-line rows, and the national table's
     tighter ones. */
 export const ORIGIN_ROW_H = 54;
@@ -19,7 +19,7 @@ export function rowWindow(scrollTop: number, viewH: number, n: number, rowH: num
   return [first, Math.max(first, last)];
 }
 
-export interface TableWindow {
+interface TableWindow {
   /** The rows to render are `first` to `last` (exclusive) of the list. */
   first: number;
   last: number;

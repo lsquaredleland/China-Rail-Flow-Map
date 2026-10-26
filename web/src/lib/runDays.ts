@@ -3,7 +3,7 @@
    The only facts used besides those two are the calendar's own dates (to name
    the weekdays of a weekday-set). */
 
-export interface RunDays {
+interface RunDays {
   /** "Daily", "Weekends", "Fri–Sun", "Every other day" or "Irregular". */
   label: string;
   /** Sort order of the categories: Daily, Weekends, weekday sets, Every other day, Irregular. */

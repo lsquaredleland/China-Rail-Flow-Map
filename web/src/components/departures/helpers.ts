@@ -19,7 +19,7 @@ export function depDayOffset(d: DepVM): number {
   return Math.floor((dm + d.dur) / 1440);
 }
 
-export function normCityStr(s: string): string {
+function normCityStr(s: string): string {
   return s
     .toLowerCase()
     .normalize("NFD")

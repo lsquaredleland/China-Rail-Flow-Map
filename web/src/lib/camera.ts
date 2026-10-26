@@ -8,7 +8,7 @@ export interface View {
 }
 
 /** deck.gl OrthographicView({flipY: false}) state for the same camera. */
-export interface ViewState {
+interface ViewState {
   target: [number, number, number];
   zoom: number;
 }

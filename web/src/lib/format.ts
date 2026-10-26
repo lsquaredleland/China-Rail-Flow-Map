@@ -23,7 +23,7 @@ export function enName(en: string): string {
 
 /** Train-table index of a raw dep/arr row. The one place that knows the
     row layout, so a row-format change only touches this. */
-export function rowTrainIdx(row: readonly unknown[]): number {
+function rowTrainIdx(row: readonly unknown[]): number {
   return row[0] as number;
 }
 
@@ -67,7 +67,7 @@ export function esc(s: string): string {
 /** How a station's two names read: "zh-en" 重庆北 Chongqing North, "en-zh"
     Chongqing North 重庆北, "zh-paren" 重庆北 (Chongqing North). One name when
     the English is missing or identical. */
-export type NameOrder = "zh-en" | "en-zh" | "zh-paren";
+type NameOrder = "zh-en" | "en-zh" | "zh-paren";
 export function stationName(zh: string, en: string | undefined, order: NameOrder): string {
   if (!en || en === zh) return zh;
   return order === "zh-en" ? `${zh} ${en}` : order === "en-zh" ? `${en} ${zh}` : `${zh} (${en})`;

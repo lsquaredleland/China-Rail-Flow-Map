@@ -171,8 +171,8 @@ export function rampColor(mins: number, pal: Palette): string {
 
 // Dot radius is a screen-space size, clamped so a destination stays a
 // marker at any zoom instead of swelling into a blob over the track.
-export const STATION_R_MIN = 2;
-export const STATION_R_MAX = 26;
+const STATION_R_MIN = 2;
+const STATION_R_MAX = 26;
 export function stationR(trains: number): number {
   return Math.max(
     STATION_R_MIN,

@@ -2,7 +2,7 @@
    throw (blocked site data, sandboxed iframes, some private modes), as can
    every get/set/remove (quota, disabled storage), so each access is wrapped
    and a failure reads as "nothing stored" / "write dropped". */
-export interface SafeStorage {
+interface SafeStorage {
   get(key: string): string | null;
   set(key: string, value: string): void;
   remove(key: string): void;

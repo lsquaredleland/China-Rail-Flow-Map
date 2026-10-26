@@ -5,12 +5,12 @@
 
 /** One shared track section: encoded geometry plus optional HSR flag
     (v2 dropped the endpoint station indices). */
-export interface RawSection {
+interface RawSection {
   g: string; // Google-polyline-encoded track geometry, precision 1e4
   h?: number; // 1 for high-speed rail (HSR), omitted/0 for conventional rail
 }
 
-export interface RawCity {
+interface RawCity {
   zh: string;
   en: string;
   pt: [number, number]; // [lon, lat] of the city's principal station point
@@ -31,7 +31,7 @@ export interface RawTrain {
 }
 
 /** A leg with no track routing, drawn straight. a/b are station-table indices. */
-export interface RawChord {
+interface RawChord {
   a: number;
   b: number;
   n: number; // trains/day
@@ -47,22 +47,22 @@ export type RawFlow = number[];
      1 if the train terminates in this city else 0,
      optional sec_cnt (number of section indices from origin to this stop)].
     Clock times are integer minutes since midnight. */
-export type RawCall = [number, number, number, number, number, number?];
+type RawCall = [number, number, number, number, number, number?];
 
 /** [city index, trains, fast, terminating, fastest min, median min, crow km, rail km]
     rail km is -1 when unknown (e.g. Hong Kong's unrouted tunnel leg). */
-export type RawDest = [number, number, number, number, number, number, number, number];
+type RawDest = [number, number, number, number, number, number, number, number];
 
 /** Parallel in shape to RawDest, for a city sending trains INTO the origin:
     [city index, trains, fast, originating, fastest min, median min, crow km, rail km]. */
-export type RawSrc = RawDest;
+type RawSrc = RawDest;
 
 /** One train arriving in the origin city, as seen from a source city:
     [index into the origin's arrs, boarding minutes at the source city,
      arrival minutes in the origin city, arrival day offset from boarding day,
      1 if the train originates in the source city else 0, boarding-station index,
      optional sec_cnt (number of section indices from boarding stop to origin)]. */
-export type RawInCall = [number, number, number, number, number, number, number?];
+type RawInCall = [number, number, number, number, number, number, number?];
 
 /** One train arriving in the origin city, positional:
     [train-table index, origin-station index (where the train truly starts),
@@ -70,7 +70,7 @@ export type RawInCall = [number, number, number, number, number, number, number?
      arrival-station index in this city, arrival minutes in this city,
      duration minutes origin to this city, stops before this city,
      rail journey km from the origin; -1 when unknown]. */
-export type RawArr = [
+type RawArr = [
   number, number, number, number, number, number, number, number, number,
 ];
 
@@ -79,7 +79,7 @@ export type RawArr = [
      to-station index, to-city index, arrival minutes,
      duration minutes, stops,
      exact journey distance by rail to the final stop; -1 when any leg is unrouted]. */
-export type RawDep = [
+type RawDep = [
   number, number, number, number, number, number, number, number, number,
 ];
 
@@ -144,7 +144,7 @@ export type ChordLeg = [number, number, number];
 /** One origin's entry in atlas-v2-out-tables.json (fmt 6): the per-row
     paths are not stored; `dep_off` locates each dep row's slice of its
     train's full path. */
-export interface OutTablesPackOrigin {
+interface OutTablesPackOrigin {
   deps: RawDep[];
   calls: RawCall[][];
   dep_off: number[];
@@ -186,7 +186,7 @@ export interface NationalTrainsData {
 }
 
 /** One origin's out tables, expanded to per-row paths. */
-export interface OutTablesOrigin {
+interface OutTablesOrigin {
   deps: RawDep[];
   calls: RawCall[][];
   dep_secs: number[][];
@@ -201,7 +201,7 @@ export interface OutTablesData {
 }
 
 /** One origin's entry in atlas-v2-in-map.json: inbound map fields. */
-export interface InMapOrigin {
+interface InMapOrigin {
   srcs: RawSrc[];
   in_flows: RawFlow[];
 }
@@ -214,7 +214,7 @@ export interface InMapData {
 
 /** One origin's entry in atlas-v2-in-tables.json (fmt 6): `arr_len` is
     the length of each arr row's prefix of its train's full path. */
-export interface InTablesPackOrigin {
+interface InTablesPackOrigin {
   arrs: RawArr[];
   in_calls: RawInCall[][];
   arr_len: number[];
@@ -229,7 +229,7 @@ export interface InTablesPack {
 }
 
 /** One origin's in tables, expanded to per-row paths. */
-export interface InTablesOrigin {
+interface InTablesOrigin {
   arrs: RawArr[];
   in_calls: RawInCall[][];
   arr_secs: number[][];
@@ -660,7 +660,7 @@ export interface NationalFlowsPack {
     `city_table` index; `dep[i]` / `arr[i]` the day's totals and
     `dep_by_class[c][i]` / `arr_by_class[c][i]` their split over the 8 class
     buckets (FLOW_CLASSES order, as `by_class`). */
-export interface NationalCities {
+interface NationalCities {
   idx: number[];
   dep: number[];
   arr: number[];

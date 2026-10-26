@@ -10,7 +10,7 @@ import type { CallVM } from "../types";
 export type DestWindow = Map<string, { arrMins: number; secCnt: number }>;
 
 /** Total minutes from the boarding midnight to the call's arrival. */
-export function callArrMins(call: CallVM): number {
+function callArrMins(call: CallVM): number {
   if (call.arrMins !== undefined) return call.arrMins;
   return (
     call.dayOff * 1440 +

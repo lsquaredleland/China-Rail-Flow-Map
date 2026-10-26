@@ -30,7 +30,7 @@ export const NAT_RIPPLE_MIN = 20;
 /** The growing circles' input: the selected trains' event minutes per city and
     the clock's minute. A city is drawn from its first event on, sized by the
     events so far (departures + arrivals, all of them at 24:00). */
-export interface NatGrowth {
+interface NatGrowth {
   ev: NatCityEvents;
   t: number;
 }

@@ -12,7 +12,7 @@ import { isFerrySection, paletteRGBA, splitFerry } from "../../../../lib";
 import { binaryPaths } from "./binary";
 import type { BinaryPaths } from "./binary";
 
-export interface BackdropInput {
+interface BackdropInput {
   atlas: DecodedAtlas;
   outline: DecodedOutline | null;
   showOutline: boolean;
@@ -94,7 +94,7 @@ for (let lon = 30; lon <= 180; lon += 5) graticule.push({ s: [lon, -10], t: [lon
 for (let lat = -10; lat <= 80; lat += 5) graticule.push({ s: [30, lat], t: [180, lat] });
 
 /** Stroke widths / dashes the Canvas path derives from the view scale (px). */
-export function backdropMetrics(scale: number) {
+function backdropMetrics(scale: number) {
   const dashW = Math.max(1, scale * 0.02);
   const ferryW = Math.min(3.5, Math.max(0.75, scale * 0.01));
   return {

@@ -19,7 +19,7 @@ import { maybeReloadForStale } from "./staleReload";
 // Every file is fetched at most once and cached for the session; each
 // merge goes into the origins in place, by index.
 export const SHARED_URL = "assets/atlas-v2-shared.json";
-export const OUT_MAP_URL = "assets/atlas-v2-out-map.json";
+const OUT_MAP_URL = "assets/atlas-v2-out-map.json";
 export const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 export const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 export const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
@@ -79,7 +79,7 @@ function longDate(iso: string, year: boolean): string | undefined {
 
 /** The timetable source sentence for a calendar (ISO dates in order); the
     same wording the pipeline writes (`provenance::about_block`). */
-export function sourceSentence(calendar: readonly string[] | undefined): string {
+function sourceSentence(calendar: readonly string[] | undefined): string {
   const base = "Timetable data is sourced from China Railway (12306)";
   if (!calendar || calendar.length === 0) return `${base}.`;
   const from = calendar[0];

@@ -74,7 +74,7 @@ export function fitCountryCalc(M: MapCtx) {
   S.current.fitScale = S.current.view.scale;
 }
 
-export function fitGuangzhouInitialCalc(M: MapCtx) {
+function fitGuangzhouInitialCalc(M: MapCtx) {
   fitCountryCalc(M);
   // Regional extent matching initial launch: Guangzhou near bottom,
   // Hunan/Hubei/Henan corridors extending north.
@@ -112,7 +112,7 @@ export function zoomAt(M: MapCtx, px: number, py: number, factor: number) {
 }
 
 
-export function reportViewChange(M: MapCtx) {
+function reportViewChange(M: MapCtx) {
   const { S, P, toLon, toLat } = M;
   if (!P.current.onViewChange) return;
   const st = S.current;
@@ -129,7 +129,7 @@ export function reportViewChange(M: MapCtx) {
 }
 
 
-export function scheduleViewReport(M: MapCtx) {
+function scheduleViewReport(M: MapCtx) {
   const { P, viewReportTimerRef } = M;
   if (!P.current.onViewChange) return;
   if (viewReportTimerRef.current) clearTimeout(viewReportTimerRef.current);

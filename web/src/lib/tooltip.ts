@@ -16,7 +16,7 @@ import {
 } from "./format";
 import { stationLabel } from "./geo";
 
-export interface TooltipInput {
+interface TooltipInput {
   data: AtlasData;
   cur: OriginVM;
   direction: Direction;

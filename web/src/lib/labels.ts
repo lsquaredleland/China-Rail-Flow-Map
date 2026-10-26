@@ -11,7 +11,7 @@
 import type { CityPointVM } from "../types";
 import { stationR, stationZoomK } from "./palette";
 
-export interface LabelStyle {
+interface LabelStyle {
   fs: number;
   weight: string;
   pad: number;
@@ -20,14 +20,14 @@ export interface LabelStyle {
   isBoxed?: boolean;
 }
 
-export interface Box {
+interface Box {
   x: number;
   y: number;
   w: number;
   h: number;
 }
 
-export interface PlacedLabel {
+interface PlacedLabel {
   text: string;
   /** Text anchor (canvas textAlign = align). */
   x: number;
@@ -37,7 +37,7 @@ export interface PlacedLabel {
   style: LabelStyle;
 }
 
-export interface LabelOptions {
+interface LabelOptions {
   /** The origin city (always labelled); null in national mode, which has none. */
   origin: { zh: string; en: string; pt: [number, number] } | null;
   /** Radius (px, at the national fit) of the circle drawn for a point of `trains`;
@@ -52,7 +52,7 @@ export interface LabelOptions {
 }
 
 /** `measure(text, fs, weight)` is the rendered text width in px. */
-export type Measure = (text: string, fs: number, weight: string) => number;
+type Measure = (text: string, fs: number, weight: string) => number;
 
 /** What the layout reads of a city. Origin views pass whole `CityPointVM`s; the national view
     has no termini, so `endpoint` / `nn` are absent there (read as 0). */
