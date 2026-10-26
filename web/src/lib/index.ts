@@ -67,6 +67,8 @@ export {
   nationalCountsAt,
   nationalFlowPasses,
   nationalWidths,
+  nationalCityCounts,
+  NAT_WIDTH_FACTOR,
   requireNationalEntries,
   requireNationalFlows,
 } from "./nationalFlows";

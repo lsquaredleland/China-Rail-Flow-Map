@@ -81,6 +81,24 @@ function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
    only. The candidate index is the dot's index; the view-model is built for the
    winner only. */
 function pickNational(M: MapCtx, px: number, py: number): Hit | null {
+  return pickNationalTrain(M, px, py) ?? pickNationalCity(M, px, py);
+}
+
+/* A city circle under the pointer (the smallest, as it is drawn on top). */
+function pickNationalCity(M: MapCtx, px: number, py: number): Hit | null {
+  const { S, X, Y } = M;
+  const d = S.current.natCities;
+  if (!d) return null;
+  let best = -1;
+  for (let i = 0; i < d.idx.length; i++) {
+    const dx = px - X(d.pos[i][0]), dy = py - Y(d.pos[i][1]);
+    if (dx * dx + dy * dy > (d.r[i] + 2) * (d.r[i] + 2)) continue;
+    if (best < 0 || d.r[i] < d.r[best]) best = i;
+  }
+  return best < 0 ? null : { kind: "natCity", idx: d.idx[best], dep: d.dep[best], arr: d.arr[best] };
+}
+
+function pickNationalTrain(M: MapCtx, px: number, py: number): Hit | null {
   const { S, P, X, Y } = M;
   const st = S.current;
   const f = st.natPick;
@@ -214,6 +232,7 @@ export function sameHit(a: Hit | null, b: Hit | null): boolean {
   if (a.kind === "seg" && b.kind === "seg") return a.s === b.s;
   if (a.kind === "chord" && b.kind === "chord") return a.chord === b.chord;
   if (a.kind === "train" && b.kind === "train") return a.train.code === b.train.code;
+  if (a.kind === "natCity" && b.kind === "natCity") return a.idx === b.idx;
   if (a.kind === "station" && b.kind === "station")
     return a.station === b.station;
   return true; // origin

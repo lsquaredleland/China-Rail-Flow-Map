@@ -91,11 +91,35 @@ export function nationalCounts(nf: NationalFlowsPack, classes: readonly string[]
   return out;
 }
 
-/** Stroke width (CSS px) per section, on the origin flows' scale. */
+/** National flows are drawn at half the origin flows' width (presentation:
+    a national section carries far more trains than an origin's). */
+export const NAT_WIDTH_FACTOR = 0.5;
+
+/** Stroke width (CSS px) per section: the origin flows' scale times NAT_WIDTH_FACTOR
+    (the 0.5 px hairline floor stays). */
 export function nationalWidths(counts: Uint32Array, scale: number, fitScale: number): Float32Array {
   const w = new Float32Array(counts.length);
-  for (let s = 0; s < counts.length; s++) w[s] = flowWidth(counts[s], scale, fitScale);
+  for (let s = 0; s < counts.length; s++) w[s] = Math.max(0.5, flowWidth(counts[s], scale, fitScale) * NAT_WIDTH_FACTOR);
   return w;
+}
+
+/** Per-city departures and arrivals under the class filter (as nationalCounts),
+    parallel to `cities.idx`; empty when the pack has no `cities`. */
+export function nationalCityCounts(
+  nf: NationalFlowsPack,
+  classes: readonly string[],
+): { idx: number[]; dep: Uint32Array; arr: Uint32Array } {
+  const c = nf.cities;
+  if (!c) return { idx: [], dep: new Uint32Array(0), arr: new Uint32Array(0) };
+  if (!classes.length) return { idx: c.idx, dep: Uint32Array.from(c.dep), arr: Uint32Array.from(c.arr) };
+  const dep = new Uint32Array(c.idx.length), arr = new Uint32Array(c.idx.length);
+  for (const ci of new Set(classes.map(classIndex))) {
+    for (let i = 0; i < dep.length; i++) {
+      dep[i] += c.dep_by_class[ci][i];
+      arr[i] += c.arr_by_class[ci][i];
+    }
+  }
+  return { idx: c.idx, dep, arr };
 }
 
 /** The national flow pass: sections with n > 0, widest first (ties by

@@ -26,12 +26,18 @@ import type {
   NationalTrainsData,
 } from "../../../../types";
 import {
+  NAT_WIDTH_FACTOR,
   buildNational,
+  classIndex,
   natPositions,
+  nationalCityCounts,
   nationalCounts,
   nationalCountsAt,
   nationalFlowPasses,
   palette,
+  rgba,
+  stationR,
+  stationZoomK,
 } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
 import type { PassData } from "./flows";
@@ -115,6 +121,21 @@ export function maxDots(tl: NationalTimeline): number {
   return c;
 }
 
+/** Per-train 0/1 flag for the class filter (null = all): the train's
+    `train_table` class is among `classes`. Memoised per (timeline, filter). */
+let keepMemo: { tl: NationalTimeline; atlas: DecodedAtlas; key: string; keep: Uint8Array } | null = null;
+export function nationalKeep(atlas: DecodedAtlas, tl: NationalTimeline, classes: readonly string[]): Uint8Array | null {
+  if (!classes.length) return null;
+  const key = [...new Set(classes)].sort().join(",");
+  if (keepMemo && keepMemo.tl === tl && keepMemo.atlas === atlas && keepMemo.key === key) return keepMemo.keep;
+  const want = new Set(classes.map(classIndex));
+  const tt = atlas.data.train_table;
+  const keep = new Uint8Array(tl.n);
+  for (let q = 0; q < tl.n; q++) keep[q] = want.has(classIndex(tt[tl.tIdx[q]].class)) ? 1 : 0;
+  keepMemo = { tl, atlas, key, keep };
+  return keep;
+}
+
 export interface NationalFrame {
   count: number;
   /** Distinct trains among the dots (a run over 24 h shows more than one dot). */
@@ -135,7 +156,7 @@ export interface NationalFrame {
 let pool: { tl: NationalTimeline; f: NationalFrame } | null = null;
 
 /** Fills the pooled frame buffers for display minute m (0..1440). */
-export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: number, scale: number): NationalFrame {
+export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: number, scale: number, keep?: Uint8Array | null): NationalFrame {
   if (!pool || pool.tl !== tl) {
     const cap = Math.max(1, maxDots(tl));
     pool = {
@@ -157,7 +178,7 @@ export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: numb
     };
   }
   const f = pool.f;
-  const c = natPositions(tl, atlas, m, f.buf, f.qOf);
+  const c = natPositions(tl, atlas, m, f.buf, f.qOf, keep);
   let tc = 0, dc = 0, run = 0;
   for (let i = 0; i < c; i++) {
     if (i === 0 || f.qOf[i] !== f.qOf[i - 1]) run++;
@@ -314,5 +335,62 @@ export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
     pd = atMemo.pd;
     sections = atMemo.sections;
   }
-  return { layers: passDataLayers("national", pd, 1, false, pal, dark, scale, fitScale), sections, updateMs };
+  // Width = n * WIDTH_K / fitScale, so the national factor rides on fitScale.
+  return { layers: passDataLayers("national", pd, 1, false, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR), sections, updateMs };
+}
+
+/* ---------- national city circles ---------- */
+
+export interface NationalCityDots {
+  /** `city_table` index, position, departures, arrivals and drawn radius (px) of each circle. */
+  idx: number[];
+  pos: [number, number][];
+  dep: Uint32Array;
+  arr: Uint32Array;
+  r: number[];
+}
+
+/** A circle per city sized by departures + arrivals under the class filter,
+    on the origin dots' radius scale and zoom growth (`stationT`). Cities with
+    no trains are left out. Null when the pack carries no `cities`. */
+export function nationalCityDots(atlas: DecodedAtlas, nf: NationalFlowsPack, classes: readonly string[], stationT: number): NationalCityDots | null {
+  if (!nf.cities) return null;
+  const c = nationalCityCounts(nf, classes);
+  const out: NationalCityDots = { idx: [], pos: [], dep: new Uint32Array(c.idx.length), arr: new Uint32Array(c.idx.length), r: [] };
+  let k = 0;
+  for (let i = 0; i < c.idx.length; i++) {
+    const n = c.dep[i] + c.arr[i];
+    if (n <= 0) continue;
+    const r0 = stationR(n);
+    out.idx.push(c.idx[i]);
+    out.pos.push(atlas.data.city_table[c.idx[i]].pt);
+    out.dep[k] = c.dep[i];
+    out.arr[k] = c.arr[i];
+    out.r.push(r0 * stationZoomK(r0, stationT));
+    k++;
+  }
+  return out;
+}
+
+/** The city circles, biggest first so small ones stay on top. */
+export function nationalCityLayers(d: NationalCityDots, dark: boolean): Layer[] {
+  const pal = palette(dark);
+  const order = d.idx.map((_, i) => i).sort((a, b) => d.r[b] - d.r[a]);
+  return [
+    new ScatterplotLayer<number>({
+      id: "nat-cities",
+      data: order,
+      getPosition: (i: number) => d.pos[i],
+      getRadius: (i: number) => d.r[i],
+      radiusUnits: "pixels",
+      lineWidthUnits: "pixels",
+      stroked: true,
+      filled: true,
+      getFillColor: rgba(pal.dot, 0.85),
+      getLineColor: rgba(pal.dotEdge),
+      getLineWidth: dark ? 2 : 1.2,
+      pickable: false,
+      updateTriggers: { getPosition: [d], getRadius: [d] },
+    }),
+  ];
 }

@@ -22,6 +22,7 @@ import { flowWidth, isFilteredView as isFilteredViewOf } from "../../lib";
 import type { DestWindow } from "../../lib";
 import type { LegendHandle } from "../Legend";
 import type { DeckHandle } from "./deck/DeckHost";
+import type { NationalCityDots } from "./deck/layers/national";
 
 export interface AnimState {
   time: number; // minutes from midnight (0 up to totalMins)
@@ -169,6 +170,8 @@ function createMapState() {
     natRunning: 0,
     /* The last national frame's dots for picking (CPU scan, P2.3). */
     natPick: null as { tl: NationalTimeline; count: number; buf: Float32Array; qOf: Int32Array; m: number } | null,
+    /* The last national frame's city circles, for hover. */
+    natCities: null as NationalCityDots | null,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: false,
