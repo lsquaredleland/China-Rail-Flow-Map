@@ -46,7 +46,7 @@ export function CityCard({
   sub?: string; // text before the count ("from Chongqing"); empty for none
   count?: number;
   countLabel?: string;
-  onExpand: () => void;
+  onExpand?: () => void; // no expanded panel (national): no Details button
   onClose: () => void;
   expandRef?: React.Ref<HTMLButtonElement>;
 }) {
@@ -56,7 +56,7 @@ export function CityCard({
       role="dialog"
       aria-label={`${en} city details (minimized)`}
     >
-      <div className="mc-main mc-click" onClick={onExpand}>
+      <div className={"mc-main" + (onExpand ? " mc-click" : "")} onClick={onExpand}>
         <div className="mc-title">
           <svg className="mc-pin" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.8" />
@@ -76,16 +76,18 @@ export function CityCard({
           ) : null}
         </div>
       </div>
-      <button
-        ref={expandRef}
-        type="button"
-        className="mc-btn"
-        onClick={onExpand}
-        title="Expand city details"
-        aria-label="Expand city details"
-      >
-        <span aria-hidden="true">↗</span> <span className="mc-btn-t">Details</span>
-      </button>
+      {onExpand && (
+        <button
+          ref={expandRef}
+          type="button"
+          className="mc-btn"
+          onClick={onExpand}
+          title="Expand city details"
+          aria-label="Expand city details"
+        >
+          <span aria-hidden="true">↗</span> <span className="mc-btn-t">Details</span>
+        </button>
+      )}
       <button
         type="button"
         className="mc-close"

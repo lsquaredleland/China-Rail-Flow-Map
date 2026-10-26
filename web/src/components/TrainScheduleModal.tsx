@@ -399,7 +399,9 @@ export default function TrainScheduleModal({
         route={
           trainVM
             ? `${cardStName(trainVM.fsZh || "", trainVM.fsEn)} → ${cardStName(trainVM.tsZh || "", trainVM.tsEn)}`
-            : code
+            : st && st.length > 1
+              ? `${nm(0)} → ${nm(st.length - 1)}`
+              : code
         }
         state={state}
         leg={leg}

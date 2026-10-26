@@ -100,6 +100,8 @@ export interface Props {
   onSelectTrain?: (code: string | null) => void;
   isolatedTrainCode?: string | null;
   onSelectIsolatedTrain?: (code: string | null) => void;
+  /** National mode: a click on a city circle (null on empty map). */
+  onSelectNatCity?: (c: { idx: number; dep: number; arr: number } | null) => void;
   legendRef: RefObject<LegendHandle | null>;
   initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
   onViewChange?: (view: {

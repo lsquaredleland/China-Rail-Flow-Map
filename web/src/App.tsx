@@ -24,7 +24,7 @@ import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
-import { cardBand, cardStName } from "./components/MapCards";
+import { CityCard, cardBand, cardStName } from "./components/MapCards";
 import { IsolationChip, NationalNote, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
@@ -117,6 +117,13 @@ export default function App() {
     const list = direction === "out" ? cur.deps : cur.arrs;
     return list.find((t) => t.code === selectedTrainCode) || null;
   }, [selectedTrainCode, cur, direction, national]);
+
+  // National mode: the clicked city circle, shown as the collapsed city card.
+  const [natCity, setNatCity] = useState<{ idx: number; dep: number; arr: number } | null>(null);
+  useEffect(() => {
+    if (!national) setNatCity(null);
+  }, [national]);
+  const natCityRow = natCity && atlas ? atlas.data.city_table[natCity.idx] : null;
 
   // The isolated train's card text (its route and fastest-time band colour).
   const isolatedVM = useMemo(
@@ -370,6 +377,7 @@ export default function App() {
           onSelectTrain={setSelectedTrainCode}
           isolatedTrainCode={isolatedTrainCode}
           onSelectIsolatedTrain={setIsolatedTrainCode}
+          onSelectNatCity={setNatCity}
           legendRef={legendRef}
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
@@ -415,6 +423,14 @@ export default function App() {
               cityZh={cur ? cur.o.zh : ""}
               unit={distUnit}
               onClose={closePanel}
+            />
+          )}
+          {national && natCity && natCityRow && (
+            <CityCard
+              en={natCityRow.en}
+              zh={natCityRow.zh}
+              sub={`${natCity.dep} departures · ${natCity.arr} arrivals`}
+              onClose={() => setNatCity(null)}
             />
           )}
           {national && (
