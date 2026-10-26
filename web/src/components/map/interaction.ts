@@ -47,6 +47,7 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
   for (let i = 0; i < pts.length; i++) {
     const c = pts[i];
     if (pd && c.idx !== pd.idx) continue;
+    if (S.current.unlitCities?.has(c.idx)) continue;
     const x = X(c.pt[0]),
       y = Y(c.pt[1]);
     if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;

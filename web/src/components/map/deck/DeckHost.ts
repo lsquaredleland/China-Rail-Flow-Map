@@ -270,6 +270,8 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       },
       getSelCache(P.current, st),
     );
+    // Picking and labels skip the cities not yet lit by the animation.
+    st.unlitCities = st.animEnabled ? new Set(states.filter((s) => !s.lit).map((s) => s.idx)) : null;
     layers.push(
       ...stationLayers({
         states,

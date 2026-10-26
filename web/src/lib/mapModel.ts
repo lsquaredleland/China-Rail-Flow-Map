@@ -753,6 +753,9 @@ export interface StationState {
   alpha: number;
   /** Golden arrival ripple (frac 0..1 of its 20-minute life). */
   ripple?: { frac: number };
+  /** Drawn at all: while animating, a city lights up only once a shown
+      train has stopped there (the selected destination always is). */
+  lit: boolean;
 }
 
 /** One entry per city, in draw order of `points` (the selected destination is
@@ -809,6 +812,7 @@ export function stationStates(s: StationInput, sel: SelCache | null): StationSta
       r0,
       kd: stationZoomK(r0, s.sk),
       alpha: pd && c.idx !== pd.idx && c.idx !== s.hoverIdx ? dim : 1,
+      lit: !isAnimated || effectiveTrains > 0 || (!!pd && c.idx === pd.idx),
     };
     // Ripple only for an allowed train's arrival (never outside allowed trains).
     if (recentArrival && isAnimated && (!allowedCodes || totalCityTrains > 0)) {

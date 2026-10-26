@@ -111,6 +111,25 @@ describe("station layers", () => {
   });
   const memo = { selCache: null as SelCache | null };
 
+  test("animating: a city is drawn only once a shown train has stopped there", () => {
+    const at0 = stationStates(stIn(0, null), null);
+    expect(at0.every((s) => !s.lit)).toBe(true);
+    expect(stationDots(at0, pal, false, false).length).toBe(0);
+    const noon = stationStates(stIn(720, null), null);
+    const litNoon = noon.filter((s) => s.lit).length;
+    expect(litNoon).toBeGreaterThan(0);
+    expect(litNoon).toBeLessThan(noon.length);
+    expect(stationDots(noon, pal, false, false).length).toBe(litNoon);
+    // monotone over the day, and every city lit at the end
+    expect(stationStates(stIn(1080, null), null).filter((s) => s.lit).length).toBeGreaterThanOrEqual(litNoon);
+    expect(stationStates(stIn(cur.timeline!.totalMins, null), null).every((s) => s.lit)).toBe(true);
+    // the selected destination is always drawn
+    const pd = cur.dests[5];
+    expect(stationStates(stIn(0, pd), null).find((s) => s.idx === pd.idx)!.lit).toBe(true);
+    // not animating: everything drawn
+    expect(stationStates({ ...stIn(0, null), animEnabled: false }, null).every((s) => s.lit)).toBe(true);
+  });
+
   test("dot radius = stationR(n) * stationZoomK(r, t); stroke 1.5 light / 3 dark", () => {
     const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
     const dots = stationDots(states, pal, false, false);
