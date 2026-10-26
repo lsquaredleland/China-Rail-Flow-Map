@@ -68,9 +68,10 @@ describe("national flows", () => {
         total.map((n) => Math.fround(Math.max(0.5, flowWidth(n, scale, fit) * NAT_WIDTH_FACTOR))),
       );
     }
-    // 10 trains at the fit: 10 x 0.08 x 0.5 = 0.4 px, so the 0.5 px floor wins; 100 trains: 4 px, half of 8
-    expect(nationalWidths(Uint32Array.of(100), 100, 100)[0]).toBeCloseTo(4, 5);
-    expect(flowWidth(100, 100, 100)).toBeCloseTo(8, 5);
+    // 10 trains at the fit: 10 x 0.06 x 0.5 = 0.3 px, so the 0.5 px floor wins; 100 trains
+    // (past the knee: 40 + 2√40(√100 − √40) ≈ 86.49 units) ≈ 5.19 px, halved nationally
+    expect(flowWidth(100, 100, 100)).toBeCloseTo(5.189, 3);
+    expect(nationalWidths(Uint32Array.of(100), 100, 100)[0]).toBeCloseTo(5.189 / 2, 3);
     // the hairline floor applies to empty sections too (they are not drawn)
     expect(nationalWidths(counts, 100, 100)[3]).toBe(0.5);
   });
