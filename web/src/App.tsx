@@ -12,7 +12,7 @@ import {
 import { useFilters, useCityPanel, useTrainSelection } from "./hooks/useSelection";
 import { useAnimationClock } from "./hooks/useAnimationClock";
 import { useNationalMode } from "./hooks/useNationalMode";
-import MapCanvas, { type MapApi } from "./components/MapCanvas";
+import MapHost, { type MapApi } from "./components/MapHost";
 import Legend, { type LegendHandle } from "./components/Legend";
 import DestinationPanel from "./components/DestinationPanel";
 import DeparturesTable from "./components/DeparturesTable";
@@ -338,7 +338,7 @@ export default function App() {
           }
         />
 
-        <MapCanvas
+        <MapHost
           ref={mapRef}
           atlas={atlas}
           outline={outline}
@@ -433,7 +433,7 @@ export default function App() {
           {(direction === "out" || national) && isTimelineCollapsed && (
             <TimelineExpandButton onExpand={expandTimeline} />
           )}
-        </MapCanvas>
+        </MapHost>
 
       </div>
 

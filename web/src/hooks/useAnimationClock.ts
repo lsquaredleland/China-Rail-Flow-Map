@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { Direction } from "../types";
-import type { MapApi } from "../components/MapCanvas";
+import type { MapApi } from "../components/MapHost";
 
 /** Start the clock at `mins` and play: the animation is enabled, the clock is
     set to the minute, then it runs (setAnimEnabled first, since it sets the
