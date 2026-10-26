@@ -68,12 +68,14 @@ export default function TrainScheduleModal({
     if (was && !timelineOpen && minimized) onClose();
   }, [timelineOpen, minimized, onClose]);
   const [rawTime, setLiveTime] = useState<number>(() => currentTime ?? 360);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
   // Subscribe to live simulation ticks
   useEffect(() => {
     if (!mapRef?.current?.subscribeAnim) return;
     const unsub = mapRef.current.subscribeAnim((st) => {
       setLiveTime(st.time);
+      setIsPlaying(st.isPlaying);
     });
     return unsub;
   }, [mapRef]);
@@ -411,7 +413,7 @@ export default function TrainScheduleModal({
       )}
 
       {direction !== "in" && now && firstStop && lastStop && (
-        <section className={"sg-now is-" + (st?.state ?? "pre")} aria-live="polite">
+        <section className={"sg-now is-" + (st?.state ?? "pre")} aria-live={isPlaying ? "off" : "polite"}>
           <div className="sg-now-row">
             <div className="sg-now-text">
               <div className="sg-kicker is-red">{now.label}</div>
@@ -485,13 +487,35 @@ export default function TrainScheduleModal({
                       {isNext ? <span className="sg-next-mark">▶</span> : isPast || isCurrent ? <span className="sg-check">✓</span> : idx + 1}
                     </td>
                     <td className="sg-c-st">
-                      <div className="sg-zh">
-                        {s.stZh}
-                        {isOriginCity && <span className="sg-chip is-solid">Your origin</span>}
-                        {isCurrent && <span className="sg-chip">At station</span>}
-                        {isNext && <span className="sg-chip">Next stop · {st?.state === "transit" ? st.eta : 0} min</span>}
-                      </div>
-                      {s.stEn && s.stEn !== s.stZh && <div className="sg-en">{s.stEn}</div>}
+                      {(() => {
+                        // The station name doubles as the keyboard path to "jump the
+                        // simulation to this stop" (a real button; the row click stays).
+                        const name = (
+                          <>
+                            <span className="sg-zh">
+                              {s.stZh}
+                              {isOriginCity && <span className="sg-chip is-solid">Your origin</span>}
+                              {isCurrent && <span className="sg-chip">At station</span>}
+                              {isNext && <span className="sg-chip">Next stop · {st?.state === "transit" ? st.eta : 0} min</span>}
+                            </span>
+                            {s.stEn && s.stEn !== s.stZh && <span className="sg-en">{s.stEn}</span>}
+                          </>
+                        );
+                        return onJumpToTime ? (
+                          <button
+                            type="button"
+                            className="sg-jump-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onJumpToTime(Math.max(0, jumpTime));
+                            }}
+                          >
+                            {name}
+                          </button>
+                        ) : (
+                          name
+                        );
+                      })()}
                     </td>
                     <td className="sg-c-n">{idx > 0 && (s.legKm ?? 0) > 0 ? legDist(s.legKm!) : "—"}</td>
                     <td className="sg-c-n">{s.arr}</td>

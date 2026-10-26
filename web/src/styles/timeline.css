@@ -257,9 +257,20 @@
   font-weight: 700;
   color: var(--tl-ink);
   transition: color 0.15s ease;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  line-height: inherit;
 }
 .tb-tick-item:hover {
   color: var(--tl-accent);
+}
+.tb-tick-item:focus-visible {
+  outline: 2px solid var(--tl-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 @media (max-width: 900px) {
   .tb-metrics-group {

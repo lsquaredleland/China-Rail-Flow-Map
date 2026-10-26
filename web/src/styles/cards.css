@@ -151,3 +151,12 @@
   .map-card { --mc-h: 44px; }
   .mc-btn, .mc-close { min-height: 44px; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .map-card,
+  .map-cards,
+  #destPanel {
+    transition: none;
+    animation: none;
+  }
+}

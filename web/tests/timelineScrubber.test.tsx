@@ -34,6 +34,8 @@ describe("TimelineScrubber", () => {
     expect(h).not.toContain("TRAINS");
     expect(h).toContain("Finish");
     expect(h).toContain("tb-speed-btn");
+    expect(h).toContain('<button type="button" class="tb-tick-item at-0"');
+    expect(h).toContain('<button type="button" class="tb-tick-item at-end"');
   });
 
   test("origin inbound mode: BOARDED, ARRIVED, TOTAL labels, and Finish present", () => {
