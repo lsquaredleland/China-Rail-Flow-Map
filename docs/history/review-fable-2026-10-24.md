@@ -1,5 +1,14 @@
 # Review: China Rail Flow Map — `main` @ `f199472` (Fable, 2026-10-24)
 
+> **Historical record (moved here 2026-10-26 by the pre-main audit, `docs/AUDIT_PRE_MAIN.md`).**
+> Written against the Canvas client before the deck.gl migration. Of its top recommendations:
+> #1 router determinism (O17) and #3 atlas determinism (O18) are done (`optimization-progress.md`);
+> #4 the deploy cache contract is fixed (content-hashed packs, `Content-Encoding: br`, `web/bundle.mjs`);
+> #5 the atlas/audit duplication is gone (shared `analyze/src/*.rs` modules with tests; the two
+> binaries now share 262 identical lines and only `main` by name); the client has 266 `bun test`s
+> and a CI smoke job. #2 (canonical geometry) became the `[canon] mode = "hybrid"` rule (PR #23).
+> File:line references below are to `f199472` and no longer match the tree.
+
 Scope: read-only review of `/Users/leland/Downloads/china-rail-animation` (pipeline + web), with one glance at the `feat/o1-throat-stubs` worktree. Claims are tied to `file:line` on this commit. Two small read-only scripts were run against the shipped `candidates.json` from the handoff (`china-rail-handoff-v3/data/derived/corridor-v3/`); no rebuilds, no 12306 queries. Anything I could not verify from code or on-disk artifacts is marked **(uncertain)**.
 
 ---

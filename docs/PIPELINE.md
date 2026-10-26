@@ -161,8 +161,9 @@ live recipe" below); an empty-overrides build does not reproduce it. A bare
 Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
 ```bash
 ./target/release/atlas        # → china-flow-atlas-data.json (v1 combined)
-./target/release/atlaspack    # → the v2 five-file pack + combined v2:
-#   atlas-v2-{shared,out-map,out-tables,in-map,in-tables}.json(.br)
+./target/release/atlaspack    # → the v2 pack + combined v2:
+#   atlas-v2-{shared,out-map,out-tables,in-map,in-tables,schedules}.json(.br)
+#   atlas-v2-{national,national-trains,national-entries,national-index}.json(.br)
 #   china-flow-atlas-data-v2.json(.br)  (original section numbering)
 ./target/release/audit        # the audit gate — must report:
                               # dropped chains 0, flow lost 0
