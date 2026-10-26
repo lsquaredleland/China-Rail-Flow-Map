@@ -102,7 +102,31 @@ export function flowUnits(n: number): number {
   return n <= WIDTH_KNEE ? n : WIDTH_KNEE + 2 * SQRT_KNEE * (Math.sqrt(n) - SQRT_KNEE);
 }
 export function flowWidth(n: number, scale: number, fitScale: number): number {
-  return Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale));
+  return Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale) * zoomWidthScale(scale / fitScale));
+}
+
+// Owner trial (removable): with `?zoomwidth=sqrt`, flow widths grow with the
+// zoom only up to ZOOM_WIDTH_KNEE x the national fit, then with its square
+// root, so busy hubs don't balloon when zoomed in. Off by default. To remove:
+// delete this block, its exports and its call sites.
+// The switch is read from the URL on first use rather than set from main.tsx:
+// the lazily loaded deck chunk carries its own copy of this module.
+export const ZOOM_WIDTH_KNEE = 3;
+let zoomWidthDamped: boolean | null = null;
+export function setZoomWidthDamped(on: boolean): void {
+  zoomWidthDamped = on;
+}
+function isZoomWidthDamped(): boolean {
+  if (zoomWidthDamped === null) {
+    zoomWidthDamped =
+      typeof location !== "undefined" && new URLSearchParams(location.search).get("zoomwidth") === "sqrt";
+  }
+  return zoomWidthDamped;
+}
+/** Multiplier on a zoom-proportional width at zoom ratio `r` (scale / fitScale): 1 when off or up to the knee. */
+export function zoomWidthScale(r: number): number {
+  if (!isZoomWidthDamped() || r <= ZOOM_WIDTH_KNEE) return 1;
+  return Math.sqrt(ZOOM_WIDTH_KNEE / r);
 }
 
 function rgbStr(c: [number, number, number]): string {

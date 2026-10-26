@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import type { Palette } from "../types";
-import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, flowUnits, rampColor, natCityR, stationR, stationZoomK } from "../lib";
+import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, flowUnits, zoomWidthScale, rampColor, natCityR, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
     the stepped width bar's heights depend on the live zoom ratio. The
@@ -125,7 +125,8 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         // Same width mapping as the map; the zoom factor is capped for
         // the legend alone so a deep zoom cannot grow the panel without
         // bound. Step i spans [4 + i*stepW, ...] on a shared baseline.
-        const ratio = Math.min(zoomRatio, 8);
+        const capped = Math.min(zoomRatio, 8);
+        const ratio = capped * zoomWidthScale(capped);
         const { steps, samples, k } = scaleRef.current;
         let maxH = 0.5;
         for (let i = 0; i < steps.length; i++) {
