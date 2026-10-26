@@ -354,8 +354,11 @@ export default function TrainScheduleModal({
       return;
     }
     openedOn.current = code;
-    const row = el.querySelector<HTMLElement>(`tr[data-stop="${focusIdx}"]`);
-    if (row) el.scrollTop = Math.max(0, rowTop(el, row) - row.offsetHeight * 3);
+    // Start the window two stops above the current one, its first row flush
+    // under the sticky column header (not cut by it).
+    const row = el.querySelector<HTMLElement>(`tr[data-stop="${Math.max(0, focusIdx - 2)}"]`);
+    const head = el.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    if (row) el.scrollTop = Math.max(0, rowTop(el, row) - head);
     updateWindow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, alignedStops, minimized]);
