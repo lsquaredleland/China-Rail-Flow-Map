@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, NatLayer, OriginVM } from "./types";
-import { buildOrigin } from "./lib";
+import { buildOrigin, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
@@ -24,7 +24,7 @@ import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
-import { CityCard, MapCardSlot, cardBand, cardStName } from "./components/MapCards";
+import { CityCard, MapCardSlot, cardBand } from "./components/MapCards";
 import { IsolationChip, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
@@ -141,7 +141,7 @@ export default function App() {
     [isolatedTrainCode, cur],
   );
   const isolatedRoute = isolatedVM
-    ? `${cardStName(isolatedVM.fsZh, isolatedVM.fsEn)} → ${cardStName(isolatedVM.tsZh, isolatedVM.tsEn)}`
+    ? `${stationName(isolatedVM.fsZh, isolatedVM.fsEn, "zh-en")} → ${stationName(isolatedVM.tsZh, isolatedVM.tsEn, "zh-en")}`
     : "";
   const isolatedBand = cardBand(isolatedVM ? isolatedVM.dur : 0, dark);
 

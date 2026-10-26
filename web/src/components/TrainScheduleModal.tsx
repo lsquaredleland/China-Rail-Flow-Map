@@ -2,8 +2,8 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefOb
 import type { DepVM, ArrVM, DistUnit, RawTrain, SchedulesData, ScheduleStop } from "../types";
 import { RunsLabel } from "./departures/RunsCell";
 import type { MapApi } from "./MapCanvas";
-import { formatScheduleStops } from "../lib";
-import { TrainCard, cardBand, cardStName, type TrainCardState } from "./MapCards";
+import { fmtDurationWords, formatScheduleStops, stationName } from "../lib";
+import { TrainCard, cardBand, type TrainCardState } from "./MapCards";
 import { useDialogFocus } from "../hooks/useDialog";
 
 interface Props {
@@ -37,18 +37,6 @@ interface Props {
 interface AlignedStop extends ScheduleStop {
   simArrMins: number;
   simDepMins: number;
-}
-
-/** "Wuchang 武昌": the English name then the Chinese one. */
-function fmtShort(en: string | undefined, zh: string): string {
-  return en && en !== zh ? `${en} ${zh}` : zh;
-}
-
-function fmtStName(zh: string, en?: string): string {
-  if (en && en !== zh) {
-    return `${zh} (${en})`;
-  }
-  return zh;
 }
 
 export default function TrainScheduleModal({
@@ -146,10 +134,10 @@ export default function TrainScheduleModal({
     : "";
 
   const originStDisplay = trainVM
-    ? fmtStName(trainVM.fsZh || "", trainVM.fsEn)
+    ? stationName(trainVM.fsZh || "", trainVM.fsEn, "zh-paren")
     : "";
   const destStDisplay = trainVM
-    ? fmtStName(trainVM.tsZh || "", trainVM.tsEn)
+    ? stationName(trainVM.tsZh || "", trainVM.tsEn, "zh-paren")
     : "";
 
   const originStop = useMemo(() => {
@@ -252,13 +240,13 @@ export default function TrainScheduleModal({
       const wait = Math.max(0, Math.round(first.simDepMins - liveTime));
       return {
         state: "pre" as const,
-        text: `Departs ${fmtStName(first.stZh, first.stEn)} in ${wait > 60 ? `${Math.floor(wait / 60)}h ${wait % 60}m` : `${wait}m`} (at ${first.dep})`,
+        text: `Departs ${stationName(first.stZh, first.stEn, "zh-paren")} in ${wait > 60 ? `${Math.floor(wait / 60)}h ${wait % 60}m` : `${wait}m`} (at ${first.dep})`,
       };
     }
     if (liveTime >= last.simArrMins) {
       return {
         state: "post" as const,
-        text: `Completed journey to ${fmtStName(last.stZh, last.stEn)} at ${last.arr}`,
+        text: `Completed journey to ${stationName(last.stZh, last.stEn, "zh-paren")} at ${last.arr}`,
       };
     }
 
@@ -274,7 +262,7 @@ export default function TrainScheduleModal({
         const rem = Math.max(0, Math.round(s.simDepMins - liveTime));
         return {
           state: "stopped" as const,
-          text: `Stopped at ${fmtStName(s.stZh, s.stEn)} · Departs in ${rem}m (${s.dep})`,
+          text: `Stopped at ${stationName(s.stZh, s.stEn, "zh-paren")} · Departs in ${rem}m (${s.dep})`,
           stopIdx: i,
         };
       }
@@ -297,7 +285,7 @@ export default function TrainScheduleModal({
             : `${finalM}m`;
         return {
           state: "transit" as const,
-          text: `En route: ${fmtStName(curr.stZh, curr.stEn)} ➔ ${fmtStName(next.stZh, next.stEn)} · ETA in ${finalEtaStr} (${last.arr})`,
+          text: `En route: ${stationName(curr.stZh, curr.stEn, "zh-paren")} ➔ ${stationName(next.stZh, next.stEn, "zh-paren")} · ETA in ${finalEtaStr} (${last.arr})`,
           fromIdx: i,
           toIdx: i + 1,
           eta,
@@ -389,7 +377,7 @@ export default function TrainScheduleModal({
   // Minimized floating train card (not modal: the map stays usable)
   if (minimized) {
     const st = alignedStops;
-    const nm = (i: number) => (st ? cardStName(st[i].stZh, st[i].stEn) : "");
+    const nm = (i: number) => (st ? stationName(st[i].stZh, st[i].stEn, "zh-en") : "");
     let state: TrainCardState = "en-route";
     let leg = "";
     if (currentStatus && st) {
@@ -411,7 +399,7 @@ export default function TrainScheduleModal({
         code={code}
         route={
           trainVM
-            ? `${cardStName(trainVM.fsZh || "", trainVM.fsEn)} → ${cardStName(trainVM.tsZh || "", trainVM.tsEn)}`
+            ? `${stationName(trainVM.fsZh || "", trainVM.fsEn, "zh-en")} → ${stationName(trainVM.tsZh || "", trainVM.tsEn, "zh-en")}`
             : st && st.length > 1
               ? `${nm(0)} → ${nm(st.length - 1)}`
               : code
@@ -432,11 +420,7 @@ export default function TrainScheduleModal({
   const firstStop = alignedStops && n > 0 ? alignedStops[startIdx] : null;
   const lastStop = alignedStops && n > 0 ? alignedStops[n - 1] : null;
   const pct = Math.round(overallProgress * 100);
-  const nameOf = (s: { stZh: string; stEn: string }) => (s.stEn && s.stEn !== s.stZh ? `${s.stEn} ${s.stZh}` : s.stZh);
-  const durText = (m: number) => {
-    const r = Math.max(0, Math.round(m));
-    return r >= 60 ? `${Math.floor(r / 60)} h ${r % 60 ? (r % 60) + " min" : ""}`.trim() : `${r} min`;
-  };
+  const nameOf = (s: { stZh: string; stEn: string }) => stationName(s.stZh, s.stEn, "en-zh");
   // The class badge and the number: "T145" -> T + 145; a plain train has no letter.
   const badge = cls === "plain" ? "普" : cls;
   const number = code.startsWith(cls) && cls !== "plain" ? code.slice(cls.length) : code;
@@ -453,7 +437,7 @@ export default function TrainScheduleModal({
     if (!st || st.state === "pre") {
       const run0 = alignedStops[0];
       const wait = Math.max(0, Math.round(run0.simDepMins - liveTime));
-      return { label: "Not yet departed", title: nameOf(run0), sub: `Leaves ${run0.dep} · in ${durText(wait)}`, pct: 0 };
+      return { label: "Not yet departed", title: nameOf(run0), sub: `Leaves ${run0.dep} · in ${fmtDurationWords(wait)}`, pct: 0 };
     }
     if (st.state === "post") return { label: "Arrived", title: nameOf(lastStop), sub: `Arrived ${lastStop.arr}`, pct: 100 };
     if (st.state === "stopped") {
@@ -475,12 +459,12 @@ export default function TrainScheduleModal({
         <span className="sg-num">{number}</span>
         <div className="sg-title-block">
           <h2 className="sg-title" id={titleId}>
-            {trainVM ? `${fmtShort(trainVM.fsEn, trainVM.fsZh)} → ${fmtShort(trainVM.tsEn, trainVM.tsZh)}` : `Train ${code}`}
+            {trainVM ? `${stationName(trainVM.fsZh, trainVM.fsEn, "en-zh")} → ${stationName(trainVM.tsZh, trainVM.tsEn, "en-zh")}` : `Train ${code}`}
           </h2>
           <p className="sg-sub">
             {trainVM ? (
               <>
-                Dep <b>{trainVM.dep}</b> · Arr <b>{trainVM.arr}</b> · {durText(trainVM.dur)}
+                Dep <b>{trainVM.dep}</b> · Arr <b>{trainVM.arr}</b> · {fmtDurationWords(trainVM.dur)}
                 {n > 0 ? ` · ${n} calling stops` : ""}
               </>
             ) : (
@@ -532,7 +516,7 @@ export default function TrainScheduleModal({
         <div className="sg-origin">
           <span className="sg-kicker">Your origin</span>
           <span>
-            <b>{fmtShort(originStop.stEn, originStop.stZh)}</b>
+            <b>{stationName(originStop.stZh, originStop.stEn, "en-zh")}</b>
             {originStop.arr !== "—" ? ` · arr ${originStop.arr}` : ""} · dep {originStop.dep}
             {originStop.dwellMins > 0 ? ` · ${originStop.dwellMins} min dwell` : ""}
           </span>
@@ -608,7 +592,7 @@ export default function TrainScheduleModal({
                     onClick={() => {
                       if (onJumpToTime) onJumpToTime(Math.max(0, jumpTime));
                     }}
-                    title={onJumpToTime ? `Jump the simulation to ${fmtStName(s.stZh, s.stEn)} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
+                    title={onJumpToTime ? `Jump the simulation to ${stationName(s.stZh, s.stEn, "zh-paren")} (${s.arr !== "—" ? s.arr : s.dep})` : undefined}
                   >
                     <td className="sg-c-idx">
                       {isNext ? <span className="sg-next-mark">▶</span> : isPast || isCurrent ? <span className="sg-check">✓</span> : idx + 1}
@@ -640,7 +624,7 @@ export default function TrainScheduleModal({
                             Now{(next.legKm ?? 0) > 0 ? ` · ${legDist(next.legKm!)} leg` : ""}
                           </span>
                           <span>
-                            <b>{lp}%</b> · {durText(st.eta)} to {next.stEn || next.stZh}
+                            <b>{lp}%</b> · {fmtDurationWords(st.eta)} to {next.stEn || next.stZh}
                           </span>
                         </div>
                         <div className="sg-bar is-leg">

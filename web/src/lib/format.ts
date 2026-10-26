@@ -64,6 +64,21 @@ export function esc(s: string): string {
 }
 
 
+/** How a station's two names read: "zh-en" 重庆北 Chongqing North, "en-zh"
+    Chongqing North 重庆北, "zh-paren" 重庆北 (Chongqing North). One name when
+    the English is missing or identical. */
+export type NameOrder = "zh-en" | "en-zh" | "zh-paren";
+export function stationName(zh: string, en: string | undefined, order: NameOrder): string {
+  if (!en || en === zh) return zh;
+  return order === "zh-en" ? `${zh} ${en}` : order === "en-zh" ? `${en} ${zh}` : `${zh} (${en})`;
+}
+
+/** Minutes as words: "45 min", "1 h", "1 h 5 min". */
+export function fmtDurationWords(m: number): string {
+  const r = Math.max(0, Math.round(m));
+  return r >= 60 ? `${Math.floor(r / 60)} h ${r % 60 ? (r % 60) + " min" : ""}`.trim() : `${r} min`;
+}
+
 export function fmtTime(m: number | null | undefined): string {
   if (m === null || m === undefined || m < 0 || isNaN(m)) return "—";
   const h = Math.floor(m / 60);
