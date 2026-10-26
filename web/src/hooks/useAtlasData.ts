@@ -31,7 +31,7 @@ import {
   requireNationalTrains,
 } from "../lib";
 import {
-  ABOUT,
+  aboutText,
   IN_MAP_URL,
   IN_TABLES_URL,
   NATIONAL_ENTRIES_URL,
@@ -448,7 +448,7 @@ export function useAtlasData({
         if (cancelled) return;
         const data: AtlasData = {
           ...shared,
-          about: ABOUT,
+          about: aboutText(shared),
           origins: outMap.origins,
         };
         const decoded = prepAtlas(data);

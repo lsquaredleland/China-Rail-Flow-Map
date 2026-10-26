@@ -19,6 +19,12 @@
 //! `dirty: true` is present only when `pipeline/` has uncommitted changes
 //! (tracked or untracked, not ignored); the key is omitted when clean.
 //! `CRFM_PIPELINE_TREE` overrides the tree (builds outside a git checkout).
+//!
+//! `shared.about` (train-export builds, next to `shared.calendar`; optional,
+//! packs without it still load) is a pack fact for the page footer:
+//! `{ "source": "<sentence naming the source and the window>", "from":
+//! "YYYY-MM-DD", "to": "YYYY-MM-DD" }`, derived from the calendar by
+//! [`about_block`]. `atlaspack` writes it and `audit` recomputes it.
 
 use crate::inputs::{pair_path_files, Inputs};
 use crate::legs::leg_paths_file;
@@ -88,9 +94,89 @@ pub fn build_block(inp: &Inputs) -> Value {
     b
 }
 
+const MONTHS: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+/// "23 October" (no year) or "23 October 2026" of an ISO date.
+fn long_date(iso: &str, year: bool) -> Option<String> {
+    let mut it = iso.split('-');
+    let y: u32 = it.next()?.parse().ok()?;
+    let m: usize = it.next()?.parse().ok()?;
+    let d: u32 = it.next()?.parse().ok()?;
+    let month = MONTHS.get(m.checked_sub(1)?)?;
+    Some(if year {
+        format!("{d} {month} {y}")
+    } else {
+        format!("{d} {month}")
+    })
+}
+
+/// `shared.about` for a train-export pack: the timetable source sentence and
+/// the schedule window, both derived from `calendar` (ISO dates in order).
+/// `None` for an empty or malformed calendar.
+pub fn about_block(calendar: &[String]) -> Option<Value> {
+    let (from, to) = (calendar.first()?, calendar.last()?);
+    let same_year = from.get(..4) == to.get(..4);
+    let window = if from == to {
+        format!("on {}", long_date(from, true)?)
+    } else {
+        format!(
+            "from {} to {}",
+            long_date(from, !same_year)?,
+            long_date(to, true)?
+        )
+    };
+    Some(json!({
+        "source": format!(
+            "Timetable data is sourced from China Railway (12306), covering the passenger trains listed as running on at least one date {window}."
+        ),
+        "from": from,
+        "to": to,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn cal(a: &str, b: &str) -> Vec<String> {
+        vec![a.to_string(), "2026-10-24".to_string(), b.to_string()]
+    }
+
+    #[test]
+    fn about_block_names_the_window() {
+        let a = about_block(&cal("2026-10-23", "2026-11-06")).unwrap();
+        assert_eq!(
+            a["source"],
+            "Timetable data is sourced from China Railway (12306), covering the passenger trains listed as running on at least one date from 23 October to 6 November 2026."
+        );
+        assert_eq!(a["from"], "2026-10-23");
+        assert_eq!(a["to"], "2026-11-06");
+        let a = about_block(&cal("2026-12-30", "2027-01-02")).unwrap();
+        assert!(a["source"]
+            .as_str()
+            .unwrap()
+            .ends_with("from 30 December 2026 to 2 January 2027."));
+        let a = about_block(&["2026-10-23".to_string()]).unwrap();
+        assert!(a["source"]
+            .as_str()
+            .unwrap()
+            .ends_with("date on 23 October 2026."));
+        assert!(about_block(&[]).is_none());
+        assert!(about_block(&["x".to_string()]).is_none());
+    }
 
     #[test]
     fn sha256_matches_the_known_vectors() {

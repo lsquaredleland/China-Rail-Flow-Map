@@ -126,6 +126,9 @@ export interface SharedData {
   throats: string[];
   /** Train-export packs only: the schedule window's dates (ISO, in order). */
   calendar?: string[];
+  /** Train-export packs: the timetable source sentence and the schedule
+      window (`from`/`to`, ISO), written by the pipeline. Optional. */
+  about?: { source: string; from: string; to: string };
 }
 
 /** atlas-v2-out-map.json: every origin's identity + outbound map
@@ -238,7 +241,7 @@ export interface InTablesData {
   origins: InTablesOrigin[];
 }
 
-export interface AtlasData extends SharedData {
+export interface AtlasData extends Omit<SharedData, "about"> {
   about: string;
   origins: RawOrigin[];
 }
