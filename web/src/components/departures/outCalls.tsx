@@ -175,8 +175,8 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
           >
             Arrives <span className="arrow">{cArrow("arr")}</span>
           </th>
-          <th scope="col">Departs</th>
           <th scope="col">Station</th>
+          <th scope="col">Departs</th>
           <th scope="col">Status</th>
           <th
             scope="col"
@@ -235,11 +235,11 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
                     <span className="plus"> +{c.dayOff}d</span>
                   ) : null}
                 </td>
-                <td className="c-time">{c.term ? "—" : c.depAt}</td>
                 <td>
                   {st ? st.zh : null}
                   {st && st.en ? <span className="to-stn">{st.en}</span> : null}
                 </td>
+                <td className="c-time">{c.term ? "—" : c.depAt}</td>
                 <td>
                   <span
                     className={

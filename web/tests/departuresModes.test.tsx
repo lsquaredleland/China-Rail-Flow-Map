@@ -133,7 +133,7 @@ describe("DeparturesTable modes", () => {
       <DeparturesTable {...baseProps} cur={o} direction="out" panelCity={dest} />,
     );
     const hs = headers(h);
-    expect(hs).toEqual(["Train", "Departs", "From", "Duration", "Arrives", "Departs", "Station", "Status", "Runs"]);
+    expect(hs).toEqual(["Train", "Departs", "From", "Duration", "Arrives", "Station", "Departs", "Status", "Runs"]);
     for (const x of hs) {
       expect(x).not.toContain(dest.en);
       expect(x).not.toContain(o.en);
