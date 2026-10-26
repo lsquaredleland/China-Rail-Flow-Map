@@ -4,15 +4,14 @@ import { buildOrigin, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
-  initialNatFlows,
   initialNational,
   usePrefs,
   useUrlSync,
-  writeNatFlowsParam,
   writeNationalParam,
 } from "./hooks/useUrlState";
 import { useFilters, useCityPanel, useTrainSelection } from "./hooks/useSelection";
 import { useAnimationClock } from "./hooks/useAnimationClock";
+import { useNationalMode } from "./hooks/useNationalMode";
 import MapCanvas, { type MapApi } from "./components/MapCanvas";
 import Legend, { type LegendHandle } from "./components/Legend";
 import DestinationPanel from "./components/DestinationPanel";
@@ -40,9 +39,6 @@ export default function App() {
   const [showTimeline] = useState<boolean>(true);
   // National mode (D11 / D13): every national train on one 24h clock, map-only.
   const [national, setNational] = useState<boolean>(initialNational);
-  // National flows (with the city circles): a map toggle, on by default
-  // (?natLayer=none starts with them off).
-  const [natFlowsOn, setNatFlowsOn] = useState<boolean>(initialNatFlows);
 
   const prefs = usePrefs();
   // "Zoom clarity" trial (removable, lib/palette.ts): always starts off.
@@ -125,13 +121,6 @@ export default function App() {
     return list.find((t) => t.code === selectedTrainCode) || null;
   }, [selectedTrainCode, cur, direction, national]);
 
-  // National mode: the clicked city circle, shown as the collapsed city card.
-  const [natCity, setNatCity] = useState<{ idx: number; dep: number; arr: number } | null>(null);
-  useEffect(() => {
-    if (!national) setNatCity(null);
-  }, [national]);
-  const natCityRow = natCity && atlas ? atlas.data.city_table[natCity.idx] : null;
-
   // The isolated train's card text (its route and fastest-time band colour).
   const isolatedVM = useMemo(
     () => (isolatedTrainCode && cur ? cur.deps.find((t) => t.code === isolatedTrainCode) ?? null : null),
@@ -141,14 +130,6 @@ export default function App() {
     ? `${stationName(isolatedVM.fsZh, isolatedVM.fsEn, "zh-en")} → ${stationName(isolatedVM.tsZh, isolatedVM.tsEn, "zh-en")}`
     : "";
   const isolatedBand = cardBand(isolatedVM ? isolatedVM.dur : 0, dark);
-
-  // National mode: the dot's train is not in the origin's departures, so the
-  // schedule key is found by code in the shared train table (codes are unique).
-  const nationalTrainT = useMemo(() => {
-    if (!national || !selectedTrainCode || !atlas) return null;
-    const t = atlas.data.train_table.findIndex((r) => r.code === selectedTrainCode);
-    return t >= 0 ? t : null;
-  }, [national, selectedTrainCode, atlas]);
 
   const { panelCity, setPanelCity, availableClasses, closePanel } = useCityPanel({
     cur,
@@ -163,8 +144,21 @@ export default function App() {
 
   const { isTimelineCollapsed, expandTimeline, collapseTimeline, playFrom } =
     useAnimationClock(mapRef, direction, national);
-  // The animation is the origin view's: its bar is open while it plays.
-  const natTrainsOn = national && !isTimelineCollapsed;
+  const { natFlowsOn, toggleNatFlows, natLayersDrawn, natCity, setNatCity, natCityRow, nationalTrainT, natLoadError } =
+    useNationalMode({
+      national,
+      atlas,
+      selectedTrainCode,
+      isolatedTrainCode,
+      isTimelineCollapsed,
+      nationalFlowsFailed,
+      nationalTrainsFailed,
+      ensureNationalTrains,
+      ensureNationalFlows,
+      ensureNationalEntries,
+      ensureNationalIndex,
+      ensureSchedules,
+    });
   // The isolated train belongs to the outbound animation.
   useEffect(() => {
     if (direction === "in" && !national) setIsolatedTrainCode(null);
@@ -178,24 +172,11 @@ export default function App() {
     setPanelCity(null);
   }, [originIdx, setSelectedTrainCode, setIsolatedTrainCode, setPanelCity]);
 
-  // National mode closes the city panel; its trains file loads only when the
-  // animation is turned on (never in the origin view).
+  // National mode closes the city panel.
   useEffect(() => {
     if (!national) return;
     setPanelCity(null);
   }, [national, setPanelCity]);
-  useEffect(() => {
-    // The trains file also gives an isolated train its path.
-    if (national && (natTrainsOn || isolatedTrainCode)) ensureNationalTrains();
-  }, [national, natTrainsOn, isolatedTrainCode, ensureNationalTrains]);
-  // The per-train index (hour / distance / duration / code filters): national mode only.
-  useEffect(() => {
-    if (national) ensureNationalIndex();
-  }, [national, ensureNationalIndex]);
-  // The national table is timed by the schedules asset.
-  useEffect(() => {
-    if (national) ensureSchedules();
-  }, [national, ensureSchedules]);
   const setNationalMode = (v: boolean) => {
     if (v === national) return;
     // A selected or isolated train belongs to the mode it was picked in.
@@ -204,29 +185,6 @@ export default function App() {
     setNational(v);
     writeNationalParam(v);
   };
-  // The flows files load only when national mode asks to draw them: the
-  // day's totals for Flows, the entry ticks too when the animation is on
-  // (the flows then build up with the clock).
-  useEffect(() => {
-    if (!national || !natFlowsOn) return;
-    ensureNationalFlows();
-    if (natTrainsOn) ensureNationalEntries();
-  }, [national, natFlowsOn, natTrainsOn, ensureNationalFlows, ensureNationalEntries]);
-  const toggleNatFlows = () => {
-    setNatFlowsOn(!natFlowsOn);
-    writeNatFlowsParam(!natFlowsOn);
-  };
-  // What the map draws; a flows file that failed leaves the trains drawn.
-  const flowsDrawn = natFlowsOn && !nationalFlowsFailed;
-  const natLayersDrawn = useMemo(() => ({ flows: flowsDrawn, trains: natTrainsOn }), [flowsDrawn, natTrainsOn]);
-  // A load failure is reported where the origin view reports one.
-  const natLoadError = !national
-    ? null
-    : nationalFlowsFailed && natFlowsOn
-      ? "The national flow data could not be loaded."
-      : nationalTrainsFailed && natTrainsOn
-        ? "The national train data could not be loaded."
-        : null;
 
   /* ---------- actions ---------- */
   const selectOrigin = (idx: number) => {
