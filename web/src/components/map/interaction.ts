@@ -41,8 +41,12 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
   const { W, H } = S.current;
   const sk = stationT(M);
   const pts = M.points();
+  // With a destination selected (the two-city focus), only that city and the
+  // origin answer the pointer until the focus is closed.
+  const pd = P.current.panelDest;
   for (let i = 0; i < pts.length; i++) {
     const c = pts[i];
+    if (pd && c.idx !== pd.idx) continue;
     const x = X(c.pt[0]),
       y = Y(c.pt[1]);
     if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
