@@ -11,7 +11,7 @@ import type {
   SrcVM,
 } from "../types";
 import { classIndex, FLOW_CLASSES, selectNatRows, sortNatRows } from "../lib";
-import type { NatSortKey } from "../lib";
+import type { HistRow, NatSortKey } from "../lib";
 import Histograms from "./Histograms";
 import FilterToolbar from "./departures/FilterToolbar";
 import LoadingSection from "./departures/LoadingSection";
@@ -350,6 +350,38 @@ export default function DeparturesTable({
     setInCallSort({ key: "arr", dir: 1 });
   }, [srcFilter]);
 
+  const tablesReady = direction === "out" ? outTablesReady : inTablesReady;
+  // The histograms bin the origin's departures (outbound) or arrivals (inbound);
+  // in national mode every national train. A pinned city adds its own calls.
+  const hist = useMemo(() => {
+    if (cur) {
+      if (!tablesReady) return null;
+      const rows: HistRow[] =
+        direction === "in"
+          ? cur.arrs.map((a) => ({ time: a.arr, distKm: a.distKm, dur: a.dur, cls: a.cls }))
+          : cur.deps.map((d) => ({ time: d.dep, distKm: d.distKm, dur: d.dur, cls: d.cls }));
+      let subRows: HistRow[] | undefined;
+      if (activeCity) {
+        subRows =
+          direction === "in"
+            ? ((cur.srcs.find((s) => s.idx === activeCity.idx) || (activeCity as SrcVM)).inCalls || []).map((c) => ({
+                time: c.arr.arr,
+                distKm: c.arr.distKm,
+                dur: c.arr.dur,
+                cls: c.arr.cls,
+              }))
+            : ((cur.dests.find((d) => d.idx === activeCity.idx) || (activeCity as DestVM)).calls || []).map((c) => ({
+                time: c.dep.dep,
+                distKm: c.dep.distKm,
+                dur: c.dep.dur,
+                cls: c.dep.cls,
+              }));
+      }
+      return { rows, subRows, where: cur.en };
+    }
+    return national ? { rows: national.histRows, subRows: undefined, where: "China" } : null;
+  }, [cur, direction, activeCity, national, tablesReady]);
+
   const handleClearChip = () => {
     setQuery("");
     onClearFilter();
@@ -357,7 +389,6 @@ export default function DeparturesTable({
   };
 
   /* ---------------- tables still in flight ---------------- */
-  const tablesReady = direction === "out" ? outTablesReady : inTablesReady;
   if (cur && !tablesReady) {
     return (
       <LoadingSection
@@ -416,12 +447,14 @@ export default function DeparturesTable({
       <h2>{view.heading}</h2>
       <StationLine stations={view.stations} />
       <p className="dep-note">{view.depNote}</p>
-      {cur ? (
+      {hist && (
         <Histograms
-          cur={cur}
+          rows={hist.rows}
+          subRows={hist.subRows}
+          where={hist.where}
           unit={unit}
-          direction={direction}
-          panelCity={activeCity}
+          direction={national ? "out" : direction}
+          panelCity={cur ? activeCity : null}
           selectedClasses={selectedClasses}
           selectedHour={selectedHour}
           selectedHours={activeHours}
@@ -436,26 +469,7 @@ export default function DeparturesTable({
           onSelectDurBin={setSelectedDurBin}
           onSelectDurBins={onSelectDurBins}
         />
-      ) : national ? (
-        <Histograms
-          rows={national.histRows}
-          unit={unit}
-          direction="out"
-          selectedClasses={selectedClasses}
-          selectedHour={selectedHour}
-          selectedHours={activeHours}
-          onSelectHour={setSelectedHour}
-          onSelectHours={onSelectHours}
-          selectedDistBin={selectedDistBin}
-          selectedDistBins={activeDistBins}
-          onSelectDistBin={setSelectedDistBin}
-          onSelectDistBins={onSelectDistBins}
-          selectedDurBin={selectedDurBin}
-          selectedDurBins={activeDurBins}
-          onSelectDurBin={setSelectedDurBin}
-          onSelectDurBins={onSelectDurBins}
-        />
-      ) : null}
+      )}
       <FilterToolbar
         cur={cur}
         activeCity={activeCity}
