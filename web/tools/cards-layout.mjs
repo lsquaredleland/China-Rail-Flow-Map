@@ -13,7 +13,7 @@ const newBrowser = () => launch({ args: ["--use-angle=swiftshader", "--enable-un
 const until = (pg, fn, timeout = 30000) => pg.waitForFunction(fn, { timeout, polling: 100 });
 const fails = [];
 const click = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (e) e.click(); return !!e; }, sel);
-// two cases at a time (all five at once starve each other and time out)
+// sequential: parallel cases (2 or 5 at once) starve each other and were slower on CI
 const cases = [
   [1280, 800, false],
   [390, 844, false],
@@ -74,7 +74,7 @@ const runCase = async ([w, h, expanded]) => {
   await browser.close();
 };
 const queue = [...cases];
-await Promise.all([0, 1].map(async () => { for (let c; (c = queue.shift()); ) await runCase(c); }));
+await Promise.all([0].map(async () => { for (let c; (c = queue.shift()); ) await runCase(c); }));
 await close();
 if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
 console.log("CARDS LAYOUT OK");
