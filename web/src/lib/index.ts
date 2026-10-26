@@ -27,7 +27,6 @@ export {
   flowColor,
   flowUnits,
   flowWidth,
-  setZoomWidthDamped,
   zoomWidthScale,
   ZOOM_WIDTH_KNEE,
   palette,

@@ -24,6 +24,8 @@ export interface NationalFlowsInput {
   dark: boolean;
   scale: number;
   fitScale: number;
+  /** Zoom clarity (P.current.zoomClarity). */
+  damped: boolean;
 }
 
 export interface NationalFlows {
@@ -45,7 +47,7 @@ let atMemo: { day: PassData; ne: NationalEntriesPack; minute: number; pd: PassDa
     the same paths with each section's trains entered by `minute`, recounted
     only when the minute, class filter, theme or file changes. */
 export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
-  const { atlas, nf, ne, minute, classes, view, dark, scale, fitScale } = inp;
+  const { atlas, nf, ne, minute, classes, view, dark, scale, fitScale, damped } = inp;
   const pal = palette(dark);
   const cls = view.key;
   let updateMs = 0;
@@ -74,13 +76,13 @@ export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
     drawnCounts = atMemo.counts;
   }
   // Width = flowUnits(n) * WIDTH_K / fitScale, so the national factor rides on fitScale.
-  return { layers: passDataLayers("national", pd, 1, true, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR), sections, counts: drawnCounts, updateMs };
+  return { layers: passDataLayers("national", pd, 1, true, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR, damped), sections, counts: drawnCounts, updateMs };
 }
 
 /** The hovered section's highlight, as the origin view draws it: the whole
     section a little wider than its flow. */
-export function nationalHighlight(atlas: DecodedAtlas, s: number, n: number, scale: number, fitScale: number, dark: boolean): Layer[] {
-  const hw = Math.max(0.5, flowWidth(n, scale, fitScale) * NAT_WIDTH_FACTOR) + 1.6;
+export function nationalHighlight(atlas: DecodedAtlas, s: number, n: number, scale: number, fitScale: number, dark: boolean, damped: boolean): Layer[] {
+  const hw = Math.max(0.5, flowWidth(n, scale, fitScale, damped) * NAT_WIDTH_FACTOR) + 1.6;
   return [
     new PathLayer<number[]>({
       id: "nat-seg-highlight",

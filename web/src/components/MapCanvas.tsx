@@ -7,7 +7,6 @@ import {
 } from "react";
 import type { OriginVM } from "../types";
 import { createMapCtx } from "./map/context";
-import { setZoomWidthDamped } from "../lib";
 import type { MapApi, Props } from "./map/context";
 import { createMapApi } from "./map/api";
 import { notifyAnimListeners } from "./map/anim";
@@ -248,18 +247,13 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     notifyAnimListeners(M);
   }, [M, props.national, props.nationalTrains]);
 
-  // "Zoom clarity" trial (lib/palette.ts): the switch is global, then redraw.
-  useEffect(() => {
-    setZoomWidthDamped(!!props.zoomClarity);
-    M.render();
-  }, [M, props.zoomClarity]);
-
   // Toggle / theme / direction / selected-station changes just need a redraw.
   useEffect(() => {
     M.render();
     notifyAnimListeners(M);
   }, [
     M,
+    props.zoomClarity,
     props.showNetwork,
     props.showLabels,
     props.showInfra,

@@ -152,6 +152,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       dark: P.current.dark,
       scale: st.view.scale,
       fitScale: st.fitScale,
+      damped: !!P.current.zoomClarity,
       hover: st.hover,
       activeTrainsAt: M.activeTrainsAt,
       chords: cur.chords,

@@ -259,7 +259,7 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     Y: (lat) => -lat * S.current.view.scale + S.current.view.ty,
     toLon: (px) => (px - S.current.view.tx) / S.current.view.scale,
     toLat: (py) => (S.current.view.ty - py) / S.current.view.scale,
-    widthOf: (n) => flowWidth(n, S.current.view.scale, S.current.fitScale),
+    widthOf: (n) => flowWidth(n, S.current.view.scale, S.current.fitScale, !!P.current.zoomClarity),
 
     /* ---------- direction-aware views of the current origin ---------- */
     points: () => {
