@@ -1,0 +1,143 @@
+/* ---------- collapsed map cards: city card and train card ----------
+   Black rule on top, 2px frame, no radius. One solid action (the focus
+   button), one outlined square close. Frame/focus come from --ink and
+   --btn-on, so night is the same structure on #1A1B1E with a paper-white
+   button. */
+.map-card {
+  --mc-h: 56px;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  min-height: var(--mc-h);
+  background: var(--card-frame);
+  border: 2px solid var(--card-frame);
+  border-top-width: 5px;
+  color: var(--ink);
+  box-shadow: var(--shadow-panel);
+  font-family: inherit;
+}
+.map-card > * { min-width: 0; }
+.mc-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 14px;
+  background: var(--panel);
+}
+.mc-click { cursor: pointer; }
+.mc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.train-card .mc-title { display: block; font-size: 14px; letter-spacing: 0; }
+.mc-pin { flex: none; width: 18px; height: 18px; }
+.mc-sub {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.2;
+}
+.mc-sub b { color: var(--ink); font-weight: 800; }
+.mc-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-title > .mc-ell { min-width: 0; }
+.mc-btn,
+.mc-close {
+  flex: none;
+  min-height: 44px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.mc-btn {
+  padding: 0 18px;
+  background: var(--btn-on);
+  color: var(--btn-on-ink);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mc-btn:hover { filter: brightness(1.15); }
+.mc-close {
+  width: 56px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+.mc-close:hover { background: var(--paper-deep); }
+.mc-btn:focus-visible { outline: 2px solid var(--btn-on-ink); outline-offset: -5px; }
+.mc-close:focus-visible { outline: 2px solid var(--ink); outline-offset: -5px; }
+
+/* train card: band + class box + number */
+.mc-id {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 12px;
+  background: var(--panel);
+  border-right: 2px solid var(--card-frame);
+}
+.mc-band { width: 8px; height: 28px; background: var(--card-time); }
+.mc-class {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 3px;
+  border: 2px solid var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+.mc-num { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.mc-state {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.mc-state.is-en-route { color: var(--card-live); }
+.mc-leg { margin-left: 4px; }
+.train-card.is-isolated { border-color: var(--card-time); background: var(--card-time); }
+.train-card.is-isolated .mc-id { border-right-color: var(--card-time); }
+
+/* placement: one reserved stack in the map's top-right corner (#mapCards).
+   The legend, scale bar, expand button and timeline sit elsewhere, so the
+   cards never cover them; the cards stack instead of overlapping. */
+.map-cards {
+  position: absolute;
+  top: 14px; right: 14px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(520px, calc(100% - 28px));
+  pointer-events: none;
+}
+.map-cards > * { pointer-events: auto; }
+.map-cards .map-card { position: static; width: auto; }
+
+@media (max-width: 640px) {
+  .map-cards { top: 10px; right: 10px; width: calc(100% - 20px); }
+  .mc-btn { padding: 0 14px; font-size: 18px; }
+  .mc-btn-t { display: none; }
+  .mc-close { width: 44px; }
+  .mc-main { padding: 6px 10px; }
+  .mc-id { gap: 7px; padding: 0 10px 0 9px; }
+  .mc-num { font-size: 22px; }
+  .city-card .mc-title { font-size: 16px; }
+}
+.map-cards .active-filter-bar { position: static; max-width: none; align-self: flex-end; }

@@ -3,6 +3,7 @@ import type { DepVM, ArrVM, DistUnit, RawTrain, SchedulesData, ScheduleStop } fr
 import { RunsLabel } from "./departures/RunsCell";
 import type { MapApi } from "./MapCanvas";
 import { formatScheduleStops } from "../lib";
+import { TrainCard, cardBand, cardStName, type TrainCardState } from "./MapCards";
 import { useDialogFocus } from "../hooks/useDialog";
 
 interface Props {
@@ -372,39 +373,45 @@ export default function TrainScheduleModal({
   const legDist = (km: number) =>
     unit === "mi" ? `${(km * 0.621371).toFixed(1)} mi` : `${km} km`;
 
-  // Minimized floating dock pill (not modal: the map stays usable)
+  // Minimized floating train card (not modal: the map stays usable)
   if (minimized) {
+    const st = alignedStops;
+    const nm = (i: number) => (st ? cardStName(st[i].stZh, st[i].stEn) : "");
+    let state: TrainCardState = "en-route";
+    let leg = "";
+    if (currentStatus && st) {
+      if (currentStatus.state === "transit") {
+        leg = `${nm(currentStatus.fromIdx)} → ${nm(currentStatus.toIdx)}`;
+      } else if (currentStatus.state === "stopped") {
+        state = "stopped";
+        leg = nm(currentStatus.stopIdx);
+      } else if (currentStatus.state === "pre") {
+        state = "not-departed";
+        leg = `departs ${st[0].dep}`;
+      } else {
+        state = "arrived";
+        leg = nm(st.length - 1);
+      }
+    }
     return (
-      <div
-        className={"tsm-hud" + (isIsolated ? " is-isolated" : "")}
-        role="dialog"
-        aria-label={`Train ${code} schedule (minimized)`}
-      >
-        <span className={codeClass}>{code}</span>
-        <div className="tsm-hud-main">
-          <div className="tsm-hud-route">{route ?? code}</div>
-          {currentStatus && (
-            <div className="tsm-hud-status">{currentStatus.text}</div>
-          )}
-        </div>
-        <button
-          type="button"
-          className="tsm-hud-expand"
-          onClick={() => setMinimized(false)}
-          title="Expand timetable"
-        >
-          ⤢ Timetable
-        </button>
-        <button
-          type="button"
-          className="tsm-hud-close"
-          onClick={onClose}
-          title="Close modal"
-          aria-label="Close timetable"
-        >
-          ✕
-        </button>
-      </div>
+      <TrainCard
+        code={code}
+        route={
+          trainVM
+            ? `${cardStName(trainVM.fsZh || "", trainVM.fsEn)} → ${cardStName(trainVM.tsZh || "", trainVM.tsEn)}`
+            : st && st.length > 1
+              ? `${nm(0)} → ${nm(st.length - 1)}`
+              : code
+        }
+        state={state}
+        leg={leg}
+        band={cardBand(trainVM ? trainVM.dur : 0, dark)}
+        isolated={isIsolated}
+        onTimetable={() => setMinimized(false)}
+        onClose={onClose}
+        closeLabel="Close timetable"
+        ariaLabel={`Train ${code} schedule (minimized)`}
+      />
     );
   }
 

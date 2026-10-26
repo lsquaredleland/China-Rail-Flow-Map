@@ -142,6 +142,7 @@ const CSS_ORDER = [
   "modal.css",
   "timeline.css",
   "overlays.css",
+  "cards.css",
   "responsive.css",
 ];
 const cssOnDisk = readdirSync("src/styles").filter((f) => f.endsWith(".css"));

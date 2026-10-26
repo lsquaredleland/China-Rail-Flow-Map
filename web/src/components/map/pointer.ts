@@ -93,12 +93,16 @@ export function endPointer(M: MapCtx, e: ReactPointerEvent) {
       } else if (hit && hit.kind === "train") {
         P.current.onSelectTrain?.(hit.train.code);
         hideTooltip(M);
+      } else if (hit && hit.kind === "natCity" && P.current.onSelectNatCity) {
+        P.current.onSelectNatCity({ idx: hit.idx, dep: hit.dep, arr: hit.arr });
+        hideTooltip(M);
       } else if (hit) {
         st.pinned = true;
         showTooltip(M, hit, p.x, p.y);
       } else {
         hideTooltip(M);
         P.current.onSelectDest(null);
+        P.current.onSelectNatCity?.(null);
       }
       M.render();
     }

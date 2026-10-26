@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CityPointVM, DestVM, Direction, DistUnit, SrcVM } from "../types";
 import { sourceRows, stationRows } from "../lib";
+import { CityCard } from "./MapCards";
 
 interface Props {
   point: CityPointVM | null;
@@ -8,6 +9,9 @@ interface Props {
   cityEn: string; // the selected city (origin outbound, destination inbound)
   cityZh: string;
   unit: DistUnit;
+  /** Minimised card line before the count; national mode has no origin
+      ("120 departures · 98 arrivals"). Default: "from <city>". */
+  sub?: string;
   onClose: () => void;
 }
 
@@ -22,6 +26,7 @@ export default function DestinationPanel({
   cityEn,
   cityZh,
   unit,
+  sub,
   onClose,
 }: Props) {
   // Minimized keeps the selection (map highlight, flows, table filter);
@@ -59,43 +64,19 @@ export default function DestinationPanel({
 
   if (minimized) {
     return (
-      <div
-        className="tsm-hud dp-hud"
-        role="dialog"
-        aria-label={`${point.en} city details (minimized)`}
-      >
-        <div
-          className="tsm-hud-main dp-hud-main"
-          onClick={() => setMin(false)}
-        >
-          <div className="tsm-hud-route">
-            {point.en} &middot; {point.zh}
-          </div>
-          <div className="tsm-hud-status">
-            {direction === "out" ? "from " : "to "}
-            {cityEn}
-            {point.trains > 0 ? ` · ${point.trains} trains` : ""}
-          </div>
-        </div>
-        <button
-          ref={expandBtn}
-          type="button"
-          className="tsm-hud-expand"
-          onClick={() => setMin(false)}
-          title="Expand city details"
-        >
-          ⤢ Details
-        </button>
-        <button
-          type="button"
-          className="tsm-hud-close"
-          onClick={onClose}
-          title="Close city details"
-          aria-label="Close city details"
-        >
-          ✕
-        </button>
-      </div>
+      <CityCard
+        en={point.en}
+        zh={point.zh}
+        sub={
+          sub !== undefined
+            ? sub
+            : `${direction === "out" ? "from " : "to "}${cityEn}`
+        }
+        count={point.trains}
+        onExpand={() => setMin(false)}
+        onClose={onClose}
+        expandRef={expandBtn}
+      />
     );
   }
 
