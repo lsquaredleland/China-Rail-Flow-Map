@@ -10,7 +10,7 @@ import { createMapCtx } from "./map/context";
 import type { MapApi, Props } from "./map/context";
 import { createMapApi } from "./map/api";
 import { notifyAnimListeners } from "./map/anim";
-import { fitCountryCalc, frameTail, resize, updateScaleBar, zoomAt } from "./map/camera";
+import { frameTail, resize, updateScaleBar, zoomAt } from "./map/camera";
 import { hideTooltip } from "./map/interaction";
 import { endPointer, onPointerDown, onPointerLeave, onPointerMove } from "./map/pointer";
 import { loadDeck } from "./map/deck/load";
@@ -232,8 +232,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     if (M.S.current.interacted) return;
     // Later resizes then keep the country fit instead of the opening regional view.
     M.S.current.initialViewApplied = true;
-    fitCountryCalc(M);
-    M.render();
+    resize(M); // not interacted: refits the country and resizes the renderer
   }, [M, props.national, props.atlas, props.cur]);
 
   // Entering / leaving national mode keeps the camera (S.current.view); the

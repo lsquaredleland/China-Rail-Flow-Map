@@ -420,7 +420,8 @@ export function nationalCityDots(
   let k = 0;
   for (let i = 0; i < c.idx.length; i++) {
     const n = c.dep[i] + c.arr[i];
-    if (n <= 0) continue;
+    const pt = atlas.data.city_table[c.idx[i]].pt;
+    if (n <= 0 || (pt[0] === 0 && pt[1] === 0)) continue; // unplaced cities are not drawn
     const r0 = natCityR(n);
     out.idx.push(c.idx[i]);
     out.pos.push(atlas.data.city_table[c.idx[i]].pt);
