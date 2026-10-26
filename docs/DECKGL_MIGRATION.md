@@ -1331,8 +1331,8 @@ clock (Flows only) the circles show the totals as before. Perf (`perf/national.m
   Phase 2), `useAtlasData` (+ retained raw out-tables, Phase 2).
 - `lib/`: `decode`, `filter`, `origin`, `stopEffects`, `format`, `geo`; `timeline`
   (+ exported `prepTrainPath`, Phase 2), `palette` (+ RGBA).
-- Data packs (fmt 6) through Phase 2; `web/vercel.json` headers (the active config; the root
-  `vercel.json` mirrors it); `staleReload` behaviour (extended, not changed).
+- Data packs (fmt 6) through Phase 2; `web/vercel.json` headers (the sole config;
+  the stale root copy was removed); `staleReload` behaviour (extended, not changed).
 - `main` itself, until the owner's G-MAIN merge.
 - Owner rules: no MapLibre, no basemap tiles, no API keys. deck.gl standalone with
   `OrthographicView`, drawing our own outline and network.
