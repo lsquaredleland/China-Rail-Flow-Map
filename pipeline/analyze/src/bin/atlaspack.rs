@@ -106,6 +106,11 @@
 //! run date. The pack holds every train that runs on any calendar date,
 //! once; the client does not read these fields yet.
 //!
+//! Provenance for the footer: `shared.about` (same builds, next to
+//! `calendar`) is `{source, from, to}`, the timetable source sentence and the
+//! schedule window derived from `calendar` (`provenance::about_block`).
+//! Optional: a pack without it still loads.
+//!
 //! Outputs, each also written Brotli-compressed (quality 11) with a `.br`
 //! suffix:
 //! - china-flow-atlas-data-v2.json (original section numbering)
@@ -203,6 +208,7 @@
 //! 1e4 step). Any mismatch aborts with a nonzero exit.
 
 use analyze_rs::entries;
+use analyze_rs::provenance;
 use serde_json::{json, Map, Value};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -1120,6 +1126,17 @@ fn main() {
             .as_object_mut()
             .unwrap()
             .insert("calendar".into(), c.clone());
+        // The footer's source sentence and window: a pack fact (optional).
+        let dates: Vec<String> = arr(c)
+            .iter()
+            .filter_map(|d| d.as_str().map(String::from))
+            .collect();
+        if let Some(about) = provenance::about_block(&dates) {
+            shared5
+                .as_object_mut()
+                .unwrap()
+                .insert("about".into(), about);
+        }
     }
     let (op, osp, och, ooff) = pack_paths(&origins, &OUT, n_trains, &perm_out);
     let national_trains = v1.get("national_trains").map(|nt| {

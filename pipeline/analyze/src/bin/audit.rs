@@ -14,6 +14,7 @@ use analyze_rs::model::*;
 use analyze_rs::names::*;
 use analyze_rs::pack;
 use analyze_rs::polyline::*;
+use analyze_rs::provenance;
 use analyze_rs::timetable::*;
 
 #[derive(Default, Clone)]
@@ -217,6 +218,9 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     g.insert("sections".into(), n(&shared["sections"]));
     g.insert("in_sections".into(), n(&shared["in_sections"]));
     g.insert("schedules_trains".into(), n(&sch["schedules"]));
+    let about_bad = check_about(shared);
+    ok &= about_bad == 0;
+    g.insert("about_mismatch".into(), about_bad);
     g.insert("chord_leg_rows".into(), paths.chord_legs as i64);
     g.insert("continuity_gaps_le6km".into(), paths.throat_gaps as i64);
     g.insert(
@@ -238,6 +242,28 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         if ok { "PASS" } else { "FAIL" }
     );
     (ok, g)
+}
+
+/// `shared.about` is optional; when present it must be what the calendar
+/// derives (`provenance::about_block`). Returns 1 on a mismatch, else 0.
+fn check_about(shared: &Value) -> i64 {
+    let calendar: Vec<String> = arr(&shared["calendar"])
+        .iter()
+        .filter_map(|d| d.as_str().map(String::from))
+        .collect();
+    let bad = shared
+        .get("about")
+        .is_some_and(|a| Some(a) != provenance::about_block(&calendar).as_ref());
+    println!(
+        "AUDIT pack about: {} ({} calendar dates)",
+        match shared.get("about") {
+            None => "none",
+            Some(_) if bad => "MISMATCH with the calendar",
+            Some(_) => "matches the calendar",
+        },
+        calendar.len()
+    );
+    i64::from(bad)
 }
 
 /// Every table and map file carries `fmt: 6`.
