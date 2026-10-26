@@ -1341,24 +1341,31 @@ clock (Flows only) the circles show the totals as before. Perf (`perf/national.m
 
 ## 9. Maintainability: custom render code before and after
 
-`wc -l` of `web/src/components/map/*.ts` plus `MapCanvas.tsx` today **[measured]**; other
-columns **[estimate]**.
+`wc -l` **[measured]** on `deckgl` at `794ec62` (2026-10-26). The "Before" column is the Canvas
+renderer's size when this plan was written (an estimate table then; the Canvas files are gone).
 
-| Module | Today | After P1c.2 (origin on deck) | After Phase 2 (+ national) |
-|---|---:|---:|---:|
-| `backdrop.ts` | 240 | 0 (→ ≈ 60 `deck/layers/backdrop.ts`) | same |
-| `flows.ts` | 853 | 0 (→ ≈ 250 `mapModel` + ≈ 120 layers) | same |
-| `stations.ts` | 432 | 0 (→ ≈ 200 `lib/labels.ts` + ≈ 80 layers + ≈ 50 overlay) | same |
-| `trains.ts` | 278 | 0 (→ ≈ 90 `mapModel`, ≈ 60 layers) | same |
-| `interaction.ts` | 439 | ≈ 80 glue + ≈ 190 `lib/tooltip.ts` + ≈ 60 `lib/pick.ts` | same |
-| `pointer.ts` | 119 | 119 (kept, D17) | same |
-| `camera.ts` | 187 | ≈ 60 glue + ≈ 110 `lib/camera.ts` | same |
-| `render.ts` | 82 | 0 | same |
-| `context.ts` | 275 | ≈ 150 | ≈ 160 |
-| `anim.ts` / `api.ts` | 241 | ≈ 245 | ≈ 270 |
-| `MapCanvas.tsx` | 216 | ≈ 120 | ≈ 130 |
-| deck host (new) | — | ≈ 200 `DeckHost.tsx` + ≈ 400 layers + ≈ 50 overlay + ≈ 40 load + 15 `TailLayer` | + ≈ 120 `layers/national.ts` + ≈ 40 host; + ≈ 250 `lib/national.ts` (tested) |
-| **Total render-side** | **≈ 3,360** | **≈ 1,500** glue/layers + **≈ 750** pure tested `lib` | **≈ 1,700** + **≈ 1,000** `lib` |
+| Module (shipped) | Lines | Replaces (Canvas, before) |
+|---|---:|---|
+| `components/map/deck/layers/backdrop.ts` | 211 | `backdrop.ts` 240 |
+| `components/map/deck/layers/flows.ts` | 694 | `flows.ts` 853 |
+| `components/map/deck/layers/stations.ts` + `labelsOverlay.ts` | 202 + 175 | `stations.ts` 432 |
+| `components/map/deck/layers/trains.ts` | 245 | `trains.ts` 278 |
+| `components/map/deck/layers/national.ts` (new, national mode) | 720 | n/a |
+| `components/map/deck/DeckHost.ts` + `load.ts` + `TailLayer.ts` + `layers/binary.ts` | 513 + 13 + 16 + 64 | `render.ts` 82 |
+| `components/map/interaction.ts` | 267 | `interaction.ts` 439 |
+| `components/map/camera.ts` | 236 | `camera.ts` 187 |
+| `components/map/pointer.ts` | 122 | `pointer.ts` 119 |
+| `components/map/context.ts`, `anim.ts`, `api.ts`, `flows.ts` | 298 + 205 + 75 + 24 | `context.ts` 275, `anim.ts`/`api.ts` 241 |
+| `components/MapCanvas.tsx` | 329 | `MapCanvas.tsx` 216 |
+| **`components/map/` (all, incl. `deck/`)** | **4,080** | **≈ 3,360** (render side only) |
+| `lib/` (22 files, pure and tested) | 4,939 | n/a (logic that was inside the Canvas modules) |
+| `components/departures/` | 1,834 | n/a |
+| top-level `components/*.tsx` | 4,715 | n/a |
+
+Without `layers/national.ts` the render side is ≈ 3,360 lines, the same size as the Canvas
+renderer it replaced, and it now also draws national mode on top. The
+pure logic that used to be buried in the Canvas modules (camera, picking, tooltips, labels,
+timeline, national) lives in `lib/`, which the 266 tests cover.
 
 ---
 

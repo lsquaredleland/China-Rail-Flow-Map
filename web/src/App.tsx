@@ -541,7 +541,7 @@ export default function App() {
         {atlas ? atlas.data.about : ""}
       </footer>
 
-      <Footnote />
+      <Footnote national={national} />
 
       <TrainScheduleModal
         key={trainOpenSeq}

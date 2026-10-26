@@ -70,7 +70,7 @@ Two products from one pipeline:
 
 ### 1.1 The 2026-10-22 v2+ enhancements to China Rail Flow Map
 
-- **2-Color HSR vs. Conventional Infrastructure Overlay**: `sections` (4,274 HSR / 3,257 conv) and `in_sections` (4,146 HSR / 3,116 conv) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h, rendered in `#0066cc` (light) / `#4da3ff` (dark) for HSR vs `#40231a` / `#ecdfc2` for conventional rail, with an interactive 2-color Infrastructure key in the legend card.
+- **2-Color HSR vs. Conventional Infrastructure Overlay**: `sections` (4,519 HSR / 4,587 conv, current pack; 12306-era: 4,274 / 3,257) and `in_sections` (4,495 HSR / 4,560 conv; 12306-era: 4,146 / 3,116) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h, rendered in `#0066cc` (light) / `#4da3ff` (dark) for HSR vs `#40231a` / `#ecdfc2` for conventional rail, with an interactive 2-color Infrastructure key in the legend card.
 - **8-Class Per-Section Flow Breakdown (`G, D, C, S, Z, T, K, plain/普`)**: `flows` and `in_flows` rows pack `[sec_idx, total, g, d, c, s, z, t, k, plain]` (trailing zero counts stripped). Selecting any combination of classes in the map toolbar or table filter bar dynamically redraws the map's flow widths/colors, destination/source city dots, and header stats, while highlighting the selected classes as an overlay on top of the fixed background histograms.
 - **Exact Per-Train Section Index (`dep_secs`, `arr_secs`, and per-call `sec_cnt`)**: `atlas-v2-out-tables.json` and `atlas-v2-in-tables.json` include each train's ordered section index list (`dep_secs` / `arr_secs`) and each call's stop-cutoff section count (`sec_cnt`). Clicking any station dot fades non-connecting trunks to ~18% opacity and draws the exact city-pair train count per section at 100% opacity on top of the ghosted full trunk width.
 - **Three Interactive Histograms (Hour, Distance, Duration)**: Added the 3rd **Trains by journey time** histogram (1-hour bins `0–1h` … `24h+` in `#1b9e77`), hover count labels directly above every hovered bar, and click-to-filter on all three histograms.
@@ -177,10 +177,13 @@ the national files `atlas-v2-{national,national-trains,national-entries}.json.br
 and the plain `.json` copies (`atlas-v2-schedules.json`, `china-outline.json`)
 are not fetched by the app (it loads `<url>.br`, with a plain `.json` fallback
 that is not deployed) and only add to the deploy size.
-Format: shared + per-direction map/tables files (`atlas-v2-{shared,out-map,out-tables,in-map,in-tables}.json(.br)`),
-array rows, integer-minute times, geometry at 1e4. Top-100 cut: #1 广州 1,201/day …
-#100 麻城 137/day.
-- **Infrastructure (`atlas-v2-shared.json`)**: `sections` (4,274 HSR / 3,257 conv) and `in_sections` (4,146 HSR / 3,116 conv) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h.
+Format (fmt 6, current pack of 2026-10-26, 11,248 trains): shared + per-direction map/tables
+files (`atlas-v2-{shared,out-map,out-tables,in-map,in-tables}.json(.br)`) plus the schedules and
+national files above, array rows, integer-minute times, geometry at 1e4. The out-map carries
+102 origin cities; the busiest is 广州 with 1,498 outbound trains/day, and the smallest in the
+file are 宜昌 174, 香港 110 and 拉萨 12. (The earlier 12306-era pack was a strict top-100 cut,
+#1 广州 1,201/day … #100 麻城 137/day.)
+- **Infrastructure (`atlas-v2-shared.json`)**: `sections` (4,519 HSR / 4,587 conv, current pack; 12306-era: 4,274 / 3,257) and `in_sections` (4,495 HSR / 4,560 conv; 12306-era: 4,146 / 3,116) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h.
 - **8-Class Flow Breakdown (`out-map` / `in-map`)**: `flows` and `in_flows` rows pack `[sec_idx, total, g, d, c, s, z, t, k, plain]` (trailing zero counts stripped).
 - **National table (`atlas-v2-national.json`, P3.1; shipped since 2026-10-25)**: `{fmt, trains, total, by_class}`, arrays parallel to `sections`: distinct trains/day per section, every train counted once nationally, split into the same 8 classes. Format and rule: `atlaspack.rs` header and `docs/DECKGL_MIGRATION.md` (P3.1 as built).
 - **Per-Train Section Indices (`out-tables` / `in-tables`)**: packs ordered section index lists (`dep_secs` / `arr_secs`) and per-call section cutoff counts (`sec_cnt`), allowing the client to highlight exact city-pair train corridors at 100% opacity over ~18% ghosted trunks.
