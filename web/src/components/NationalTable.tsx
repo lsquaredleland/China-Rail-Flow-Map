@@ -102,7 +102,7 @@ export default function NationalTable({
                 {th("arr", "Arrives")}
                 {th("dur", "Duration")}
                 {th("km", "Distance", "num")}
-                {th("days", "Runs")}
+                {th("runs", "Runs")}
               </tr>
             </thead>
             <tbody id="depBody">

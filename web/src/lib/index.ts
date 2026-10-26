@@ -68,7 +68,7 @@ export { buildNational, nat, natPositions, natState, natXY, requireNationalTrain
 export { natTrainVM } from "./natTrain";
 export { buildNatRows, selectNatRows, sortNatRows } from "./natTable";
 export type { NatRow, NatSortKey } from "./natTable";
-export { runCount, runDays } from "./runDays";
+export { runRank, runDays } from "./runDays";
 export type { RunDays } from "./runDays";
 export {
   NAT_DIST_BINS,

@@ -3,7 +3,7 @@
    per-train selection that drives the map (`natSelect`). Lookups and sorting
    only; the pack decided every fact. */
 import type { RawStation, RawTrain, SchedulesData } from "../types";
-import { runCount } from "./runDays";
+import { runRank } from "./runDays";
 
 export interface NatRow {
   t: number; // train_table index
@@ -17,15 +17,16 @@ export interface NatRow {
   arr: number; // minutes from the departure day's midnight (can pass 1440)
   dur: number; // arr - dep; -1 without a schedule
   km: number; // rail km at the last stop; -1 without a schedule
-  days: number; // run days in the calendar window (0 without run-day data)
+  runs: number; // run-days category rank (Daily first)
 }
 
-export type NatSortKey = "code" | "dep" | "arr" | "dur" | "km" | "days";
+export type NatSortKey = "code" | "dep" | "arr" | "dur" | "km" | "runs";
 
 export function buildNatRows(
   trainTable: readonly RawTrain[],
   stationTable: readonly RawStation[],
   sched: SchedulesData,
+  calendar?: readonly string[],
 ): NatRow[] {
   const name = (idx: number): [string, string] => {
     if (idx < stationTable.length) return [stationTable[idx].zh, stationTable[idx].en];
@@ -35,7 +36,7 @@ export function buildNatRows(
   return trainTable.map((tr, t) => {
     const s = sched.schedules[t];
     if (!s || s.length === 0) {
-      return { t, code: tr.code, cls: tr.class, from: "", fromEn: "", to: "", toEn: "", dep: -1, arr: -1, dur: -1, km: -1, days: runCount(tr.days) };
+      return { t, code: tr.code, cls: tr.class, from: "", fromEn: "", to: "", toEn: "", dep: -1, arr: -1, dur: -1, km: -1, runs: runRank(tr, calendar) };
     }
     const first = s[0];
     const last = s[s.length - 1];
@@ -55,7 +56,7 @@ export function buildNatRows(
       arr,
       dur: dep >= 0 && arr >= 0 ? arr - dep : -1,
       km: typeof last[4] === "number" ? last[4] : -1,
-      days: runCount(tr.days),
+      runs: runRank(tr, calendar),
     };
   });
 }

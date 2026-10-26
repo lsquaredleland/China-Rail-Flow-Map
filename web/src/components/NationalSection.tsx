@@ -38,8 +38,8 @@ export default function NationalSection({
   onSelectTrain: (code: string) => void;
 }) {
   const rows = useMemo(
-    () => (schedules ? buildNatRows(trainTable, stationTable, schedules) : null),
-    [trainTable, stationTable, schedules],
+    () => (schedules ? buildNatRows(trainTable, stationTable, schedules, calendar) : null),
+    [trainTable, stationTable, schedules, calendar],
   );
   const sel = useMemo(() => natSelect(trainTable, index, filter), [trainTable, index, filter]);
   return (

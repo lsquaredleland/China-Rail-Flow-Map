@@ -1,6 +1,6 @@
 /* Inbound with a source: every train arriving from that city. */
 import type { OriginVM, SrcVM } from "../../types";
-import { fmtTime, runCount } from "../../lib";
+import { fmtTime, runRank } from "../../lib";
 import HeadCount, { OfTotal } from "./HeadCount";
 import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
@@ -48,8 +48,8 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
   });
   const { key: ik, dir: idir } = inCallSort;
   list.sort((a, b) => {
-    if (ik === "days") {
-      const dd = runCount(atlas?.data.train_table[a.arr.t]?.days) - runCount(atlas?.data.train_table[b.arr.t]?.days);
+    if (ik === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.arr.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.arr.t], atlas?.data.calendar);
       if (dd) return dd * idir;
     }
     if (ik === "dur") {
@@ -177,11 +177,11 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
           <th
             scope="col"
             className="sortable"
-            data-sort="days"
-            aria-sort={iAriaSort("days")}
-            onClick={() => onInCallSort("days")}
+            data-sort="runs"
+            aria-sort={iAriaSort("runs")}
+            onClick={() => onInCallSort("runs")}
           >
-            Runs <span className="arrow">{iArrow("days")}</span>
+            Runs <span className="arrow">{iArrow("runs")}</span>
           </th>
         </tr>
       </thead>

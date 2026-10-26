@@ -30,7 +30,7 @@ describe("national table", () => {
       ],
     } as any;
     const rows = buildNatRows(tt, st, sched);
-    expect(rows[1]).toMatchObject({ from: "乙", to: "丙", dep: 1380, arr: 1500, dur: 120, km: 120.5, days: 1 });
+    expect(rows[1]).toMatchObject({ from: "乙", to: "丙", dep: 1380, arr: 1500, dur: 120, km: 120.5 });
     expect(sortNatRows(rows.slice(), "dur", -1).map((r) => r.code)).toEqual(["K2", "G1"]);
     expect(selectNatRows(rows, Uint8Array.of(0, 1)).map((r) => r.code)).toEqual(["K2"]);
   });

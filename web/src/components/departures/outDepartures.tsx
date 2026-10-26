@@ -1,5 +1,5 @@
 /* Outbound, no destination: every train departing the origin city. */
-import { fmtDist, fmtTime, runCount } from "../../lib";
+import { fmtDist, fmtTime, runRank } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
@@ -36,8 +36,8 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   );
   const { key, dir } = sort;
   list.sort((a, b) => {
-    if (key === "days") {
-      const dd = runCount(atlas?.data.train_table[a.t]?.days) - runCount(atlas?.data.train_table[b.t]?.days);
+    if (key === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.t], atlas?.data.calendar);
       if (dd) return dd * dir;
     }
     if (key === "dur" || key === "km") {
@@ -138,11 +138,11 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
           <th
             scope="col"
             className="sortable"
-            data-sort="days"
-            aria-sort={ariaOf("days")}
-            onClick={() => onSort("days")}
+            data-sort="runs"
+            aria-sort={ariaOf("runs")}
+            onClick={() => onSort("runs")}
           >
-            Runs <span className="arrow">{arrow("days")}</span>
+            Runs <span className="arrow">{arrow("runs")}</span>
           </th>
         </tr>
       </thead>

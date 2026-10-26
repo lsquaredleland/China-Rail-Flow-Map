@@ -1,8 +1,7 @@
 import type { DecodedAtlas } from "../../types";
 import { runDays } from "../../lib";
 
-/** The run days of a train: the "9/15" count and the short label; the
-    tooltip lists the dates. */
+/** The run days of a train, as one label ("Daily", "Weekends", "Fri–Sun", ...). */
 export function RunsLabel({
   days,
   pattern,
@@ -13,15 +12,7 @@ export function RunsLabel({
   calendar?: readonly string[];
 }) {
   const r = runDays(days, pattern, calendar);
-  if (!r) return <>—</>;
-  return (
-    <span className="runs" title={r.title ? "Runs " + r.title : "Does not run in the window"}>
-      <b className="runs-n">
-        {r.count}/{r.total}
-      </b>{" "}
-      <span className="runs-label">{r.label}</span>
-    </span>
-  );
+  return <span className="runs-label">{r ? r.label : "—"}</span>;
 }
 
 /** The "Runs" table cell of an origin-view row, looked up by train_table index. */

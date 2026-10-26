@@ -302,7 +302,6 @@
 }
 /* ---------- run days + national table ---------- */
 .c-runs { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.runs-n { font-weight: 700; }
 .runs-label { color: var(--ink-soft); }
 .nat-table { min-width: 760px; }
 .nat-table tbody tr { height: 46px; }
@@ -310,4 +309,3 @@
 .nat-table tbody tr.nat-spacer { height: auto; cursor: default; background: none !important; }
 .nat-table tbody tr.nat-spacer td { padding: 0; border: 0; }
 .nat-table tbody tr.nat-spacer:hover { background: none !important; }
-.tsm-subtitle .runs-n { margin-left: 4px; }
