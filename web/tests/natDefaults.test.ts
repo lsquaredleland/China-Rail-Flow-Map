@@ -1,7 +1,7 @@
 // National mode's default view: flows and city circles, no animation; the
-// ?natLayer URL values map onto the two toggles.
+// ?natLayer=none turns the Flows toggle off.
 import { afterEach, describe, expect, test } from "bun:test";
-import { initialNatLayer } from "../src/hooks/useUrlState";
+import { initialNatFlows } from "../src/hooks/useUrlState";
 
 const g = globalThis as unknown as { window?: unknown };
 const withSearch = (search: string) => {
@@ -14,14 +14,14 @@ afterEach(() => {
 describe("national defaults", () => {
   test("no natLayer param: flows only (no animation)", () => {
     withSearch("?national=1");
-    expect(initialNatLayer()).toBe("flows");
+    expect(initialNatFlows()).toBe(true);
   });
-  test("natLayer back-compat values", () => {
-    for (const v of ["trains", "both", "none", "flows"]) {
+  test("natLayer=none: flows off; the retired values open with flows on", () => {
+    withSearch("?national=1&natLayer=none");
+    expect(initialNatFlows()).toBe(false);
+    for (const v of ["trains", "both", "flows", "bogus"]) {
       withSearch("?national=1&natLayer=" + v);
-      expect(initialNatLayer()).toBe(v as never);
+      expect(initialNatFlows()).toBe(true);
     }
-    withSearch("?natLayer=bogus");
-    expect(initialNatLayer()).toBe("flows");
   });
 });

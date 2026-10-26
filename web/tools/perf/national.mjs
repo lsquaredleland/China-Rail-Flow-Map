@@ -6,7 +6,7 @@
 // the SwiftShader check: see lib.mjs. The national trains, flows and entries
 // files must be served with the build (dist/assets/atlas-v2-national-*.json.br).
 // Default = Trains + flows (A+B, the Flows toggle is on by default);
-// --query '&natLayer=trains' draws the trains alone (A).
+// --query '&natLayer=none' draws the trains alone (A).
 // --query '&natSynth=12000' repeats the trains up to ~12,000 (perf load only).
 // usage: node tools/perf/national.mjs [base] [--frames 300] [--dpr 1,2]
 //          [--throttle 1] [--start 1095] [--end 1155] [--headed] [--out f.json]

@@ -45,9 +45,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   if (!atlas) return [];
   const layers: Layer[] = [];
   const st = S.current;
-  const mode = P.current.nationalLayer ?? "flows";
-  const withFlows = mode === "flows" || mode === "both";
-  const withTrains = mode === "trains" || mode === "both";
+  const { flows: withFlows, trains: withTrains } = P.current.nationalLayers ?? { flows: true, trains: false };
   const nf = P.current.nationalFlows;
   const filter = P.current.nationalFilter ?? NO_FILTER;
   const view = natView(atlas, nf ?? null, P.current.nationalIndex ?? null, filter);
@@ -66,10 +64,10 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       return layers;
     }
   }
-  if (!iso && withFlows && nf && (mode === "flows" || P.current.nationalEntries)) {
+  if (!iso && withFlows && nf && (!withTrains || P.current.nationalEntries)) {
     // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
     // The entry ticks know only the class, so an index filter draws the day's totals.
-    const minute = mode === "both" && !view.indexed ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
+    const minute = withTrains && !view.indexed ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
     const fl = nationalFlowLayers({
       atlas,
       nf,
@@ -95,7 +93,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   if (!iso && withFlows && nf) {
     // The city circles ride with the flows (day totals, whatever the clock).
     // With the clock running (flows + trains) the circles grow as the trains stop there.
-    const ev = mode === "both" ? natViewEvents(view, nf, P.current.nationalIndex ?? null) : null;
+    const ev = withTrains ? natViewEvents(view, nf, P.current.nationalIndex ?? null) : null;
     const growth = ev ? { ev, t: Math.min(1440, Math.max(0, st.animTime)) } : null;
     st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale), st.view.scale / st.fitScale, growth);
     const hv = st.hover;

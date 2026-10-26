@@ -8,7 +8,7 @@ import type {
   DayTimelineVM,
   Direction,
   DistUnit,
-  NatLayer,
+  NatLayers,
   NationalEntriesPack,
   NationalFlowsPack,
   NationalIndexPack,
@@ -87,8 +87,8 @@ export interface Props {
   national?: boolean;
   /** The national trains file and its schedules, once loaded. */
   nationalTrains?: NationalTrainsData | null;
-  /** National mode: trains (A), the day's flows (B), or both (A+B). */
-  nationalLayer?: NatLayer;
+  /** National mode: the day's flows (B), the trains (A), or both (A+B). */
+  nationalLayers?: NatLayers;
   /** The national flows file (B) and its entry ticks (A+B), once loaded. */
   nationalFlows?: NationalFlowsPack | null;
   nationalEntries?: NationalEntriesPack | null;

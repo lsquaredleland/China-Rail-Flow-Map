@@ -43,7 +43,7 @@ const SCEN = new Set(
   (opt.scenarios || (NATIONAL ? "origin-initial,national-fit,city-x10" : "origin-initial,city-x10,anim-peak,switch,load")).split(","),
 );
 const fitScaleOverride = opt.fitScale ? +opt.fitScale : null;
-const query = (NATIONAL ? "&national=1" + (NATIONAL === "trains" ? "&natLayer=trains" : "") : "") + (opt.query || "");
+const query = (NATIONAL ? "&national=1" + (NATIONAL === "trains" ? "&natLayer=none" : "") : "") + (opt.query || "");
 
 const stat = (a) => {
   if (!a.length) return { mean: 0, p50: 0, p95: 0, max: 0 };
