@@ -300,3 +300,14 @@
 @media (max-width: 640px) {
   .nat-code input { min-height: 44px; font-size: 16px; flex: 1 1 auto; }
 }
+/* ---------- run days + national table ---------- */
+.c-runs { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.runs-n { font-weight: 700; }
+.runs-label { color: var(--ink-soft); }
+.nat-table { min-width: 760px; }
+.nat-table tbody tr { height: 46px; }
+.nat-table tbody td { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 280px; padding-top: 4px; padding-bottom: 4px; vertical-align: middle; }
+.nat-table tbody tr.nat-spacer { height: auto; cursor: default; background: none !important; }
+.nat-table tbody tr.nat-spacer td { padding: 0; border: 0; }
+.nat-table tbody tr.nat-spacer:hover { background: none !important; }
+.tsm-subtitle .runs-n { margin-left: 4px; }

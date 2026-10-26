@@ -1,7 +1,8 @@
 /* Outbound, no destination: every train departing the origin city. */
-import { fmtDist, fmtTime } from "../../lib";
+import { fmtDist, fmtTime, runCount } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
+import RunsCell from "./RunsCell";
 import HeadCount from "./HeadCount";
 import { byClass, classTag, depDayOffset } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
@@ -21,6 +22,7 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
     setSort,
     emptyProps,
     cur,
+    atlas,
   } = ctx;
   let showingNote: string;
   const deps = cur ? cur.deps : [];
@@ -34,6 +36,10 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   );
   const { key, dir } = sort;
   list.sort((a, b) => {
+    if (key === "days") {
+      const dd = runCount(atlas?.data.train_table[a.t]?.days) - runCount(atlas?.data.train_table[b.t]?.days);
+      if (dd) return dd * dir;
+    }
     if (key === "dur" || key === "km") {
       const va = key === "dur" ? a.dur : a.km;
       const vb = key === "dur" ? b.dur : b.km;
@@ -129,12 +135,21 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
           <th scope="col" className="num">
             Stops
           </th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="days"
+            aria-sort={ariaOf("days")}
+            onClick={() => onSort("days")}
+          >
+            Runs <span className="arrow">{arrow("days")}</span>
+          </th>
         </tr>
       </thead>
       <tbody id="depBody">
         {!cur ? null : list.length === 0 ? (
           <tr>
-            <td colSpan={8} className="dep-empty">
+            <td colSpan={9} className="dep-empty">
               <EmptyMessage {...emptyProps} />
             </td>
           </tr>
@@ -180,6 +195,7 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
               <td className="c-time">{fmtTime(d.dur)}</td>
               <td className="num c-time">{fmtDist(d.km, unit)}</td>
               <td className="num">{d.stops}</td>
+              <RunsCell atlas={atlas} t={d.t} />
             </tr>
           ))
         )}

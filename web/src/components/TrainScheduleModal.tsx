@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import type { DepVM, ArrVM, DistUnit, SchedulesData, ScheduleStop } from "../types";
+import type { DepVM, ArrVM, DistUnit, RawTrain, SchedulesData, ScheduleStop } from "../types";
+import { RunsLabel } from "./departures/RunsCell";
 import type { MapApi } from "./MapCanvas";
 import { formatScheduleStops } from "../lib";
 import { useDialogFocus } from "../hooks/useDialog";
@@ -7,6 +8,8 @@ import { useDialogFocus } from "../hooks/useDialog";
 interface Props {
   code: string | null;
   trainT: number | null; // train_table index; keys the schedules file
+  trainRow?: RawTrain | null; // its train_table row (run days)
+  calendar?: readonly string[];
   onClose: () => void;
   schedulesData: SchedulesData | null;
   stationTable: { zh: string; en: string }[];
@@ -38,6 +41,8 @@ function fmtStName(zh: string, en?: string): string {
 export default function TrainScheduleModal({
   code,
   trainT,
+  trainRow,
+  calendar,
   onClose,
   schedulesData,
   stationTable,
@@ -317,6 +322,11 @@ export default function TrainScheduleModal({
             <div className="tsm-subtitle">
               {trainVM ? `Dep ${trainVM.dep} · Arr ${trainVM.arr} (${Math.floor(trainVM.dur / 60)}h ${trainVM.dur % 60}m)` : "Full Station Timetable"}
             </div>
+            {trainRow?.days ? (
+              <div className="tsm-subtitle">
+                Runs <RunsLabel days={trainRow.days} pattern={trainRow.pattern} calendar={calendar} />
+              </div>
+            ) : null}
           </div>
         </div>
 

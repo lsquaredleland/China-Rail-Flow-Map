@@ -1,8 +1,9 @@
 /* Outbound with a destination: every train calling at that city. */
 import type { DestVM, OriginVM } from "../../types";
-import { fmtTime } from "../../lib";
+import { fmtTime, runCount } from "../../lib";
 import HeadCount, { OfTotal } from "./HeadCount";
 import TrainCell from "./TrainCell";
+import RunsCell from "./RunsCell";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
 import { callStations } from "../../stationBreakdown";
@@ -50,6 +51,10 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
   });
   const { key: ck, dir: cdir } = callSort;
   list.sort((a, b) => {
+    if (ck === "days") {
+      const dd = runCount(atlas?.data.train_table[a.dep.t]?.days) - runCount(atlas?.data.train_table[b.dep.t]?.days);
+      if (dd) return dd * cdir;
+    }
     if (ck === "dur") {
       const va = a.dur;
       const vb = b.dur;
@@ -171,12 +176,21 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
           <th scope="col">Departs {destFilter.en}</th>
           <th scope="col">Final destination</th>
           <th scope="col">Status</th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="days"
+            aria-sort={cAriaSort("days")}
+            onClick={() => onCallSort("days")}
+          >
+            Runs <span className="arrow">{cArrow("days")}</span>
+          </th>
         </tr>
       </thead>
       <tbody id="depBody">
         {list.length === 0 ? (
           <tr>
-            <td colSpan={8} className="dep-empty">
+            <td colSpan={9} className="dep-empty">
               No trains match that filter.
             </td>
           </tr>
@@ -236,6 +250,7 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
                     {c.term ? "Terminates here" : "Intermediate stop"}
                   </span>
                 </td>
+                <RunsCell atlas={atlas} t={d.t} />
               </tr>
             );
           })

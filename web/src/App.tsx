@@ -18,7 +18,7 @@ import Legend, { type LegendHandle } from "./components/Legend";
 import DestinationPanel from "./components/DestinationPanel";
 import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
-import NationalFilters from "./components/NationalFilters";
+import NationalSection from "./components/NationalSection";
 import TimelineScrubber from "./components/TimelineScrubber";
 import TrainScheduleModal from "./components/TrainScheduleModal";
 import AnimAnnouncer from "./components/AnimAnnouncer";
@@ -80,6 +80,7 @@ export default function App() {
     nationalIndex,
     nationalIndexFailed,
     ensureNationalIndex,
+    ensureSchedules,
     ensureNationalFlows,
     ensureNationalEntries,
   } = useAtlasData({
@@ -153,6 +154,10 @@ export default function App() {
   useEffect(() => {
     if (national) ensureNationalIndex();
   }, [national, ensureNationalIndex]);
+  // The national table is timed by the schedules asset.
+  useEffect(() => {
+    if (national) ensureSchedules();
+  }, [national, ensureSchedules]);
   const toggleNational = () => {
     const v = !national;
     setNational(v);
@@ -288,21 +293,6 @@ export default function App() {
           onSetDark={setDark}
           national={national}
           onToggleNational={toggleNational}
-          extraFilters={
-            national && atlas ? (
-              <NationalFilters
-                index={nationalIndex}
-                failed={nationalIndexFailed}
-                trainTable={atlas.data.train_table}
-                filter={natFilter}
-                unit={distUnit}
-                onHours={filters.setSelectedHours}
-                onDistBins={filters.setSelectedDistBins}
-                onDurBins={filters.setSelectedDurBins}
-                onTrainCodes={filters.setSelectedTrainCodes}
-              />
-            ) : null
-          }
           activeFilterCount={
             selectedClasses.length +
             [filters.hours, filters.distBins, filters.durBins, filters.selectedTrainCodes].filter((a) => a && a.length > 0).length
@@ -424,6 +414,23 @@ export default function App() {
         )}
       </div>
 
+      {national && atlas && (
+        <NationalSection
+          index={nationalIndex}
+          indexFailed={nationalIndexFailed}
+          trainTable={atlas.data.train_table}
+          stationTable={atlas.data.station_table}
+          calendar={atlas.data.calendar}
+          schedules={schedulesData}
+          filter={natFilter}
+          unit={distUnit}
+          onHours={filters.setSelectedHours}
+          onDistBins={filters.setSelectedDistBins}
+          onDurBins={filters.setSelectedDurBins}
+          onTrainCodes={filters.setSelectedTrainCodes}
+          onSelectTrain={setSelectedTrainCode}
+        />
+      )}
       {!national && (
       <DeparturesTable
         key={direction}
@@ -474,6 +481,11 @@ export default function App() {
       <TrainScheduleModal
         code={selectedTrainCode}
         trainT={selectedTrainVM ? selectedTrainVM.t : nationalTrainT}
+        trainRow={(() => {
+          const t = selectedTrainVM ? selectedTrainVM.t : nationalTrainT;
+          return t !== null && atlas ? atlas.data.train_table[t] : null;
+        })()}
+        calendar={atlas?.data.calendar}
         onClose={() => setSelectedTrainCode(null)}
         schedulesData={schedulesData}
         stationTable={atlas ? atlas.data.station_table : []}
