@@ -80,6 +80,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       dark: P.current.dark,
       scale: st.view.scale,
       fitScale: st.fitScale,
+      damped: !!P.current.zoomClarity,
     });
     layers.push(...fl.layers);
     stats.natFlows = fl.sections;
@@ -98,7 +99,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     const growth = ev ? { ev, t: Math.min(1440, Math.max(0, st.animTime)) } : null;
     st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale), st.view.scale / st.fitScale, growth);
     const hv = st.hover;
-    if (hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, P.current.dark));
+    if (hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, P.current.dark, !!P.current.zoomClarity));
     if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark, hv && hv.kind === "natCity" ? hv.idx : -1));
   }
   const built = withTrains ? nationalTimeline(atlas, P.current.nationalTrains) : null;

@@ -20,6 +20,7 @@ export interface LegendHandle {
     showInfra?: boolean,
     showAnim?: boolean,
     stationT?: number,
+    damped?: boolean,
   ) => void;
 }
 
@@ -110,6 +111,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         showInfra?: boolean,
         showAnim?: boolean,
         stationT = 0,
+        damped = false,
       ) {
         const svg = svgRef.current;
         if (!svg) return;
@@ -126,7 +128,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         // the legend alone so a deep zoom cannot grow the panel without
         // bound. Step i spans [4 + i*stepW, ...] on a shared baseline.
         const capped = Math.min(zoomRatio, 8);
-        const ratio = capped * zoomWidthScale(capped);
+        const ratio = capped * zoomWidthScale(capped, damped);
         const { steps, samples, k } = scaleRef.current;
         let maxH = 0.5;
         for (let i = 0; i < steps.length; i++) {

@@ -213,6 +213,7 @@ export function frameTail(M: MapCtx) {
       P.current.showInfra,
       st.animEnabled,
       stationT(M),
+      !!P.current.zoomClarity,
     );
   updateScaleBar(M);
   // Only a moved view re-arms the debounce: the animation loop draws

@@ -278,6 +278,8 @@ export interface FlowLayersInput {
   /** View scale (px per degree) and the fit scale of the national view. */
   scale: number;
   fitScale: number;
+  /** Zoom clarity: flow widths grow with the square root of the zoom past the knee. */
+  damped: boolean;
   hover: Hit | null;
   activeTrainsAt: (tl: DayTimelineVM, t: number) => ActiveTrainVM[];
   chords: ChordVM[];
@@ -285,15 +287,15 @@ export interface FlowLayersInput {
 
 const ferryBlue = (dark: boolean) => rgba(dark ? "#38BDF8" : "#0284C7");
 /** Canvas flowWidth in CSS px. */
-const widthPx = (n: number, scale: number, fitScale: number) => flowWidth(n, scale, fitScale);
+const widthPx = (n: number, scale: number, fitScale: number, damped: boolean) => flowWidth(n, scale, fitScale, damped);
 
-function flowPassLayer(role: string, pd: PassData, scale: number, fitScale: number, dark: boolean) {
+function flowPassLayer(role: string, pd: PassData, scale: number, fitScale: number, dark: boolean, damped: boolean) {
   return new PathLayer({
     id: "flows-" + role,
     data: pd.data,
     _pathType: "open",
     widthUnits: "common",
-    widthScale: zoomWidthScale(scale / fitScale),
+    widthScale: zoomWidthScale(scale / fitScale, damped),
     widthMinPixels: 0.5,
     capRounded: true,
     jointRounded: true,
@@ -338,14 +340,14 @@ function flowPickLayer(role: string, pd: PassData) {
 }
 
 /** Dashed open-water crossings of a pass's ferry items (the former Canvas renderer's strokeFlowList). */
-function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: number, colour: RGBA) {
+function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: number, colour: RGBA, damped: boolean) {
   return new PathLayer<DashPiece>({
     id,
     data: pd.ferry,
     getPath: (d: DashPiece) => d.path,
     positionFormat: "XY",
     widthUnits: "common",
-    widthScale: zoomWidthScale(scale / fitScale),
+    widthScale: zoomWidthScale(scale / fitScale, damped),
     widthMinPixels: 0.5,
     getWidth: (d: DashPiece) => (flowUnits(d.n) * WIDTH_K) / fitScale,
     getColor: colour,
@@ -354,7 +356,7 @@ function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: numbe
     extensions: [dashExt],
     dashUnits: "pixels",
     getDashArray: (d: DashPiece) => {
-      const w = widthPx(d.n, scale, fitScale);
+      const w = widthPx(d.n, scale, fitScale, damped);
       return [Math.max(12, w * 2.5), Math.max(9, w * 1.8)];
     },
     updateTriggers: { getWidth: [fitScale, pd.id], getColor: colour.join(), getDashArray: [scale, fitScale, pd.id] },
@@ -371,13 +373,14 @@ export function passDataLayers(
   dark: boolean,
   scale: number,
   fitScale: number,
+  damped = false,
 ): Layer[] {
-  const L: Layer[] = [flowPassLayer(role, pd, scale, fitScale, dark)];
+  const L: Layer[] = [flowPassLayer(role, pd, scale, fitScale, dark, damped)];
   if (pickable) L.push(flowPickLayer(role, pd));
   if (pd.ferry.length) {
     const blue = ferryBlue(dark);
     const col = alpha >= 1 ? blue : blendOver(blue, rgba(pal.paper), alpha);
-    L.push(ferryDashLayer(`flows-${role}-ferry`, pd, scale, fitScale, col));
+    L.push(ferryDashLayer(`flows-${role}-ferry`, pd, scale, fitScale, col, damped));
   }
   return L;
 }
@@ -390,11 +393,12 @@ export function flowPassLayers(
   dark: boolean,
   scale: number,
   fitScale: number,
+  damped: boolean,
 ): Layer[] {
   const L: Layer[] = [];
   for (const pass of passes) {
     const pd = buildPassData(set, pass.items, pal, pass.alpha, pass.maxN);
-    L.push(...passDataLayers(pass.role, pd, pass.alpha, pass.pickable, pal, dark, scale, fitScale));
+    L.push(...passDataLayers(pass.role, pd, pass.alpha, pass.pickable, pal, dark, scale, fitScale, damped));
   }
   return L;
 }
@@ -487,7 +491,7 @@ let chordMemo: ChordItem[] = [];
 const chordDash = (w: number): [number, number] => [Math.max(3, w * 1.1), Math.max(2.5, w * 0.8)];
 
 export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
-  const { ms, caches, scale, fitScale, hover, chords } = inp;
+  const { ms, caches, scale, fitScale, hover, chords, damped } = inp;
   if (ms.dir !== "out") return [];
   const plan = chordPlan(ms, caches);
   if (!plan) return [];
@@ -513,7 +517,7 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
       getPath: (d: ChordItem) => d.path,
       positionFormat: "XY",
       widthUnits: plan.isolated ? "pixels" : "common",
-      widthScale: plan.isolated ? 1 : zoomWidthScale(scale / fitScale),
+      widthScale: plan.isolated ? 1 : zoomWidthScale(scale / fitScale, damped),
       widthMinPixels: plan.isolated ? 0 : 0.5,
       getWidth: plan.isolated ? 1.5 : (d: ChordItem) => (flowUnits(d.ch.n) * WIDTH_K) / fitScale,
       getColor: colour,
@@ -521,7 +525,7 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
       jointRounded: true,
       extensions: [dashExt],
       dashUnits: "pixels",
-      getDashArray: (d: ChordItem) => chordDash(plan.isolated ? 1.5 : widthPx(d.ch.n, scale, fitScale)),
+      getDashArray: (d: ChordItem) => chordDash(plan.isolated ? 1.5 : widthPx(d.ch.n, scale, fitScale, damped)),
       updateTriggers: {
         getWidth: [plan.isolated, fitScale],
         getColor: colour.join(),
@@ -543,7 +547,7 @@ export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
     } as object),
   );
   if (highlight && !plan.isolated) {
-    const hw = widthPx(highlight.n, scale, fitScale) + 1.6;
+    const hw = widthPx(highlight.n, scale, fitScale, damped) + 1.6;
     L.push(
       new PathLayer<ChordItem>({
         id: "chord-highlight",
@@ -630,12 +634,12 @@ export function corridorLayers(inp: FlowLayersInput): Layer[] {
 /* ---------- hover highlight ---------- */
 
 export function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
-  const { set, ms, caches, scale, fitScale, hover, dark } = inp;
+  const { set, ms, caches, scale, fitScale, hover, dark, damped } = inp;
   if (!hover || hover.kind !== "seg") return [];
   const n = hover.subN !== undefined ? hover.subN : hover.n;
   const effectiveN = highlightSegN(ms, caches, hover.s, n);
   if (effectiveN === null) return [];
-  const hw = widthPx(effectiveN, scale, fitScale) + 1.6;
+  const hw = widthPx(effectiveN, scale, fitScale, damped) + 1.6;
   const solid = (paths: number[][]) =>
     new PathLayer<number[]>({
       id: "seg-highlight",
@@ -682,11 +686,11 @@ export function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
 /** `under`: chords, flow passes, corridor, infra (Canvas order; trains follow in P1b.3).
     `over`: the hover highlight (stations follow in P1b.3). */
 export function flowLayers(inp: FlowLayersInput): { under: Layer[]; over: Layer[] } {
-  const { set, ms, caches, scale, fitScale, dark } = inp;
+  const { set, ms, caches, scale, fitScale, dark, damped } = inp;
   const pal = palette(dark);
   const under: Layer[] = [
     ...chordLayers(inp, pal),
-    ...flowPassLayers(set, memoFlowPasses(ms, caches), pal, dark, scale, fitScale),
+    ...flowPassLayers(set, memoFlowPasses(ms, caches), pal, dark, scale, fitScale, damped),
     ...corridorLayers(inp),
     ...(ms.showInfra ? infraLayers(set, memoInfraPasses(ms, caches), pal, dark) : []),
   ];
