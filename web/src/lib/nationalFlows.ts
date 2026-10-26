@@ -103,6 +103,20 @@ export function nationalWidths(counts: Uint32Array, scale: number, fitScale: num
   return w;
 }
 
+/** Zoom tiers of the national city circles (presentation, like label tiers):
+    how many of the `total` cities with trains to draw at `zoom` (the view's
+    scale over the national fit scale), busiest first. The top NAT_CITY_TOP at
+    the fit, growing geometrically as the user zooms in, all of them from
+    NAT_CITY_ALL_ZOOM. Monotone in zoom. */
+export const NAT_CITY_TOP = 120;
+export const NAT_CITY_ALL_ZOOM = 4;
+export function natCityTier(total: number, zoom: number): number {
+  if (total <= NAT_CITY_TOP) return total;
+  const f = Math.max(0, Math.log(Math.max(1, zoom)) / Math.log(NAT_CITY_ALL_ZOOM));
+  if (f >= 1) return total;
+  return Math.min(total, Math.round(NAT_CITY_TOP * Math.pow(total / NAT_CITY_TOP, f)));
+}
+
 /** Per-city departures and arrivals under the class filter (as nationalCounts),
     parallel to `cities.idx`; empty when the pack has no `cities`. */
 export function nationalCityCounts(

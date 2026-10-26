@@ -24,6 +24,7 @@ import {
   nationalFlowLayers,
   nationalFrame,
   nationalHighlight,
+  nationalInfraLayers,
   nationalKeep,
   nationalLayers,
   nationalTimeline,
@@ -156,6 +157,8 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     stats.natFlows = 0;
     st.natCities = null;
     st.natCounts = null;
+    // The infrastructure overlay sits under the flows and the circles.
+    if (withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark));
     if (withFlows && nf && (mode === "flows" || P.current.nationalEntries)) {
       // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
       // The entry ticks know only the class, so an index filter draws the day's totals.
@@ -181,10 +184,10 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     }
     if (withFlows && nf) {
       // The city circles ride with the flows (day totals, whatever the clock).
-      st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale));
+      st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale), st.view.scale / st.fitScale);
       const hv = st.hover;
       if (hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, P.current.dark));
-      if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark));
+      if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark, hv && hv.kind === "natCity" ? hv.idx : -1));
     }
     const built = withTrains ? nationalTimeline(atlas, P.current.nationalTrains) : null;
     if (!built) {

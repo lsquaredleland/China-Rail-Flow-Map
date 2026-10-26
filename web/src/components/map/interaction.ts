@@ -112,7 +112,7 @@ function pickNationalFlow(M: MapCtx, px: number, py: number): Hit | null {
 }
 
 /* A city circle under the pointer (the smallest, as it is drawn on top). */
-function pickNationalCity(M: MapCtx, px: number, py: number): Hit | null {
+export function pickNationalCity(M: MapCtx, px: number, py: number): Hit | null {
   const { S, X, Y } = M;
   const d = S.current.natCities;
   if (!d) return null;
