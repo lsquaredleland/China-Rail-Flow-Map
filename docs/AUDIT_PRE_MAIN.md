@@ -1,18 +1,56 @@
 # Pre-main audit of `deckgl` (2026-10-26)
 
-> **Status after follow-ups (2026-10-26).** The findings below are the historical record and are
-> not edited. Done since, into `deckgl`: security headers #93 (§11.1), esbuild pin and `engines`
-> #94 (§11.8), stale root `vercel.json` removed #95 (§9), stale comments and `NatData` move #96
-> (§1.3), caller-side logging #98 (§1.6), docs refresh and national footnote #99 (§8),
-> `atlas` `main()` split #100 (S7), one `stationName` / `fmtDurationWords` #101 (§1.5), national
-> builder out of `DeckHost` and layers split into `layers/national/{timeline,trains,flows,cities,index}.ts`
-> #102 (S2, S3), timetable modal unroll and `lib/tripStatus` #103 (S4), `audit_pack` split #104
-> (S8), one dot/ring builder and honest label points #105 (R10, R12), Zoom clarity as a parameter
-> instead of `globalThis` #107 (§1.4), cards-layout in CI #108 (§6), `shared.about` carries the
-> source sentence and window #109 (§11.5), `Histograms` takes rows only #110 (S5, R5),
-> `NatLayer` as `{flows, trains}` with only `?natLayer=none` #111 (§1.4), `useNationalMode` out of
-> `App` #112 (S1). Still open: the ref-ui items (modal, `DestinationPanel`, `MapHost`, windowed
-> tables) and the §1.2 export trimming.
+## Status after follow-ups (updated 2026-10-26)
+
+The findings below (§0–§12) are the historical record and are not edited. ✅ merged into
+`deckgl`, ⏳ in progress, ❌ open.
+
+| Item | Status |
+|---|---|
+| **§0 top actions** | |
+| 1. Merge with `--no-ff` (Vercel ignore rule) | ⏳ at merge time (owner) |
+| 2. Route-change review (8 rows) | ❌ owner |
+| 3. Surface a failed national index load | ❌ queued |
+| 4. ABOUT window from the pack | ✅ #109, pack swap #116 |
+| 5. Decide the trials | ✅ Zoom clarity kept as a parameter #107; `NatLayer` simplified #111 |
+| 6. Phone: cap the card column | ❌ owner decision |
+| 7. Accessibility | ❌ queued |
+| 8. Tests and flake | ✅ #106, #108, #117, #118 |
+| 9. Maintainability | ✅ see §1 |
+| 10. Hygiene | ✅ mostly, see §9 |
+| **§1 Code structure** | |
+| S1 `useNationalMode` out of `App` | ✅ #112 |
+| S2 national builder out of `DeckHost` | ✅ #102 |
+| S3 `layers/national/{timeline,trains,flows,cities,index}.ts` | ✅ #102 |
+| S4 timetable modal unroll, `lib/tripStatus` | ✅ #103 |
+| S5 `Histograms` takes rows | ✅ #110 |
+| S6 `MapCanvas` → `MapHost` | ⏳ #119 |
+| S7 `atlas.rs` `main()` split (byte-identical pack) | ✅ #100 |
+| S8 `audit.rs` split (identical output) | ✅ #104 |
+| §1.2 unused exports | ⏳ after the UI refactors |
+| §1.3 stale comments, `NatData` move | ✅ #96 |
+| §1.4 trials | ✅ #107, #111 |
+| §1.5 one `stationName` / `fmtDurationWords`; one dot/ring builder | ✅ #101, #105 |
+| §1.6 caller-side logging | ✅ #98 |
+| **§2 Component reuse** | |
+| R3 one `DestinationPanel` | ✅ #113 |
+| R4 windowed origin tables | ⏳ in progress |
+| R5 one `Histograms` input | ✅ #110 |
+| R10 `dotLayers` / `ringLayer` | ✅ #105 |
+| R12 `LabelPoint` | ✅ #105 |
+| **§3 Merge readiness** | ✅ fast-forward, no conflicts; only the `--no-ff` note remains |
+| **§4 Performance report** | ✅ this document, `docs/perf/2026-10-26-canvas-vs-deck/` |
+| **§5 Unused files, stale docs** | ✅ #89, #90, #91 |
+| **§6 Tests / CI** | ✅ #106, #108, #117, #118 |
+| **§7 Accessibility and mobile** | ❌ queued; the phone panel cap is an owner decision |
+| **§8 Docs** | ✅ #99, #115 |
+| **§9 Hygiene** | ✅ 38 merged branches deleted, spikes kept as tags `spike/deckgl-f04acf8` and `spike/national-anim-600b3de`, 16 stale worktrees removed, root `vercel.json` removed #95; ❌ `exp/canonical-production-geometry` and `backup/handoff-local-main-3484031` (owner) |
+| **§10 Upstream data note** | ❌ for the owner to send |
+| **§11 Before merge** | ✅ 11.1 security headers #93 (no CSP, fonts not self-hosted); ❌ 11.2 index-failure notice (= top action 3); ✅ 11.5 provenance #109/#116; ✅ 11.8–11.9 pinning and `engines` #94 |
+
+Other fixes since the audit: footer style and the 21/28 Oct copy #97, swipe hint only on
+overflow #114, docs refreshed after the refactors #115.
+
 
 Audit of the long-lived integration branch `deckgl` before it merges into `main`. Read-only
 review of the tree at `4c2dde4` (merge of PR #87) plus four cleanup PRs merged during the audit
