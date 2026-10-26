@@ -9,7 +9,7 @@ const { url, close } = await resolveBase(pos[0] || "dist");
 const browser = await launch();
 const fails = [];
 const click = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (e) e.click(); return !!e; }, sel);
-for (const [w, h] of [[1280, 800], [390, 844]]) {
+for (const [w, h, expanded] of [[1280, 800, false], [390, 844, false], [1280, 800, true], [390, 844, true]]) {
   const pg = await browser.newPage();
   await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
   await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
@@ -23,7 +23,7 @@ for (const [w, h] of [[1280, 800], [390, 844]]) {
     if (g) g.click();
   });
   await sleep(500);
-  await click(pg, "#destMin");
+  if (!expanded) await click(pg, "#destMin");
   await sleep(300);
   await click(pg, 'button[title^="View full schedule"]');
   await sleep(1200);
@@ -33,7 +33,7 @@ for (const [w, h] of [[1280, 800], [390, 844]]) {
     const r = (e) => { const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
     const one = (sel) => [...document.querySelectorAll(sel)].map(r).filter(Boolean).map((b, i) => ({ sel: `${sel}#${i}`, ...b }));
     return {
-      cards: one(".map-card"),
+      cards: [...one(".map-card"), ...one("#destPanel")],
       others: [
         "#legend", "#scalebar", ".tl-expand-btn", ".timeline-bar-dock", ".timeline-collapsed-bar",
         ".toolbar", "header", ".active-filter-bar",
@@ -49,7 +49,7 @@ for (const [w, h] of [[1280, 800], [390, 844]]) {
   for (let i = 0; i < boxes.cards.length; i++)
     for (let j = i + 1; j < boxes.cards.length; j++)
       if (hit(boxes.cards[i], boxes.cards[j])) fails.push(`${w}x${h}: cards ${i} and ${j} overlap`);
-  console.log(`${w}x${h}: ${boxes.cards.length} cards, ${boxes.others.length} other boxes checked`);
+  console.log(`${w}x${h}${expanded ? " expanded-panel" : ""}: ${boxes.cards.length} cards, ${boxes.others.length} other boxes checked`);
   await pg.close();
 }
 await browser.close();

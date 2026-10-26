@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CityPointVM, DestVM, Direction, DistUnit, SrcVM } from "../types";
 import { sourceRows, stationRows } from "../lib";
-import { CityCard } from "./MapCards";
+import { CityCard, InSlot } from "./MapCards";
 
 interface Props {
   point: CityPointVM | null;
@@ -81,6 +81,7 @@ export default function DestinationPanel({
   }
 
   return (
+    <InSlot>
     <div id="destPanel">
       <div className="dp-actions">
         <button
@@ -138,5 +139,6 @@ export default function DestinationPanel({
         )}
       </div>
     </div>
+    </InSlot>
   );
 }
