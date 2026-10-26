@@ -13,14 +13,15 @@ const newBrowser = () => launch({ args: ["--use-angle=swiftshader", "--enable-un
 const until = (pg, fn, timeout = 30000) => pg.waitForFunction(fn, { timeout, polling: 100 });
 const fails = [];
 const click = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (e) e.click(); return !!e; }, sel);
-// cases run in parallel (each is single-thread bound on its own browser)
-await Promise.all([
+// two cases at a time (all five at once starve each other and time out)
+const cases = [
   [1280, 800, false],
   [390, 844, false],
   [390, 664, false],
   [1280, 800, true],
   [390, 844, true],
-].map(async ([w, h, expanded]) => {
+];
+const runCase = async ([w, h, expanded]) => {
   const T0 = Date.now(), lg = (m) => console.log(`  ${w}x${h}${expanded ? "e" : ""} ${m} ${Date.now() - T0}ms`);
   const browser = await newBrowser();
   const pg = await browser.newPage();
@@ -71,7 +72,9 @@ await Promise.all([
       if (hit(boxes.cards[i], boxes.cards[j])) fails.push(`${w}x${h}: cards ${i} and ${j} overlap`);
   console.log(`${w}x${h}${expanded ? " expanded-panel" : ""}: ${boxes.cards.length} cards, ${boxes.others.length} other boxes checked`);
   await browser.close();
-}));
+};
+const queue = [...cases];
+await Promise.all([0, 1].map(async () => { for (let c; (c = queue.shift()); ) await runCase(c); }));
 await close();
 if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
 console.log("CARDS LAYOUT OK");
