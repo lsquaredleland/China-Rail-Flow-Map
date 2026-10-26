@@ -719,28 +719,119 @@ fn walk_edges(seqs: &[Vec<i64>], walk: &LegWalk, fwd: bool, mut f: impl FnMut(i6
     }
 }
 
-fn main() {
-    let inp = inputs::load();
-    let out_path = env::var("ATLAS_OUT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| inp.paths.files.join("china-flow-atlas-data.json"));
-    let data_dir = inp.paths.data_dir.clone();
-    let override_map = &inp.override_map;
-    let trains = &inp.trains;
-    let d1_len = inp.d1_len;
-    let path_map = &inp.path_map;
-    let coords = &inp.coords;
-    let city_en = &inp.city_en;
-    let en = |c: &str| -> String { inp.en(c) };
-    let station_pt = |name: &str| -> Option<[f64; 2]> { inp.stations.point(name) };
+type StationGrid = HashMap<(i32, i32), Vec<[f64; 2]>>;
 
-    // ---- HSR edges & nodes from the OSM ways (highspeed=yes or maxspeed>=200) ----
-    let osm::WayClasses {
-        hsr_edges,
-        conv_edges,
-        hsr_nodes,
-    } = osm::scan_ways(&inp.osm_data);
-    let chain_hsr = |chain: &[i64]| -> u8 {
+struct DepRaw {
+    code: String,
+    from_station: String,
+    depart: String,
+    to_station: String,
+    to_city: String,
+    arrive: String,
+    dur: Option<i64>,
+    stops_after: u64,
+    set: u8,
+    km: f64,
+    leg_keys: Vec<(String, String, String)>,
+    /// Per leg: travelled key.0 -> key.1 (the key is canonical (min, max)).
+    leg_fwd: Vec<bool>,
+    /// Per leg: index of its departing stop in the train's stop list.
+    leg_stop: Vec<usize>,
+    /// Index of the boarding stop in the train's stop list.
+    board: usize,
+    /// The train's index into `trains`.
+    ti: usize,
+}
+/// (class bucket, train index into `trains`, leg keys)
+type TrainLegs = (usize, usize, Vec<(String, String, String)>);
+struct CityWork {
+    zh: String,
+    outbound: u64,
+    fully_tracked: u64,
+    legs: Vec<((String, String, String), u64)>,
+    dests: Vec<(String, DestStats)>,
+    deps: Vec<DepRaw>,
+    home_pt: [f64; 2],
+    train_leg_keys: Vec<TrainLegs>,
+}
+struct InArrRaw {
+    code: String,
+    from_station: String,
+    from_city: String,
+    depart: String,
+    arr_station: String,
+    arrive: String,
+    dur: Option<i64>,
+    stops_before: u64,
+    set: u8,
+    km: f64,
+    leg_keys: Vec<(String, String, String)>,
+    /// Per leg: travelled key.0 -> key.1 (the key is canonical (min, max)).
+    leg_fwd: Vec<bool>,
+    /// Per leg: index of its departing stop in the train's stop list.
+    leg_stop: Vec<usize>,
+    /// The train's index into `trains`.
+    ti: usize,
+}
+struct InCityWork {
+    zh: String,
+    arrivals: u64,
+    sources: Vec<(String, InSrcStats)>,
+    arrs: Vec<InArrRaw>,
+    home_pt: [f64; 2],
+    train_leg_keys: Vec<TrainLegs>,
+}
+
+/// Read-only state every phase shares: the loaded inputs plus what is derived
+/// from them once (way classes, per-train cleaned names and cities).
+struct Ctx<'a> {
+    inp: &'a inputs::Inputs,
+    ways: osm::WayClasses,
+    train_names: Vec<Vec<String>>,
+    train_cities: Vec<Vec<String>>,
+}
+
+impl<'a> Ctx<'a> {
+    /// HSR edges & nodes from the OSM ways (highspeed=yes or maxspeed>=200),
+    /// and the per-train names/cities.
+    fn new(inp: &'a inputs::Inputs) -> Ctx<'a> {
+        let ways = osm::scan_ways(&inp.osm_data);
+        let trains = &inp.trains;
+
+        let train_names: Vec<Vec<String>> = trains
+            .iter()
+            .map(|t| t.stops.iter().map(|s| clean(&s.name)).collect())
+            .collect();
+        let train_cities: Vec<Vec<String>> = train_names
+            .iter()
+            .map(|ns| ns.iter().map(|n| city_of(n)).collect())
+            .collect();
+
+        Ctx {
+            inp,
+            ways,
+            train_names,
+            train_cities,
+        }
+    }
+
+    fn station_pt(&self, name: &str) -> Option<[f64; 2]> {
+        self.inp.stations.point(name)
+    }
+
+    fn seg_coords(&self, ids: &[i64]) -> Vec<[f64; 2]> {
+        ids.iter()
+            .filter_map(|id| self.inp.coords.get(id).copied())
+            .collect()
+    }
+
+    fn chain_hsr(&self, chain: &[i64]) -> u8 {
+        let osm::WayClasses {
+            hsr_edges,
+            conv_edges,
+            hsr_nodes,
+        } = &self.ways;
+
         let total = chain.len().saturating_sub(1);
         let hsr_n = chain
             .windows(2)
@@ -757,25 +848,14 @@ fn main() {
             })
             .count();
         u8::from(total > 0 && hsr_n * 2 >= total)
-    };
+    }
+}
 
-    let seg_coords = |ids: &[i64]| -> Vec<[f64; 2]> {
-        ids.iter()
-            .filter_map(|id| coords.get(id).copied())
-            .collect()
-    };
+/// Rank cities by outbound trains and pick the top 100 plus the featured ones.
+fn select_cities(cx: &Ctx) -> Vec<String> {
+    let train_cities = &cx.train_cities;
+    let en = |c: &str| -> String { cx.inp.en(c) };
 
-    // ---- precompute per-train names/cities ----
-    let train_names: Vec<Vec<String>> = trains
-        .iter()
-        .map(|t| t.stops.iter().map(|s| clean(&s.name)).collect())
-        .collect();
-    let train_cities: Vec<Vec<String>> = train_names
-        .iter()
-        .map(|ns| ns.iter().map(|n| city_of(n)).collect())
-        .collect();
-
-    // ---- rank cities by outbound trains ----
     let mut outbound_count: HashMap<String, u64> = HashMap::new();
     for cities in train_cities.iter() {
         let mut seen: HashSet<&str> = HashSet::new();
@@ -811,8 +891,15 @@ fn main() {
     for (i, (c, n)) in ranked.iter().take(top_n).enumerate() {
         println!("  {:>2}. {} {} - {}", i + 1, c, en(c), n);
     }
+    selected
+}
 
-    // ---- global station stop counts per city -> principal points ----
+/// Global station stop counts per city -> principal points ([lat, lon]).
+fn principal_points(cx: &Ctx) -> HashMap<String, [f64; 2]> {
+    let trains = &cx.inp.trains;
+    let (train_names, train_cities) = (&cx.train_names, &cx.train_cities);
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+
     let mut city_stations: HashMap<String, HashMap<String, (u64, usize)>> = HashMap::new();
     let mut cs_counter = 0usize;
     for (ti, _) in trains.iter().enumerate() {
@@ -843,125 +930,202 @@ fn main() {
             city_pt.insert(cty.clone(), p);
         }
     }
+    city_pt
+}
 
-    // ---- corridor graph (shared by all cities) ----
-    let pair_len: HashMap<(String, String), f64> = path_map
-        .iter()
-        .filter(|(_, (_, segs))| segs.iter().any(|s| s.len() >= 2))
-        .map(|(k, (_, segs))| {
-            let l: f64 = segs
-                .iter()
-                .map(|s| {
-                    let c = seg_coords(s);
-                    c.windows(2).map(|w| hav_km_ll(w[0], w[1])).sum::<f64>()
-                })
-                .sum();
-            (k.clone(), l)
-        })
-        .collect();
-    let mut adj_pure: CorridorAdj = HashMap::new();
-    let mut adj: CorridorAdj = HashMap::new();
-    let mut pair_lens: Vec<(&(String, String), &f64)> = pair_len.iter().collect();
-    pair_lens.sort_by(|a, b| a.0.cmp(b.0));
-    for (k, l) in pair_lens {
-        adj_pure
-            .entry(k.0.clone())
-            .or_default()
-            .push((k.1.clone(), Some(k.clone()), *l));
-        adj_pure
-            .entry(k.1.clone())
-            .or_default()
-            .push((k.0.clone(), Some(k.clone()), *l));
-        adj.entry(k.0.clone())
-            .or_default()
-            .push((k.1.clone(), Some(k.clone()), *l));
-        adj.entry(k.1.clone())
-            .or_default()
-            .push((k.0.clone(), Some(k.clone()), *l));
-    }
-    {
-        let mut all_stations: HashSet<String> = HashSet::new();
-        for (a, b) in path_map.keys() {
-            all_stations.insert(a.clone());
-            all_stations.insert(b.clone());
+/// The corridor graph shared by all cities.
+struct Corridor {
+    pair_len: HashMap<(String, String), f64>,
+    adj_pure: CorridorAdj,
+    adj: CorridorAdj,
+}
+
+impl Corridor {
+    fn build(cx: &Ctx) -> Corridor {
+        let path_map = &cx.inp.path_map;
+        let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+
+        let pair_len: HashMap<(String, String), f64> = path_map
+            .iter()
+            .filter(|(_, (_, segs))| segs.iter().any(|s| s.len() >= 2))
+            .map(|(k, (_, segs))| {
+                let l: f64 = segs
+                    .iter()
+                    .map(|s| {
+                        let c = cx.seg_coords(s);
+                        c.windows(2).map(|w| hav_km_ll(w[0], w[1])).sum::<f64>()
+                    })
+                    .sum();
+                (k.clone(), l)
+            })
+            .collect();
+        let mut adj_pure: CorridorAdj = HashMap::new();
+        let mut adj: CorridorAdj = HashMap::new();
+        let mut pair_lens: Vec<(&(String, String), &f64)> = pair_len.iter().collect();
+        pair_lens.sort_by(|a, b| a.0.cmp(b.0));
+        for (k, l) in pair_lens {
+            adj_pure
+                .entry(k.0.clone())
+                .or_default()
+                .push((k.1.clone(), Some(k.clone()), *l));
+            adj_pure
+                .entry(k.1.clone())
+                .or_default()
+                .push((k.0.clone(), Some(k.clone()), *l));
+            adj.entry(k.0.clone())
+                .or_default()
+                .push((k.1.clone(), Some(k.clone()), *l));
+            adj.entry(k.1.clone())
+                .or_default()
+                .push((k.0.clone(), Some(k.clone()), *l));
         }
-        let mut by_city: HashMap<String, Vec<String>> = HashMap::new();
-        for s in all_stations.iter() {
-            by_city.entry(city_of(s)).or_default().push(s.clone());
-        }
-        let mut by_city: Vec<(String, Vec<String>)> = by_city.into_iter().collect();
-        by_city.sort();
-        for (_, sts) in by_city.iter_mut() {
-            sts.sort();
-            if sts.len() < 2 || sts.len() > 12 {
-                continue;
+        {
+            let mut all_stations: HashSet<String> = HashSet::new();
+            for (a, b) in path_map.keys() {
+                all_stations.insert(a.clone());
+                all_stations.insert(b.clone());
             }
-            for i in 0..sts.len() {
-                for j in (i + 1)..sts.len() {
-                    if let (Some(p), Some(q)) = (station_pt(&sts[i]), station_pt(&sts[j])) {
-                        let w = hav_km_ll([p[1], p[0]], [q[1], q[0]]) * 2.0 + 2.0;
-                        if w > 60.0 {
-                            continue;
+            let mut by_city: HashMap<String, Vec<String>> = HashMap::new();
+            for s in all_stations.iter() {
+                by_city.entry(city_of(s)).or_default().push(s.clone());
+            }
+            let mut by_city: Vec<(String, Vec<String>)> = by_city.into_iter().collect();
+            by_city.sort();
+            for (_, sts) in by_city.iter_mut() {
+                sts.sort();
+                if sts.len() < 2 || sts.len() > 12 {
+                    continue;
+                }
+                for i in 0..sts.len() {
+                    for j in (i + 1)..sts.len() {
+                        if let (Some(p), Some(q)) = (station_pt(&sts[i]), station_pt(&sts[j])) {
+                            let w = hav_km_ll([p[1], p[0]], [q[1], q[0]]) * 2.0 + 2.0;
+                            if w > 60.0 {
+                                continue;
+                            }
+                            adj.entry(sts[i].clone())
+                                .or_default()
+                                .push((sts[j].clone(), None, w));
+                            adj.entry(sts[j].clone())
+                                .or_default()
+                                .push((sts[i].clone(), None, w));
                         }
-                        adj.entry(sts[i].clone())
-                            .or_default()
-                            .push((sts[j].clone(), None, w));
-                        adj.entry(sts[j].clone())
-                            .or_default()
-                            .push((sts[i].clone(), None, w));
                     }
                 }
             }
         }
+        Corridor {
+            pair_len,
+            adj_pure,
+            adj,
+        }
     }
-    let mut leg_cache: HashMap<(String, String), Option<Vec<Vec<i64>>>> = HashMap::new();
-    let mut variant_cache: VariantCache = HashMap::new();
-    let mut variant_stats: (u64, u64) = (0, 0);
+}
 
-    // ---- interning tables (filled during assembly) ----
-    let mut city_table: Vec<AtlasCity> = Vec::new();
-    let mut city_idx: HashMap<String, i64> = HashMap::new();
-    let mut station_table: Vec<AtlasStation> = Vec::new();
-    let mut station_idx: HashMap<String, i64> = HashMap::new();
-    let mut train_table: Vec<AtlasTrainRef> = Vec::new();
-    // train_table t -> index into `trains` (train_ti[t]), and back
-    let mut train_ti: Vec<usize> = Vec::new();
-    let mut train_idx: HashMap<usize, usize> = HashMap::new();
+/// Leg resolution caches, filled while the per-city passes resolve legs.
+#[derive(Default)]
+struct LegCaches {
+    leg_cache: HashMap<(String, String), Option<Vec<Vec<i64>>>>,
+    variant_cache: VariantCache,
+    variant_stats: (u64, u64),
+}
 
-    // ---- per-city work ----
-    struct DepRaw {
-        code: String,
-        from_station: String,
-        depart: String,
-        to_station: String,
-        to_city: String,
-        arrive: String,
-        dur: Option<i64>,
-        stops_after: u64,
-        set: u8,
-        km: f64,
-        leg_keys: Vec<(String, String, String)>,
-        /// Per leg: travelled key.0 -> key.1 (the key is canonical (min, max)).
-        leg_fwd: Vec<bool>,
-        /// Per leg: index of its departing stop in the train's stop list.
-        leg_stop: Vec<usize>,
-        /// Index of the boarding stop in the train's stop list.
-        board: usize,
-        /// The train's index into `trains`.
-        ti: usize,
+/// Interning tables (filled during assembly).
+#[derive(Default)]
+struct Interner {
+    city_table: Vec<AtlasCity>,
+    city_idx: HashMap<String, i64>,
+    station_table: Vec<AtlasStation>,
+    station_idx: HashMap<String, i64>,
+    train_table: Vec<AtlasTrainRef>,
+    /// train_table t -> index into `trains` (train_ti[t]), and back
+    train_ti: Vec<usize>,
+    train_idx: HashMap<usize, usize>,
+}
+
+impl Interner {
+    fn city(
+        &mut self,
+        zh: &str,
+        city_en: &HashMap<String, String>,
+        city_pt: &HashMap<String, [f64; 2]>,
+    ) -> i64 {
+        if let Some(i) = self.city_idx.get(zh) {
+            return *i;
+        }
+        let pt = city_pt.get(zh).map(|p| [p[1], p[0]]).unwrap_or_else(|| {
+            panic!("city {zh} has no point: add it to CITY_POINTS in cn/gazetteer.rs")
+        });
+        let i = self.city_table.len() as i64;
+        self.city_table.push(AtlasCity {
+            zh: zh.to_string(),
+            en: city_en.get(zh).cloned().unwrap_or_else(|| zh.to_string()),
+            pt,
+        });
+        self.city_idx.insert(zh.to_string(), i);
+        i
     }
-    /// (class bucket, train index into `trains`, leg keys)
-    type TrainLegs = (usize, usize, Vec<(String, String, String)>);
-    struct CityWork {
-        zh: String,
-        outbound: u64,
-        fully_tracked: u64,
-        legs: Vec<((String, String, String), u64)>,
-        dests: Vec<(String, DestStats)>,
-        deps: Vec<DepRaw>,
-        home_pt: [f64; 2],
-        train_leg_keys: Vec<TrainLegs>,
+
+    fn station(&mut self, zh: &str, city_en: &HashMap<String, String>) -> i64 {
+        if let Some(i) = self.station_idx.get(zh) {
+            return *i;
+        }
+        let i = self.station_table.len() as i64;
+        self.station_table.push(AtlasStation {
+            zh: zh.to_string(),
+            en: station_en(zh, city_en),
+        });
+        self.station_idx.insert(zh.to_string(), i);
+        i
     }
+
+    /// The train_table row of train `ti` (an index into `inp.trains`): one row
+    /// per train, so two trains sharing a code stay apart.
+    fn train(&mut self, inp: &inputs::Inputs, ti: usize) -> usize {
+        if let Some(i) = self.train_idx.get(&ti) {
+            return *i;
+        }
+        let i = self.train_table.len();
+        let t = &inp.trains[ti];
+        let cal = inp.calendar.as_ref().map(|(c, _)| &c[ti]);
+        self.train_table.push(AtlasTrainRef {
+            code: t.code.clone(),
+            class: t.train_class.clone(),
+            days: cal.map(|c| c.days.clone()),
+            pattern: cal.and_then(|c| c.pattern.clone()),
+            suspended: cal.and_then(|c| c.listed_suspended.then_some(true)),
+        });
+        self.train_ti.push(ti);
+        self.train_idx.insert(ti, i);
+        i
+    }
+}
+
+/// The outbound pass's results.
+struct OutPass {
+    works: Vec<CityWork>,
+    /// dep rows with stations that have no city call: [home city, terminus
+    /// city, intermediate city, any]; and the distinct trains behind "any"
+    skipped_rows: [u64; 4],
+    skipped_trains: HashSet<String>,
+    skipped_example: [Option<String>; 3],
+    throat_stations: HashSet<String>,
+}
+
+/// Per-city work: for each selected city, every train departing from it.
+fn outbound_works(
+    cx: &Ctx,
+    selected: &[String],
+    city_pt: &HashMap<String, [f64; 2]>,
+    corr: &Corridor,
+    lc: &mut LegCaches,
+) -> OutPass {
+    let inp = cx.inp;
+    let (trains, d1_len) = (&inp.trains, inp.d1_len);
+    let (override_map, path_map) = (&inp.override_map, &inp.path_map);
+    let (train_names, train_cities) = (&cx.train_names, &cx.train_cities);
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+
     let mut works: Vec<CityWork> = Vec::new();
     // dep rows with stations that have no city call: [home city, terminus
     // city, intermediate city, any]; and the distinct trains behind "any"
@@ -1028,7 +1192,7 @@ fn main() {
                 while last_k < j {
                     let (a, b) = (names[last_k].clone(), names[last_k + 1].clone());
                     if a != b {
-                        match leg_km(override_map, &pair_len, t, &a, &b) {
+                        match leg_km(override_map, &corr.pair_len, t, &a, &b) {
                             Some(l) => cum_km += l,
                             None => cum_ok = false,
                         }
@@ -1111,13 +1275,13 @@ fn main() {
             let r = resolve_leg3(
                 k,
                 path_map,
-                &adj_pure,
-                &adj,
-                &pair_len,
+                &corr.adj_pure,
+                &corr.adj,
+                &corr.pair_len,
                 &station_pt,
-                &mut leg_cache,
-                &mut variant_cache,
-                &mut variant_stats,
+                &mut lc.leg_cache,
+                &mut lc.variant_cache,
+                &mut lc.variant_stats,
             );
             resolved_flags.insert(k.clone(), r.is_some());
             legs_vec.push((k.clone(), *n));
@@ -1156,40 +1320,32 @@ fn main() {
             train_leg_keys: train_legs,
         });
     }
+    OutPass {
+        works,
+        skipped_rows,
+        skipped_trains,
+        skipped_example,
+        throat_stations,
+    }
+}
 
-    // ---- inbound works: for each selected city, every train arriving there.
-    // Mirror of the outbound pass. cd_in = the train's first stop in the city
-    // at index >= 1 (a real arrival). Sources = every distinct city boarded
-    // before a later arrival in this city; per source, the arrival used is
-    // the first home-city stop AFTER boarding, which makes the pair identity
-    // srcs[X][P].total == dests[P][X].total exact (checked at assembly).
-    struct InArrRaw {
-        code: String,
-        from_station: String,
-        from_city: String,
-        depart: String,
-        arr_station: String,
-        arrive: String,
-        dur: Option<i64>,
-        stops_before: u64,
-        set: u8,
-        km: f64,
-        leg_keys: Vec<(String, String, String)>,
-        /// Per leg: travelled key.0 -> key.1 (the key is canonical (min, max)).
-        leg_fwd: Vec<bool>,
-        /// Per leg: index of its departing stop in the train's stop list.
-        leg_stop: Vec<usize>,
-        /// The train's index into `trains`.
-        ti: usize,
-    }
-    struct InCityWork {
-        zh: String,
-        arrivals: u64,
-        sources: Vec<(String, InSrcStats)>,
-        arrs: Vec<InArrRaw>,
-        home_pt: [f64; 2],
-        train_leg_keys: Vec<TrainLegs>,
-    }
+/// Inbound works: for each selected city, every train arriving there.
+/// Mirror of the outbound pass. cd_in = the train's first stop in the city
+/// at index >= 1 (a real arrival). Sources = every distinct city boarded
+/// before a later arrival in this city; per source, the arrival used is
+/// the first home-city stop AFTER boarding, which makes the pair identity
+/// srcs[X][P].total == dests[P][X].total exact (checked at assembly).
+fn inbound_works(
+    cx: &Ctx,
+    selected: &[String],
+    city_pt: &HashMap<String, [f64; 2]>,
+    corr: &Corridor,
+) -> Vec<InCityWork> {
+    let inp = cx.inp;
+    let (trains, d1_len) = (&inp.trains, inp.d1_len);
+    let override_map = &inp.override_map;
+    let (train_names, train_cities) = (&cx.train_names, &cx.train_cities);
+
     let mut in_works: Vec<InCityWork> = Vec::new();
     for home_city in selected.iter() {
         let mut src_stats: HashMap<String, InSrcStats> = HashMap::new();
@@ -1211,7 +1367,7 @@ fn main() {
                 pref_bad[k] = pref_bad[k - 1];
                 pref_km[k] = pref_km[k - 1];
                 if a != b {
-                    match leg_km(override_map, &pair_len, t, &a, &b) {
+                    match leg_km(override_map, &corr.pair_len, t, &a, &b) {
                         Some(l) => pref_km[k] += l,
                         None => pref_bad[k] += 1,
                     }
@@ -1337,10 +1493,25 @@ fn main() {
             train_leg_keys: train_leg_keys_in,
         });
     }
-    // Inbound legs resolve exactly like outbound ones. Legs before the first
-    // selected city on a train are never seen outbound, so resolve them here
-    // (cached per key, so outbound legs are unaffected). Their stations trim
-    // throats in the inbound pass only, which keeps outbound flows unchanged.
+    in_works
+}
+
+/// Inbound legs resolve exactly like outbound ones. Legs before the first
+/// selected city on a train are never seen outbound, so resolve them here
+/// (cached per key, so outbound legs are unaffected). Their stations trim
+/// throats in the inbound pass only, which keeps outbound flows unchanged.
+/// Returns the stations that trim throats in the inbound pass.
+fn resolve_inbound_legs(
+    cx: &Ctx,
+    out: &OutPass,
+    in_works: &[InCityWork],
+    corr: &Corridor,
+    lc: &mut LegCaches,
+) -> HashSet<String> {
+    let path_map = &cx.inp.path_map;
+    let throat_stations = &out.throat_stations;
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+
     let mut in_throat_stations = throat_stations.clone();
     for key in in_works
         .iter()
@@ -1352,17 +1523,28 @@ fn main() {
         resolve_leg3(
             key,
             path_map,
-            &adj_pure,
-            &adj,
-            &pair_len,
+            &corr.adj_pure,
+            &corr.adj,
+            &corr.pair_len,
             &station_pt,
-            &mut leg_cache,
-            &mut variant_cache,
-            &mut variant_stats,
+            &mut lc.leg_cache,
+            &mut lc.variant_cache,
+            &mut lc.variant_stats,
         );
     }
+    in_throat_stations
+}
 
-    // ---- leg walks: every resolved leg oriented key.0 -> key.1 ----
+/// Leg walks: every resolved leg oriented key.0 -> key.1.
+fn orient_legs(
+    cx: &Ctx,
+    works: &[CityWork],
+    in_works: &[InCityWork],
+    lc: &LegCaches,
+) -> HashMap<(String, String, String), LegWalk> {
+    let (path_map, coords) = (&cx.inp.path_map, &cx.inp.coords);
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+
     // One-time direction check: base pair paths must already run
     // key.0 -> key.1 (fail loudly otherwise); router, variant (via) and
     // corridor-chain geometry is oriented from coordinates and reported.
@@ -1382,7 +1564,7 @@ fn main() {
         if leg_walks.contains_key(key) {
             continue;
         }
-        let Some(seqs) = leg_seqs(key, &leg_cache, &variant_cache) else {
+        let Some(seqs) = leg_seqs(key, &lc.leg_cache, &lc.variant_cache) else {
             continue;
         };
         let kind = if leg_path(&key.2).is_some() {
@@ -1460,51 +1642,106 @@ fn main() {
         "pair paths not stored key.0 -> key.1: {bad_pairs:?}"
     );
     println!("leg orientation: all checked pair paths run key.0 -> key.1");
+    leg_walks
+}
 
-    // ---- global atomic sections over the union of all selected cities ----
-    let throat_grid = |names: &HashSet<String>| {
-        let mut grid: HashMap<(i32, i32), Vec<[f64; 2]>> = HashMap::new();
-        for nm in names.iter() {
-            if let Some(p) = station_pt(nm) {
-                let ll = [p[1], p[0]];
-                grid.entry(((ll[0] * 50.0).floor() as i32, (ll[1] * 50.0).floor() as i32))
-                    .or_default()
-                    .push(ll);
-            }
+/// Grid of station points (50 cells per degree), for `near_station`.
+fn throat_grid(cx: &Ctx, names: &HashSet<String>) -> StationGrid {
+    let mut grid: StationGrid = HashMap::new();
+    for nm in names.iter() {
+        if let Some(p) = cx.station_pt(nm) {
+            let ll = [p[1], p[0]];
+            grid.entry(((ll[0] * 50.0).floor() as i32, (ll[1] * 50.0).floor() as i32))
+                .or_default()
+                .push(ll);
         }
-        grid
-    };
-    let station_grid = throat_grid(&throat_stations);
-    let in_station_grid = throat_grid(&in_throat_stations);
-    let near_station = |station_grid: &HashMap<(i32, i32), Vec<[f64; 2]>>, pt: &[f64; 2]| -> bool {
-        let gx = (pt[0] * 50.0).floor() as i32;
-        let gy = (pt[1] * 50.0).floor() as i32;
-        for dx in -1..=1 {
-            for dy in -1..=1 {
-                if let Some(cell) = station_grid.get(&(gx + dx, gy + dy)) {
-                    for c in cell {
-                        if hav_km_ll(*pt, *c) < 1.3 {
-                            return true;
-                        }
+    }
+    grid
+}
+
+fn near_station(station_grid: &StationGrid, pt: &[f64; 2]) -> bool {
+    let gx = (pt[0] * 50.0).floor() as i32;
+    let gy = (pt[1] * 50.0).floor() as i32;
+    for dx in -1..=1 {
+        for dy in -1..=1 {
+            if let Some(cell) = station_grid.get(&(gx + dx, gy + dy)) {
+                for c in cell {
+                    if hav_km_ll(*pt, *c) < 1.3 {
+                        return true;
                     }
                 }
             }
         }
-        false
-    };
-    // atomic edge -> per-city DISTINCT train counts: each train counts at
-    // most once per edge, no matter how many of its legs' paths overlap
-    // there (adjacent-leg path overlap near stations otherwise inflates
-    // short sections between close stations). The rule lives in
-    // flows::train_edges, shared with the inbound and national counts.
-    let seqs_of = |k: &(String, String, String)| leg_seqs(k, &leg_cache, &variant_cache);
+    }
+    false
+}
+
+/// Section endpoint station names (nearest real station point).
+fn section_station_points(cx: &Ctx) -> HashMap<String, [f64; 2]> {
+    let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
+    for (a, b) in cx.inp.path_map.keys() {
+        for s in [a, b] {
+            if let Some(p) = cx.station_pt(s) {
+                station_pts_all.insert(s.clone(), [p[1], p[0]]);
+            }
+        }
+    }
+    station_pts_all
+}
+
+/// Everything the section, assembly and national phases read once the
+/// per-city passes and the leg walks are done.
+struct Model<'a> {
+    cx: &'a Ctx<'a>,
+    selected: Vec<String>,
+    city_pt: HashMap<String, [f64; 2]>,
+    corr: Corridor,
+    lc: LegCaches,
+    out: OutPass,
+    in_works: Vec<InCityWork>,
+    leg_walks: HashMap<(String, String, String), LegWalk>,
+    station_grid: StationGrid,
+    in_station_grid: StationGrid,
+    station_pts_all: HashMap<String, [f64; 2]>,
+}
+
+/// The atomic sections of one direction, with their per-city flow rows.
+struct SectionSet {
+    sections: Vec<AtlasSection>,
+    /// directed edge -> (section, travelled against the section's stored
+    /// point order)
+    edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)>,
+    flows_per_city: Vec<Vec<Vec<usize>>>,
+    total_sec_pts: usize,
+    /// edges per section (row_path's partial re-coverage, national heads)
+    sec_edges: Vec<usize>,
+}
+
+/// Atomic edge -> per-city DISTINCT train counts: each train counts at
+/// most once per edge, no matter how many of its legs' paths overlap
+/// there (adjacent-leg path overlap near stations otherwise inflates
+/// short sections between close stations). The rule lives in
+/// flows::train_edges, shared with the inbound and national counts.
+struct EdgeCounts {
+    counts: HashMap<(i64, i64), HashMap<usize, u64>>,
+    class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>>,
+    trains: chains::EdgeTrains,
+}
+
+/// `per_city[ci]` is city `ci`'s trains' leg keys.
+fn count_edges<'a>(
+    per_city: impl Iterator<Item = &'a Vec<TrainLegs>>,
+    lc: &LegCaches,
+    coords: &HashMap<i64, [f64; 2]>,
+    station_grid: &StationGrid,
+) -> EdgeCounts {
+    let seqs_of = |k: &(String, String, String)| leg_seqs(k, &lc.leg_cache, &lc.variant_cache);
     let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
     let mut edge_trains = chains::EdgeTrains::new();
-    for (ci, w) in works.iter().enumerate() {
-        for (k, (cidx, _, legs)) in w.train_leg_keys.iter().enumerate() {
-            let eset =
-                flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
+    for (ci, train_leg_keys) in per_city.enumerate() {
+        for (k, (cidx, _, legs)) in train_leg_keys.iter().enumerate() {
+            let eset = flows::train_edges(legs, seqs_of, coords, |p| near_station(station_grid, p));
             let mark = chains::train_mark(ci, k);
             for e in eset {
                 let m = edge_trains.entry(e).or_insert(0);
@@ -1518,35 +1755,25 @@ fn main() {
             }
         }
     }
-    println!("union atomic edges: {}", edge_counts.len());
-    // intern count signatures: a global section has constant per-city counts
-    let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
-    println!("distinct signatures: {}", sig_list.len());
-    let walk_geom = |key: &(String, String, String)| {
-        leg_seqs(key, &leg_cache, &variant_cache).zip(leg_walks.get(key))
-    };
-    let cuts = chain_cuts(
-        works
-            .iter()
-            .flat_map(|w| w.deps.iter())
-            .map(|d| (&d.leg_keys[..], &d.leg_fwd[..])),
-        &walk_geom,
-        &edge_sig,
-    );
-    println!(
-        "section chain cuts (rows leaving equal-signature track mid-way): {}",
-        cuts.len()
-    );
-    let section_chains = chains::build_section_chains(&edge_sig, &edge_trains, &cuts);
-    // section endpoint station names (nearest real station point)
-    let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
-    for (a, b) in path_map.keys() {
-        for s in [a, b] {
-            if let Some(p) = station_pt(s) {
-                station_pts_all.insert(s.clone(), [p[1], p[0]]);
-            }
-        }
+    EdgeCounts {
+        counts: edge_counts,
+        class_counts: edge_class_counts,
+        trains: edge_trains,
     }
+}
+
+/// Turn the section chains into `AtlasSection`s (interning their endpoint
+/// stations) and the per-city packed flow rows.
+fn build_sections(
+    cx: &Ctx,
+    section_chains: &[(u32, Vec<i64>)],
+    sig_list: &[chains::Sig],
+    n_cities: usize,
+    station_pts_all: &HashMap<String, [f64; 2]>,
+    it: &mut Interner,
+) -> SectionSet {
+    let (coords, city_en) = (&cx.inp.coords, &cx.inp.city_en);
+
     let nearest_station = |pt: [f64; 2]| -> String {
         let mut best: Option<(&String, f64)> = None;
         for (nm, sp) in station_pts_all.iter() {
@@ -1562,7 +1789,7 @@ fn main() {
     // few points are skipped, so chain and section indices drift).
     let mut edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
     let mut sections: Vec<AtlasSection> = Vec::new();
-    let mut flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); works.len()];
+    let mut flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); n_cities];
     let mut total_sec_pts = 0usize;
     for (sid, chain) in section_chains.iter() {
         let raw: Vec<[f64; 2]> = chain
@@ -1588,18 +1815,18 @@ fn main() {
         let a_i = if a_nm.is_empty() {
             -1
         } else {
-            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
+            it.station(&a_nm, city_en)
         };
         let b_i = if b_nm.is_empty() {
             -1
         } else {
-            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
+            it.station(&b_nm, city_en)
         };
         sections.push(AtlasSection {
             a: a_i,
             b: b_i,
             g: polyline_encode(&simp),
-            h: chain_hsr(chain),
+            h: cx.chain_hsr(chain),
         });
         for (ci, n, cls_counts) in sig_list[*sid as usize].iter() {
             flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
@@ -1608,20 +1835,88 @@ fn main() {
     for f in flows_per_city.iter_mut() {
         f.sort_by(|a, b| b[1].cmp(&a[1]));
     }
-    println!("sections: {} points: {}", sections.len(), total_sec_pts);
     // edges per section (row_path's partial re-coverage, national heads)
     let mut sec_edges = vec![0usize; sections.len()];
     for &(s, rev) in edge_dir_to_sec.values() {
         sec_edges[s] += !rev as usize;
     }
+    SectionSet {
+        sections,
+        edge_dir_to_sec,
+        flows_per_city,
+        total_sec_pts,
+        sec_edges,
+    }
+}
 
-    // ---- P3.1 national table over `sections`: every train once ----
-    // A train's legs are the union of its outbound rows (from its first
-    // selected city on) and inbound rows (from its first stop to a selected
-    // city), so it covers its whole run whenever it calls at a selected city.
-    // Edges go through the same rule as the per-city counts (one count per
-    // edge, outbound near_station grid); a train counts once on a section
-    // when it covers any of its edges (flows::national_table).
+/// Global atomic sections over the union of all selected cities.
+fn out_sections(m: &Model, it: &mut Interner) -> SectionSet {
+    let cx = m.cx;
+    let (coords, lc) = (&cx.inp.coords, &m.lc);
+    let (works, leg_walks) = (&m.out.works, &m.leg_walks);
+    let ec = count_edges(
+        works.iter().map(|w| &w.train_leg_keys),
+        lc,
+        coords,
+        &m.station_grid,
+    );
+    println!("union atomic edges: {}", ec.counts.len());
+    // intern count signatures: a global section has constant per-city counts
+    let (sig_list, edge_sig) = chains::intern_sigs(&ec.counts, &ec.class_counts);
+    println!("distinct signatures: {}", sig_list.len());
+
+    let walk_geom = |key: &(String, String, String)| {
+        leg_seqs(key, &lc.leg_cache, &lc.variant_cache).zip(leg_walks.get(key))
+    };
+    let cuts = chain_cuts(
+        works
+            .iter()
+            .flat_map(|w| w.deps.iter())
+            .map(|d| (&d.leg_keys[..], &d.leg_fwd[..])),
+        &walk_geom,
+        &edge_sig,
+    );
+    println!(
+        "section chain cuts (rows leaving equal-signature track mid-way): {}",
+        cuts.len()
+    );
+    let section_chains = chains::build_section_chains(&edge_sig, &ec.trains, &cuts);
+    let ss = build_sections(
+        cx,
+        &section_chains,
+        &sig_list,
+        works.len(),
+        &m.station_pts_all,
+        it,
+    );
+    println!(
+        "sections: {} points: {}",
+        ss.sections.len(),
+        ss.total_sec_pts
+    );
+    ss
+}
+
+/// P3.1 national table over `sections`: every train once.
+/// A train's legs are the union of its outbound rows (from its first
+/// selected city on) and inbound rows (from its first stop to a selected
+/// city), so it covers its whole run whenever it calls at a selected city.
+/// Edges go through the same rule as the per-city counts (one count per
+/// edge, outbound near_station grid); a train counts once on a section
+/// when it covers any of its edges (flows::national_table).
+fn national_table(
+    m: &Model,
+    os: &SectionSet,
+) -> (
+    std::collections::BTreeMap<usize, TrainLegs>,
+    flows::National,
+) {
+    let (coords, lc) = (&m.cx.inp.coords, &m.lc);
+    let (works, in_works) = (&m.out.works, &m.in_works);
+    let station_grid = &m.station_grid;
+    let (edge_dir_to_sec, sections) = (&os.edge_dir_to_sec, &os.sections);
+    let seqs_of = |k: &(String, String, String)| leg_seqs(k, &lc.leg_cache, &lc.variant_cache);
+
     let mut nat_legs: std::collections::BTreeMap<usize, TrainLegs> = Default::default();
     let all_legs = works
         .iter()
@@ -1639,7 +1934,7 @@ fn main() {
         legs.dedup();
     }
     let nat_trains = nat_legs.values().map(|(cidx, ti, legs)| {
-        let eset = flows::train_edges(legs, seqs_of, coords, |p| near_station(&station_grid, p));
+        let eset = flows::train_edges(legs, seqs_of, coords, |p| near_station(station_grid, p));
         (*ti, *cidx, eset)
     });
     let (national, nat_u) = flows::national_table(
@@ -1657,30 +1952,26 @@ fn main() {
         "national uniformity: {} sections with unequal per-edge counts (max spread {}); {} sections whose distinct trains exceed their busiest edge (max +{})",
         nat_u.nonuniform, nat_u.max_spread, nat_u.union_above_max, nat_u.max_union_gain
     );
+    (nat_legs, national)
+}
 
-    // ---- inbound atomic sections: same machinery, indexed by dest city ----
-    let mut in_edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
-    let mut in_edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
-    let mut in_edge_trains = chains::EdgeTrains::new();
-    for (ci, w) in in_works.iter().enumerate() {
-        for (k, (cidx, _, legs)) in w.train_leg_keys.iter().enumerate() {
-            let eset =
-                flows::train_edges(legs, seqs_of, coords, |p| near_station(&in_station_grid, p));
-            let mark = chains::train_mark(ci, k);
-            for e in eset {
-                let m = in_edge_trains.entry(e).or_insert(0);
-                *m = m.wrapping_add(mark);
-                *in_edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
-                in_edge_class_counts
-                    .entry(e)
-                    .or_default()
-                    .entry(ci)
-                    .or_insert([0; 8])[*cidx] += 1;
-            }
-        }
-    }
-    println!("union inbound atomic edges: {}", in_edge_counts.len());
-    let (in_sig_list, in_edge_sig) = chains::intern_sigs(&in_edge_counts, &in_edge_class_counts);
+/// Inbound atomic sections: same machinery, indexed by dest city.
+fn in_sections(m: &Model, it: &mut Interner) -> SectionSet {
+    let cx = m.cx;
+    let (coords, lc) = (&cx.inp.coords, &m.lc);
+    let (in_works, leg_walks) = (&m.in_works, &m.leg_walks);
+    let ec = count_edges(
+        in_works.iter().map(|w| &w.train_leg_keys),
+        lc,
+        coords,
+        &m.in_station_grid,
+    );
+    println!("union inbound atomic edges: {}", ec.counts.len());
+    let (in_sig_list, in_edge_sig) = chains::intern_sigs(&ec.counts, &ec.class_counts);
+
+    let walk_geom = |key: &(String, String, String)| {
+        leg_seqs(key, &lc.leg_cache, &lc.variant_cache).zip(leg_walks.get(key))
+    };
     let in_cuts = chain_cuts(
         in_works
             .iter()
@@ -1690,418 +1981,448 @@ fn main() {
         &in_edge_sig,
     );
     println!("inbound section chain cuts: {}", in_cuts.len());
-    let in_section_chains = chains::build_section_chains(&in_edge_sig, &in_edge_trains, &in_cuts);
-    let mut in_edge_dir_to_sec: HashMap<(i64, i64), (usize, bool)> = HashMap::new();
-    let mut in_sections: Vec<AtlasSection> = Vec::new();
-    let mut in_flows_per_city: Vec<Vec<Vec<usize>>> = vec![Vec::new(); in_works.len()];
-    let mut in_total_sec_pts = 0usize;
-    for (sid, chain) in in_section_chains.iter() {
-        let raw: Vec<[f64; 2]> = chain
-            .iter()
-            .filter_map(|id| coords.get(id).copied())
-            .collect();
-        if raw.len() < 2 {
-            continue;
-        }
-        let simp = dp_keep(&raw, 0.00035);
-        let simp: Vec<[f64; 2]> = simp.iter().map(|p| round_pt(*p, 4)).collect();
-        if simp.len() < 2 {
-            continue;
-        }
-        in_total_sec_pts += simp.len();
-        let sec_idx = in_sections.len();
-        for win in chain.windows(2) {
-            in_edge_dir_to_sec.insert((win[0], win[1]), (sec_idx, false));
-            in_edge_dir_to_sec.insert((win[1], win[0]), (sec_idx, true));
-        }
-        let a_nm = nearest_station(simp[0]);
-        let b_nm = nearest_station(*simp.last().unwrap());
-        let a_i = if a_nm.is_empty() {
-            -1
-        } else {
-            intern_station(&mut station_table, &mut station_idx, &a_nm, city_en)
-        };
-        let b_i = if b_nm.is_empty() {
-            -1
-        } else {
-            intern_station(&mut station_table, &mut station_idx, &b_nm, city_en)
-        };
-        in_sections.push(AtlasSection {
-            a: a_i,
-            b: b_i,
-            g: polyline_encode(&simp),
-            h: chain_hsr(chain),
-        });
-        for (ci, n, cls_counts) in in_sig_list[*sid as usize].iter() {
-            in_flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
-        }
-    }
-    for f in in_flows_per_city.iter_mut() {
-        f.sort_by(|a, b| b[1].cmp(&a[1]));
-    }
+    let in_section_chains = chains::build_section_chains(&in_edge_sig, &ec.trains, &in_cuts);
+    let ss = build_sections(
+        cx,
+        &in_section_chains,
+        &in_sig_list,
+        in_works.len(),
+        &m.station_pts_all,
+        it,
+    );
     println!(
         "in_sections: {} points: {}",
-        in_sections.len(),
-        in_total_sec_pts
+        ss.sections.len(),
+        ss.total_sec_pts
     );
-    let mut in_sec_edges = vec![0usize; in_sections.len()];
-    for &(s, rev) in in_edge_dir_to_sec.values() {
-        in_sec_edges[s] += !rev as usize;
-    }
+    ss
+}
 
-    // ---- assemble origins ----
-    let (mut chord_legs_out, mut chord_legs_in) = (0usize, 0usize);
-    // O1: throat pieces shared by both directions; path entries `base + j`
-    // with base = that direction's section count
-    let mut throats = Throats::default();
-    let mut throat_drops = [0u64; 2];
+/// What `assemble_origins` threads through the per-city loop.
+struct Assembled {
+    origins: Vec<AtlasOrigin>,
+    /// O1: throat pieces shared by both directions; path entries `base + j`
+    /// with base = that direction's section count
+    throats: Throats,
+    throat_drops: [u64; 2],
+}
+
+#[derive(Default)]
+struct AsmCounters {
+    chord_legs_out: usize,
+    chord_legs_in: usize,
+    pair_mismatch: u64,
+}
+
+/// The outbound half of one origin's assembly.
+struct OutSide {
+    dep_secs: Vec<Vec<i64>>,
+    dep_chord_legs: Vec<Vec<[usize; 3]>>,
+    dep_stop_pos: Vec<Vec<usize>>,
+    dests: Vec<[i64; 8]>,
+    calls_out: Vec<CallList>,
+    chords: Vec<AtlasChord>,
+    deps: Vec<AtlasDep>,
+}
+
+/// The inbound half of one origin's assembly.
+struct InSide {
+    arr_secs: Vec<Vec<i64>>,
+    arr_chord_legs: Vec<Vec<[usize; 3]>>,
+    srcs: Vec<[i64; 8]>,
+    in_calls_out: Vec<InCallList>,
+    arrs_out: Vec<AtlasArr>,
+}
+
+fn assemble_outbound(
+    m: &Model,
+    os: &SectionSet,
+    asm: &mut Assembled,
+    cnt: &mut AsmCounters,
+    it: &mut Interner,
+    w: &CityWork,
+) -> OutSide {
+    let cx = m.cx;
+    let (coords, city_en, city_pt) = (&cx.inp.coords, &cx.inp.city_en, &m.city_pt);
+    let lc = &m.lc;
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+    let station_grid = &m.station_grid;
+    let (sections, edge_dir_to_sec, sec_edges) = (&os.sections, &os.edge_dir_to_sec, &os.sec_edges);
     let geom = |key: &(String, String, String)| {
-        leg_seqs(key, &leg_cache, &variant_cache).zip(leg_walks.get(key))
+        leg_seqs(key, &lc.leg_cache, &lc.variant_cache).zip(m.leg_walks.get(key))
     };
-    let mut pair_mismatch = 0u64;
-    let mut origins: Vec<AtlasOrigin> = Vec::new();
-    for (ci, w) in works.iter().enumerate() {
-        // dep_secs: sections in travel order, a section again whenever the
-        // train runs back over it (flows dedupe per train separately, above);
-        // `!sec` (= -(sec + 1)) marks a section travelled against its
-        // stored point order; entries >= sections.len() are throats (O1,
-        // see row_path). Positions count every entry; call sec_cnt counts
-        // flow sections only (dep_leg_sec_cnt = RowPath::flow_cnt).
-        let mut dep_secs: Vec<Vec<i64>> = Vec::with_capacity(w.deps.len());
-        let mut dep_leg_sec_cnt: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
-        let mut dep_chord_legs: Vec<Vec<[usize; 3]>> = Vec::with_capacity(w.deps.len());
-        // dep_stop_pos: per dep row, the path position of every stop after
-        // boarding (entries before it = full_cnt at its stop, so the stop
-        // sits at the start of the departing leg's station throat), station
-        // level; times and stations come from schedules[t]
-        let mut dep_stop_pos: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
-        for d in w.deps.iter() {
-            let p = row_path(
-                &d.leg_keys,
-                &d.leg_fwd,
-                &d.leg_stop,
-                &geom,
-                &|u, v| edge_dir_to_sec.get(&(u, v)).copied(),
-                &sec_edges,
-                &|_, _, p| near_station(&station_grid, p).then_some(None),
-                coords,
-                &mut throats,
-                sections.len(),
-                &mut throat_drops,
-            );
-            let chord_legs = p.chord_legs;
-            chord_legs_out += chord_legs.len();
-            dep_stop_pos.push(
-                ((d.board + 1)..=(d.board + d.stops_after as usize))
-                    .map(|j| p.full_cnt[d.leg_stop.partition_point(|&s| s < j)])
-                    .collect(),
-            );
-            dep_secs.push(p.secs);
-            dep_leg_sec_cnt.push(p.flow_cnt);
-            dep_chord_legs.push(chord_legs);
-        }
-        let dep_lookup: HashMap<DepKey, usize> = w
-            .deps
-            .iter()
-            .enumerate()
-            .map(|(i, d)| ((d.ti, d.from_station.clone(), d.depart.clone()), i))
-            .collect();
-        let mut dests: Vec<[i64; 8]> = Vec::new();
-        let mut calls_out: Vec<CallList> = Vec::new();
-        for (zh, st) in w.dests.iter() {
-            let dp = match city_pt.get(zh) {
-                Some(p) => *p,
-                None => continue,
-            };
-            let idx = intern_city(&mut city_table, &mut city_idx, zh, city_en, &city_pt);
-            let mut times = st.times.clone();
-            times.sort();
-            let fastest = times.first().copied().unwrap_or(-1);
-            let median_v = if times.is_empty() {
-                -1
-            } else {
-                times[times.len() / 2]
-            };
-            // crow-flies km (origin pt -> destination city pt) and rail km
-            // (median over direct trains of summed track leg lengths)
-            let crow = hav_km_ll(w.home_pt, [dp[1], dp[0]]).round() as i64;
-            let mut rail = st.rail.clone();
-            rail.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            let rail_v = if rail.is_empty() {
-                -1
-            } else {
-                rail[rail.len() / 2].round() as i64
-            };
-            dests.push([
-                idx,
-                st.total as i64,
-                st.fast as i64,
-                st.terminating as i64,
-                fastest,
-                median_v,
-                crow,
-                rail_v,
-            ]);
-            let mut cl: Vec<(usize, String, String, i64, u8, usize)> = Vec::new();
-            for c in st.calls.iter() {
-                if let Some(di) = dep_lookup.get(&(c.ti, c.from_station.clone(), c.depart.clone()))
-                {
-                    let sec_cnt = dep_leg_sec_cnt[*di]
-                        .get(c.leg_cnt)
-                        .copied()
-                        .unwrap_or(*dep_leg_sec_cnt[*di].last().unwrap());
-                    cl.push((
-                        *di,
-                        c.arr.clone(),
-                        c.dep.clone(),
-                        c.off,
-                        if c.term { 1 } else { 0 },
-                        sec_cnt,
-                    ));
-                }
-            }
-            cl.sort_by_key(|r| (r.3, mins(&r.1).unwrap_or(0)));
-            if cl.len() as u64 != st.total {
-                println!(
-                    "CALLS MISMATCH {} -> {}: {} calls vs total {}",
-                    w.zh,
-                    zh,
-                    cl.len(),
-                    st.total
-                );
-            }
-            calls_out.push(cl);
-        }
-        let mut chords: Vec<AtlasChord> = Vec::new();
-        for (key, n) in w.legs.iter() {
-            let resolved = leg_seqs(key, &leg_cache, &variant_cache).is_some();
-            if resolved {
-                continue;
-            }
-            if let (Some(p1), Some(p2)) = (station_pt(&key.0), station_pt(&key.1)) {
-                let a_i = intern_station(&mut station_table, &mut station_idx, &key.0, city_en);
-                let b_i = intern_station(&mut station_table, &mut station_idx, &key.1, city_en);
-                chords.push(AtlasChord {
-                    a: a_i,
-                    b: b_i,
-                    n: *n,
-                    g: polyline_encode(&[[p1[1], p1[0]], [p2[1], p2[0]]]),
-                });
+    let (throats, throat_drops) = (&mut asm.throats, &mut asm.throat_drops);
+    let chord_legs_out = &mut cnt.chord_legs_out;
+    let inp = cx.inp;
+
+    // dep_secs: sections in travel order, a section again whenever the
+    // train runs back over it (flows dedupe per train separately, above);
+    // `!sec` (= -(sec + 1)) marks a section travelled against its
+    // stored point order; entries >= sections.len() are throats (O1,
+    // see row_path). Positions count every entry; call sec_cnt counts
+    // flow sections only (dep_leg_sec_cnt = RowPath::flow_cnt).
+    let mut dep_secs: Vec<Vec<i64>> = Vec::with_capacity(w.deps.len());
+    let mut dep_leg_sec_cnt: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
+    let mut dep_chord_legs: Vec<Vec<[usize; 3]>> = Vec::with_capacity(w.deps.len());
+    // dep_stop_pos: per dep row, the path position of every stop after
+    // boarding (entries before it = full_cnt at its stop, so the stop
+    // sits at the start of the departing leg's station throat), station
+    // level; times and stations come from schedules[t]
+    let mut dep_stop_pos: Vec<Vec<usize>> = Vec::with_capacity(w.deps.len());
+    for d in w.deps.iter() {
+        let p = row_path(
+            &d.leg_keys,
+            &d.leg_fwd,
+            &d.leg_stop,
+            &geom,
+            &|u, v| edge_dir_to_sec.get(&(u, v)).copied(),
+            sec_edges,
+            &|_, _, p| near_station(station_grid, p).then_some(None),
+            coords,
+            throats,
+            sections.len(),
+            throat_drops,
+        );
+        let chord_legs = p.chord_legs;
+        *chord_legs_out += chord_legs.len();
+        dep_stop_pos.push(
+            ((d.board + 1)..=(d.board + d.stops_after as usize))
+                .map(|j| p.full_cnt[d.leg_stop.partition_point(|&s| s < j)])
+                .collect(),
+        );
+        dep_secs.push(p.secs);
+        dep_leg_sec_cnt.push(p.flow_cnt);
+        dep_chord_legs.push(chord_legs);
+    }
+    let dep_lookup: HashMap<DepKey, usize> = w
+        .deps
+        .iter()
+        .enumerate()
+        .map(|(i, d)| ((d.ti, d.from_station.clone(), d.depart.clone()), i))
+        .collect();
+    let mut dests: Vec<[i64; 8]> = Vec::new();
+    let mut calls_out: Vec<CallList> = Vec::new();
+    for (zh, st) in w.dests.iter() {
+        let dp = match city_pt.get(zh) {
+            Some(p) => *p,
+            None => continue,
+        };
+        let idx = it.city(zh, city_en, city_pt);
+        let mut times = st.times.clone();
+        times.sort();
+        let fastest = times.first().copied().unwrap_or(-1);
+        let median_v = if times.is_empty() {
+            -1
+        } else {
+            times[times.len() / 2]
+        };
+        // crow-flies km (origin pt -> destination city pt) and rail km
+        // (median over direct trains of summed track leg lengths)
+        let crow = hav_km_ll(w.home_pt, [dp[1], dp[0]]).round() as i64;
+        let mut rail = st.rail.clone();
+        rail.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let rail_v = if rail.is_empty() {
+            -1
+        } else {
+            rail[rail.len() / 2].round() as i64
+        };
+        dests.push([
+            idx,
+            st.total as i64,
+            st.fast as i64,
+            st.terminating as i64,
+            fastest,
+            median_v,
+            crow,
+            rail_v,
+        ]);
+        let mut cl: Vec<(usize, String, String, i64, u8, usize)> = Vec::new();
+        for c in st.calls.iter() {
+            if let Some(di) = dep_lookup.get(&(c.ti, c.from_station.clone(), c.depart.clone())) {
+                let sec_cnt = dep_leg_sec_cnt[*di]
+                    .get(c.leg_cnt)
+                    .copied()
+                    .unwrap_or(*dep_leg_sec_cnt[*di].last().unwrap());
+                cl.push((
+                    *di,
+                    c.arr.clone(),
+                    c.dep.clone(),
+                    c.off,
+                    if c.term { 1 } else { 0 },
+                    sec_cnt,
+                ));
             }
         }
-        let mut deps: Vec<AtlasDep> = Vec::new();
-        for d in w.deps.iter() {
-            let t_i = intern_train(&mut train_table, &mut train_ti, &mut train_idx, &inp, d.ti);
-            let fs_i = intern_station(
-                &mut station_table,
-                &mut station_idx,
-                &d.from_station,
-                city_en,
+        cl.sort_by_key(|r| (r.3, mins(&r.1).unwrap_or(0)));
+        if cl.len() as u64 != st.total {
+            println!(
+                "CALLS MISMATCH {} -> {}: {} calls vs total {}",
+                w.zh,
+                zh,
+                cl.len(),
+                st.total
             );
-            let ts_i = intern_station(&mut station_table, &mut station_idx, &d.to_station, city_en);
-            let tc_i = intern_city(
-                &mut city_table,
-                &mut city_idx,
-                &d.to_city,
-                city_en,
-                &city_pt,
-            );
-            deps.push(AtlasDep {
-                t: t_i,
-                fs: fs_i,
-                dep: d.depart.clone(),
-                ts: ts_i,
-                tc: tc_i,
-                arr: d.arrive.clone(),
-                dur: d.dur.unwrap_or(-1),
-                stops: d.stops_after,
-                set: d.set,
-                km: if d.km > 0.0 { d.km.round() as i64 } else { -1 },
+        }
+        calls_out.push(cl);
+    }
+    let mut chords: Vec<AtlasChord> = Vec::new();
+    for (key, n) in w.legs.iter() {
+        let resolved = leg_seqs(key, &lc.leg_cache, &lc.variant_cache).is_some();
+        if resolved {
+            continue;
+        }
+        if let (Some(p1), Some(p2)) = (station_pt(&key.0), station_pt(&key.1)) {
+            let a_i = it.station(&key.0, city_en);
+            let b_i = it.station(&key.1, city_en);
+            chords.push(AtlasChord {
+                a: a_i,
+                b: b_i,
+                n: *n,
+                g: polyline_encode(&[[p1[1], p1[0]], [p2[1], p2[0]]]),
             });
         }
-        // ---- inbound assembly for this city ----
-        let iw = &in_works[ci];
-        // arr_secs: same encoding as dep_secs (throats >= in_sections.len()),
-        // in travel order (train origin -> arrival here). arr_leg_sec_cnt[li]
-        // = flow sections from leg li to the arrival, so a call's sec_cnt is
-        // the trailing count.
-        let mut arr_secs: Vec<Vec<i64>> = Vec::with_capacity(iw.arrs.len());
-        let mut arr_leg_sec_cnt: Vec<Vec<usize>> = Vec::with_capacity(iw.arrs.len());
-        let mut arr_chord_legs: Vec<Vec<[usize; 3]>> = Vec::with_capacity(iw.arrs.len());
-        for a in iw.arrs.iter() {
-            let p = row_path(
-                &a.leg_keys,
-                &a.leg_fwd,
-                &a.leg_stop,
-                &geom,
-                &|u, v| in_edge_dir_to_sec.get(&(u, v)).copied(),
-                &in_sec_edges,
-                &|_, _, p| near_station(&in_station_grid, p).then_some(None),
-                coords,
-                &mut throats,
-                in_sections.len(),
-                &mut throat_drops,
-            );
-            let total = *p.flow_cnt.last().unwrap();
-            chord_legs_in += p.chord_legs.len();
-            arr_secs.push(p.secs);
-            arr_leg_sec_cnt.push(p.flow_cnt.iter().map(|c| total - c).collect());
-            arr_chord_legs.push(p.chord_legs);
+    }
+    let mut deps: Vec<AtlasDep> = Vec::new();
+    for d in w.deps.iter() {
+        let t_i = it.train(inp, d.ti);
+        let fs_i = it.station(&d.from_station, city_en);
+        let ts_i = it.station(&d.to_station, city_en);
+        let tc_i = it.city(&d.to_city, city_en, city_pt);
+        deps.push(AtlasDep {
+            t: t_i,
+            fs: fs_i,
+            dep: d.depart.clone(),
+            ts: ts_i,
+            tc: tc_i,
+            arr: d.arrive.clone(),
+            dur: d.dur.unwrap_or(-1),
+            stops: d.stops_after,
+            set: d.set,
+            km: if d.km > 0.0 { d.km.round() as i64 } else { -1 },
+        });
+    }
+    OutSide {
+        dep_secs,
+        dep_chord_legs,
+        dep_stop_pos,
+        dests,
+        calls_out,
+        chords,
+        deps,
+    }
+}
+
+fn assemble_inbound(
+    m: &Model,
+    is_: &SectionSet,
+    asm: &mut Assembled,
+    cnt: &mut AsmCounters,
+    it: &mut Interner,
+    iw: &InCityWork,
+) -> InSide {
+    let cx = m.cx;
+    let (coords, city_en, city_pt) = (&cx.inp.coords, &cx.inp.city_en, &m.city_pt);
+    let lc = &m.lc;
+    let (selected, works) = (&m.selected, &m.out.works);
+    let in_station_grid = &m.in_station_grid;
+    let (in_sections, in_edge_dir_to_sec, in_sec_edges) =
+        (&is_.sections, &is_.edge_dir_to_sec, &is_.sec_edges);
+    let geom = |key: &(String, String, String)| {
+        leg_seqs(key, &lc.leg_cache, &lc.variant_cache).zip(m.leg_walks.get(key))
+    };
+    let (throats, throat_drops) = (&mut asm.throats, &mut asm.throat_drops);
+    let chord_legs_in = &mut cnt.chord_legs_in;
+    let pair_mismatch = &mut cnt.pair_mismatch;
+    let inp = cx.inp;
+
+    // arr_secs: same encoding as dep_secs (throats >= in_sections.len()),
+    // in travel order (train origin -> arrival here). arr_leg_sec_cnt[li]
+    // = flow sections from leg li to the arrival, so a call's sec_cnt is
+    // the trailing count.
+    let mut arr_secs: Vec<Vec<i64>> = Vec::with_capacity(iw.arrs.len());
+    let mut arr_leg_sec_cnt: Vec<Vec<usize>> = Vec::with_capacity(iw.arrs.len());
+    let mut arr_chord_legs: Vec<Vec<[usize; 3]>> = Vec::with_capacity(iw.arrs.len());
+    for a in iw.arrs.iter() {
+        let p = row_path(
+            &a.leg_keys,
+            &a.leg_fwd,
+            &a.leg_stop,
+            &geom,
+            &|u, v| in_edge_dir_to_sec.get(&(u, v)).copied(),
+            in_sec_edges,
+            &|_, _, p| near_station(in_station_grid, p).then_some(None),
+            coords,
+            throats,
+            in_sections.len(),
+            throat_drops,
+        );
+        let total = *p.flow_cnt.last().unwrap();
+        *chord_legs_in += p.chord_legs.len();
+        arr_secs.push(p.secs);
+        arr_leg_sec_cnt.push(p.flow_cnt.iter().map(|c| total - c).collect());
+        arr_chord_legs.push(p.chord_legs);
+    }
+    let arr_lookup: HashMap<ArrKey, usize> = iw
+        .arrs
+        .iter()
+        .enumerate()
+        .map(|(i, a)| ((a.ti, a.from_station.clone(), a.depart.clone(), a.set), i))
+        .collect();
+    let mut srcs: Vec<[i64; 8]> = Vec::new();
+    let mut in_calls_out: Vec<InCallList> = Vec::new();
+    for (zh, st) in iw.sources.iter() {
+        let dp = match city_pt.get(zh) {
+            Some(p) => *p,
+            None => continue,
+        };
+        let idx = it.city(zh, city_en, city_pt);
+        let mut times = st.times.clone();
+        times.sort();
+        let fastest = times.first().copied().unwrap_or(-1);
+        let median_v = if times.is_empty() {
+            -1
+        } else {
+            times[times.len() / 2]
+        };
+        let crow = hav_km_ll(iw.home_pt, [dp[1], dp[0]]).round() as i64;
+        let mut rail = st.rail.clone();
+        rail.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let rail_v = if rail.is_empty() {
+            -1
+        } else {
+            rail[rail.len() / 2].round() as i64
+        };
+        srcs.push([
+            idx,
+            st.total as i64,
+            st.fast as i64,
+            st.originating as i64,
+            fastest,
+            median_v,
+            crow,
+            rail_v,
+        ]);
+        let mut cl: Vec<(usize, String, String, i64, u8, i64, usize)> = Vec::new();
+        for c in st.calls.iter() {
+            if let Some(ai) =
+                arr_lookup.get(&(c.ti, c.okey_station.clone(), c.okey_depart.clone(), c.set))
+            {
+                let bfs_i = it.station(&c.from_station, city_en);
+                let sec_cnt = arr_leg_sec_cnt[*ai]
+                    .get(c.leg_start)
+                    .copied()
+                    .unwrap_or(arr_leg_sec_cnt[*ai][0]);
+                cl.push((
+                    *ai,
+                    c.depart.clone(),
+                    c.arr.clone(),
+                    c.off,
+                    if c.started { 1 } else { 0 },
+                    bfs_i,
+                    sec_cnt,
+                ));
+            }
         }
-        let arr_lookup: HashMap<ArrKey, usize> = iw
-            .arrs
-            .iter()
-            .enumerate()
-            .map(|(i, a)| ((a.ti, a.from_station.clone(), a.depart.clone(), a.set), i))
-            .collect();
-        let mut srcs: Vec<[i64; 8]> = Vec::new();
-        let mut in_calls_out: Vec<InCallList> = Vec::new();
-        for (zh, st) in iw.sources.iter() {
-            let dp = match city_pt.get(zh) {
-                Some(p) => *p,
-                None => continue,
-            };
-            let idx = intern_city(&mut city_table, &mut city_idx, zh, city_en, &city_pt);
-            let mut times = st.times.clone();
-            times.sort();
-            let fastest = times.first().copied().unwrap_or(-1);
-            let median_v = if times.is_empty() {
-                -1
-            } else {
-                times[times.len() / 2]
-            };
-            let crow = hav_km_ll(iw.home_pt, [dp[1], dp[0]]).round() as i64;
-            let mut rail = st.rail.clone();
-            rail.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            let rail_v = if rail.is_empty() {
-                -1
-            } else {
-                rail[rail.len() / 2].round() as i64
-            };
-            srcs.push([
-                idx,
-                st.total as i64,
-                st.fast as i64,
-                st.originating as i64,
-                fastest,
-                median_v,
-                crow,
-                rail_v,
-            ]);
-            let mut cl: Vec<(usize, String, String, i64, u8, i64, usize)> = Vec::new();
-            for c in st.calls.iter() {
-                if let Some(ai) =
-                    arr_lookup.get(&(c.ti, c.okey_station.clone(), c.okey_depart.clone(), c.set))
-                {
-                    let bfs_i = intern_station(
-                        &mut station_table,
-                        &mut station_idx,
-                        &c.from_station,
-                        city_en,
-                    );
-                    let sec_cnt = arr_leg_sec_cnt[*ai]
-                        .get(c.leg_start)
-                        .copied()
-                        .unwrap_or(arr_leg_sec_cnt[*ai][0]);
-                    cl.push((
-                        *ai,
-                        c.depart.clone(),
-                        c.arr.clone(),
-                        c.off,
-                        if c.started { 1 } else { 0 },
-                        bfs_i,
-                        sec_cnt,
-                    ));
+        cl.sort_by_key(|r| (r.3, mins(&r.2).unwrap_or(0)));
+        if cl.len() as u64 != st.total {
+            println!(
+                "IN CALLS MISMATCH {} <- {}: {} calls vs total {}",
+                iw.zh,
+                zh,
+                cl.len(),
+                st.total
+            );
+        }
+        in_calls_out.push(cl);
+        // pair identity: srcs[X][P] must equal dests[P][X] when P is selected
+        if let Some(pi) = selected.iter().position(|c| c == zh) {
+            match works[pi].dests.iter().find(|(dz, _)| dz == &iw.zh) {
+                Some((_, dst)) => {
+                    if dst.total != st.total {
+                        *pair_mismatch += 1;
+                        println!(
+                            "PAIR IDENTITY MISMATCH {} -> {}: out {} vs in {}",
+                            zh, iw.zh, dst.total, st.total
+                        );
+                    }
+                }
+                None => {
+                    *pair_mismatch += 1;
+                    println!("PAIR IDENTITY MISSING {} -> {}", zh, iw.zh);
                 }
             }
-            cl.sort_by_key(|r| (r.3, mins(&r.2).unwrap_or(0)));
-            if cl.len() as u64 != st.total {
-                println!(
-                    "IN CALLS MISMATCH {} <- {}: {} calls vs total {}",
-                    iw.zh,
-                    zh,
-                    cl.len(),
-                    st.total
-                );
-            }
-            in_calls_out.push(cl);
-            // pair identity: srcs[X][P] must equal dests[P][X] when P is selected
-            if let Some(pi) = selected.iter().position(|c| c == zh) {
-                match works[pi].dests.iter().find(|(dz, _)| dz == &iw.zh) {
-                    Some((_, dst)) => {
-                        if dst.total != st.total {
-                            pair_mismatch += 1;
-                            println!(
-                                "PAIR IDENTITY MISMATCH {} -> {}: out {} vs in {}",
-                                zh, iw.zh, dst.total, st.total
-                            );
-                        }
-                    }
-                    None => {
-                        pair_mismatch += 1;
-                        println!("PAIR IDENTITY MISSING {} -> {}", zh, iw.zh);
-                    }
-                }
-            }
         }
-        let mut arrs_out: Vec<AtlasArr> = Vec::new();
-        for a in iw.arrs.iter() {
-            let t_i = intern_train(&mut train_table, &mut train_ti, &mut train_idx, &inp, a.ti);
-            let fs_i = intern_station(
-                &mut station_table,
-                &mut station_idx,
-                &a.from_station,
-                city_en,
-            );
-            let fc_i = intern_city(
-                &mut city_table,
-                &mut city_idx,
-                &a.from_city,
-                city_en,
-                &city_pt,
-            );
-            let ts_i = intern_station(
-                &mut station_table,
-                &mut station_idx,
-                &a.arr_station,
-                city_en,
-            );
-            arrs_out.push(AtlasArr {
-                t: t_i,
-                fs: fs_i,
-                fc: fc_i,
-                dep: a.depart.clone(),
-                ts: ts_i,
-                arr: a.arrive.clone(),
-                dur: a.dur.unwrap_or(-1),
-                stops: a.stops_before,
-                set: a.set,
-                km: if a.km > 0.0 { a.km.round() as i64 } else { -1 },
-            });
-        }
-        origins.push(AtlasOrigin {
+    }
+    let mut arrs_out: Vec<AtlasArr> = Vec::new();
+    for a in iw.arrs.iter() {
+        let t_i = it.train(inp, a.ti);
+        let fs_i = it.station(&a.from_station, city_en);
+        let fc_i = it.city(&a.from_city, city_en, city_pt);
+        let ts_i = it.station(&a.arr_station, city_en);
+        arrs_out.push(AtlasArr {
+            t: t_i,
+            fs: fs_i,
+            fc: fc_i,
+            dep: a.depart.clone(),
+            ts: ts_i,
+            arr: a.arrive.clone(),
+            dur: a.dur.unwrap_or(-1),
+            stops: a.stops_before,
+            set: a.set,
+            km: if a.km > 0.0 { a.km.round() as i64 } else { -1 },
+        });
+    }
+    InSide {
+        arr_secs,
+        arr_chord_legs,
+        srcs,
+        in_calls_out,
+        arrs_out,
+    }
+}
+
+/// Assemble origins.
+fn assemble_origins(m: &Model, os: &SectionSet, is_: &SectionSet, it: &mut Interner) -> Assembled {
+    let en = |c: &str| -> String { m.cx.inp.en(c) };
+    let out = &m.out;
+    let mut asm = Assembled {
+        origins: Vec::new(),
+        throats: Throats::default(),
+        throat_drops: [0u64; 2],
+    };
+    let mut cnt = AsmCounters::default();
+    for (ci, w) in out.works.iter().enumerate() {
+        let o = assemble_outbound(m, os, &mut asm, &mut cnt, it, w);
+        let iw = &m.in_works[ci];
+        let i = assemble_inbound(m, is_, &mut asm, &mut cnt, it, iw);
+        asm.origins.push(AtlasOrigin {
             zh: w.zh.clone(),
             en: en(&w.zh),
             pt: w.home_pt,
             outbound: w.outbound,
             fully_tracked: w.fully_tracked,
-            dests,
-            calls: calls_out,
-            flows: flows_per_city[ci].clone(),
-            chords,
-            deps,
-            dep_secs,
-            dep_chord_legs,
-            dep_stop_pos,
+            dests: o.dests,
+            calls: o.calls_out,
+            flows: os.flows_per_city[ci].clone(),
+            chords: o.chords,
+            deps: o.deps,
+            dep_secs: o.dep_secs,
+            dep_chord_legs: o.dep_chord_legs,
+            dep_stop_pos: o.dep_stop_pos,
             inbound: iw.arrivals,
-            srcs,
-            in_calls: in_calls_out,
-            in_flows: in_flows_per_city[ci].clone(),
-            arrs: arrs_out,
-            arr_secs,
-            arr_chord_legs,
+            srcs: i.srcs,
+            in_calls: i.in_calls_out,
+            in_flows: is_.flows_per_city[ci].clone(),
+            arrs: i.arrs_out,
+            arr_secs: i.arr_secs,
+            arr_chord_legs: i.arr_chord_legs,
         });
     }
+    let (skipped_rows, skipped_trains, skipped_example) =
+        (&out.skipped_rows, &out.skipped_trains, &out.skipped_example);
+    let (pair_mismatch, chord_legs_out, chord_legs_in) =
+        (cnt.pair_mismatch, cnt.chord_legs_out, cnt.chord_legs_in);
+    let lc = &m.lc;
 
     println!("pair identity mismatches: {}", pair_mismatch);
     println!(
@@ -2119,23 +2440,46 @@ fn main() {
     );
     println!(
         "variant legs: {} resolved via override tiling, {} fell back to base pair geometry",
-        variant_stats.0, variant_stats.1
+        lc.variant_stats.0, lc.variant_stats.1
     );
-    // ---- P2.2 national trains (A): every national train's whole run ----
-    // Same train set and legs as the national table (nat_legs: the union of
-    // a train's outbound and inbound legs, which is every leg of its run).
-    // The whole path is a head over the legs before the train's first
-    // selected-city departure, then that city's out-tables row verbatim (a
-    // train with no outbound row is all head). The head walks `sections`
-    // through the same edge map as the national table, so the sections it
-    // touches are exactly the ones that table counts. A section the head
-    // covers whole is a flow entry as in the out-tables rows. Sections are
-    // cut where per-city counts change, so a head (track no selected city's
-    // outbound train runs over) can join one at a junction mid-way: that
-    // partial stretch, and track no section carries, become geometry-only
-    // pieces interned like throats (a shared throat when the node chain
-    // matches one, else a new piece in `extra`); a piece on a partly covered
-    // section is listed in `on_sec`, so the train still counts there.
+    asm
+}
+
+/// P2.2 national trains (A): every national train's whole run.
+/// Same train set and legs as the national table (nat_legs: the union of
+/// a train's outbound and inbound legs, which is every leg of its run).
+/// The whole path is a head over the legs before the train's first
+/// selected-city departure, then that city's out-tables row verbatim (a
+/// train with no outbound row is all head). The head walks `sections`
+/// through the same edge map as the national table, so the sections it
+/// touches are exactly the ones that table counts. A section the head
+/// covers whole is a flow entry as in the out-tables rows. Sections are
+/// cut where per-city counts change, so a head (track no selected city's
+/// outbound train runs over) can join one at a junction mid-way: that
+/// partial stretch, and track no section carries, become geometry-only
+/// pieces interned like throats (a shared throat when the node chain
+/// matches one, else a new piece in `extra`); a piece on a partly covered
+/// section is listed in `on_sec`, so the train still counts there.
+/// Returns the trains and the extra pieces' node chains.
+fn national_trains_phase(
+    m: &Model,
+    os: &SectionSet,
+    nat_legs: &std::collections::BTreeMap<usize, TrainLegs>,
+    national: &flows::National,
+    asm: &Assembled,
+    it: &Interner,
+) -> (NationalTrains, Vec<Vec<i64>>) {
+    let cx = m.cx;
+    let inp = cx.inp;
+    let (trains, coords, override_map) = (&inp.trains, &inp.coords, &inp.override_map);
+    let train_names = &cx.train_names;
+    let (lc, works) = (&m.lc, &m.out.works);
+    let (sections, edge_dir_to_sec, sec_edges) = (&os.sections, &os.edge_dir_to_sec, &os.sec_edges);
+    let (origins, throats) = (&asm.origins, &asm.throats);
+    let geom = |key: &(String, String, String)| {
+        leg_seqs(key, &lc.leg_cache, &lc.variant_cache).zip(m.leg_walks.get(key))
+    };
+
     // ti -> (boarding stop, origin, dep row) of its earliest outbound row
     let mut first_dep: HashMap<usize, (usize, usize, usize)> = HashMap::new();
     for (ci, w) in works.iter().enumerate() {
@@ -2160,8 +2504,8 @@ fn main() {
     let mut nt_on_sec: std::collections::BTreeMap<usize, usize> = Default::default();
     let mut nt_partial = 0usize;
     let mut nt_rev_examples: Vec<String> = Vec::new();
-    for (t, tr) in train_table.iter().enumerate() {
-        let ti = train_ti[t];
+    for (t, tr) in it.train_table.iter().enumerate() {
+        let ti = it.train_ti[t];
         let Some((_, _, nat_keys)) = nat_legs.get(&ti) else {
             national_trains.paths.push(Vec::new());
             national_trains.stop_pos.push(Vec::new());
@@ -2212,7 +2556,7 @@ fn main() {
                     .copied()
                     .filter(|&(s, _)| whole_sec(s))
             },
-            &sec_edges,
+            sec_edges,
             &|u, v, _| Some(edge_dir_to_sec.get(&(u, v)).map(|&(s, _)| s)),
             coords,
             &mut nat_throats,
@@ -2344,10 +2688,19 @@ fn main() {
         "national trains: {nt_partial} (train, section) pairs where a head covers only part of a section, on {} pieces",
         national_trains.on_sec.len()
     );
+    (national_trains, extra_chains)
+}
 
-    // ---- per-train schedules, indexed by train_table t, from data/raw ----
-    // Names are clean()ed before interning, so every stop resolves into
-    // station_table (appended after the atlas's own stations).
+/// Per-train schedules, indexed by train_table t, from data/raw.
+/// Names are clean()ed before interning, so every stop resolves into
+/// station_table (appended after the atlas's own stations).
+fn schedules_phase(m: &Model, it: &mut Interner) -> Vec<Vec<ScheduleRow>> {
+    let cx = m.cx;
+    let inp = cx.inp;
+    let (trains, d1_len, override_map) = (&inp.trains, inp.d1_len, &inp.override_map);
+    let (city_en, data_dir) = (&inp.city_en, &inp.paths.data_dir);
+    let (train_names, corr) = (&cx.train_names, &m.corr);
+
     // A train export's stop lists are its schedules; otherwise the 12306
     // stop-list dumps, keyed (dataset, train_no).
     let mut raw_stops: HashMap<(u8, String), Vec<RawStop>> = HashMap::new();
@@ -2359,9 +2712,10 @@ fn main() {
             }
         }
     }
-    let mut schedules: Vec<Vec<ScheduleRow>> = Vec::with_capacity(train_table.len());
+    let mut schedules: Vec<Vec<ScheduleRow>> = Vec::with_capacity(it.train_table.len());
     let (mut sched_name_mismatch, mut sched_km_unknown) = (0usize, 0usize);
-    for &ti in &train_ti {
+    let train_tis = it.train_ti.clone();
+    for &ti in &train_tis {
         let t = &trains[ti];
         let set = if ti < d1_len { 0u8 } else { 1 };
         let own: Vec<RawStop>;
@@ -2403,7 +2757,7 @@ fn main() {
             let km = if j == 0 || names[j - 1] == names[j] {
                 0.0
             } else {
-                match leg_km(override_map, &pair_len, t, &names[j - 1], &names[j]) {
+                match leg_km(override_map, &corr.pair_len, t, &names[j - 1], &names[j]) {
                     Some(l) => (l * 10.0).round() / 10.0,
                     None => {
                         sched_km_unknown += 1;
@@ -2411,7 +2765,7 @@ fn main() {
                     }
                 }
             };
-            let st = intern_station(&mut station_table, &mut station_idx, &names[j], city_en);
+            let st = it.station(&names[j], city_en);
             rows.push((
                 st,
                 arr.unwrap_or(-1),
@@ -2428,8 +2782,13 @@ fn main() {
         sched_name_mismatch,
         sched_km_unknown
     );
+    schedules
+}
 
-    // ---- network backdrop (shared, polyline-encoded) ----
+/// Network backdrop (shared, polyline-encoded).
+fn network_backdrop(cx: &Ctx) -> Vec<String> {
+    let path_map = &cx.inp.path_map;
+
     let mut network: Vec<String> = Vec::new();
     {
         let mut seen: HashSet<(String, String)> = HashSet::new();
@@ -2441,7 +2800,7 @@ fn main() {
                 continue;
             }
             for s in segs {
-                let c = seg_coords(s);
+                let c = cx.seg_coords(s);
                 if c.len() >= 2 {
                     let simp = dp_keep(&c, 0.008);
                     let simp: Vec<[f64; 2]> = simp.iter().map(|p| round_pt(*p, 3)).collect();
@@ -2453,8 +2812,23 @@ fn main() {
         }
     }
     println!("network polylines: {}", network.len());
+    network
+}
 
-    // ---- O1 throat geometry, simplified like the sections ----
+/// O1 throat geometry, simplified like the sections; also fills the national
+/// trains' extra pieces. Returns the throat pieces.
+fn throat_geometry(
+    cx: &Ctx,
+    asm: &Assembled,
+    extra_chains: &[Vec<i64>],
+    national_trains: &mut NationalTrains,
+    os: &SectionSet,
+    is_: &SectionSet,
+) -> Vec<String> {
+    let coords = &cx.inp.coords;
+    let (origins, throats, throat_drops) = (&asm.origins, &asm.throats, asm.throat_drops);
+    let (sections, in_sections) = (&os.sections, &is_.sections);
+
     let mut throat_pts = 0usize;
     let throat_geo: Vec<String> = throats
         .chains
@@ -2503,17 +2877,14 @@ fn main() {
         throat_drops[0],
         throat_drops[1]
     );
+    throat_geo
+}
 
-    let mut stats: std::collections::BTreeMap<String, i64> = Default::default();
-    stats.insert("origins".into(), origins.len() as i64);
-    stats.insert("sections".into(), sections.len() as i64);
-    stats.insert("in_sections".into(), in_sections.len() as i64);
-    stats.insert("section_points".into(), total_sec_pts as i64);
-    stats.insert("city_table".into(), city_table.len() as i64);
-    stats.insert("station_table".into(), station_table.len() as i64);
-    stats.insert("train_table".into(), train_table.len() as i64);
-    stats.insert("network_polylines".into(), network.len() as i64);
-    stats.insert("throats".into(), throat_geo.len() as i64);
+/// The `about` sentence and, for train-export builds, the date window.
+fn about_and_calendar(cx: &Ctx) -> (String, Option<Vec<String>>) {
+    let inp = cx.inp;
+    let trains = &inp.trains;
+
     let mut about = "China Rail Flow Atlas - Minard-style outbound flow maps for China's top 100 rail cities. Shared national track-section atlas (each section = a stretch of track with constant per-city train counts); every origin city is a sparse index (section, trains/day) into it, plus destination stats and departures. Track geometry: OpenStreetMap. Timetables: 12306 timetables Wed 2026-10-21 (5,043 trains, trunk) and Wed 2026-10-28 (2,210 intercity C/S trains). Flow width = trains/day summed over each shared track section. Dashed chords = legs with no track routing. Geometry strings are Google-polyline-encoded at 1e5 precision, [lat, lon] order.".to_string();
     let calendar = inp.calendar.as_ref().map(|(_, window)| window.clone());
     if let Some(w) = &calendar {
@@ -2527,12 +2898,20 @@ fn main() {
             ),
         );
     }
-    // ---- per-city national counts (dep/arr), the origins' counting rules ----
-    // Interned after every other city so existing city_table indices keep
-    // their values; a city with no coordinates is not drawable and left out.
-    let mut national = national;
+    (about, calendar)
+}
+
+/// Per-city national counts (dep/arr), the origins' counting rules.
+/// Interned after every other city so existing city_table indices keep
+/// their values; a city with no coordinates is not drawable and left out.
+fn national_cities(m: &Model, asm: &Assembled, national: &mut flows::National, it: &mut Interner) {
+    let cx = m.cx;
+    let (trains, city_en) = (&cx.inp.trains, &cx.inp.city_en);
+    let (train_cities, city_pt) = (&cx.train_cities, &m.city_pt);
+    let origins = &asm.origins;
+
     // over the pack's trains (train_table), the same set as the sections
-    let counts = flows::city_counts(train_ti.iter().map(|&ti| {
+    let counts = flows::city_counts(it.train_ti.iter().map(|&ti| {
         (
             class_idx(&trains[ti].train_class),
             train_cities[ti].as_slice(),
@@ -2545,7 +2924,7 @@ fn main() {
             no_pt += 1;
             continue;
         }
-        let i = intern_city(&mut city_table, &mut city_idx, zh, city_en, &city_pt);
+        let i = it.city(zh, city_en, city_pt);
         rows.push((i, *d, *a));
     }
     rows.sort_by_key(|r| r.0);
@@ -2563,7 +2942,8 @@ fn main() {
     }
     // parity: every origin's outbound/inbound is its city's dep/arr
     for o in origins.iter() {
-        let k = city_idx
+        let k = it
+            .city_idx
             .get(&o.zh)
             .and_then(|i| nc.idx.binary_search(i).ok())
             .unwrap_or_else(|| panic!("origin {} has no national city row", o.zh));
@@ -2580,12 +2960,24 @@ fn main() {
         no_pt,
         origins.len()
     );
-    stats.insert("city_table".into(), city_table.len() as i64);
-    // ---- per-train national index (see flows::NationalIndex) ----
+}
+
+/// Per-train national index (see flows::NationalIndex).
+fn national_index_phase(
+    m: &Model,
+    national: &flows::National,
+    it: &Interner,
+) -> flows::NationalIndex {
+    let cx = m.cx;
+    let (trains, override_map) = (&cx.inp.trains, &cx.inp.override_map);
+    let (train_names, train_cities) = (&cx.train_names, &cx.train_cities);
+    let (corr, city_pt) = (&m.corr, &m.city_pt);
+    let nc = &national.cities;
+
     let secs_of: HashMap<usize, &Vec<usize>> =
         national.train_secs.iter().map(|(ti, v)| (*ti, v)).collect();
     let mut national_index = flows::NationalIndex::default();
-    for &ti in train_ti.iter() {
+    for &ti in it.train_ti.iter() {
         let (tr, names, cities) = (&trains[ti], &train_names[ti], &train_cities[ti]);
         let last = tr.stops.len() - 1;
         national_index
@@ -2597,7 +2989,7 @@ fn main() {
         let (mut km, mut ok) = (0f64, true);
         for k in 0..last {
             if names[k] != names[k + 1] {
-                match leg_km(override_map, &pair_len, tr, &names[k], &names[k + 1]) {
+                match leg_km(override_map, &corr.pair_len, tr, &names[k], &names[k + 1]) {
                     Some(l) => km += l,
                     None => ok = false,
                 }
@@ -2627,7 +3019,7 @@ fn main() {
                     .iter()
                     .filter_map(|c| {
                         let k = f(cities, c)?;
-                        let i = *city_idx.get(c)?;
+                        let i = *it.city_idx.get(c)?;
                         nc.idx.binary_search(&i).ok()?;
                         let s = &tr.stops[k];
                         let m = if dep {
@@ -2649,16 +3041,72 @@ fn main() {
         national_index.arr.push(ids_a);
         national_index.arr_min.push(min_a);
     }
+    national_index
+}
+
+fn main() {
+    let inp = inputs::load();
+    let out_path = env::var("ATLAS_OUT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| inp.paths.files.join("china-flow-atlas-data.json"));
+    let cx = Ctx::new(&inp);
+    let selected = select_cities(&cx);
+    let city_pt = principal_points(&cx);
+    let corr = Corridor::build(&cx);
+    let mut lc = LegCaches::default();
+    let mut it = Interner::default();
+    let out = outbound_works(&cx, &selected, &city_pt, &corr, &mut lc);
+    let in_works = inbound_works(&cx, &selected, &city_pt, &corr);
+    let in_throat_stations = resolve_inbound_legs(&cx, &out, &in_works, &corr, &mut lc);
+    let leg_walks = orient_legs(&cx, &out.works, &in_works, &lc);
+    let station_grid = throat_grid(&cx, &out.throat_stations);
+    let in_station_grid = throat_grid(&cx, &in_throat_stations);
+    let station_pts_all = section_station_points(&cx);
+    let m = Model {
+        cx: &cx,
+        selected,
+        city_pt,
+        corr,
+        lc,
+        out,
+        in_works,
+        leg_walks,
+        station_grid,
+        in_station_grid,
+        station_pts_all,
+    };
+    let os = out_sections(&m, &mut it);
+    let (nat_legs, mut national) = national_table(&m, &os);
+    let is_ = in_sections(&m, &mut it);
+    let asm = assemble_origins(&m, &os, &is_, &mut it);
+    let (mut national_trains, extra_chains) =
+        national_trains_phase(&m, &os, &nat_legs, &national, &asm, &it);
+    let schedules = schedules_phase(&m, &mut it);
+    let network = network_backdrop(&cx);
+    let throat_geo = throat_geometry(&cx, &asm, &extra_chains, &mut national_trains, &os, &is_);
+    let (about, calendar) = about_and_calendar(&cx);
+    national_cities(&m, &asm, &mut national, &mut it);
+    let national_index = national_index_phase(&m, &national, &it);
+    let mut stats: std::collections::BTreeMap<String, i64> = Default::default();
+    stats.insert("origins".into(), asm.origins.len() as i64);
+    stats.insert("sections".into(), os.sections.len() as i64);
+    stats.insert("in_sections".into(), is_.sections.len() as i64);
+    stats.insert("section_points".into(), os.total_sec_pts as i64);
+    stats.insert("city_table".into(), it.city_table.len() as i64);
+    stats.insert("station_table".into(), it.station_table.len() as i64);
+    stats.insert("train_table".into(), it.train_table.len() as i64);
+    stats.insert("network_polylines".into(), network.len() as i64);
+    stats.insert("throats".into(), throat_geo.len() as i64);
     let out = AtlasOut {
         build: provenance::build_block(&inp),
         about,
-        origins,
-        sections,
-        in_sections,
+        origins: asm.origins,
+        sections: os.sections,
+        in_sections: is_.sections,
         throats: throat_geo,
-        city_table,
-        station_table,
-        train_table,
+        city_table: it.city_table,
+        station_table: it.station_table,
+        train_table: it.train_table,
         network,
         stats,
         schedules,
@@ -2667,6 +3115,7 @@ fn main() {
         national_index,
         calendar,
     };
+
     let txt = serde_json::to_string(&out).unwrap();
     fs::write(&out_path, &txt).unwrap();
     println!(
@@ -2674,74 +3123,6 @@ fn main() {
         out_path.display(),
         txt.len() as f64 / 1e6
     );
-}
-
-fn intern_city(
-    table: &mut Vec<AtlasCity>,
-    idx: &mut HashMap<String, i64>,
-    zh: &str,
-    city_en: &HashMap<String, String>,
-    city_pt: &HashMap<String, [f64; 2]>,
-) -> i64 {
-    if let Some(i) = idx.get(zh) {
-        return *i;
-    }
-    let pt = city_pt.get(zh).map(|p| [p[1], p[0]]).unwrap_or_else(|| {
-        panic!("city {zh} has no point: add it to CITY_POINTS in cn/gazetteer.rs")
-    });
-    let i = table.len() as i64;
-    table.push(AtlasCity {
-        zh: zh.to_string(),
-        en: city_en.get(zh).cloned().unwrap_or_else(|| zh.to_string()),
-        pt,
-    });
-    idx.insert(zh.to_string(), i);
-    i
-}
-
-fn intern_station(
-    table: &mut Vec<AtlasStation>,
-    idx: &mut HashMap<String, i64>,
-    zh: &str,
-    city_en: &HashMap<String, String>,
-) -> i64 {
-    if let Some(i) = idx.get(zh) {
-        return *i;
-    }
-    let i = table.len() as i64;
-    table.push(AtlasStation {
-        zh: zh.to_string(),
-        en: station_en(zh, city_en),
-    });
-    idx.insert(zh.to_string(), i);
-    i
-}
-
-/// The train_table row of train `ti` (an index into `inp.trains`): one row
-/// per train, so two trains sharing a code stay apart.
-fn intern_train(
-    table: &mut Vec<AtlasTrainRef>,
-    table_ti: &mut Vec<usize>,
-    idx: &mut HashMap<usize, usize>,
-    inp: &inputs::Inputs,
-    ti: usize,
-) -> usize {
-    if let Some(i) = idx.get(&ti) {
-        return *i;
-    }
-    let i = table.len();
-    let t = &inp.trains[ti];
-    let cal = inp.calendar.as_ref().map(|(c, _)| &c[ti]);
-    table.push(AtlasTrainRef {
-        code: t.code.clone(),
-        class: t.train_class.clone(),
-        days: cal.map(|c| c.days.clone()),
-        pattern: cal.and_then(|c| c.pattern.clone()),
-        suspended: cal.and_then(|c| c.listed_suspended.then_some(true)),
-    });
-    table_ti.push(ti);
-    idx.insert(ti, i);
-    i
 }
 
 #[cfg(test)]
