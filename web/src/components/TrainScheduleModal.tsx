@@ -3,8 +3,7 @@ import type { DepVM, ArrVM, DistUnit, RawTrain, SchedulesData, ScheduleStop } fr
 import { RunsLabel } from "./departures/RunsCell";
 import type { MapApi } from "./MapCanvas";
 import { formatScheduleStops } from "../lib";
-import { palette, rampColor } from "../lib/palette";
-import { TrainCard, cardStName, type TrainCardState } from "./MapCards";
+import { TrainCard, cardBand, cardStName, type TrainCardState } from "./MapCards";
 import { useDialogFocus } from "../hooks/useDialog";
 
 interface Props {
@@ -404,7 +403,7 @@ export default function TrainScheduleModal({
         }
         state={state}
         leg={leg}
-        band={rampColor(trainVM ? trainVM.dur : 0, palette(dark))}
+        band={cardBand(trainVM ? trainVM.dur : 0, dark)}
         isolated={isIsolated}
         onTimetable={() => setMinimized(false)}
         onClose={onClose}

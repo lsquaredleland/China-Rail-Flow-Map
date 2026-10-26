@@ -24,8 +24,7 @@ import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
-import { cardStName } from "./components/MapCards";
-import { palette, rampColor } from "./lib/palette";
+import { cardBand, cardStName } from "./components/MapCards";
 import { IsolationChip, NationalNote, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
@@ -127,7 +126,7 @@ export default function App() {
   const isolatedRoute = isolatedVM
     ? `${cardStName(isolatedVM.fsZh, isolatedVM.fsEn)} → ${cardStName(isolatedVM.tsZh, isolatedVM.tsEn)}`
     : "";
-  const isolatedBand = rampColor(isolatedVM ? isolatedVM.dur : 0, palette(dark));
+  const isolatedBand = cardBand(isolatedVM ? isolatedVM.dur : 0, dark);
 
   // National mode: the dot's train is not in the origin's departures, so the
   // schedule key is found by code in the shared train table (codes are unique).

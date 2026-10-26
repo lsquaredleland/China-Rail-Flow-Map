@@ -3,6 +3,9 @@
    black rule on top, 2px frame, no radius, one solid action, one outlined
    close. Styles in styles/cards.css. */
 
+import { palette, rampColor } from "../lib/palette";
+import type { RampStop } from "../types";
+
 export type TrainCardState = "en-route" | "stopped" | "not-departed" | "arrived" | "isolated";
 
 const STATE_LABEL: Record<TrainCardState, string> = {
@@ -12,6 +15,16 @@ const STATE_LABEL: Record<TrainCardState, string> = {
   arrived: "Arrived",
   isolated: "Isolated",
 };
+
+/** A train's fastest-time band colour for the card; at night the saffron
+    band lifts to #F0B85A (the global ramp is unchanged). */
+export function cardBand(mins: number, dark: boolean): string {
+  const pal = palette(dark);
+  if (!dark) return rampColor(mins, pal);
+  const lift = pal.ramp.map(([t, c]) =>
+    [t, c[0] === 227 && c[1] === 166 && c[2] === 63 ? [240, 184, 90] : c] as RampStop);
+  return rampColor(mins, { ...pal, ramp: lift });
+}
 
 /** "重庆北 Chongqing North": Chinese name then English, once if identical. */
 export function cardStName(zh: string, en?: string): string {
