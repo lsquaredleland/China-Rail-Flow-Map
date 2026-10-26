@@ -1,9 +1,15 @@
 # deck.gl migration plan: from the Canvas 2D renderer to deck.gl
 
-Status: **approved for execution, phase by phase, on the integration branch `deckgl`.**
+Status (2026-10-26): **built.** Phases 0–3 are merged on `deckgl` (origin view on deck.gl,
+Canvas deleted in P1c.2, national mode with trains A, flows B and A+B, the 11k train-export
+pack swapped in on 2026-10-25). Later UI work on `deckgl` (PR #80 onward: the Flows toggle in
+the toolbar, the shared 24h animation bar, map cards, the national table and filters, city
+growth, Play from origin, the Zoom-clarity trial) is recorded in those PRs, so the national
+"three-way control" and "coverage note" described under P3.2 below are superseded. The
+`deckgl` → `main` merge is the owner's gate (G-MAIN, D16); the pre-merge audit is
+`docs/AUDIT_PRE_MAIN.md`. Everything below is the plan and the as-built record per task.
 **Gate G0: GO with conditions** (independent gate review 2026-10-25, §11.6; the conditions are
-folded into the P1b tasks as C16–C26 below). Phase 1 is in progress: P1.0, P1.1, P1a.1–P1a.3 are
-merged; P1b.1 is the next task.
+folded into the P1b tasks as C16–C26 below).
 Each phase is a set of numbered, PR-sized tasks with files, tests, acceptance numbers and a
 stop/go gate. The owner decisions D1–D16 (§10) are **adopted defaults**: implementers follow
 them unless the owner overrides one in writing.
