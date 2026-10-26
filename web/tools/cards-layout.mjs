@@ -20,15 +20,19 @@ for (const [w, h, expanded] of [
   [1280, 800, true],
   [390, 844, true],
 ]) {
+  const T0 = Date.now(), lg = (m) => console.log(`  ${m} ${Date.now() - T0}ms`);
   const browser = await newBrowser();
   const pg = await browser.newPage();
   await pg.evaluateOnNewDocument(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
   await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
   await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
   await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
+  lg("loaded");
   await until(pg, "window.__deckStats && window.__deckStats.settled", 60000);
+  lg("settled");
   await pg.evaluate(() => window.__mapApi.selectDestByZh("深圳"));
   await until(pg, "document.querySelector('#destPanel')");
+  lg("dest");
   // a class filter, so the active-filter bar is in the stack too
   await pg.evaluate(() => {
     const g = [...document.querySelectorAll(".cls-filter .cls-btn")].find((e) => e.textContent.trim() === "G");
@@ -37,10 +41,12 @@ for (const [w, h, expanded] of [
   await until(pg, "document.querySelector('.active-filter-bar')", 5000).catch(() => {});
   if (!expanded) await click(pg, "#destMin");
   await sleep(300);
+  lg("filter");
   await click(pg, 'button[title^="View full schedule"]');
   await until(pg, "document.querySelector('button[aria-label=\"Minimize timetable\"]')", 10000).catch(() => {});
   await pg.evaluate(() => { const b = document.querySelector('button[aria-label="Minimize timetable"]'); b && b.click(); });
   await until(pg, "!document.querySelector('button[aria-label=\"Minimize timetable\"]')", 10000).catch(() => {});
+  lg("schedule");
   await sleep(400); // CSS transitions
   const boxes = await pg.evaluate(() => {
     const r = (e) => { const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
