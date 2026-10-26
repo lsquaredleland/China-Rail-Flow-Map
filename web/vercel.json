@@ -6,6 +6,23 @@
   "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in main) git diff --quiet HEAD^ HEAD -- . ;; deckgl) if git log -1 --pretty=%B | grep -qF \"[deploy]\"; then exit 1; fi; exit 0 ;; *) exit 0 ;; esac",
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
       "source": "/",
       "headers": [
         {

@@ -1,7 +1,7 @@
 // Static server for dist/ that mimics the Vercel headers in vercel.json:
 //   assets/*.json.br   immutable cache, Content-Encoding: br, application/json
 //   index.html         Cache-Control: public, max-age=0, must-revalidate
-//   every file         ETag (If-None-Match -> 304); .js/.html/.css/.svg are
+//   every file         nosniff, Referrer-Policy, Permissions-Policy//   every file         ETag (If-None-Match -> 304); .js/.html/.css/.svg are
 //                      brotli-compressed on the fly when accepted, as the host does
 // usage: node tools/serve.mjs [--dir dist] [--port 8766] [--404 <path-substring>[,...]]
 //   --404 answers 404 for any request path containing one of the substrings
@@ -39,7 +39,11 @@ export function serve(dir, port, { quiet = true, notFound = [] } = {}) {
       res.writeHead(404);
       return res.end();
     }
-    const h = {};
+    const h = {
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    };
     if (/^\/assets\/.*\.json\.br$/.test(p)) {
       h["Cache-Control"] = "public, max-age=31536000, immutable";
       h["Content-Encoding"] = "br";
