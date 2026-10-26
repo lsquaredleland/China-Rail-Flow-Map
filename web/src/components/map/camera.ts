@@ -209,7 +209,7 @@ export function frameTail(M: MapCtx) {
     P.current.legendRef.current.draw(
       pal,
       st.view.scale / st.fitScale,
-      true,
+      !P.current.national,
       P.current.showInfra,
       st.animEnabled,
       stationT(M),

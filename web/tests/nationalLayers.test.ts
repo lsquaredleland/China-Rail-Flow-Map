@@ -1,9 +1,9 @@
 // National-mode deck layers (P2.2): the frame buffers from natPositions, the
 // layer props, and the ?natSynth load. No GPU.
 import { describe, expect, test } from "bun:test";
-import { natPositions, natTrainVM, tooltipHtml } from "../src/lib";
+import { DATA_FMT, classIndex, natPositions, natTrainVM, tooltipHtml } from "../src/lib";
 import type { NationalTrainsData } from "../src/types";
-import { maxDots, nationalFrame, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
+import { maxDots, nationalCityDots, nationalFrame, nationalKeep, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
 import { glowOf } from "../src/components/map/deck/layers/trains";
 import { nationalTrains, pack } from "./fixture";
 
@@ -88,5 +88,71 @@ describe("national layers", () => {
       expect(!!vm.isDwelling).toBe((f.buf[i * 6 + 5] & 16) !== 0);
       expect(tooltipHtml({ kind: "train", train: vm }, { data: atlas.data, cur: null as never, direction: "out", distUnit: "km", panelDest: null, dark: false, ferry: false })).toContain(vm.code);
     }
+  });
+});
+
+describe("national class filter on the dots", () => {
+  const classOf = (q: number) => atlas.data.train_table[tl.tIdx[q]].class;
+  test("no filter keeps everything (null mask)", () => {
+    expect(nationalKeep(atlas, tl, [])).toBeNull();
+  });
+  test("the mask is the train_table class lookup", () => {
+    const keep = nationalKeep(atlas, tl, ["G"])!;
+    let g = 0;
+    for (let q = 0; q < tl.n; q++) {
+      expect(keep[q]).toBe(classIndex(classOf(q)) === 0 ? 1 : 0);
+      g += keep[q];
+    }
+    expect(g).toBeGreaterThan(0);
+    expect(g).toBeLessThan(tl.n);
+  });
+  test("frames hold only the selected classes' dots; the classes partition the all-class frame", () => {
+    const all = nationalFrame(tl, atlas, 1095, 100).count;
+    const g = nationalFrame(tl, atlas, 1095, 100, nationalKeep(atlas, tl, ["G"])).count;
+    const rest = nationalFrame(tl, atlas, 1095, 100, nationalKeep(atlas, tl, ["D", "C", "S", "Z", "T", "K", "plain"])).count;
+    expect(g).toBeGreaterThan(0);
+    expect(g).toBeLessThan(all);
+    expect(g + rest).toBe(all);
+    const f = nationalFrame(tl, atlas, 1095, 100, nationalKeep(atlas, tl, ["G"]));
+    for (let i = 0; i < f.count; i++) expect(classIndex(classOf(f.qOf[i]))).toBe(0);
+  });
+});
+
+describe("national city circles", () => {
+  const nCities = atlas.data.city_table.length;
+  const z = () => new Array(nCities >= 2 ? 2 : 1).fill(0);
+  const nf = {
+    fmt: DATA_FMT,
+    trains: 0,
+    total: [],
+    by_class: [],
+    cities: {
+      idx: [0, 1],
+      dep: [100, 0],
+      arr: [50, 0],
+      dep_by_class: [[100, 0], ...Array.from({ length: 7 }, z)],
+      arr_by_class: [[20, 0], [30, 0], ...Array.from({ length: 6 }, z)],
+    },
+  };
+  test("a pack without cities draws none", () => {
+    expect(nationalCityDots(atlas, { ...nf, cities: undefined }, [], 0)).toBeNull();
+  });
+  test("radius from departures + arrivals, empty cities left out, class filter applied", () => {
+    const d = nationalCityDots(atlas, nf, [], 0)!;
+    expect(d.idx).toEqual([0]);
+    expect([d.dep[0], d.arr[0]]).toEqual([100, 50]);
+    expect(d.pos[0]).toEqual(atlas.data.city_table[0].pt);
+    const g = nationalCityDots(atlas, nf, ["G"], 0)!;
+    expect([g.dep[0], g.arr[0]]).toEqual([100, 20]);
+    expect(g.r[0]).toBeLessThan(d.r[0]);
+    expect(nationalCityDots(atlas, nf, ["D"], 0)!.idx).toEqual([0]);
+    expect(nationalCityDots(atlas, nf, ["C"], 0)!.idx).toEqual([]);
+  });
+  test("tooltip: city name, departures and arrivals", () => {
+    const html = tooltipHtml({ kind: "natCity", idx: 0, dep: 1234, arr: 1 }, { data: atlas.data } as never);
+    const c = atlas.data.city_table[0];
+    expect(html).toContain(c.zh);
+    expect(html).toContain("1,234 departures");
+    expect(html).toContain("1 arrival");
   });
 });

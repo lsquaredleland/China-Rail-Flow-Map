@@ -1,5 +1,4 @@
 /* Floating controls drawn over the map canvas. */
-import type { NatLayer } from "../types";
 
 /** "Isolated: K9217 [Timetable] [x]" pill while one train is isolated. */
 export function IsolationChip({
@@ -36,54 +35,58 @@ export function IsolationChip({
   );
 }
 
-const NAT_LAYERS: { v: NatLayer; label: string; title: string }[] = [
-  { v: "trains", label: "Trains", title: "Every train's dot on the 24h clock" },
-  { v: "flows", label: "Flows", title: "Trains per day on each section" },
-  { v: "both", label: "Trains + flows", title: "Dots over the flows, built up to the clock's time" },
-];
-
-/** National mode's coverage note: the trains drawn and the schedule window
-    they run in (`span`, from the pack's calendar), and what the map draws
-    (trains, flows, or both: P3.2 / P3.3). */
+/** National mode's note and its two independent toggles: what the dots mean
+    (every train that runs at least once in the schedule window `span`, from
+    the pack's calendar, all on one 24-hour clock), Flows (the day's trains
+    per section and the city circles) and Animation (the trains' dots on the
+    clock, off until pressed). */
 export function NationalNote({
   trains,
   span,
   failed,
-  layer,
-  onLayer,
+  flows,
+  animate,
+  onFlows,
+  onAnimate,
   flowsFailed,
 }: {
   trains: number;
   span: string | undefined;
   failed: boolean;
-  layer: NatLayer;
-  onLayer: (v: NatLayer) => void;
+  flows: boolean;
+  animate: boolean;
+  onFlows: () => void;
+  onAnimate: () => void;
   flowsFailed: boolean;
 }) {
   return (
     <div className="nat-note" role="note">
-      <span className="nat-note-tag">National · beta</span>
       <span>
-        {failed
-          ? "The national train data could not be loaded."
-          : trains
-          ? `${trains.toLocaleString("en-US")} trains running${span ? " " + span : ""}`
-          : "Loading national trains…"}
+        Trains of China Rail
+        {trains ? ` · ${trains.toLocaleString("en-US")} trains` : ""}
+        {span ? ` · ${span}, all on one 24-hour clock` : ""}
       </span>
+      {failed && <span>The national train data could not be loaded.</span>}
       {flowsFailed && <span>The national flow data could not be loaded.</span>}
       <span className="nat-layers" role="group" aria-label="National map layers">
-        {NAT_LAYERS.map((o) => (
-          <button
-            key={o.v}
-            id={"natLayer-" + o.v}
-            type="button"
-            aria-pressed={layer === o.v ? "true" : "false"}
-            title={o.title}
-            onClick={() => onLayer(o.v)}
-          >
-            {o.label}
-          </button>
-        ))}
+        <button
+          id="natFlows"
+          type="button"
+          aria-pressed={flows ? "true" : "false"}
+          title="Trains per day on each section, and a circle per city sized by its departures and arrivals"
+          onClick={() => onFlows()}
+        >
+          Flows
+        </button>
+        <button
+          id="natAnimate"
+          type="button"
+          aria-pressed={animate ? "true" : "false"}
+          title="Play every train as a dot on the 24-hour clock"
+          onClick={() => onAnimate()}
+        >
+          Animation
+        </button>
       </span>
     </div>
   );

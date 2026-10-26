@@ -117,6 +117,20 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
         `<div class='t-sub' style='color:${blueCol};font-weight:600'>` +
         "粤海铁路轮渡 (Guangdong–Hainan Train Ferry) &middot; Qiongzhou Strait crossing</div>";
     }
+  } else if (hit.kind === "natCity") {
+    const c = data.city_table[hit.idx];
+    html =
+      "<div class='t-title'>" +
+      esc(c.zh) +
+      " &middot; " +
+      esc(c.en) +
+      "</div><div>" +
+      hit.dep.toLocaleString("en-US") +
+      (hit.dep === 1 ? " departure" : " departures") +
+      " &middot; " +
+      hit.arr.toLocaleString("en-US") +
+      (hit.arr === 1 ? " arrival" : " arrivals") +
+      "</div>";
   } else if (hit.kind === "train") {
     const tr = hit.train;
     const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";

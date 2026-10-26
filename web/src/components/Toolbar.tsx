@@ -58,6 +58,8 @@ export default function Toolbar({
 }) {
   return (
     <div className="toolbar">
+      {!national && (
+      <>
       <div className="group city-picker">
         <label htmlFor="originSearch">Origin city</label>
         <CityPicker
@@ -84,6 +86,8 @@ export default function Toolbar({
           Inbound
         </button>
       </div>
+      </>
+      )}
       <div
         className="group cls-filter"
         role="group"
@@ -131,13 +135,15 @@ export default function Toolbar({
         >
           National view
         </button>
-        <button
-          id="btnHome"
-          type="button"
-          onClick={() => mapRef.current?.fitHome()}
-        >
-          Origin close-up
-        </button>
+        {!national && (
+          <button
+            id="btnHome"
+            type="button"
+            onClick={() => mapRef.current?.fitHome()}
+          >
+            Origin close-up
+          </button>
+        )}
       </div>
       <div className="spacer"></div>
       <div className="group">
@@ -226,8 +232,8 @@ export default function Toolbar({
         </button>
       </div>
       <span className="hint">
-        Drag to pan &middot; scroll or pinch to zoom &middot; click a city
-        for its distances
+        Drag to pan &middot; scroll or pinch to zoom
+        {national ? " · hover a city for its trains" : " · click a city for its distances"}
       </span>
       {/* Last, so it takes free space at the row's end and moves nothing else. */}
       <div className="group">
