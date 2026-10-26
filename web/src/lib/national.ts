@@ -23,7 +23,6 @@ export function requireNationalTrains(d: NationalTrainsPack, nSec: number, nThr:
     Array.isArray(d.extra);
   if (ok) return;
   const msg = `${url}: national trains do not match the shared pack (${nSec} sections, ${nThr} throats, ${nTrains} trains); rebuild the data pack`;
-  console.error(msg);
   const err = new Error(msg);
   err.name = "FmtError";
   throw err;

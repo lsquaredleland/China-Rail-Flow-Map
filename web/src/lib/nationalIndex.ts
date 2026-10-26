@@ -42,7 +42,6 @@ export function requireNationalIndex(d: NationalIndexPack, nSec: number, nTrain:
     [d.hour, d.dist_km, d.dist_mi, d.dur, d.secs, d.dep, d.arr].every((a) => Array.isArray(a) && a.length === nTrain);
   if (ok) return;
   const msg = `${url}: national index does not match the shared pack (${nSec} sections, ${nTrain} trains); rebuild the data pack`;
-  console.error(msg);
   const err = new Error(msg);
   err.name = "FmtError";
   throw err;

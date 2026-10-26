@@ -23,7 +23,6 @@ export function requireNationalFlows(d: NationalFlowsPack, nSections: number, ur
     d.by_class.every((c) => Array.isArray(c) && c.length === nSections);
   if (ok) return;
   const msg = `${url}: national flows do not match the shared sections (${nSections}); rebuild the data pack`;
-  console.error(msg);
   const err = new Error(msg);
   err.name = "FmtError";
   throw err;
@@ -42,7 +41,6 @@ export function requireNationalEntries(d: NationalEntriesPack, nSections: number
     d.by_class.every((c) => Array.isArray(c) && c.length === nSections);
   if (ok) return;
   const msg = `${url}: national entries do not match the shared sections (${nSections}); rebuild the data pack`;
-  console.error(msg);
   const err = new Error(msg);
   err.name = "FmtError";
   throw err;

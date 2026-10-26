@@ -164,7 +164,6 @@ export const DATA_FMT = 6;
 export function requireFmt(fmt: unknown, url: string): void {
   if (fmt === DATA_FMT) return;
   const msg = `${url}: unsupported data format ${String(fmt)} (need fmt ${DATA_FMT}); rebuild the data pack`;
-  console.error(msg);
   const err = new Error(msg);
   err.name = "FmtError";
   throw err;
