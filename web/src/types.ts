@@ -508,6 +508,7 @@ export interface DayTimelineVM {
   numSteps: number; // total steps across all days
   totalMins: number; // total duration until all trains arrive (e.g. 1440, 2880, 4320)
   totalDays: number; // number of 24h cycles needed for all trains to complete
+  firstDepMins: number; // the earliest departure (where the animation starts), 0 with no trains
   secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(numSteps) of cumulative train count
   maxFlowSteps: Uint16Array; // length numSteps: max flow count across all sections at each step
   getActiveTrains: (tMins: number) => ActiveTrainVM[];

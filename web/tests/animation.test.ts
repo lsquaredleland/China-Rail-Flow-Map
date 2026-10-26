@@ -3,7 +3,7 @@
 // filters), animated trains subset of the filter, no teleporting dots.
 import { describe, expect, test } from "bun:test";
 import { filterOrigin, trainDistAt } from "../src/lib";
-import { animLoop, getAnimState, setPlaying, setTime } from "../src/components/map/anim";
+import { animLoop, getAnimState, setAnimEnabled, setPlaying, setTime } from "../src/components/map/anim";
 import { createMapCtx } from "../src/components/map/context";
 import type { MapCtx, Props } from "../src/components/map/context";
 import { origin, pack } from "./fixture";
@@ -228,6 +228,31 @@ describe("national clock (P2.2)", () => {
     expect(st.animTime).toBe(0);
     step(M, 30);
     expect(st.animTime).toBeCloseTo(30, 6);
+    setPlaying(M, false);
+  });
+
+  test("starting the animation: national at 00:00, an origin at its first departure", () => {
+    const N = ctx(true);
+    N.S.current.animTime = 777;
+    setAnimEnabled(N, true);
+    expect(N.S.current.animTime).toBe(0);
+
+    const M = ctx(false);
+    const st = M.S.current;
+    const tl = M.activeTimeline()!;
+    const first = Math.min(...origin("广州").deps.map((d) => tl.getPrepTrain(d.code)?.depMins ?? Infinity));
+    expect(tl.firstDepMins).toBe(first);
+    expect(first).toBeGreaterThan(0);
+    st.animTime = 900;
+    setAnimEnabled(M, true);
+    expect(st.animTime).toBe(Math.floor(first));
+    // already running: re-enabling keeps the clock; playing from the end wraps to the first departure
+    st.animTime = 900;
+    setAnimEnabled(M, true);
+    expect(st.animTime).toBe(900);
+    st.animTime = tl.totalMins;
+    setPlaying(M, true);
+    expect(st.animTime).toBe(Math.floor(first));
     setPlaying(M, false);
   });
 

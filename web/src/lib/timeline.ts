@@ -286,6 +286,7 @@ export function buildDayTimeline(
       numSteps: 12,
       totalMins: 60,
       totalDays: 1,
+      firstDepMins: 0,
       secFlowSteps: new Map(),
       maxFlowSteps: new Uint16Array(12),
       getActiveTrains: () => [],
@@ -423,9 +424,12 @@ export function buildDayTimeline(
   ): DayTimelineVM {
     // Track max arrival time across all services (ending time of the bar varies depending on the last train)
     let maxArrMins = 0;
+    let firstDepMins = Infinity;
     for (let ti = 0; ti < trains.length; ti++) {
       if (trains[ti].arrMins > maxArrMins) maxArrMins = trains[ti].arrMins;
+      if (trains[ti].depMins < firstDepMins) firstDepMins = trains[ti].depMins;
     }
+    if (!isFinite(firstDepMins)) firstDepMins = 0;
     const totalMins = spanMins ?? Math.max(60, Math.ceil(maxArrMins / 5) * 5);
     const totalDays = Math.max(1, Math.ceil(totalMins / 1440));
     const numSteps = Math.ceil(totalMins / stepMins);
@@ -686,6 +690,7 @@ export function buildDayTimeline(
       numSteps,
       totalMins,
       totalDays,
+      firstDepMins,
       secFlowSteps,
       maxFlowSteps,
       getActiveTrains,
