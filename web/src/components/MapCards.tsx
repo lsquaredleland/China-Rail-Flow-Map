@@ -3,8 +3,22 @@
    black rule on top, 2px frame, no radius, one solid action, one outlined
    close. Styles in styles/cards.css. */
 
+import { createPortal } from "react-dom";
 import { palette, rampColor } from "../lib/palette";
 import type { RampStop } from "../types";
+
+/** The cards live in one reserved stack (#mapCards, top-right of the map)
+    that the legend, scale bar, expand button and timeline are laid out
+    around, so they never cover each other. Without the host (tests) a card
+    renders in place. */
+export function InSlot({ children }: { children: React.ReactElement }) {
+  const host = typeof document === "undefined" ? null : document.getElementById("mapCards");
+  return host ? createPortal(children, host) : children;
+}
+
+export function MapCardSlot() {
+  return <div id="mapCards" className="map-cards" />;
+}
 
 export type TrainCardState = "en-route" | "stopped" | "not-departed" | "arrived" | "isolated";
 
@@ -51,6 +65,7 @@ export function CityCard({
   expandRef?: React.Ref<HTMLButtonElement>;
 }) {
   return (
+    <InSlot>
     <div
       className="map-card city-card"
       role="dialog"
@@ -98,6 +113,7 @@ export function CityCard({
         ✕
       </button>
     </div>
+    </InSlot>
   );
 }
 
@@ -128,6 +144,7 @@ export function TrainCard({
   const letter = m ? m[1] : "";
   const num = m ? m[2] : code;
   return (
+    <InSlot>
     <div
       className={"map-card train-card" + (isolated ? " is-isolated" : "")}
       role="dialog"
@@ -158,5 +175,6 @@ export function TrainCard({
         ✕
       </button>
     </div>
+    </InSlot>
   );
 }

@@ -1,5 +1,6 @@
 import type { DistBinFilter, DurBinFilter } from "../types";
 import { formatHoursLabel } from "../lib";
+import { InSlot } from "./MapCards";
 
 export default function ActiveFilterBar({
   classes,
@@ -35,6 +36,7 @@ export default function ActiveFilterBar({
   if (!hasAny) return null;
 
   return (
+    <InSlot>
     <div
       className="active-filter-bar"
       role="status"
@@ -112,5 +114,6 @@ export default function ActiveFilterBar({
         Reset
       </button>
     </div>
+    </InSlot>
   );
 }

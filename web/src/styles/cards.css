@@ -113,33 +113,25 @@
 .train-card.is-isolated { border-color: var(--card-time); background: var(--card-time); }
 .train-card.is-isolated .mc-id { border-right-color: var(--card-time); }
 
-/* placement over the map */
-.city-card {
+/* placement: one reserved stack in the map's top-right corner (#mapCards).
+   The legend, scale bar, expand button and timeline sit elsewhere, so the
+   cards never cover them; the cards stack instead of overlapping. */
+.map-cards {
   position: absolute;
   top: 14px; right: 14px;
   z-index: 6;
-  width: min(420px, calc(100% - 28px));
-}
-.train-card {
-  position: fixed;
-  bottom: 90px; right: 24px;
-  z-index: 200;
-  width: min(520px, calc(100vw - 48px));
-}
-.iso-chip {
-  position: absolute;
-  top: 14px; left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   width: min(520px, calc(100% - 28px));
+  pointer-events: none;
 }
-.iso-chip .train-card { position: static; width: auto; }
+.map-cards > * { pointer-events: auto; }
+.map-cards .map-card { position: static; width: auto; }
 
 @media (max-width: 640px) {
-  .city-card { top: 10px; right: 10px; width: calc(100% - 20px); }
-  .train-card { right: 10px; left: 10px; width: auto; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
-  .iso-chip { width: calc(100% - 20px); }
-  .iso-chip .train-card { left: auto; right: auto; }
+  .map-cards { top: 10px; right: 10px; width: calc(100% - 20px); }
   .mc-btn { padding: 0 14px; font-size: 18px; }
   .mc-btn-t { display: none; }
   .mc-close { width: 44px; }
@@ -148,3 +140,4 @@
   .mc-num { font-size: 22px; }
   .city-card .mc-title { font-size: 16px; }
 }
+.map-cards .active-filter-bar { position: static; max-width: none; align-self: flex-end; }

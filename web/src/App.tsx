@@ -24,7 +24,7 @@ import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
-import { CityCard, cardBand, cardStName } from "./components/MapCards";
+import { CityCard, MapCardSlot, cardBand, cardStName } from "./components/MapCards";
 import { IsolationChip, NationalNote, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
@@ -382,6 +382,7 @@ export default function App() {
           initialCamera={initialCamera}
           onViewChange={handleViewChange}
         >
+          <MapCardSlot />
           {(direction === "out" || national) && isolatedTrainCode && isolatedTrainCode !== selectedTrainCode && (
             <IsolationChip
               code={isolatedTrainCode}

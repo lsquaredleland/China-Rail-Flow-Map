@@ -17,8 +17,7 @@ export function IsolationChip({
   onExit: () => void;
 }) {
   return (
-    <div className="iso-chip">
-      <TrainCard
+    <TrainCard
         code={code}
         route={route || code}
         state="isolated"
@@ -30,7 +29,6 @@ export function IsolationChip({
         closeLabel="Exit single train isolation"
         ariaLabel={`Train ${code} isolated`}
       />
-    </div>
   );
 }
 
