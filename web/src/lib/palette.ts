@@ -107,8 +107,8 @@ export function flowWidth(n: number, scale: number, fitScale: number): number {
 
 // "Zoom clarity" (owner trial, removable): when on, flow widths grow with the
 // zoom only up to ZOOM_WIDTH_KNEE x the national fit, then with its square
-// root, so busy hubs don't balloon when zoomed in. Off by default; the Toolbar
-// button (or ?zoomwidth=sqrt) turns it on. The switch lives on globalThis
+// root, so busy hubs don't balloon when zoomed in. Off by default; only the
+// Toolbar button turns it on. The switch lives on globalThis
 // because the lazily loaded deck chunk carries its own copy of this module.
 // To remove: delete this block, its exports, its call sites, the Toolbar
 // button and the zoomClarity state in App / MapCanvas.

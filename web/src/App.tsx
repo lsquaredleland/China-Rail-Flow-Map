@@ -48,10 +48,8 @@ export default function App() {
   });
 
   const prefs = usePrefs();
-  // "Zoom clarity" trial (removable, lib/palette.ts): off unless ?zoomwidth=sqrt.
-  const [zoomClarity, setZoomClarity] = useState<boolean>(
-    () => new URLSearchParams(window.location.search).get("zoomwidth") === "sqrt",
-  );
+  // "Zoom clarity" trial (removable, lib/palette.ts): always starts off.
+  const [zoomClarity, setZoomClarity] = useState<boolean>(false);
   const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
   const { selectedTrainCode, setSelectedTrainCode, isolatedTrainCode, setIsolatedTrainCode } =
     useTrainSelection();
