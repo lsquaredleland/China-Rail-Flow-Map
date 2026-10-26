@@ -33,6 +33,9 @@
     "national_trains_out_tail_eq": 10371,
     "national_trains_stops_total": 96591,
     "national_entries_total": 609273,
+    "national_cities": 1893,
+    "national_cities_origin_parity_bad": 0,
+    "national_index_trains": 11248,
     "national_entries_eq_national": 9106,
     "national_entries_recompute_eq": 9106
   },

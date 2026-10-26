@@ -48,6 +48,61 @@ pub fn train_edges<'k, 's, K: 'k>(
     eset
 }
 
+/// Whether a train with stop cities `cities` departs from `city`: it stops
+/// there (first call) and runs on. The one definition of an origin's
+/// `outbound` and of the national per-city `dep`.
+pub fn departs_from(cities: &[String], city: &str) -> Option<usize> {
+    cities
+        .iter()
+        .position(|c| c == city)
+        .filter(|&i| i + 1 < cities.len())
+}
+
+/// Whether a train arrives at `city`: it stops there at stop index >= 1
+/// (first such call). The one definition of an origin's `inbound` and of
+/// the national per-city `arr`.
+pub fn arrives_at(cities: &[String], city: &str) -> Option<usize> {
+    (1..cities.len()).find(|&j| cities[j] == city)
+}
+
+/// National per-city counts, parallel arrays over the cities with at least
+/// one departure or arrival, ascending `idx` (city_table index). `dep` /
+/// `arr` are distinct trains per city and direction, whole run; the
+/// `*_by_class` rows (8 class buckets, as `National::by_class`) sum to them.
+#[derive(Debug, Default, PartialEq, serde::Serialize)]
+pub struct NationalCities {
+    pub idx: Vec<i64>,
+    pub dep: Vec<u32>,
+    pub arr: Vec<u32>,
+    pub dep_by_class: Vec<Vec<u32>>,
+    pub arr_by_class: Vec<Vec<u32>>,
+}
+
+/// Per-city `(dep, arr)` class-bucket counts over `trains` (class bucket,
+/// stop cities), by [`departs_from`] / [`arrives_at`], so a city's totals
+/// equal an origin's outbound / inbound.
+pub fn city_counts<'a>(
+    trains: impl IntoIterator<Item = (usize, &'a [String])>,
+) -> std::collections::BTreeMap<String, ([u32; 8], [u32; 8])> {
+    let mut out: std::collections::BTreeMap<String, ([u32; 8], [u32; 8])> = Default::default();
+    for (cls, cities) in trains {
+        let mut seen: HashSet<&str> = HashSet::new();
+        for c in cities {
+            if !seen.insert(c.as_str()) {
+                continue;
+            }
+            let d = departs_from(cities, c).is_some();
+            let a = arrives_at(cities, c).is_some();
+            if d || a {
+                let e = out.entry(c.clone()).or_default();
+                e.0[cls] += d as u32;
+                e.1[cls] += a as u32;
+            }
+        }
+    }
+    out
+}
+
 /// The national per-section table: per section, the distinct trains that
 /// cover any of its edges (`total`), split by class (`by_class[c][s]`).
 #[derive(Debug, Default, PartialEq, serde::Serialize)]
@@ -56,6 +111,62 @@ pub struct National {
     pub trains: usize,
     pub total: Vec<u32>,
     pub by_class: Vec<Vec<u32>>,
+    /// Per-city departures and arrivals (filled by `atlas` once the city
+    /// table is final; `national_table` leaves it empty).
+    pub cities: NationalCities,
+    /// Per train `(train index, its distinct sections ascending)`, in the
+    /// order given; the sections a train adds to `total` (not serialized).
+    #[serde(skip)]
+    pub train_secs: Vec<(usize, Vec<usize>)>,
+}
+
+/// Per-train facts the national view filters and sums over, all indexed by
+/// shared `train_table` t. A filter selects trains; flows and city counts
+/// are then sums over the selected trains: `secs[t]` adds 1 to each of its
+/// sections, `dep[t]` / `arr[t]` to each of its cities, and with every
+/// train selected they equal `National::total` / `cities.dep` / `cities.arr`.
+/// The bins are the origin view's (`Histograms.tsx`, `filter.ts`), taken over
+/// the train's whole run instead of origin -> terminus: `hour` = departure
+/// hour at the first stop (24 = none); `dist_km` = `min(30, km / 100)`,
+/// `dist_mi` = `min(40, miles / 50)` of the first-to-last-stop track km
+/// (crow-flies between those stops' cities when a leg has no km); `dur` =
+/// `min(24, minutes / 60)` first departure to last arrival. -1 = unknown.
+#[derive(Debug, Default, PartialEq, serde::Serialize)]
+pub struct NationalIndex {
+    pub hour: Vec<i16>,
+    pub dist_km: Vec<i16>,
+    pub dist_mi: Vec<i16>,
+    pub dur: Vec<i16>,
+    pub secs: Vec<Vec<u32>>,
+    pub dep: Vec<Vec<i64>>,
+    pub arr: Vec<Vec<i64>>,
+}
+
+/// Hour bucket of a "HH:MM" departure (the origin filter's `slice(0,2)`).
+pub fn hour_bin(dep: &str) -> i16 {
+    dep.get(..2)
+        .and_then(|h| h.parse::<i16>().ok())
+        .filter(|h| (0..24).contains(h))
+        .unwrap_or(-1)
+}
+
+/// `(km bin, mile bin)` of a journey distance in km (-1 = unknown).
+pub fn dist_bins(km: f64) -> (i16, i16) {
+    if km.is_nan() || km <= 0.0 {
+        return (-1, -1);
+    }
+    (
+        (km / 100.0).floor().min(30.0) as i16,
+        (km * 0.621371 / 50.0).floor().min(40.0) as i16,
+    )
+}
+
+/// Duration bin of a journey in minutes (-1 = unknown).
+pub fn dur_bin(mins: Option<i64>) -> i16 {
+    match mins {
+        Some(m) if m > 0 => (m / 60).min(24) as i16,
+        _ => -1,
+    }
 }
 
 /// How far the per-edge national counts vary inside one section (the
@@ -89,6 +200,7 @@ pub fn national_table(
     let mut edge_n: HashMap<Edge, u32> = HashMap::new();
     let mut seen: HashSet<usize> = HashSet::new();
     let mut n_trains = 0usize;
+    let mut train_secs: Vec<(usize, Vec<usize>)> = Vec::new();
     for (ti, cls, eset) in trains {
         assert!(seen.insert(ti), "train {ti} listed twice");
         let mut secs: Vec<usize> = Vec::new();
@@ -100,6 +212,7 @@ pub fn national_table(
         }
         secs.sort_unstable();
         secs.dedup();
+        train_secs.push((ti, secs.clone()));
         n_trains += !secs.is_empty() as usize;
         for s in secs {
             total[s] += 1;
@@ -131,6 +244,8 @@ pub fn national_table(
         trains: n_trains,
         total,
         by_class,
+        cities: NationalCities::default(),
+        train_secs,
     };
     (nat, u)
 }
@@ -196,6 +311,33 @@ mod tests {
                 max_union_gain: 1,
             }
         );
+    }
+
+    #[test]
+    fn city_counts_split_dep_arr_and_count_a_train_once() {
+        let v = |xs: &[&str]| xs.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let a = v(&["A", "A", "B", "C"]);
+        let b = v(&["C", "B", "C"]); // loop: C departs and arrives once each
+        let m = city_counts([(0, &a[..]), (1, &b[..])]);
+        // two A stations: the second stop is an arrival (as for origins)
+        assert_eq!(m["A"], ([1, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0]));
+        assert_eq!(m["B"], ([1, 1, 0, 0, 0, 0, 0, 0], [1, 1, 0, 0, 0, 0, 0, 0]));
+        assert_eq!(m["C"], ([0, 1, 0, 0, 0, 0, 0, 0], [1, 1, 0, 0, 0, 0, 0, 0]));
+        assert_eq!(departs_from(&a, "C"), None);
+        assert_eq!(arrives_at(&a, "A"), Some(1));
+    }
+
+    #[test]
+    fn bins_follow_the_origin_filters() {
+        assert_eq!(hour_bin("07:45"), 7);
+        assert_eq!(hour_bin("----"), -1);
+        assert_eq!(dist_bins(99.9), (0, 1)); // 62 mi
+        assert_eq!(dist_bins(100.0), (1, 1));
+        assert_eq!(dist_bins(9000.0), (30, 40));
+        assert_eq!(dist_bins(-1.0), (-1, -1));
+        assert_eq!(dur_bin(Some(59)), 0);
+        assert_eq!(dur_bin(Some(60 * 30)), 24);
+        assert_eq!(dur_bin(None), -1);
     }
 
     #[test]

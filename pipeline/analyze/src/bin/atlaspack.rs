@@ -129,6 +129,12 @@
 //! `trains` = distinct trains on at least one section. It carries the same
 //! `fmt` as the shared file because its indices are only valid against that
 //! file's section numbering. The counting rule is atlas's (`flows.rs`).
+//! Optional `cities` (per-city national counts): `{idx, dep, arr,
+//! dep_by_class, arr_by_class}`, parallel over the cities with a departure
+//! or arrival (`idx` = shared `city_table` index, ascending). `dep` = distinct
+//! trains that stop at the city and run on, `arr` = distinct trains that
+//! stop there after their first stop: exactly an origin's `outbound` /
+//! `inbound`. The 8 class rows sum to `dep` / `arr`.
 //!
 //! National trains (`atlas-v2-national-trains.json`, P2.2 data source for
 //! the national animation A): `{fmt, n_sec, n_thr, paths, stop_pos, chords,
@@ -159,6 +165,17 @@
 //!   the geometry is the piece's own).
 //!
 //! `n_sec` / `n_thr` / `fmt` must match the shared file.
+//!
+//! National index (`atlas-v2-national-index.json`, with `national.cities`):
+//! `{fmt, n_sec, n_train, hour, dist_km, dist_mi, dur, secs, dep, arr}`, every
+//! array one row per `shared.train_table` train. `hour` / `dist_km` /
+//! `dist_mi` / `dur` are the origin view's filter bins taken over the train's
+//! whole run (`flows::NationalIndex`; -1 = unknown). `secs[t]` = the
+//! train's distinct national section ids, `dep[t]` / `arr[t]` its distinct
+//! departure / arrival city_table ids (cities of `national.cities`), each
+//! ascending and delta-coded (first id, then gaps). Selecting trains and
+//! summing their rows gives flows and city counts under any filter; with
+//! every train selected: `total`, `cities.dep`, `cities.arr` exactly.
 //!
 //! National entries (`atlas-v2-national-entries.json`, P3.3 A+B; written
 //! with the national trains file): `{fmt, n_sec, trains, ticks_per_min,
@@ -739,6 +756,52 @@ fn pack_paths(
     (paths, stop_pos, chords, per_origin)
 }
 
+/// Ascending ids as first value then gaps (empty stays empty).
+fn delta(mut v: Vec<i64>) -> Vec<i64> {
+    v.sort_unstable();
+    v.dedup();
+    let mut prev = 0;
+    for x in v.iter_mut() {
+        let cur = *x;
+        *x = cur - prev;
+        prev = cur;
+    }
+    v
+}
+
+/// The per-train national index (`atlas-v2-national-index.json`, see the
+/// header): the v1 `national_index` with section ids in the shared file's
+/// order. Per train `secs` / `dep` / `arr` are ascending and delta-coded.
+fn pack_national_index(ix: &Value, perm: &[usize], n_trains: usize) -> Value {
+    let n = ix["hour"].as_array().map_or(0, |a| a.len());
+    assert_eq!(n, n_trains, "national index: one row per train_table train");
+    let secs: Vec<Vec<i64>> = arr(get(ix, "secs"))
+        .iter()
+        .map(|r| {
+            delta(
+                ints(r)
+                    .into_iter()
+                    .map(|s| perm[s as usize] as i64)
+                    .collect(),
+            )
+        })
+        .collect();
+    let lists =
+        |k: &str| -> Vec<Vec<i64>> { arr(get(ix, k)).iter().map(|r| delta(ints(r))).collect() };
+    json!({
+        "fmt": FMT,
+        "n_sec": perm.len(),
+        "n_train": n,
+        "hour": get(ix, "hour"),
+        "dist_km": get(ix, "dist_km"),
+        "dist_mi": get(ix, "dist_mi"),
+        "dur": get(ix, "dur"),
+        "secs": secs,
+        "dep": lists("dep"),
+        "arr": lists("arr"),
+    })
+}
+
 /// The national table in the shared file's section order (see the header).
 /// Asserts the arrays are section-parallel and the classes sum to the total.
 fn pack_national(nat: &Value, perm: &[usize]) -> Value {
@@ -765,7 +828,16 @@ fn pack_national(nat: &Value, perm: &[usize]) -> Value {
             "national section {s}: classes sum to {sum}, total {t}"
         );
     }
-    json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class })
+    let mut out =
+        json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class });
+    // per-city counts are indexed by city_table, which packing leaves alone
+    if let Some(c) = nat
+        .get("cities")
+        .filter(|c| !get(c, "idx").is_null() && !arr(get(c, "idx")).is_empty())
+    {
+        out["cities"] = c.clone();
+    }
+    out
 }
 
 /// The national trains in the shared file's section order (see the
@@ -1114,6 +1186,11 @@ fn main() {
             perm_out.len()
         );
         by_name.push(("atlas-v2-national.json", national));
+    }
+    if let Some(ix) = v1.get("national_index") {
+        let packed = pack_national_index(ix, &perm_out, arr(get(&v1, "train_table")).len());
+        println!("national index: {} trains", get(&packed, "n_train"));
+        by_name.push(("atlas-v2-national-index.json", packed));
     }
     if let Some(packed) = national_trains {
         println!(
