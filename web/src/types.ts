@@ -24,6 +24,10 @@ export interface RawStation {
 export interface RawTrain {
   code: string;
   class: string; // "G" | "D" | "C" | "S" | "K" | ... | "plain"
+  /** Train-export packs: one "0"/"1" per `calendar` date (runs that day). */
+  days?: string;
+  /** Train-export packs: "daily" | "weekday-set" | "date-specific" | "irregular" | "alternate-day". */
+  pattern?: string;
 }
 
 /** A leg with no track routing, drawn straight. a/b are station-table indices. */

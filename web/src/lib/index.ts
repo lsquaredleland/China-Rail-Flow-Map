@@ -66,6 +66,10 @@ export {
 } from "./timeline";
 export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
 export { natTrainVM } from "./natTrain";
+export { buildNatRows, selectNatRows, sortNatRows } from "./natTable";
+export type { NatRow, NatSortKey } from "./natTable";
+export { runCount, runDays } from "./runDays";
+export type { RunDays } from "./runDays";
 export {
   NAT_DIST_BINS,
   NAT_DIST_SIZE,

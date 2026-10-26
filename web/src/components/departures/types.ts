@@ -4,10 +4,10 @@ import type { StationCount } from "../../stationBreakdown";
 import type { EmptyProps } from "./EmptyMessage";
 
 export type SortDir = 1 | -1;
-export type SortKey = "dep" | "dur" | "km";
-export type CallSortKey = "arr" | "dep" | "dur";
-export type ArrSortKey = "dep" | "arr" | "dur" | "km";
-export type InCallSortKey = "board" | "arr" | "dur";
+export type SortKey = "dep" | "dur" | "km" | "days";
+export type CallSortKey = "arr" | "dep" | "dur" | "days";
+export type ArrSortKey = "dep" | "arr" | "dur" | "km" | "days";
+export type InCallSortKey = "board" | "arr" | "dur" | "days";
 
 export interface SortState<K> {
   key: K;

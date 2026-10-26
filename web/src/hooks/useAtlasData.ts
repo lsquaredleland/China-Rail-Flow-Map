@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type {
   AtlasData,
@@ -402,6 +402,13 @@ export function useAtlasData({
     };
   }, [loader, selectedTrainCode]);
 
+  // National mode's table is timed by the schedules asset.
+  const ensureSchedules = useCallback(() => {
+    loader.loadSchedules().then((d) => {
+      if (d) setSchedulesData(d);
+    });
+  }, [loader]);
+
   /* ---------- load (phase 1) ---------- */
   useEffect(() => {
     let cancelled = false;
@@ -487,6 +494,7 @@ export function useAtlasData({
     nationalTrainsFailed,
     nationalIndex,
     nationalIndexFailed,
+    ensureSchedules,
     ensureNationalIndex: loader.ensureNationalIndex,
     ensureOutTables: loader.ensureOutTables,
     ensureInMap: loader.ensureInMap,

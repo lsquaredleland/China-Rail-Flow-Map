@@ -1,8 +1,9 @@
 /* Inbound with a source: every train arriving from that city. */
 import type { OriginVM, SrcVM } from "../../types";
-import { fmtTime } from "../../lib";
+import { fmtTime, runCount } from "../../lib";
 import HeadCount, { OfTotal } from "./HeadCount";
 import TrainCell from "./TrainCell";
+import RunsCell from "./RunsCell";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
 import { inCallStations } from "../../stationBreakdown";
@@ -19,6 +20,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
     handleClearChip,
     inCallSort,
     setInCallSort,
+    atlas,
   } = ctx;
   const calls = srcFilter.inCalls;
   const stations = inCallStations(calls, ctx.selectedClasses);
@@ -46,6 +48,10 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
   });
   const { key: ik, dir: idir } = inCallSort;
   list.sort((a, b) => {
+    if (ik === "days") {
+      const dd = runCount(atlas?.data.train_table[a.arr.t]?.days) - runCount(atlas?.data.train_table[b.arr.t]?.days);
+      if (dd) return dd * idir;
+    }
     if (ik === "dur") {
       const va = a.dur;
       const vb = b.dur;
@@ -168,12 +174,21 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
           </th>
           <th scope="col">Origin</th>
           <th scope="col">Status</th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="days"
+            aria-sort={iAriaSort("days")}
+            onClick={() => onInCallSort("days")}
+          >
+            Runs <span className="arrow">{iArrow("days")}</span>
+          </th>
         </tr>
       </thead>
       <tbody id="depBody">
         {list.length === 0 ? (
           <tr>
-            <td colSpan={6} className="dep-empty">
+            <td colSpan={7} className="dep-empty">
               No trains match that filter.
             </td>
           </tr>
@@ -235,6 +250,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
                     {c.started ? "Originates here" : "Through train"}
                   </span>
                 </td>
+                <RunsCell atlas={atlas} t={a.t} />
               </tr>
             );
           })
