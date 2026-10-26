@@ -262,7 +262,7 @@ const MapCanvas = forwardRef<MapApi, Props>(function MapCanvas(props, apiRef) {
     props.dark,
     props.direction,
     props.panelDest,
-    props.nationalLayer,
+    props.nationalLayers,
     props.nationalFlows,
     props.nationalEntries,
     props.nationalFilter,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { local as localStore, session as sessionStore } from "../storage";
-import type { DecodedAtlas, Direction, DistUnit, NatLayer } from "../types";
+import type { DecodedAtlas, Direction, DistUnit } from "../types";
 import { enName } from "../lib";
 import type { MapApi } from "../components/MapCanvas";
 
@@ -45,22 +45,20 @@ export function writeNationalParam(on: boolean): void {
   }
 }
 
-/* What national mode draws: ?natLayer=trains | both | none, absent = flows
-   (the default view: flows and city circles, no animation); the Flows and
-   Animation toggles are its two halves. URL only, like ?national. */
-export function initialNatLayer(): NatLayer {
+/* National mode's Flows toggle: on unless ?natLayer=none (the default view: flows
+   and city circles, no animation). URL only, like ?national. */
+export function initialNatFlows(): boolean {
   try {
-    const v = new URLSearchParams(window.location.search).get("natLayer");
-    return v === "trains" || v === "both" || v === "none" ? v : "flows";
+    return new URLSearchParams(window.location.search).get("natLayer") !== "none";
   } catch {
-    return "flows";
+    return true;
   }
 }
 
-export function writeNatLayerParam(v: NatLayer): void {
+export function writeNatFlowsParam(on: boolean): void {
   const params = new URLSearchParams(window.location.search);
-  if (v === "flows") params.delete("natLayer");
-  else params.set("natLayer", v);
+  if (on) params.delete("natLayer");
+  else params.set("natLayer", "none");
   const search = params.toString();
   if (window.location.search !== (search ? "?" + search : "")) {
     window.history.replaceState(null, "", `${window.location.pathname}${search ? "?" + search : ""}`);

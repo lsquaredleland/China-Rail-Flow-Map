@@ -567,10 +567,13 @@ export interface OriginVM {
 
 export type DistUnit = "km" | "mi";
 export type Direction = "out" | "in";
-/** Which national layers are on: the trains (A), the day's flows and city
-    circles (B), both, or neither. The Flows and Animation toggles set it; the
-    `?natLayer=` URL param only restores the initial value (`useUrlState.ts`). */
-export type NatLayer = "trains" | "flows" | "both" | "none";
+/** Which national layers are drawn: the day's flows and city circles (B), the
+    trains (A), both (A+B) or neither. The Flows and Animation toggles set it; the
+    `?natLayer=none` URL param only restores the Flows toggle (`useUrlState.ts`). */
+export interface NatLayers {
+  flows: boolean;
+  trains: boolean;
+}
 
 /** What the pointer is over on the map. */
 export type Hit =

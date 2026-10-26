@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DecodedAtlas, Direction, DistUnit, NatLayer, OriginVM } from "./types";
+import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
 import { buildOrigin, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
-  initialNatLayer,
+  initialNatFlows,
   initialNational,
   usePrefs,
   useUrlSync,
-  writeNatLayerParam,
+  writeNatFlowsParam,
   writeNationalParam,
 } from "./hooks/useUrlState";
 import { useFilters, useCityPanel, useTrainSelection } from "./hooks/useSelection";
@@ -41,11 +41,8 @@ export default function App() {
   // National mode (D11 / D13): every national train on one 24h clock, map-only.
   const [national, setNational] = useState<boolean>(initialNational);
   // National flows (with the city circles): a map toggle, on by default
-  // (?natLayer=trains | none starts with them off).
-  const [natFlowsOn, setNatFlowsOn] = useState<boolean>(() => {
-    const v = initialNatLayer();
-    return v === "flows" || v === "both";
-  });
+  // (?natLayer=none starts with them off).
+  const [natFlowsOn, setNatFlowsOn] = useState<boolean>(initialNatFlows);
 
   const prefs = usePrefs();
   // "Zoom clarity" trial (removable, lib/palette.ts): always starts off.
@@ -217,11 +214,11 @@ export default function App() {
   }, [national, natFlowsOn, natTrainsOn, ensureNationalFlows, ensureNationalEntries]);
   const toggleNatFlows = () => {
     setNatFlowsOn(!natFlowsOn);
-    writeNatLayerParam(natFlowsOn ? "none" : "flows");
+    writeNatFlowsParam(!natFlowsOn);
   };
   // What the map draws; a flows file that failed leaves the trains drawn.
   const flowsDrawn = natFlowsOn && !nationalFlowsFailed;
-  const natLayerDrawn: NatLayer = flowsDrawn ? (natTrainsOn ? "both" : "flows") : natTrainsOn ? "trains" : "none";
+  const natLayersDrawn = useMemo(() => ({ flows: flowsDrawn, trains: natTrainsOn }), [flowsDrawn, natTrainsOn]);
   // A load failure is reported where the origin view reports one.
   const natLoadError = !national
     ? null
@@ -396,7 +393,7 @@ export default function App() {
           inLoading={direction === "in" && inMapLoading && !national}
           national={national}
           nationalTrains={nationalTrains}
-          nationalLayer={natLayerDrawn}
+          nationalLayers={natLayersDrawn}
           nationalFlows={nationalFlows}
           nationalEntries={nationalEntries}
           nationalFilter={natFilter}
