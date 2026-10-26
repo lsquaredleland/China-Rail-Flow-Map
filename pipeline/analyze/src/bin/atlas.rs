@@ -2670,7 +2670,9 @@ fn intern_city(
     if let Some(i) = idx.get(zh) {
         return *i;
     }
-    let pt = city_pt.get(zh).map(|p| [p[1], p[0]]).unwrap_or([0.0, 0.0]);
+    let pt = city_pt.get(zh).map(|p| [p[1], p[0]]).unwrap_or_else(|| {
+        panic!("city {zh} has no point: add it to CITY_POINTS in cn/gazetteer.rs")
+    });
     let i = table.len() as i64;
     table.push(AtlasCity {
         zh: zh.to_string(),

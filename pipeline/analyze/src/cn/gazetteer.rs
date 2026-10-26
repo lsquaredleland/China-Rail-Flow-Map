@@ -614,10 +614,15 @@ pub fn city_of(station_name: &str) -> String {
 ///   is the Lanxi urban area, Jinhua, Zhejiang.
 /// - 溆浦: the busiest station is 溆浦南 (22 calls), outside town; the point
 ///   is 溆浦 downtown.
+/// - 万象: Vientiane, terminus of 中老铁路 trains. No called station resolves in
+///   the OSM gazetteer (outside China), so the point is Vientiane railway
+///   station (Laos-China Railway), approx 17.999 N, 102.655 E, from public
+///   map knowledge (no external query).
 const CITY_POINTS: &[(&str, f64, f64)] = &[
     ("铜仁", 109.1995, 27.7306),
     ("兰溪", 119.5074, 29.2152),
     ("溆浦", 110.594, 27.908),
+    ("万象", 102.655, 17.999),
 ];
 
 /// `[lat, lon]` override for a city, if one is adjudicated.
@@ -636,6 +641,9 @@ mod tests {
     fn city_point_overrides_are_lat_lon() {
         assert_eq!(city_point_override("兰溪"), Some([29.2152, 119.5074]));
         assert_eq!(city_point_override("北京"), None);
+        // cross-border terminus: never falls back to [0, 0]
+        let [lat, lon] = city_point_override("万象").unwrap();
+        assert!((15.0..56.0).contains(&lat) && (70.0..140.0).contains(&lon));
     }
 
     #[test]

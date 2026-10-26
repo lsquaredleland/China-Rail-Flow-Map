@@ -151,6 +151,22 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         println!("AUDIT pack {name} fmt: {fmt:?}");
         ok &= fmt == Some(6);
     }
+    // every city point is a real place in China's box (a [0,0] point once
+    // stretched the client's fitted extent to the Gulf of Guinea)
+    let bad_city_pts: Vec<String> = arr(&shared["city_table"])
+        .iter()
+        .filter(|c| {
+            let (lon, lat) = (c["pt"][0].as_f64(), c["pt"][1].as_f64());
+            !matches!((lon, lat), (Some(x), Some(y))
+                if (70.0..=140.0).contains(&x) && (15.0..=56.0).contains(&y))
+        })
+        .map(|c| c["zh"].as_str().unwrap_or("?").to_string())
+        .collect();
+    println!(
+        "AUDIT pack city points outside lon 70-140 / lat 15-56: {} {bad_city_pts:?}",
+        bad_city_pts.len()
+    );
+    ok &= bad_city_pts.is_empty();
     if ok {
         expand_tables(&mut out_t, true);
         expand_tables(&mut in_t, false);
