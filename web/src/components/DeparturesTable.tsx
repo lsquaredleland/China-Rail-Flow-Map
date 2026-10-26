@@ -22,7 +22,7 @@ import { inCallsMode } from "./departures/inCalls";
 import { outCallsMode } from "./departures/outCalls";
 import { outDeparturesMode } from "./departures/outDepartures";
 import { natTrainsMode } from "./departures/natTrains";
-import type { NatData } from "./departures/natTrains";
+import type { NatData } from "./departures/types";
 import type {
   ArrSortKey,
   CallSortKey,

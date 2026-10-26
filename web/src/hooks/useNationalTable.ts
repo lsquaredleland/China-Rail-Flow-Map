@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { DecodedAtlas, NationalIndexPack, SchedulesData } from "../types";
 import { FLOW_CLASSES, buildNatRows, classIndex, natHistRows, natSelect } from "../lib";
 import type { NatFilter } from "../lib";
-import type { NatData } from "../components/departures/natTrains";
+import type { NatData } from "../components/departures/types";
 
 /** National mode's rows for the shared departures section: every train read
     off the schedules, the same trains as histogram rows, and the selection the

@@ -29,8 +29,8 @@ export function requireNationalTrains(d: NationalTrainsPack, nSec: number, nThr:
   throw err;
 }
 
-/** `out` is the national trains file (or any per-train path table of the
-    same shape: out-tables `paths` / `stop_pos` / `chords`, no `extra`). */
+/** `out` is the national trains pack; only its `paths`, `stop_pos`, `chords`
+    and (optional) `extra` are read. */
 export function buildNational(
   atlas: DecodedAtlas,
   out: Pick<NationalTrainsPack, "paths" | "stop_pos" | "chords"> & { extra?: string[] },

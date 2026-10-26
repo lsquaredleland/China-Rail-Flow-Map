@@ -1,25 +1,10 @@
 /* National mode, no city: every national train under the active filters. */
-import type { RawTrain } from "../../types";
-import type { HistRow, NatRow, NatSortKey } from "../../lib";
+import type { NatRow, NatSortKey } from "../../lib";
 import HeadCount from "./HeadCount";
 import NatTable from "./NatTable";
 import { classTag } from "./helpers";
 import { nextSort } from "./sorting";
-import type { DepCtx, ModeView } from "./types";
-
-/** What national mode hands the shared departures section instead of an origin. */
-export interface NatData {
-  /** Every train's row; null while the schedules load. */
-  rows: NatRow[] | null;
-  /** The same trains as the histograms bin them. */
-  histRows: HistRow[];
-  /** natSelect's flags per train_table row (null = all). */
-  sel: Uint8Array | null;
-  trainTable: readonly RawTrain[];
-  calendar?: readonly string[];
-  /** Trains per class (FLOW_CLASSES names) for the class buttons. */
-  classCounts: Record<string, number>;
-}
+import type { DepCtx, ModeView, NatData } from "./types";
 
 export function natTrainsMode(ctx: DepCtx, nat: NatData, list: NatRow[]): ModeView {
   const { hasExtraFilters, natSort, setNatSort, onSelectTrain, unit } = ctx;

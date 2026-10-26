@@ -1,8 +1,8 @@
 import type { MouseEvent, ReactNode } from "react";
-import type { DecodedAtlas, DistUnit, OriginVM } from "../../types";
+import type { DecodedAtlas, DistUnit, OriginVM, RawTrain } from "../../types";
 import type { StationCount } from "../../stationBreakdown";
 import type { EmptyProps } from "./EmptyMessage";
-import type { NatSortKey } from "../../lib";
+import type { HistRow, NatRow, NatSortKey } from "../../lib";
 
 export type SortDir = 1 | -1;
 export type SortKey = "dep" | "dur" | "km" | "runs";
@@ -72,4 +72,18 @@ export interface DepCtx {
   setInCallSort: (
     f: (s: SortState<InCallSortKey>) => SortState<InCallSortKey>,
   ) => void;
+}
+
+/** What national mode hands the shared departures section instead of an origin. */
+export interface NatData {
+  /** Every train's row; null while the schedules load. */
+  rows: NatRow[] | null;
+  /** The same trains as the histograms bin them. */
+  histRows: HistRow[];
+  /** natSelect's flags per train_table row (null = all). */
+  sel: Uint8Array | null;
+  trainTable: readonly RawTrain[];
+  calendar?: readonly string[];
+  /** Trains per class (FLOW_CLASSES names) for the class buttons. */
+  classCounts: Record<string, number>;
 }
