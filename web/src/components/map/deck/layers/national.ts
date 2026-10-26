@@ -33,6 +33,8 @@ import {
   buildNational,
   natPositions,
   natCityCounts,
+  natCityEvents,
+  natCityEventsAt,
   natFilterKey,
   natFlowCounts,
   natIndexActive,
@@ -46,10 +48,12 @@ import {
   stationZoomK,
 } from "../../../../lib";
 import type { CityPointVM } from "../../../../types";
-import type { InfraPass, NatFilter } from "../../../../lib";
+import type { InfraPass, NatCityEvents, NatFilter } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
 import type { PassData } from "./flows";
 import { buildPassData, infraLayers, passDataLayers, recountPassData, wholePath } from "./flows";
+import { rippleRing } from "./stations";
+import type { Ripple } from "./stations";
 import { glowOf } from "./trains";
 
 /** Glow colour per NationalTimeline class: 0 G/D/C, 1 Z/T/K/S, 2 other. */
@@ -406,6 +410,32 @@ export interface NationalCityDots {
   dep: Uint32Array;
   arr: Uint32Array;
   r: number[];
+  /** Per circle, how far (0..1) through its 20-minute golden ripple it is, or
+      -1 for none; empty when the circles are not growing with the clock. */
+  ripple: number[];
+}
+
+/** The ripple lasts this many minutes after a stop event (the origin view's). */
+export const NAT_RIPPLE_MIN = 20;
+
+/** The growing circles' input: the selected trains' event minutes per city and
+    the clock's minute. A city is drawn from its first event on, sized by the
+    events so far (departures + arrivals, all of them at 24:00). */
+export interface NatGrowth {
+  ev: NatCityEvents;
+  t: number;
+}
+
+/** The per-city event minutes of a view's selection, built once per view. */
+const eventsMemo = new WeakMap<NatView, NatCityEvents | null>();
+export function natViewEvents(view: NatView, nf: NationalFlowsPack | null, ix: NationalIndexPack | null): NatCityEvents | null {
+  if (!nf) return null;
+  let ev = eventsMemo.get(view);
+  if (ev === undefined) {
+    ev = natCityEvents(nf, ix, view.sel);
+    eventsMemo.set(view, ev);
+  }
+  return ev;
 }
 
 /* The cities with trains, busiest first (ties by city id), per counts object. */
@@ -423,27 +453,47 @@ function ranked(c: { idx: number[]; dep: Uint32Array; arr: Uint32Array }): numbe
 
 /** A circle per city sized by departures + arrivals under the filters, on
     the radius scale `natCityR` and the origin dots' zoom growth (`stationT`).
-    Only the busiest `natCityTier(.., zoom)` cities are drawn (and so pickable).
-    Cities with no trains are left out. Null when the pack carries no `cities`. */
+    Only the busiest `natCityTier(.., zoom)` cities (by the day's totals, so
+    the set does not change with the clock) are drawn (and so pickable).
+    Cities with no trains are left out. With `growth` the size is the events
+    so far and a city with none yet is left out too, with a ripple when its
+    last event was within 20 minutes. Null when the pack carries no `cities`. */
 export function nationalCityDots(
   atlas: DecodedAtlas,
   nf: NationalFlowsPack,
   c: { idx: number[]; dep: Uint32Array; arr: Uint32Array },
   stationT: number,
   zoom: number,
+  growth: NatGrowth | null = null,
 ): NationalCityDots | null {
   if (!nf.cities) return null;
   const order = ranked(c);
   const k = natCityTier(order.length, zoom);
-  const out: NationalCityDots = { idx: [], pos: [], dep: new Uint32Array(k), arr: new Uint32Array(k), r: [] };
+  const out: NationalCityDots = { idx: [], pos: [], dep: new Uint32Array(k), arr: new Uint32Array(k), r: [], ripple: [] };
+  let n = 0;
   for (let j = 0; j < k; j++) {
     const i = order[j];
-    const r0 = natCityR(c.dep[i] + c.arr[i]);
+    let size = c.dep[i] + c.arr[i];
+    let ripple = -1;
+    if (growth) {
+      const { ev, t } = growth;
+      size = natCityEventsAt(ev, i, t);
+      if (size === 0) continue;
+      const dt = t - ev.minutes[ev.off[i] + size - 1];
+      if (dt >= 0 && dt <= NAT_RIPPLE_MIN) ripple = dt / NAT_RIPPLE_MIN;
+    }
+    const r0 = natCityR(size);
     out.idx.push(c.idx[i]);
     out.pos.push(atlas.data.city_table[c.idx[i]].pt);
-    out.dep[j] = c.dep[i];
-    out.arr[j] = c.arr[i];
+    out.dep[n] = c.dep[i];
+    out.arr[n] = c.arr[i];
+    n++;
     out.r.push(r0 * stationZoomK(r0, stationT));
+    if (growth) out.ripple.push(ripple);
+  }
+  if (n < k) {
+    out.dep = out.dep.slice(0, n);
+    out.arr = out.arr.slice(0, n);
   }
   return out;
 }
@@ -518,6 +568,28 @@ export function nationalCityLayers(d: NationalCityDots, dark: boolean, hoverIdx 
       updateTriggers: { getPosition: [d], getRadius: [d] },
     }),
   ];
+  const rip: Ripple[] = [];
+  for (let i = 0; i < d.ripple.length; i++) {
+    if (d.ripple[i] >= 0) rip.push(rippleRing(d.pos[i], d.r[i], d.ripple[i], dark));
+  }
+  if (rip.length) {
+    layers.push(
+      new ScatterplotLayer<Ripple>({
+        id: "nat-city-ripples",
+        data: rip,
+        getPosition: (r: Ripple) => r.pos,
+        getRadius: (r: Ripple) => r.r,
+        radiusUnits: "pixels",
+        lineWidthUnits: "pixels",
+        stroked: true,
+        filled: false,
+        getLineWidth: 1.5,
+        getLineColor: (r: Ripple) => r.col,
+        pickable: false,
+        updateTriggers: { getPosition: [rip], getRadius: [rip], getLineColor: [rip] },
+      }),
+    );
+  }
   const h = hoverIdx >= 0 ? d.idx.indexOf(hoverIdx) : -1;
   if (h >= 0) {
     layers.push(

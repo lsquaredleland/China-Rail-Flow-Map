@@ -36,6 +36,7 @@
     "national_cities": 1894,
     "national_cities_origin_parity_bad": 0,
     "national_index_trains": 11248,
+    "national_index_events": 170657,
     "national_entries_eq_national": 9106,
     "national_entries_recompute_eq": 9106
   },
@@ -52,6 +53,7 @@
     "national_trains_gaps_gt3km": 30,
     "national_trains_gaps_gt100m": 16082,
     "national_entries_bracket_bad": 0,
-    "national_entries_wrapped": 108169
+    "national_entries_wrapped": 108169,
+    "national_index_minute_bad": 0
   }
 }

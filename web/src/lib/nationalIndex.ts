@@ -165,6 +165,65 @@ export function natCityCounts(
   return { idx: c.idx, dep, arr };
 }
 
+/** The stop events (departures and arrivals) at each `nf.cities` city of the
+    selected trains, as minutes of the day sorted per city: city i's events
+    are `minutes[off[i] .. off[i + 1]]`. */
+export interface NatCityEvents {
+  off: Uint32Array;
+  minutes: Uint16Array;
+}
+
+/** The selected trains' event minutes per city (null when the index has no
+    `dep_min` / `arr_min`: an older pack). A selection-dependent reduction,
+    built once per selection; the clock then only binary-searches it. */
+export function natCityEvents(
+  nf: NationalFlowsPack,
+  ix: NationalIndexPack | null,
+  sel: Uint8Array | null,
+): NatCityEvents | null {
+  const c = nf.cities;
+  if (!c || !ix || !ix.dep_min || !ix.arr_min) return null;
+  const pos = new Map<number, number>();
+  c.idx.forEach((city, i) => pos.set(city, i));
+  const d = decoded(ix);
+  const rows: [Int32Array[], number[][]][] = [
+    [d.dep, ix.dep_min],
+    [d.arr, ix.arr_min],
+  ];
+  const each = (fn: (city: number, minute: number) => void) => {
+    for (let t = 0; t < ix.n_train; t++) {
+      if (sel && !sel[t]) continue;
+      for (const [ids, mins] of rows) {
+        const row = ids[t], m = mins[t];
+        for (let j = 0; j < row.length; j++) {
+          const i = pos.get(row[j]);
+          if (i !== undefined) fn(i, m[j]);
+        }
+      }
+    }
+  };
+  const off = new Uint32Array(c.idx.length + 1);
+  each((i) => off[i + 1]++);
+  for (let i = 0; i < c.idx.length; i++) off[i + 1] += off[i];
+  const minutes = new Uint16Array(off[c.idx.length]);
+  const cur = off.slice(0, c.idx.length);
+  each((i, m) => (minutes[cur[i]++] = m));
+  for (let i = 0; i < c.idx.length; i++) minutes.subarray(off[i], off[i + 1]).sort();
+  return { off, minutes };
+}
+
+/** Events of city `i` with minute <= t. */
+export function natCityEventsAt(ev: NatCityEvents, i: number, t: number): number {
+  let lo = ev.off[i], hi = ev.off[i + 1];
+  const start = lo;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ev.minutes[mid] <= t) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo - start;
+}
+
 /** Histogram counts of one dimension under every other filter. */
 export function natHistogram(
   trainTable: readonly RawTrain[],
