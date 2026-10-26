@@ -74,6 +74,8 @@ export interface Props {
       and every flow section's track geometry is stroked again on top
       as one uniform thin line in the theme's ink tone. */
   showInfra: boolean;
+  /** "Zoom clarity" trial: damp flow widths past x3 zoom (lib/palette.ts). */
+  zoomClarity?: boolean;
   distUnit: DistUnit;
   panelDest: CityPointVM | null;
   loadError: string | null;

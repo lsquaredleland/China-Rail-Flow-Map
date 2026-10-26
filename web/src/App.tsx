@@ -48,6 +48,10 @@ export default function App() {
   });
 
   const prefs = usePrefs();
+  // "Zoom clarity" trial (removable, lib/palette.ts): off unless ?zoomwidth=sqrt.
+  const [zoomClarity, setZoomClarity] = useState<boolean>(
+    () => new URLSearchParams(window.location.search).get("zoomwidth") === "sqrt",
+  );
   const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
   const { selectedTrainCode, setSelectedTrainCode, isolatedTrainCode, setIsolatedTrainCode } =
     useTrainSelection();
@@ -355,6 +359,8 @@ export default function App() {
           onToggleLabels={() => setShowLabels((v) => !v)}
           showInfra={showInfra}
           onToggleInfra={toggleInfra}
+          zoomClarity={zoomClarity}
+          onToggleZoomClarity={() => setZoomClarity((v) => !v)}
           distUnit={distUnit}
           onSetDistUnit={setDistUnit}
           dark={dark}
@@ -380,6 +386,7 @@ export default function App() {
           showNetwork={showNetwork}
           showLabels={showLabels}
           showInfra={showInfra}
+          zoomClarity={zoomClarity}
           distUnit={distUnit}
           panelDest={panelCity}
           loadError={loadError ?? natLoadError}
