@@ -168,3 +168,5 @@ export { placeLabels } from "./labels";
 export type { LabelOptions, LabelPoint, LabelStyle, Measure, PlacedLabel } from "./labels";
 export { SEG_TIE_PX, TRAIN_RADIUS, distToLine, distToSeg, pickPriority } from "./pick";
 export type { PickCandidate, PickKind, PickLine, PickOptions, PickView } from "./pick";
+export { tripStatus, unrollStops } from "./tripStatus";
+export type { AlignedStop, TripStatus, UnrolledStop } from "./tripStatus";
