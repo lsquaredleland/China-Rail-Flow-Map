@@ -36,7 +36,11 @@ export function drawLabelsOverlay(M: MapCtx) {
   if (national && (!P.current.showLabels || !st.natCities)) return; // nothing to name
   ctx.textBaseline = "middle";
   const labels = placeLabels(
-    national ? nationalLabelPoints(P.current.atlas, st.natCities!) : points(),
+    national
+      ? nationalLabelPoints(P.current.atlas, st.natCities!)
+      : st.unlitCities
+        ? points().filter((c) => !st.unlitCities!.has(c.idx))
+        : points(),
     st.view,
     st.W,
     st.H,

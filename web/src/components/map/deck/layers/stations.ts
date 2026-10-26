@@ -40,8 +40,9 @@ export interface Ripple {
 
 const withAlpha = (c: RGBA, a: number): RGBA => [c[0], c[1], c[2], Math.round(c[3] * a)];
 
-/** Dots in Canvas paint order: with a destination selected the dimmed cities
-    first, then the full-opacity ones on top; otherwise `states` order. */
+/** Dots in Canvas paint order (lit cities only): with a destination selected
+    the dimmed cities first, then the full-opacity ones on top; otherwise
+    `states` order. */
 export function stationDots(states: StationState[], pal: Palette, dark: boolean, hasDest: boolean): StationDot[] {
   const edge = rgba(pal.dotEdge);
   const lw = dark ? 3.0 : 1.5;
@@ -56,10 +57,11 @@ export function stationDots(states: StationState[], pal: Palette, dark: boolean,
       lw,
     };
   };
-  if (!hasDest) return states.map(mk);
+  const lit = states.filter((s) => s.lit);
+  if (!hasDest) return lit.map(mk);
   const out: StationDot[] = [];
-  for (const s of states) if (s.alpha < 1) out.push(mk(s));
-  for (const s of states) if (s.alpha === 1) out.push(mk(s));
+  for (const s of lit) if (s.alpha < 1) out.push(mk(s));
+  for (const s of lit) if (s.alpha === 1) out.push(mk(s));
   return out;
 }
 

@@ -178,6 +178,8 @@ function createMapState() {
     natCounts: null as ArrayLike<number> | null,
     /* The last national frame's city circles, for hover. */
     natCities: null as NationalCityDots | null,
+    /** Origin-view cities not yet lit by the animation (null when not animating). */
+    unlitCities: null as Set<number> | null,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: false,
