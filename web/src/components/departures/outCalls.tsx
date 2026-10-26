@@ -7,7 +7,7 @@ import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
-import { callStations } from "../../stationBreakdown";
+import { callStation, callStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, CallSortKey } from "./types";
 
 export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): ModeView {
@@ -120,8 +120,8 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
       whether it ends its journey there or only calls on the way
       through. &ldquo;Arrives&rdquo; and &ldquo;Departs&rdquo; are the
       times at {destFilter.en}&rsquo;s station; &ldquo;Duration&rdquo; is
-      the travel time from {cur.en} to {destFilter.en}; &ldquo;Final
-      destination&rdquo; is where the train is ultimately bound.
+      the travel time from {cur.en} to {destFilter.en}; &ldquo;Station&rdquo;
+      is the {destFilter.en} station the train stops at.
     </>
   );
   const chipNode = (
@@ -154,19 +154,9 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
             aria-sort={cAriaSort("dep")}
             onClick={() => onCallSort("dep")}
           >
-            Departs {cur.en} <span className="arrow">{cArrow("dep")}</span>
+            Departs <span className="arrow">{cArrow("dep")}</span>
           </th>
           <th scope="col">From</th>
-          <th
-            scope="col"
-            className="sortable"
-            data-sort="arr"
-            aria-sort={cAriaSort("arr")}
-            onClick={() => onCallSort("arr")}
-          >
-            Arrives {destFilter.en}{" "}
-            <span className="arrow">{cArrow("arr")}</span>
-          </th>
           <th
             scope="col"
             className="sortable"
@@ -176,8 +166,17 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
           >
             Duration <span className="arrow">{cArrow("dur")}</span>
           </th>
-          <th scope="col">Departs {destFilter.en}</th>
-          <th scope="col">Final destination</th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="arr"
+            aria-sort={cAriaSort("arr")}
+            onClick={() => onCallSort("arr")}
+          >
+            Arrives <span className="arrow">{cArrow("arr")}</span>
+          </th>
+          <th scope="col">Departs</th>
+          <th scope="col">Station</th>
           <th scope="col">Status</th>
           <th
             scope="col"
@@ -202,6 +201,7 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
           if (i < w.first || i >= w.last) return null;
             const d = c.dep;
             const isSelected = selectedTrainCodes.includes(d.code);
+            const st = callStation(c, atlas ? atlas.data.station_table : [], atlas?.schedules);
             return (
               <tr
                 key={i}
@@ -228,22 +228,17 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
                   {d.fsZh}
                   {d.fsEn ? <span className="to-stn">{d.fsEn}</span> : null}
                 </td>
+                <td className="c-time">{fmtTime(c.dur)}</td>
                 <td className="c-time">
                   {c.arr}
                   {c.dayOff > 0 ? (
                     <span className="plus"> +{c.dayOff}d</span>
                   ) : null}
                 </td>
-                <td className="c-time">{fmtTime(c.dur)}</td>
                 <td className="c-time">{c.term ? "—" : c.depAt}</td>
                 <td>
-                  <span className="to-city">
-                    {d.tcEn} &middot; {d.tcZh}
-                  </span>
-                  <span className="to-stn">
-                    {d.tsZh}
-                    {d.tsEn ? " · " + d.tsEn : ""}
-                  </span>
+                  {st ? st.zh : null}
+                  {st && st.en ? <span className="to-stn">{st.en}</span> : null}
                 </td>
                 <td>
                   <span

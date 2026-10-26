@@ -112,7 +112,6 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
       <thead>
         <tr>
           <th scope="col">Train</th>
-          <th scope="col">Origin</th>
           <th
             scope="col"
             className="sortable"
@@ -122,6 +121,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
           >
             Departs <span className="arrow">{aArrow("dep")}</span>
           </th>
+          <th scope="col">Origin</th>
           <th
             scope="col"
             className="sortable"
@@ -185,6 +185,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
                   }
                 />
               </td>
+              <td className="c-time">{a.dep}</td>
               <td>
                 <span className="to-city">
                   {a.fcEn} &middot; {a.fcZh}
@@ -194,7 +195,6 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
                   {a.fsEn ? " · " + a.fsEn : ""}
                 </span>
               </td>
-              <td className="c-time">{a.dep}</td>
               <td className="c-time">
                 {a.arr}
                 {a.dayOff > 0 ? (

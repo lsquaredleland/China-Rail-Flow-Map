@@ -113,4 +113,37 @@ describe("DeparturesTable modes", () => {
     expect(h).toContain(`<b class="dep-num-lead">${list.length}</b>`);
     expect(h).toContain("dep-scroll");
   });
+
+  const headers = (h: string) =>
+    [...h.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) =>
+      m[1].replace(/<[^>]*>/g, "").replace(/[▲▼]/g, "").trim(),
+    );
+
+  test("outbound origin-only: header order, no city names", () => {
+    const h = renderToStaticMarkup(
+      <DeparturesTable {...baseProps} cur={o} direction="out" />,
+    );
+    const hs = headers(h);
+    expect(hs).toEqual(["Train", "Departs", "From", "Arrives", "To", "Duration", "Distance", "Stops", "Runs"]);
+  });
+
+  test("outbound pairwise: header order, no city names", () => {
+    const dest = o.dests.find((d) => d.calls.length > 0)!;
+    const h = renderToStaticMarkup(
+      <DeparturesTable {...baseProps} cur={o} direction="out" panelCity={dest} />,
+    );
+    const hs = headers(h);
+    expect(hs).toEqual(["Train", "Departs", "From", "Duration", "Arrives", "Departs", "Station", "Status", "Runs"]);
+    for (const x of hs) {
+      expect(x).not.toContain(dest.en);
+      expect(x).not.toContain(o.en);
+    }
+  });
+
+  test("inbound headers: Departs before Origin, no city names", () => {
+    const h = renderToStaticMarkup(<DeparturesTable {...baseProps} cur={o} direction="in" />);
+    expect(headers(h)).toEqual(
+      ["Train", "Departs", "Origin", "Arrives", "Duration", "Distance", "Stops", "Runs"],
+    );
+  });
 });
