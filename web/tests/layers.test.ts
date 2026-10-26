@@ -114,7 +114,7 @@ describe("station layers", () => {
     expect(stationDots(states, palette(true), true, false)[0].lw).toBe(3);
   });
 
-  test("ripple radius r + frac*7*kd, alpha 1 - frac; dimmed dots paint first", () => {
+  test("ripple spreads from the current circle by max(3, 0.8r), alpha 1 - frac; dimmed dots paint first", () => {
     let found = false;
     for (let t = 300; t < 1400 && !found; t += 5) {
       const states = stationStates(stIn(t, null), null);
@@ -123,7 +123,8 @@ describe("station layers", () => {
       expect(rp.length).toBe(withR.length);
       for (let k = 0; k < rp.length; k++) {
         const s = withR[k], f = s.ripple!.frac;
-        expect(rp[k].r).toBeCloseTo(s.r0 * s.kd + f * 7 * s.kd, 9);
+        const r = s.r0 * s.kd; // the circle as drawn now, not its full-day size
+        expect(rp[k].r).toBeCloseTo(r + f * Math.max(3, 0.8 * r), 9);
         expect(rp[k].col[3]).toBe(Math.round(255 * Math.max(0, 1 - f)));
         found = true;
       }

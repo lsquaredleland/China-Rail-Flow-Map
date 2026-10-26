@@ -63,16 +63,24 @@ export function stationDots(states: StationState[], pal: Palette, dark: boolean,
   return out;
 }
 
-/** Golden arrival ripples: centre-line radius `r + frac·7·kd`, alpha `1 − frac`. */
+const RIPPLE_GROW = 0.8;
+const RIPPLE_MIN = 3;
+
+/** Golden arrival ripples, sized to the circle as it is at that moment (its
+    radius grows with arrivals while animating): the ring starts at the
+    circle's edge and spreads by RIPPLE_GROW of the current radius (at
+    least RIPPLE_MIN px, so the smallest circles still show it), alpha
+    `1 − frac`. */
 export function stationRipples(states: StationState[], dark: boolean): Ripple[] {
   const out: Ripple[] = [];
   const gold = dark ? "#F59E0B" : "#D97706";
   for (const s of states) {
     if (!s.ripple) continue;
     const frac = s.ripple.frac;
+    const r = s.r0 * s.kd;
     out.push({
       pos: [s.c.pt[0], s.c.pt[1]],
-      r: s.r0 * s.kd + frac * 7 * s.kd,
+      r: r + frac * Math.max(RIPPLE_MIN, r * RIPPLE_GROW),
       col: rgba(gold, Math.max(0, 1 - frac)),
     });
   }
