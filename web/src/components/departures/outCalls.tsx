@@ -1,6 +1,6 @@
 /* Outbound with a destination: every train calling at that city. */
 import type { DestVM, OriginVM } from "../../types";
-import { fmtTime, runCount } from "../../lib";
+import { fmtTime, runRank } from "../../lib";
 import HeadCount, { OfTotal } from "./HeadCount";
 import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
@@ -51,8 +51,8 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
   });
   const { key: ck, dir: cdir } = callSort;
   list.sort((a, b) => {
-    if (ck === "days") {
-      const dd = runCount(atlas?.data.train_table[a.dep.t]?.days) - runCount(atlas?.data.train_table[b.dep.t]?.days);
+    if (ck === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.dep.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.dep.t], atlas?.data.calendar);
       if (dd) return dd * cdir;
     }
     if (ck === "dur") {
@@ -179,11 +179,11 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
           <th
             scope="col"
             className="sortable"
-            data-sort="days"
-            aria-sort={cAriaSort("days")}
-            onClick={() => onCallSort("days")}
+            data-sort="runs"
+            aria-sort={cAriaSort("runs")}
+            onClick={() => onCallSort("runs")}
           >
-            Runs <span className="arrow">{cArrow("days")}</span>
+            Runs <span className="arrow">{cArrow("runs")}</span>
           </th>
         </tr>
       </thead>

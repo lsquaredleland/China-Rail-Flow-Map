@@ -1,6 +1,6 @@
 /* Inbound, no source: every train arriving in the origin city. */
 import type { ArrVM, OriginVM } from "../../types";
-import { fmtDist, fmtTime, runCount } from "../../lib";
+import { fmtDist, fmtTime, runRank } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
@@ -36,8 +36,8 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   );
   const { key: ak, dir: adir } = arrSort;
   list.sort((a, b) => {
-    if (ak === "days") {
-      const dd = runCount(atlas?.data.train_table[a.t]?.days) - runCount(atlas?.data.train_table[b.t]?.days);
+    if (ak === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.t], atlas?.data.calendar);
       if (dd) return dd * adir;
     }
     if (ak === "dur" || ak === "km") {
@@ -154,11 +154,11 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
           <th
             scope="col"
             className="sortable"
-            data-sort="days"
-            aria-sort={aAriaSort("days")}
-            onClick={() => onArrSort("days")}
+            data-sort="runs"
+            aria-sort={aAriaSort("runs")}
+            onClick={() => onArrSort("runs")}
           >
-            Runs <span className="arrow">{aArrow("days")}</span>
+            Runs <span className="arrow">{aArrow("runs")}</span>
           </th>
         </tr>
       </thead>
