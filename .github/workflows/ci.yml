@@ -42,6 +42,10 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: node tools/smoke.mjs
+      - name: Check cards layout in headless Chrome
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node tools/cards-layout.mjs
 
   # O12: audit the committed pack. CI cannot rebuild it (needs the OSM
   # extract), but --pack-only needs only the pack files and goldens.json.
