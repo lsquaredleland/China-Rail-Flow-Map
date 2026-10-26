@@ -442,16 +442,14 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
             </button>
           </div>
 
-          {!isNational && (
-            <button
-              type="button"
-              className="tb-btn-action is-text"
-              onClick={handleJumpToFinish}
-              title="Jump simulation to finish when all trains have arrived"
-            >
-              Finish
-            </button>
-          )}
+          <button
+            type="button"
+            className="tb-btn-action is-text"
+            onClick={handleJumpToFinish}
+            title="Jump simulation to finish when all trains have arrived"
+          >
+            Finish
+          </button>
 
           <button
             type="button"

@@ -263,10 +263,6 @@ export default function Toolbar({
           Night
         </button>
       </div>
-      <span className="hint">
-        Drag to pan &middot; scroll or pinch to zoom
-        {national ? " · hover a city for its trains" : " · click a city for its distances"}
-      </span>
       </div>
     </div>
   );

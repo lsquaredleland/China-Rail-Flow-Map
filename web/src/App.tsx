@@ -289,7 +289,6 @@ export default function App() {
           outTablesReady={outTablesReady}
           inTablesReady={inTablesReady}
           trainCount={atlas ? atlas.data.train_table.length : 0}
-          calendarSpan={calendarSpan}
           isNational={national}
           onSetNational={setNationalMode}
           national={
