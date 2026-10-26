@@ -777,9 +777,17 @@ fn pack_national_index(ix: &Value, perm: &[usize], n_trains: usize) -> Value {
     assert_eq!(n, n_trains, "national index: one row per train_table train");
     let secs: Vec<Vec<i64>> = arr(get(ix, "secs"))
         .iter()
-        .map(|r| delta(ints(r).into_iter().map(|s| perm[s as usize] as i64).collect()))
+        .map(|r| {
+            delta(
+                ints(r)
+                    .into_iter()
+                    .map(|s| perm[s as usize] as i64)
+                    .collect(),
+            )
+        })
         .collect();
-    let lists = |k: &str| -> Vec<Vec<i64>> { arr(get(ix, k)).iter().map(|r| delta(ints(r))).collect() };
+    let lists =
+        |k: &str| -> Vec<Vec<i64>> { arr(get(ix, k)).iter().map(|r| delta(ints(r))).collect() };
     json!({
         "fmt": FMT,
         "n_sec": perm.len(),
@@ -820,9 +828,13 @@ fn pack_national(nat: &Value, perm: &[usize]) -> Value {
             "national section {s}: classes sum to {sum}, total {t}"
         );
     }
-    let mut out = json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class });
+    let mut out =
+        json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class });
     // per-city counts are indexed by city_table, which packing leaves alone
-    if let Some(c) = nat.get("cities").filter(|c| !get(c, "idx").is_null() && !arr(get(c, "idx")).is_empty()) {
+    if let Some(c) = nat
+        .get("cities")
+        .filter(|c| !get(c, "idx").is_null() && !arr(get(c, "idx")).is_empty())
+    {
         out["cities"] = c.clone();
     }
     out

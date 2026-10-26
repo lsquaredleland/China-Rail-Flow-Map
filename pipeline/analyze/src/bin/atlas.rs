@@ -2532,11 +2532,12 @@ fn main() {
     // their values; a city with no coordinates is not drawable and left out.
     let mut national = national;
     // over the pack's trains (train_table), the same set as the sections
-    let counts = flows::city_counts(
-        train_ti
-            .iter()
-            .map(|&ti| (class_idx(&trains[ti].train_class), train_cities[ti].as_slice())),
-    );
+    let counts = flows::city_counts(train_ti.iter().map(|&ti| {
+        (
+            class_idx(&trains[ti].train_class),
+            train_cities[ti].as_slice(),
+        )
+    }));
     let mut rows: Vec<(i64, [u32; 8], [u32; 8])> = Vec::new();
     let mut no_pt = 0usize;
     for (zh, (d, a)) in counts.iter() {
@@ -2587,7 +2588,9 @@ fn main() {
     for &ti in train_ti.iter() {
         let (tr, names, cities) = (&trains[ti], &train_names[ti], &train_cities[ti]);
         let last = tr.stops.len() - 1;
-        national_index.hour.push(flows::hour_bin(&tr.stops[0].depart));
+        national_index
+            .hour
+            .push(flows::hour_bin(&tr.stops[0].depart));
         national_index
             .dur
             .push(flows::dur_bin(travel_time(&tr.stops, 0, last)));
@@ -2611,9 +2614,11 @@ fn main() {
         let (dk, dm) = flows::dist_bins(km);
         national_index.dist_km.push(dk);
         national_index.dist_mi.push(dm);
-        national_index
-            .secs
-            .push(secs_of.get(&ti).map_or(Vec::new(), |v| v.iter().map(|&s| s as u32).collect()));
+        national_index.secs.push(
+            secs_of
+                .get(&ti)
+                .map_or(Vec::new(), |v| v.iter().map(|&s| s as u32).collect()),
+        );
         let ids = |f: &dyn Fn(&[String], &str) -> Option<usize>| -> Vec<i64> {
             let mut v: Vec<i64> = cities
                 .iter()

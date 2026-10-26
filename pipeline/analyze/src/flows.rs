@@ -144,15 +144,21 @@ pub struct NationalIndex {
 
 /// Hour bucket of a "HH:MM" departure (the origin filter's `slice(0,2)`).
 pub fn hour_bin(dep: &str) -> i16 {
-    dep.get(..2).and_then(|h| h.parse::<i16>().ok()).filter(|h| (0..24).contains(h)).unwrap_or(-1)
+    dep.get(..2)
+        .and_then(|h| h.parse::<i16>().ok())
+        .filter(|h| (0..24).contains(h))
+        .unwrap_or(-1)
 }
 
 /// `(km bin, mile bin)` of a journey distance in km (-1 = unknown).
 pub fn dist_bins(km: f64) -> (i16, i16) {
-    if !(km > 0.0) {
+    if km.is_nan() || km <= 0.0 {
         return (-1, -1);
     }
-    ((km / 100.0).floor().min(30.0) as i16, (km * 0.621371 / 50.0).floor().min(40.0) as i16)
+    (
+        (km / 100.0).floor().min(30.0) as i16,
+        (km * 0.621371 / 50.0).floor().min(40.0) as i16,
+    )
 }
 
 /// Duration bin of a journey in minutes (-1 = unknown).

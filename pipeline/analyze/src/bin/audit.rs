@@ -726,7 +726,9 @@ fn audit_national_cities(
             .unwrap_or_default()
     };
     let rows = |v: &Value| -> Vec<Vec<i64>> {
-        v.as_array().map(|a| a.iter().map(ints).collect()).unwrap_or_default()
+        v.as_array()
+            .map(|a| a.iter().map(ints).collect())
+            .unwrap_or_default()
     };
     let c = &nat["cities"];
     let (idx, dep, arr) = (ints(&c["idx"]), ints(&c["dep"]), ints(&c["arr"]));
@@ -765,15 +767,20 @@ fn audit_national_cities(
             .get(o["zh"].as_str().unwrap())
             .and_then(|i| idx.binary_search(i).ok());
         parity_bad += (hit.map(|j| (dep[j], arr[j]))
-            != Some((o["outbound"].as_i64().unwrap(), o["inbound"].as_i64().unwrap())))
-            as u64;
+            != Some((
+                o["outbound"].as_i64().unwrap(),
+                o["inbound"].as_i64().unwrap(),
+            ))) as u64;
     }
     println!(
         "AUDIT national cities: {k} cities; {bad} rows whose classes do not sum or are empty; {parity_bad} of {origins} origins whose outbound/inbound differ from dep/arr"
     );
     let mut ok = bad == 0 && parity_bad == 0 && origins > 0;
     g.insert("national_cities".into(), k as i64);
-    g.insert("national_cities_origin_parity_bad".into(), parity_bad as i64);
+    g.insert(
+        "national_cities_origin_parity_bad".into(),
+        parity_bad as i64,
+    );
     if !pack::exists(dir, ix_name) {
         println!("AUDIT national index: no {ix_name} in this pack, skipped");
         return ok;
@@ -807,9 +814,17 @@ fn audit_national_cities(
     let shaped = ix["fmt"].as_i64() == Some(6)
         && ix["n_train"].as_u64() == Some(n as u64)
         && ix["n_sec"].as_u64() == Some(n_sec as u64)
-        && [secs.len(), idep.len(), iarr.len(), hour.len(), dkm.len(), dmi.len(), dur.len()]
-            .iter()
-            .all(|&l| l == n);
+        && [
+            secs.len(),
+            idep.len(),
+            iarr.len(),
+            hour.len(),
+            dkm.len(),
+            dmi.len(),
+            dur.len(),
+        ]
+        .iter()
+        .all(|&l| l == n);
     if !shaped {
         println!("AUDIT national index FAIL: shape for {n} trains / {n_sec} sections");
         return false;
@@ -844,15 +859,24 @@ fn audit_national_cities(
         }
     }
     let sec_bad = (0..n_sec).filter(|&s| tot[s] != total[s]).count()
-        + (0..8).map(|c| (0..n_sec).filter(|&s| cls[c][s] != by_class[c][s]).count()).sum::<usize>();
-    let dep_bad = (0..8).map(|c| (0..k).filter(|&j| d_cls[c][j] != dbc[c][j]).count()).sum::<usize>();
-    let arr_bad = (0..8).map(|c| (0..k).filter(|&j| a_cls[c][j] != abc[c][j]).count()).sum::<usize>();
+        + (0..8)
+            .map(|c| (0..n_sec).filter(|&s| cls[c][s] != by_class[c][s]).count())
+            .sum::<usize>();
+    let dep_bad = (0..8)
+        .map(|c| (0..k).filter(|&j| d_cls[c][j] != dbc[c][j]).count())
+        .sum::<usize>();
+    let arr_bad = (0..8)
+        .map(|c| (0..k).filter(|&j| a_cls[c][j] != abc[c][j]).count())
+        .sum::<usize>();
     println!(
         "AUDIT national index: {n} trains; {range_bad} rows out of range; selecting every train: {sec_bad} section / {dep_bad} dep / {arr_bad} arr count mismatches (by class), {city_bad} cities outside the city counts"
     );
     ok &= range_bad == 0 && sec_bad == 0 && dep_bad == 0 && arr_bad == 0 && city_bad == 0;
     g.insert("national_index_trains".into(), n as i64);
-    println!("AUDIT national cities+index checks: {}", if ok { "PASS" } else { "FAIL" });
+    println!(
+        "AUDIT national cities+index checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
     ok
 }
 
