@@ -31,6 +31,8 @@ const props = (n: number, national = false) =>
     onSetDark: () => {},
     national,
     onToggleNational: () => {},
+    showFlows: true,
+    onToggleFlows: () => {},
     activeFilterCount: n,
   }) as never;
 
@@ -53,5 +55,12 @@ describe("toolbar panels", () => {
     expect(h).not.toContain('id="originSearch"');
     expect(h).not.toContain('id="dirOut"');
     expect(h).toContain("cls-filter");
+  });
+  test("the Flows toggle sits with the other map toggles in national mode only, pressed by default", () => {
+    const nat = renderToStaticMarkup(<Toolbar {...props(0, true)} />);
+    expect(nat).toMatch(/id="tglFlows"[^>]*aria-pressed="true"/);
+    // inside the Map options panel, so it is in the mobile dropdown too
+    expect(nat.indexOf('id="tbMore"')).toBeLessThan(nat.indexOf('id="tglFlows"'));
+    expect(renderToStaticMarkup(<Toolbar {...props(0, false)} />)).not.toContain("tglFlows");
   });
 });

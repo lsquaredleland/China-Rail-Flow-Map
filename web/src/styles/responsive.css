@@ -44,21 +44,11 @@
   .filter-pill { font-size: 11px; padding: 2px 5px 2px 7px; }
   #legendCol { left: 10px; bottom: 10px; width: min(216px, calc(100vw - 20px)); }
   #scalebar { right: 10px; bottom: 10px; }
-  /* National note wraps to two rows here: sit above the scale bar (~38 px tall), not under it. */
-  .nat-note {
-    top: 8px; left: 8px; right: 8px; bottom: auto; max-width: none;
-    flex-wrap: nowrap; justify-content: space-between; gap: 6px; padding: 4px 6px; font-size: 11px;
-  }
-  .nat-note > span:first-child { flex: 1 1 auto; min-width: 0; }
   .stats:empty { display: none; }
   /* The animation entry sits above the legend button and scale bar, not on them. */
   .tl-expand-wrap { bottom: 66px; }
   .tl-expand-btn.is-over-map { min-height: 44px; white-space: nowrap; }
   #depTable .train-cell.is-link { display: inline-flex; align-items: center; min-height: 44px; }
-  .nat-layers { flex: 0 0 auto; }
-  .nat-layers button { min-height: 44px; min-width: 44px; }
-  /* The filter pills sit under the note. */
-  #mapwrap:has(.nat-note) .active-filter-bar { top: 70px; }
   #legend { padding: 8px 10px; }
   #legendBody.collapsed { display: none; }
   #legendToggle {

@@ -6,33 +6,27 @@ import type { MapApi } from "../components/MapCanvas";
 /* The 24h animation bar: whether it is collapsed and the commands that
    start / stop the clock on the map. The clock itself lives in the map
    engine (components/map/anim.ts). The origin animation is outbound-only,
-   so switching to inbound collapses the bar and stops the clock; national
-   mode (D13) is an animation in either direction: it starts only when the
-   user turns the animation on (`natTrains`), which opens the bar and plays
-   from the current minute; turning it off, or leaving national mode,
-   collapses the bar and stops the clock. */
+   so switching to inbound collapses the bar and stops the clock. National
+   mode uses the same bar and buttons (an animation in either direction);
+   entering or leaving it starts from a stopped clock, and the animation
+   starts only when the user presses the expand button. */
 export function useAnimationClock(
   mapRef: RefObject<MapApi | null>,
   direction: Direction,
   national: boolean,
-  natTrains: boolean,
 ) {
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useState<boolean>(true);
 
-  const wasNational = useRef(false);
+  const wasNational = useRef(national);
   useEffect(() => {
-    if (national) {
-      wasNational.current = true;
-      setIsTimelineCollapsed(!natTrains);
-      mapRef.current?.setAnimEnabled?.(natTrains);
-      mapRef.current?.setPlaying?.(natTrains);
-    } else if (direction === "in" || wasNational.current) {
-      wasNational.current = false;
+    const modeChanged = wasNational.current !== national;
+    wasNational.current = national;
+    if (direction === "in" || modeChanged) {
       setIsTimelineCollapsed(true);
       mapRef.current?.setPlaying?.(false);
       mapRef.current?.setAnimEnabled?.(false);
     }
-  }, [direction, national, natTrains, mapRef]);
+  }, [direction, national, mapRef]);
 
   const expandTimeline = () => {
     setIsTimelineCollapsed(false);

@@ -29,6 +29,8 @@ export default function Toolbar({
   dark,
   onSetDark,
   national,
+  showFlows,
+  onToggleFlows,
   activeFilterCount,
 }: {
   origins: RawOrigin[];
@@ -55,6 +57,9 @@ export default function Toolbar({
   onSetDark: (d: boolean) => void;
   /** National mode (D11: "National · beta", D13 map-only). */
   national: boolean;
+  /** National mode's flows (and city circles): a map toggle like the others, on by default. */
+  showFlows: boolean;
+  onToggleFlows: () => void;
   /** Filters in force (class + histogram + train-code filters), for the narrow-screen badge. */
   activeFilterCount: number;
 }) {
@@ -195,6 +200,17 @@ export default function Toolbar({
         >
           City labels
         </button>
+        {national && (
+          <button
+            id="tglFlows"
+            type="button"
+            aria-pressed={showFlows ? "true" : "false"}
+            title="Trains per day on each section, and a circle per city sized by its departures and arrivals"
+            onClick={onToggleFlows}
+          >
+            Flows
+          </button>
+        )}
         <button
           id="tglInfra"
           type="button"
