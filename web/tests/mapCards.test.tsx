@@ -2,6 +2,7 @@
 // train card with its honest states.
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import DestinationPanel from "../src/components/DestinationPanel";
 import { CityCard, TrainCard } from "../src/components/MapCards";
 
 const noop = () => {};
@@ -23,6 +24,25 @@ describe("CityCard", () => {
     );
     expect(h).toContain("120 departures · 98 arrivals");
     expect(h).not.toContain("from ");
+  });
+});
+
+describe("DestinationPanel (national)", () => {
+  test("own rows, minimise button, no origin line or train link", () => {
+    const h = renderToStaticMarkup(
+      <DestinationPanel
+        point={{ idx: 3, zh: "武汉", en: "Wuhan", trains: 0 }}
+        rows={[["Departures", "120"], ["Arrivals", "98"]]}
+        direction="out"
+        unit="km"
+        onClose={noop}
+      />,
+    );
+    expect(h).toContain("Wuhan");
+    expect(h).toContain("<td>Departures</td><td>120</td>");
+    expect(h).toContain('aria-label="Minimize city details"');
+    expect(h).not.toContain("dp-sub");
+    expect(h).not.toContain("See all");
   });
 });
 

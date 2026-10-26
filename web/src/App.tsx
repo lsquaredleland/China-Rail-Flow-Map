@@ -23,7 +23,7 @@ import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
-import { CityCard, MapCardSlot, cardBand } from "./components/MapCards";
+import { MapCardSlot, cardBand } from "./components/MapCards";
 import { IsolationChip, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
@@ -159,6 +159,12 @@ export default function App() {
       ensureNationalIndex,
       ensureSchedules,
     });
+  // The national city card: the same panel as the origin view's, with its own rows.
+  const natPoint = natCity && natCityRow ? { idx: natCity.idx, zh: natCityRow.zh, en: natCityRow.en, trains: 0 } : null;
+  const natRows: [string, string][] | undefined = natCity
+    ? [["Departures", String(natCity.dep)], ["Arrivals", String(natCity.arr)]]
+    : undefined;
+  const natSub = natCity ? `${natCity.dep} departures · ${natCity.arr} arrivals` : undefined;
   // The isolated train belongs to the outbound animation.
   useEffect(() => {
     if (direction === "in" && !national) setIsolatedTrainCode(null);
@@ -400,24 +406,16 @@ export default function App() {
             onClearTrains={() => filters.setSelectedTrainCodes([])}
             onClearAll={clearFilters}
           />
-          {!national && (
-            <DestinationPanel
-              point={panelCity}
-              direction={direction}
-              cityEn={cur ? cur.en : ""}
-              cityZh={cur ? cur.o.zh : ""}
-              unit={distUnit}
-              onClose={closePanel}
-            />
-          )}
-          {national && natCity && natCityRow && (
-            <CityCard
-              en={natCityRow.en}
-              zh={natCityRow.zh}
-              sub={`${natCity.dep} departures · ${natCity.arr} arrivals`}
-              onClose={() => setNatCity(null)}
-            />
-          )}
+          <DestinationPanel
+            point={national ? natPoint : panelCity}
+            rows={national ? natRows : undefined}
+            sub={national ? natSub : undefined}
+            direction={national ? "out" : direction}
+            cityEn={!national && cur ? cur.en : ""}
+            cityZh={!national && cur ? cur.o.zh : ""}
+            unit={distUnit}
+            onClose={national ? () => setNatCity(null) : closePanel}
+          />
           <div id="legendCol">
             <Legend
               ref={legendRef}

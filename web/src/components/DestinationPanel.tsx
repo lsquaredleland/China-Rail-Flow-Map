@@ -4,10 +4,14 @@ import { sourceRows, stationRows } from "../lib";
 import { CityCard, InSlot } from "./MapCards";
 
 interface Props {
-  point: CityPointVM | null;
+  point: Pick<CityPointVM, "idx" | "zh" | "en" | "trains"> | null;
+  /** The table rows. Default: the origin view's rows for `point` (a DestVM
+      outbound, a SrcVM inbound); national mode passes its own. */
+  rows?: [string, string][];
   direction: Direction;
-  cityEn: string; // the selected city (origin outbound, destination inbound)
-  cityZh: string;
+  /** The selected city (origin outbound, destination inbound); none in national mode. */
+  cityEn?: string;
+  cityZh?: string;
   unit: DistUnit;
   /** Minimised card line before the count; national mode has no origin
       ("120 departures · 98 arrivals"). Default: "from <city>". */
@@ -22,8 +26,9 @@ interface Props {
    city — App owns that coupling. */
 export default function DestinationPanel({
   point,
+  rows: givenRows,
   direction,
-  cityEn,
+  cityEn = "",
   cityZh,
   unit,
   sub,
@@ -52,9 +57,10 @@ export default function DestinationPanel({
 
   if (!point) return null;
   const rows =
-    direction === "out"
+    givenRows ??
+    (direction === "out"
       ? stationRows(point as DestVM, cityEn, unit)
-      : sourceRows(point as SrcVM, cityEn, unit);
+      : sourceRows(point as SrcVM, cityEn, unit));
 
   const scrollToDepartures = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -109,10 +115,12 @@ export default function DestinationPanel({
         <div className="dp-title">
           {point.en} &middot; {point.zh}
         </div>
-        <div className="dp-sub">
-          {direction === "out" ? "from " : "to "}
-          {cityEn} &middot; {cityZh}
-        </div>
+        {cityEn && (
+          <div className="dp-sub">
+            {direction === "out" ? "from " : "to "}
+            {cityEn} &middot; {cityZh}
+          </div>
+        )}
         <table>
           <tbody>
             {rows.map((r) => {
