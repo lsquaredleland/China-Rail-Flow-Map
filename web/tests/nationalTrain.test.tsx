@@ -62,6 +62,8 @@ describe("national train modal", () => {
     expect(h).toContain(`<b>${first.dep}</b>`);
     expect(h).toContain("Isolate on map");
     expect(h).toContain("Play from origin");
+    expect(h).toContain('class="sg-jump-btn"');
+    expect(h).toContain('aria-live="polite"');
   });
   test("the isolated train offers to show all again", () => {
     expect(modal(t, { isIsolated: true })).toContain("Show all trains");

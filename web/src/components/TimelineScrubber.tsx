@@ -74,7 +74,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
   const rushBadgeRef = useRef<HTMLDivElement | null>(null);
   const rushBadgeTextRef = useRef<HTMLSpanElement | null>(null);
-  const finishTickRef = useRef<HTMLSpanElement | null>(null);
+  const finishTickRef = useRef<HTMLButtonElement | null>(null);
 
   // Un-rendered transient state kept in refs for 60fps direct-DOM execution
   const currentPlayingRef = useRef(false);
@@ -525,50 +525,56 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
         {/* Ticks & Labels Row */}
         <div className="tb-ticks">
-          <span
+          <button
+            type="button"
             className="tb-tick-item at-0"
             onClick={() => handleSliderInput(0)}
             title="Day 1 00:00"
           >
             00:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-6"
             onClick={() => handleSliderInput(188)}
             title="Day 1 06:00"
           >
             06:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-12"
             onClick={() => handleSliderInput(375)}
             title="Day 1 12:00"
           >
             12:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-18"
             onClick={() => handleSliderInput(562)}
             title="Day 1 18:00"
           >
             18:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-24"
             onClick={() => handleSliderInput(750)}
             title="Day 1 24:00 (Day 1 departures complete)"
           >
             24:00 · Day 1 ends
-          </span>
+          </button>
           {!isNational && (
-            <span
+            <button
+              type="button"
               ref={finishTickRef}
               className="tb-tick-item at-end"
               onClick={handleJumpToFinish}
               title="All trains arrived"
             >
               All arrived
-            </span>
+            </button>
           )}
         </div>
       </div>

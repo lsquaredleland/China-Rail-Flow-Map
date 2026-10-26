@@ -63,7 +63,7 @@ export function CityCard({
     <InSlot>
     <div
       className="map-card city-card"
-      role="dialog"
+      role="group"
       aria-label={`${en} city details (minimized)`}
     >
       <div className={"mc-main" + (onExpand ? " mc-click" : "")} onClick={onExpand}>
@@ -142,7 +142,7 @@ export function TrainCard({
     <InSlot>
     <div
       className={"map-card train-card" + (isolated ? " is-isolated" : "")}
-      role="dialog"
+      role="group"
       aria-label={ariaLabel}
     >
       <div className="mc-id">

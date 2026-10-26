@@ -141,3 +141,9 @@
   color: var(--ink);
 }
 #legendToggle { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #map, #deckcv, #tooltip {
+    transition: none;
+  }
+}

@@ -12,6 +12,8 @@ describe("CityCard", () => {
     const h = renderToStaticMarkup(
       <CityCard en="Shanghai" zh="上海" sub="from Chongqing" count={20} onExpand={noop} onClose={noop} />,
     );
+    expect(h).toContain('role="group"');
+    expect(h).not.toContain('role="dialog"');
     expect(h).toContain("Shanghai 上海");
     expect(h).toContain("from Chongqing");
     expect(h).toContain("<b>20</b> trains");
@@ -63,6 +65,8 @@ describe("TrainCard", () => {
     );
   test("splits class letter and number, shows the band colour", () => {
     const h = card("en-route", "枝江北 → 荆州");
+    expect(h).toContain('role="group"');
+    expect(h).not.toContain('role="dialog"');
     expect(h).toContain('class="mc-class">D<');
     expect(h).toContain('class="mc-num">351<');
     expect(h).toContain("background:#E3A63F");
