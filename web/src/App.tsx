@@ -273,6 +273,10 @@ export default function App() {
           onSetDark={setDark}
           national={national}
           onToggleNational={toggleNational}
+          activeFilterCount={
+            selectedClasses.length +
+            [filters.hours, filters.distBins, filters.durBins, filters.selectedTrainCodes].filter((a) => a && a.length > 0).length
+          }
         />
 
         <MapCanvas
