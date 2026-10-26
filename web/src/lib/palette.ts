@@ -264,4 +264,3 @@ export function paletteRGBA(dark: boolean) {
     ferry: rgba(dark ? "#38BDF8" : "#0284C7"),
   };
 }
-export type PaletteRGBA = ReturnType<typeof paletteRGBA>;

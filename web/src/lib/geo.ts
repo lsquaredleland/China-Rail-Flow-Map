@@ -6,12 +6,6 @@ import { enName } from "./format";
 
 /* ---------- station lookups ---------- */
 
-export function stationName(data: AtlasData, idx: number): string | null {
-  if (idx === null || idx === undefined || idx < 0) return null;
-  const s = data.station_table[idx];
-  return s ? s.zh : null;
-}
-
 export function stationLabel(data: AtlasData, idx: number): string {
   const s = data.station_table[idx];
   if (!s) return "—";

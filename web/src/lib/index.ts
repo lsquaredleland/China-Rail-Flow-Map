@@ -37,7 +37,7 @@ export {
   natCityR,
   stationZoomK,
 } from "./palette";
-export type { PaletteRGBA, RGBA } from "./palette";
+export type { RGBA } from "./palette";
 export {
   DATA_FMT,
   decodeFlat,
@@ -54,13 +54,11 @@ export {
 export {
   haversineKm,
   stationLabel,
-  stationName,
 } from "./geo";
 export {
   FLOW_CLASSES,
   buildOrigin,
   classIndex,
-  prepOrigin,
 } from "./origin";
 export {
   buildDayTimeline,
