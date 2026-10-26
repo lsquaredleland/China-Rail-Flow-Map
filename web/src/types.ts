@@ -680,6 +680,11 @@ export interface NationalIndexPack {
   secs: number[][];
   dep: number[][];
   arr: number[][];
+  /** Optional (newer packs): per train, aligned with `dep` / `arr` (so not
+      delta-coded), the minute of day 0..1439 of its departure from / arrival
+      at that city. */
+  dep_min?: number[][];
+  arr_min?: number[][];
 }
 
 /** atlas-v2-national-entries.json (P3.3), as shipped: when each national

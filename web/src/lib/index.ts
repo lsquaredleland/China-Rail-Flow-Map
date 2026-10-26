@@ -78,12 +78,14 @@ export {
   natFilterKey,
   natFlowCounts,
   natCityCounts,
+  natCityEvents,
+  natCityEventsAt,
   natHistogram,
   natIndexActive,
   natSelect,
   requireNationalIndex,
 } from "./nationalIndex";
-export type { NatFilter } from "./nationalIndex";
+export type { NatFilter, NatCityEvents } from "./nationalIndex";
 export {
   nationalCounts,
   nationalCountsAt,

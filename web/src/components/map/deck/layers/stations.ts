@@ -75,18 +75,21 @@ const RIPPLE_MIN = 3;
     `1 − frac`. */
 export function stationRipples(states: StationState[], dark: boolean): Ripple[] {
   const out: Ripple[] = [];
-  const gold = dark ? "#F59E0B" : "#D97706";
   for (const s of states) {
-    if (!s.ripple) continue;
-    const frac = s.ripple.frac;
-    const r = s.r0 * s.kd;
-    out.push({
-      pos: [s.c.pt[0], s.c.pt[1]],
-      r: r + frac * Math.max(RIPPLE_MIN, r * RIPPLE_GROW),
-      col: rgba(gold, Math.max(0, 1 - frac)),
-    });
+    if (s.ripple) out.push(rippleRing([s.c.pt[0], s.c.pt[1]], s.r0 * s.kd, s.ripple.frac, dark));
   }
   return out;
+}
+
+/** One ripple ring for a circle of drawn radius `r` at `frac` (0..1) of its
+    life (also the national city circles'). */
+export function rippleRing(pos: [number, number], r: number, frac: number, dark: boolean): Ripple {
+  const gold = dark ? "#F59E0B" : "#D97706";
+  return {
+    pos,
+    r: r + frac * Math.max(RIPPLE_MIN, r * RIPPLE_GROW),
+    col: rgba(gold, Math.max(0, 1 - frac)),
+  };
 }
 
 /** Selected-destination ring, hovered station ring, hovered origin ring. */

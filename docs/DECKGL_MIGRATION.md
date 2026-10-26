@@ -1227,6 +1227,25 @@ Trains rAF p95 16.7-16.8, draw+raster p95 12.3 / 14.6 / 10.5 ms (initial / natio
 x10), JS draw p95 3.0-3.3 ms; Trains + flows draw+raster p95 12.7 / 13.1 / 12.9 ms; 4x Trains
 draw+raster p95 12.8 / 15.1 / 9.9 ms.
 
+*National city growth (2026-10-25, `feat/national-city-growth`).* With Trains + flows the
+national city circles grow like the origin view's: not drawn until a selected train has
+stopped there, then sized by the stop events so far (departures + arrivals, all of them at
+24:00 = the totals), with the origin's golden ripple (`stationRipples` sizing) for 20 minutes
+after an event. **Pack:** the national index gains optional `dep_min` / `arr_min`, per train
+aligned with `dep` / `arr` (not delta-coded): the clock minute 0..1439 (timetable minute mod
+1440, as `national-entries`) of the departure from / arrival at that city, at the stop that
+defines the membership (`flows::departs_from` / `arrives_at`; a stop missing the time falls
+back to its other time). Audit: aligned, in range, per city exactly `cities.dep` / `cities.arr`
+events (170,657 in all), every minute is a schedule minute of the train (goldens
+`national_index_events`, `national_index_minute_bad`). Index brotli 243 → 524 KB; delta or
+start-relative coding saves only 5-7 %, so it stays raw. **Client:** `natCityEvents` (lib)
+reduces the selection to per-city sorted minutes once per selection (`natViewEvents`
+memoises per view); each frame binary-searches the tier's cities. The tier set still ranks
+on the day's totals, so it does not flicker. Without the fields (older pack) or without the
+clock (Flows only) the circles show the totals as before. Perf (`perf/national.mjs --dpr 2
+--query '&natLayer=both'`, staged pack): rAF p95 16.7-16.8 ms, draw+raster p95 10.0 / 10.2 /
+12.1 ms (initial / national fit / city x10), cpuTimePerFrame 1.1-1.3 ms.
+
 **P3.4 Optional comet mode** — only if D2 is toggled on and M4n (Trips) passed.
 
 ---
