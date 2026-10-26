@@ -66,6 +66,11 @@ export function useAtlasData({
 }) {
   const [atlas, setAtlas] = useState<DecodedAtlas | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The lib's require* guards only throw; the error is logged and shown here.
+  const failLoad = (msg: string) => {
+    console.error(msg);
+    setLoadError(msg);
+  };
   const [outline, setOutline] = useState<DecodedOutline | null>(null);
   const [outTablesReady, setOutTablesReady] = useState(false);
   const [inMapReady, setInMapReady] = useState(false);
@@ -172,7 +177,7 @@ export function useAtlasData({
           flights.outTables = false;
           // Only a wrong data format blocks the map; a failed fetch leaves
           // it usable (the table keeps its loading note), as on main.
-          if (err.name === "FmtError") setLoadError(err.message);
+          if (err.name === "FmtError") failLoad(err.message);
         });
     };
     const ensureInTables = () => {
@@ -192,7 +197,7 @@ export function useAtlasData({
         })
         .catch((err: Error) => {
           flights.inTables = false;
-          if (err.name === "FmtError") setLoadError(err.message);
+          if (err.name === "FmtError") failLoad(err.message);
         });
     };
     // National flows and their entry ticks: on request only, never part of
@@ -205,7 +210,8 @@ export function useAtlasData({
       if (!d || !at) return;
       try {
         requireNationalFlows(d, at.data.sections.length, NATIONAL_FLOWS_URL);
-      } catch {
+      } catch (err) {
+        console.error((err as Error).message);
         nationalFlowsRef.current = null;
         setNationalFlowsFailed(true);
         return;
@@ -240,7 +246,8 @@ export function useAtlasData({
       if (!d || !at) return;
       try {
         requireNationalIndex(d, at.data.sections.length, at.data.train_table.length, NATIONAL_INDEX_URL);
-      } catch {
+      } catch (err) {
+        console.error((err as Error).message);
         nationalIndexRef.current = null;
         setNationalIndexFailed(true);
         return;
@@ -272,7 +279,8 @@ export function useAtlasData({
       if (!d || !at) return;
       try {
         requireNationalEntries(d, at.data.sections.length, NATIONAL_ENTRIES_URL);
-      } catch {
+      } catch (err) {
+        console.error((err as Error).message);
         nationalEntriesRef.current = null;
         setNationalFlowsFailed(true);
         return;
@@ -310,7 +318,7 @@ export function useAtlasData({
         requireNationalTrains(d.trains, at.sec.len.length, at.thr.len.length, at.data.train_table.length, NATIONAL_TRAINS_URL);
       } catch (err) {
         nationalTrainsRef.current = null;
-        setLoadError((err as Error).message);
+        failLoad((err as Error).message);
         return;
       }
       setNationalTrains(d);
@@ -337,7 +345,7 @@ export function useAtlasData({
           flights.nationalTrains = false;
           // Only a wrong format blocks the map; a failed fetch leaves the
           // origin view as it is and national mode says so.
-          if (err.name === "FmtError") setLoadError(err.message);
+          if (err.name === "FmtError") failLoad(err.message);
           else setNationalTrainsFailed(true);
         });
     };
@@ -361,7 +369,7 @@ export function useAtlasData({
         .catch((err: Error) => {
           flights.inMap = false;
           setInMapLoading(false);
-          if (err.name === "FmtError") setLoadError(err.message);
+          if (err.name === "FmtError") failLoad(err.message);
         });
     };
 
@@ -471,7 +479,7 @@ export function useAtlasData({
         } else loader.ensureOutTables();
       })
       .catch((err: Error) => {
-        if (!cancelled) setLoadError(err.message);
+        if (!cancelled) failLoad(err.message);
       });
     return () => {
       cancelled = true;
