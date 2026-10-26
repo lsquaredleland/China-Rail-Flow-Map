@@ -2,6 +2,7 @@
 import type { ArrVM, OriginVM } from "../../types";
 import { fmtDist, fmtTime, runRank } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
+import WindowedTable, { ORIGIN_ROW_H } from "./WindowedTable";
 import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
 import HeadCount from "./HeadCount";
@@ -105,7 +106,9 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
     </>
   );
   const tableNode = (
-    <table id="depTable">
+    <WindowedTable n={list.length} rowH={ORIGIN_ROW_H} cols={8}>
+      {(w) => (
+      <>
       <thead>
         <tr>
           <th scope="col">Train</th>
@@ -168,14 +171,10 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
             </td>
           </tr>
         ) : (
-          list.map((a, i) => (
+          <>{w.top}{list.map((a, i) => i < w.first || i >= w.last ? null : (
             <tr
               key={i}
-              className={
-                selectedTrainCodes.includes(a.code)
-                  ? "dep-row-selected"
-                  : undefined
-              }
+              {...w.tr(i, selectedTrainCodes.includes(a.code) ? "dep-row-selected" : undefined)}
               onClick={(e) => handleRowClick(a.code, i, e, list)}
             >
               <td className="c-train">
@@ -207,10 +206,12 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
               <td className="num">{a.stops}</td>
               <RunsCell atlas={atlas} t={a.t} />
             </tr>
-          ))
+          ))}{w.bottom}</>
         )}
       </tbody>
-    </table>
+      </>
+      )}
+    </WindowedTable>
   );
   return { heading, depNote, stations, count, total: arrs.length, showingNote, tableNode };
 }

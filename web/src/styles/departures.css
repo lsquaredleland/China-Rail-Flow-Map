@@ -217,7 +217,7 @@
   background: var(--paper-deep) !important;
   box-shadow: inset 4px 0 0 var(--rust);
 }
-#depTable tbody tr:nth-child(even) { background: var(--row-alt); }
+#depTable tbody tr.alt { background: var(--row-alt); }
 #depTable td.num, #depTable th.num { text-align: right; }
 .c-time { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 500; }
 .c-train { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -292,9 +292,10 @@
 /* ---------- run days + national table ---------- */
 .c-runs { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .runs-label { color: var(--ink-soft); }
+/* The windowed tables: one fixed row height (set on the row), cells do not wrap. */
+.win-table tbody td { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 190px; }
+.win-table tbody tr.win-spacer { height: auto; cursor: default; background: none !important; }
+.win-table tbody tr.win-spacer td { padding: 0; border: 0; }
+.win-table tbody tr.win-spacer:hover { background: none !important; }
 .nat-table { min-width: 760px; }
-.nat-table tbody tr { height: 46px; }
-.nat-table tbody td { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 280px; padding-top: 4px; padding-bottom: 4px; vertical-align: middle; }
-.nat-table tbody tr.nat-spacer { height: auto; cursor: default; background: none !important; }
-.nat-table tbody tr.nat-spacer td { padding: 0; border: 0; }
-.nat-table tbody tr.nat-spacer:hover { background: none !important; }
+.nat-table tbody td { max-width: 280px; padding-top: 4px; padding-bottom: 4px; vertical-align: middle; }

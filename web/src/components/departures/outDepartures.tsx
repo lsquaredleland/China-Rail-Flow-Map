@@ -1,5 +1,6 @@
 /* Outbound, no destination: every train departing the origin city. */
 import { fmtDist, fmtTime, runRank } from "../../lib";
+import WindowedTable, { ORIGIN_ROW_H } from "./WindowedTable";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
@@ -96,7 +97,9 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
     </>
   );
   const tableNode = (
-    <table id="depTable">
+    <WindowedTable n={list.length} rowH={ORIGIN_ROW_H} cols={9}>
+      {(w) => (
+      <>
       <thead>
         <tr>
           <th scope="col">Train</th>
@@ -152,14 +155,10 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
             </td>
           </tr>
         ) : (
-          list.map((d, i) => (
+          <>{w.top}{list.map((d, i) => i < w.first || i >= w.last ? null : (
             <tr
               key={i}
-              className={
-                selectedTrainCodes.includes(d.code)
-                  ? "dep-row-selected"
-                  : undefined
-              }
+              {...w.tr(i, selectedTrainCodes.includes(d.code) ? "dep-row-selected" : undefined)}
               onClick={(e) => handleRowClick(d.code, i, e, list)}
             >
               <td className="c-train">
@@ -195,10 +194,12 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
               <td className="num">{d.stops}</td>
               <RunsCell atlas={atlas} t={d.t} />
             </tr>
-          ))
+          ))}{w.bottom}</>
         )}
       </tbody>
-    </table>
+      </>
+      )}
+    </WindowedTable>
   );
   return { heading, depNote, stations, count, total: deps.length, showingNote, tableNode };
 }

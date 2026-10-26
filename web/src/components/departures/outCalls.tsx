@@ -2,6 +2,7 @@
 import type { DestVM, OriginVM } from "../../types";
 import { fmtTime, runRank } from "../../lib";
 import HeadCount, { OfTotal } from "./HeadCount";
+import WindowedTable, { ORIGIN_ROW_H } from "./WindowedTable";
 import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
 import { byClass, classTag } from "./helpers";
@@ -140,7 +141,9 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
     </span>
   );
   const tableNode = (
-    <table id="depTable" className="calls">
+    <WindowedTable n={list.length} rowH={ORIGIN_ROW_H} cols={9} className="calls">
+      {(w) => (
+      <>
       <thead>
         <tr>
           <th scope="col">Train</th>
@@ -195,13 +198,14 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
             </td>
           </tr>
         ) : (
-          list.map((c, i) => {
+          <>{w.top}{list.map((c, i) => {
+          if (i < w.first || i >= w.last) return null;
             const d = c.dep;
             const isSelected = selectedTrainCodes.includes(d.code);
             return (
               <tr
                 key={i}
-                className={isSelected ? "dep-row-selected" : undefined}
+                {...w.tr(i, isSelected ? "dep-row-selected" : undefined)}
                 onClick={(e) =>
                   handleRowClick(
                     d.code,
@@ -253,10 +257,12 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
                 <RunsCell atlas={atlas} t={d.t} />
               </tr>
             );
-          })
+          })}{w.bottom}</>
         )}
       </tbody>
-    </table>
+      </>
+      )}
+    </WindowedTable>
   );
   return { heading, depNote, stations, chipNode, count, total: calls.length, showingNote, tableNode };
 }

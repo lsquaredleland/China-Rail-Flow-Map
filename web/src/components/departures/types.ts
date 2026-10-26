@@ -29,8 +29,6 @@ export interface ModeView {
   total: number;
   showingNote: string;
   tableNode: ReactNode;
-  /** The table node brings its own scroller (the windowed national table). */
-  scrollSelf?: boolean;
 }
 
 /** Everything the mode builders read from the DeparturesTable shell. */
