@@ -6,8 +6,40 @@ on:
   pull_request:
     branches: [main, deckgl]
 
+# Superseded runs on the same PR cancel; pushes to main/deckgl always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Which parts of the repo changed. On push everything runs (cheap insurance);
+  # on a PR, jobs whose inputs are untouched are skipped (reported green).
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      web: ${{ github.event_name != 'pull_request' || steps.f.outputs.web == 'true' }}
+      pipeline: ${{ github.event_name != 'pull_request' || steps.f.outputs.pipeline == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3.0.2
+        id: f
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            web:
+              - 'web/**'
+              - '.github/workflows/**'
+            pipeline:
+              - 'pipeline/**'
+              - 'web/public/assets/**'
+              - '.github/workflows/**'
+
   web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -17,6 +49,12 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run build
@@ -24,8 +62,13 @@ jobs:
 
   # Headless WebGL smoke: with the Canvas renderer gone, nothing else boots the
   # lazy deck chunk. SwiftShader software GL on the runner's preinstalled Chrome
-  # (no browser download); deterministic assertions only, no pixel comparison.
+  # (no browser download, so nothing to cache); deterministic assertions only,
+  # no pixel comparison. smoke and cards-layout run as parallel jobs; each
+  # rebuilds dist (about 10 s with a warm bun cache, cheaper than an artifact
+  # round-trip).
   web-smoke:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -36,12 +79,40 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
       - run: bun install --frozen-lockfile
       - run: bun run build
       - name: Boot dist in headless Chrome (SwiftShader)
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: node tools/smoke.mjs
+
+  web-cards-layout:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build
       - name: Check cards layout in headless Chrome
         env:
           CHROME_PATH: /usr/bin/google-chrome
@@ -52,6 +123,8 @@ jobs:
   # dropped_chains / flow_lost are not gated here: they need the OSM extract
   # (see audit_pack in audit.rs).
   pack-audit:
+    needs: changes
+    if: needs.changes.outputs.pipeline == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -147,6 +220,8 @@ jobs:
             }
 
   pipeline:
+    needs: changes
+    if: needs.changes.outputs.pipeline == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -157,6 +232,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pipeline
 
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
