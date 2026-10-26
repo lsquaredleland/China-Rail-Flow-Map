@@ -191,7 +191,7 @@ web/src/components/map/
                              context loss, settled-frame counter, onAfterRender → overlay. Imperative, no React (C23)
   deck/TailLayer.ts          LineLayer subclass with the source→target alpha fade (C1)
   deck/layers/{backdrop,flows,stations,trains}.ts   props builders only (pure given inputs)
-  deck/layers/national.ts    (Phase 2)
+  deck/layers/national/      (Phase 2: timeline, trains, flows, cities, index)
   deck/labelsOverlay.ts      thin 2D canvas: labels, origin diamond, train tag (also the pointer-capturing element)
   deck/load.ts               lazy import() of the deck chunk + stale-chunk recovery (C4)
   anim.ts, api.ts, camera.ts, context.ts, pointer.ts   kept (camera.ts shrinks to resize/report glue;
@@ -816,7 +816,7 @@ Measured on the committed pack: 2,668 dots at 1095, heap delta 20.0 MB, build 18
 stops sit on entry boundaries where a float tie picks either side of a join.
 
 **P2.2 National layers + mode + clock** — *after P1c.1, P2.1.* Files: new
-`deck/layers/national.ts` (dots, tails, dwell rings from the frame buffer; `pickable: !animPlaying`),
+`deck/layers/national/` (dots, tails, dwell rings from the frame buffer; `pickable: !animPlaying`),
 `DeckHost.tsx` (national frame loop: `M.render()` → `natPositions` → `setProps({layers})`;
 D8 DPR cap), `MapCanvas.tsx` (`national` prop), `App.tsx` (`national` state from
 `?national=1`; `TimelineScrubber` shown when `direction === 'out' || national`; city panel
@@ -913,7 +913,7 @@ pipeline now emits each national train's whole run, so the client does no stitch
   file check, heads / extra pieces decode on the map, `nationalLayers.test.ts` (buffers,
   layer props, `natSynth`), national clock in `animation.test.ts` (`totalMins` 1440, counters,
   wrap 1439.5 → 0, the origin clock keeps its day-2 tail).
-- **Layers / host.** `deck/layers/national.ts`: `nat-tails` (TailLayer), `nat-trains`
+- **Layers / host.** `deck/layers/national/` (was one `national.ts`, split in #102): `nat-tails` (TailLayer), `nat-trains`
   (positions read straight from `natPositions`' buffer, `stride 24`), `nat-dwell`; same marks
   as the origin trains; `pickable: !animPlaying` on the dots only. `buildLayers` is the seam:
   in national mode it returns the backdrop plus these and nothing origin-specific (D13); the
@@ -1010,7 +1010,7 @@ shipped as `atlas-v2-national.json.br` (fmt 7 or a new file; `DATA_FMT` check ex
   `(step, +n)` deltas) roughly 1–1.5 MB brotli (estimate, not measured). Computing it client-side from `trainEntries`
   stays the cheaper path.
 
-**P3.2 B layer** — `deck/layers/national.ts` (+ flows `PathLayer`, class filter =
+**P3.2 B layer** — `deck/layers/national/` (+ flows `PathLayer`, class filter =
 `Σ byClass[selected]` into `widthArr`). Test: per-section totals equal the pack audit.
 
 *P3.2 lib as built (groundwork; the layer and UI are not built).* `types.ts
@@ -1040,6 +1040,8 @@ client below).*
   The note exists only in national mode, so the toolbar (both modes) and every origin-view
   pixel are unchanged. Default Trains (A only, as before). `?natLayer=flows|both` (absent =
   trains), URL only like `?national`, restores the choice on load.
+  *[Superseded by #111: Flows and Animation are two independent toggles and only
+  `?natLayer=none` remains in the URL (flows off); `trains` and `both` are gone.]*
 - **Loading.** `useAtlasData` gains `ensureNationalEntries()` (the P3.3 file; `requireFmt`
   on fetch, then `requireNationalEntries` against the atlas: `n_sec`, 8 class rows of
   `sections.length` tick lists, `ticks_per_min > 0`). Flows loads only the 19 KB flows
@@ -1048,7 +1050,7 @@ client below).*
   no longer sets `loadError` (which blanks the map); it sets `nationalFlowsFailed`, the note
   says "The national flow data could not be loaded." and the map draws the trains. Driver:
   404 on either file → trains drawn, notice shown, 0 `pageerror`.
-- **Layer.** `deck/layers/national.ts nationalFlowLayers`: B = `nationalFlowPasses(
+- **Layer.** `deck/layers/national/flows.ts`: B = `nationalFlowPasses(
   nationalCounts(nf, classes))` through the origin flows' `buildPassData` (binary PathLayer,
   widest first, ferry dashes) as `flows-national` (+ `flows-national-ferry`), on
   `atlas.sec`, under the dots; no pick proxy (national picking is the P2.3 CPU scan over dots
@@ -1350,7 +1352,7 @@ renderer's size when this plan was written (an estimate table then; the Canvas f
 | `components/map/deck/layers/flows.ts` | 694 | `flows.ts` 853 |
 | `components/map/deck/layers/stations.ts` + `labelsOverlay.ts` | 202 + 175 | `stations.ts` 432 |
 | `components/map/deck/layers/trains.ts` | 245 | `trains.ts` 278 |
-| `components/map/deck/layers/national.ts` (new, national mode) | 720 | n/a |
+| `components/map/deck/layers/national.ts` (new, national mode; since split into `layers/national/{timeline,trains,flows,cities,index}.ts`, 752 lines, and `DeckHost.ts` is 409) | 720 | n/a |
 | `components/map/deck/DeckHost.ts` + `load.ts` + `TailLayer.ts` + `layers/binary.ts` | 513 + 13 + 16 + 64 | `render.ts` 82 |
 | `components/map/interaction.ts` | 267 | `interaction.ts` 439 |
 | `components/map/camera.ts` | 236 | `camera.ts` 187 |
