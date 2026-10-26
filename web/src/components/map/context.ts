@@ -79,6 +79,7 @@ export interface Props {
   distUnit: DistUnit;
   panelDest: CityPointVM | null;
   loadError: string | null;
+  onRetry?: () => void;
   /** True while the lazily-fetched inbound map file is still in
       flight: the map shows the standard loading affordance over the
       canvas. */
