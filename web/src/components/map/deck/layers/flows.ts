@@ -36,7 +36,7 @@ import {
 import type { FlowItem, FlowPass, InfraPass, ModelCaches, ModelState, RGBA } from "../../../../lib";
 
 /** Infrastructure hairline width, CSS px (the former Canvas renderer's INFRA_WIDTH). */
-export const INFRA_WIDTH = 1.25;
+const INFRA_WIDTH = 1.25;
 
 const dashExt = new PathStyleExtension({ dash: true });
 
@@ -252,7 +252,7 @@ function animKey(ms: ModelState): unknown[] {
   return [tl, t, done, ms.animEnabled];
 }
 
-export function memoFlowPasses(ms: ModelState, caches: ModelCaches): FlowPass[] {
+function memoFlowPasses(ms: ModelState, caches: ModelCaches): FlowPass[] {
   const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.dark, ...animKey(ms)];
   if (passMemo && sameKey(passMemo.key, key)) return passMemo.passes;
   const passes = flowPasses(ms, caches);
@@ -260,7 +260,7 @@ export function memoFlowPasses(ms: ModelState, caches: ModelCaches): FlowPass[] 
   return passes;
 }
 
-export function memoInfraPasses(ms: ModelState, caches: ModelCaches): InfraPass[] {
+function memoInfraPasses(ms: ModelState, caches: ModelCaches): InfraPass[] {
   const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.dark];
   if (infraMemo && sameKey(infraMemo.key, key)) return infraMemo.passes;
   const passes = infraPasses(ms, caches);
@@ -270,7 +270,7 @@ export function memoInfraPasses(ms: ModelState, caches: ModelCaches): InfraPass[
 
 /* ---------- layer builders ---------- */
 
-export interface FlowLayersInput {
+interface FlowLayersInput {
   set: DecodedSet;
   ms: ModelState;
   caches: ModelCaches;
@@ -321,7 +321,7 @@ function flowPassLayer(role: string, pd: PassData, scale: number, fitScale: numb
    is strict (`less`), so where sections coincide the busiest keeps the pixel,
    which is what the Canvas picker's "busier wins" rule would choose. */
 export const PICK_PREFIX = "pick-";
-export const PICK_WIDTH = 1.5;
+const PICK_WIDTH = 1.5;
 
 function flowPickLayer(role: string, pd: PassData) {
   return new PathLayer({
@@ -490,7 +490,7 @@ let chordMemo: ChordItem[] = [];
 
 const chordDash = (w: number): [number, number] => [Math.max(3, w * 1.1), Math.max(2.5, w * 0.8)];
 
-export function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
+function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
   const { ms, caches, scale, fitScale, hover, chords, damped } = inp;
   if (ms.dir !== "out") return [];
   const plan = chordPlan(ms, caches);
@@ -601,7 +601,7 @@ export function wholePath(set: DecodedSet, s: number, rev: boolean): number[] {
   return out;
 }
 
-export function corridorLayers(inp: FlowLayersInput): Layer[] {
+function corridorLayers(inp: FlowLayersInput): Layer[] {
   const { set, ms, activeTrainsAt } = inp;
   const corridor = isolatedCorridor(ms, activeTrainsAt);
   if (!corridor) return [];
@@ -633,7 +633,7 @@ export function corridorLayers(inp: FlowLayersInput): Layer[] {
 
 /* ---------- hover highlight ---------- */
 
-export function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
+function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
   const { set, ms, caches, scale, fitScale, hover, dark, damped } = inp;
   if (!hover || hover.kind !== "seg") return [];
   const n = hover.subN !== undefined ? hover.subN : hover.n;

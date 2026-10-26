@@ -192,7 +192,7 @@ function createMapState() {
     animRafId: null as number | null,
   };
 }
-export type MapState = ReturnType<typeof createMapState>;
+type MapState = ReturnType<typeof createMapState>;
 
 /* Everything the layer modules share: the latest props (`P`), the engine
    state (`S`), the DOM refs and the camera / view-model helpers. One stable

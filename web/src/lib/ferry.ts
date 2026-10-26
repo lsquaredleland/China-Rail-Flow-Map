@@ -13,7 +13,7 @@ export function isFerrySection(bb: ArrayLike<number>, s: number): boolean {
 }
 
 /** A step between two consecutive points is the open-water crossing. */
-export function isWaterCross(
+function isWaterCross(
   prevLon: number,
   prevLat: number,
   lon: number,
@@ -26,7 +26,7 @@ export function isWaterCross(
   );
 }
 
-export interface FerryPiece {
+interface FerryPiece {
   /** Section index. */
   s: number;
   /** Flat [lon, lat, lon, lat, ...]. */

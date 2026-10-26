@@ -3,7 +3,7 @@
    deploy; that failure triggers one recovery reload (see staleReload.ts). */
 import { maybeReloadForFailedImport } from "../../../staleReload";
 
-export type DeckHostModule = typeof import("./DeckHost");
+type DeckHostModule = typeof import("./DeckHost");
 
 export function loadDeck(): Promise<DeckHostModule> {
   return import("./DeckHost").catch((err) => {

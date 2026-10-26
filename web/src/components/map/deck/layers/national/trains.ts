@@ -22,7 +22,7 @@ import { maxDots } from "./timeline";
 /** Glow colour per NationalTimeline class: 0 G/D/C, 1 Z/T/K/S, 2 other. */
 const GLOW = [glowOf("G"), glowOf("K"), glowOf("")];
 
-export interface NationalFrame extends DotBuffers {
+interface NationalFrame extends DotBuffers {
   count: number;
   /** Distinct trains among the dots (a run over 24 h shows more than one dot). */
   running: number;

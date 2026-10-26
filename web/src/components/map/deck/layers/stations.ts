@@ -14,7 +14,7 @@ import type { CityPointVM, Palette } from "../../../../types";
 import { rampColor, rgba, stationR, stationZoomK } from "../../../../lib";
 import type { RGBA, StationState } from "../../../../lib";
 
-export interface StationDot {
+interface StationDot {
   c: CityPointVM;
   pos: [number, number];
   /** Drawn radius in px: base radius times the zoom growth. */
@@ -25,7 +25,7 @@ export interface StationDot {
   lw: number;
 }
 
-export interface Ring {
+interface Ring {
   pos: [number, number];
   r: number;
   w: number;
@@ -112,7 +112,7 @@ export function stationRings(opts: {
   return rings;
 }
 
-export interface StationLayerInput {
+interface StationLayerInput {
   states: StationState[];
   pal: Palette;
   dark: boolean;

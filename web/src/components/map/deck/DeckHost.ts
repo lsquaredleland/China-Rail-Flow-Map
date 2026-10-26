@@ -20,7 +20,7 @@ import { stationLayers } from "./layers/stations";
 import { nationalBuildLayers } from "./layers/national";
 import { shownTrains, trainLayers } from "./layers/trains";
 
-export interface PickRectOptions {
+interface PickRectOptions {
   /** Left / top of the box, CSS px. */
   x: number;
   y: number;

@@ -4,7 +4,7 @@
    has replaced them. One page reload picks up the new index.html. */
 import { session } from "./storage";
 
-export const RELOAD_KEY = "staleReloadAt";
+const RELOAD_KEY = "staleReloadAt";
 export const RELOAD_COOLDOWN_MS = 60_000;
 export const RELOAD_NOTICE = "A newer version of the map is available — reloading…";
 

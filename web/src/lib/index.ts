@@ -11,7 +11,6 @@ export {
   fmtTime,
   formatHoursLabel,
   formatScheduleStops,
-  rowTrainIdx,
   sourceRows,
   sourceRowsHtml,
   stationName,
@@ -20,8 +19,6 @@ export {
   trainOrigins,
 } from "./format";
 export {
-  STATION_R_MAX,
-  STATION_R_MIN,
   WIDTH_K,
   WIDTH_KNEE,
   flowColor,
@@ -71,12 +68,9 @@ export { natTrainVM } from "./natTrain";
 export { buildNatRows, natHistRows, selectNatRows, sortNatRows } from "./natTable";
 export type { HistRow, NatRow, NatSortKey } from "./natTable";
 export { runRank, runDays } from "./runDays";
-export type { RunDays } from "./runDays";
+
 export {
-  NAT_DIST_BINS,
   NAT_DIST_SIZE,
-  NAT_DUR_BINS,
-  NAT_HOUR_BINS,
   natFilterKey,
   natFlowCounts,
   natCityCounts,
@@ -102,7 +96,6 @@ export {
   requireNationalFlows,
 } from "./nationalFlows";
 export {
-  callArrMins,
   destWindow,
   stopArrivalTimes,
   trainShownAt,
@@ -122,50 +115,43 @@ export {
   viewToViewState,
   zoomBounds,
 } from "./camera";
-export type { Extent, View, ViewState } from "./camera";
-export { isFerrySection, isWaterCross, splitFerry } from "./ferry";
-export type { FerryPiece } from "./ferry";
+export type { Extent, View } from "./camera";
+export { isFerrySection, splitFerry } from "./ferry";
+
 export { tooltipHtml } from "./tooltip";
-export type { TooltipInput } from "./tooltip";
+
 export {
   activeTimeline,
   animStep,
   chordPlan,
   chordVisible,
   flowPasses,
-  flowsOf,
   getActiveDestSectionCounts,
   getDestSectionCounts,
   highlightSegN,
   infraPasses,
   isFilteredView,
   isolatedCorridor,
-  isolatedTrain,
   newModelCaches,
   pickableChords,
   pickableFlows,
 } from "./mapModel";
 export type {
-  ChordPlan,
   FlowItem,
   FlowPass,
   InfraPass,
-  IsolatedCorridor,
   ModelCaches,
   ModelState,
 } from "./mapModel";
 export {
-  computeAllowedTrainCodes,
-  computeCityAllowedArrivalTimes,
-  computeDestWindow,
   getSelCache,
   isTrainShown,
   stationStates,
 } from "./mapModel";
 export type { SelCache, SelInput, StationInput, StationState } from "./mapModel";
 export { placeLabels } from "./labels";
-export type { LabelOptions, LabelPoint, LabelStyle, Measure, PlacedLabel } from "./labels";
-export { SEG_TIE_PX, TRAIN_RADIUS, distToLine, distToSeg, pickPriority } from "./pick";
-export type { PickCandidate, PickKind, PickLine, PickOptions, PickView } from "./pick";
+export type { LabelPoint } from "./labels";
+export { TRAIN_RADIUS, distToLine, distToSeg, pickPriority } from "./pick";
+export type { PickCandidate } from "./pick";
 export { tripStatus, unrollStops } from "./tripStatus";
-export type { AlignedStop, TripStatus, UnrolledStop } from "./tripStatus";
+export type { AlignedStop } from "./tripStatus";

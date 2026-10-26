@@ -32,11 +32,11 @@ interface Props {
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif';
 const W = 560;
 const H = 106;
-export const PAD_L = 4;
+const PAD_L = 4;
 const PAD_R = 4;
 const TOP = 17; // headroom for the peak bar's count label
 const BASE = 84; // baseline y; axis labels hang below it
-export const PLOT_W = W - PAD_L - PAD_R;
+const PLOT_W = W - PAD_L - PAD_R;
 const PLOT_H = BASE - TOP;
 
 export interface Tick {

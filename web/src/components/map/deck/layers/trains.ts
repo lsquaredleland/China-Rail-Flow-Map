@@ -89,7 +89,7 @@ export interface DotBuffers {
   dwell: Disc[];
 }
 
-export interface TrainBuffers extends DotBuffers {
+interface TrainBuffers extends DotBuffers {
   fill: Uint8Array;
   rings: Disc[];
 }
@@ -179,7 +179,7 @@ export function buildTrainBuffers(
   };
 }
 
-export interface TrainLayerInput {
+interface TrainLayerInput {
   trains: readonly ActiveTrainVM[];
   scale: number;
   isolatedCode: string | null | undefined;

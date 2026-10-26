@@ -27,10 +27,10 @@ export interface NatFilter {
 }
 
 /** Histogram bin counts of the index: hours, distance (km / mi), duration (h). */
-export const NAT_HOUR_BINS = 24;
-export const NAT_DIST_BINS = { km: 31, mi: 41 } as const;
+const NAT_HOUR_BINS = 24;
+const NAT_DIST_BINS = { km: 31, mi: 41 } as const;
 export const NAT_DIST_SIZE = { km: 100, mi: 50 } as const;
-export const NAT_DUR_BINS = 25;
+const NAT_DUR_BINS = 25;
 
 /** Throw a FmtError unless `d` is a national index for a shared pack with
     `nSec` sections and `nTrain` train_table rows. */
@@ -86,7 +86,7 @@ function decoded(ix: NationalIndexPack): Decoded {
 
 /** Which of the filters to skip when selecting (a histogram shows its own
     dimension under all the others). */
-export type NatSkip = "hour" | "dist" | "dur" | null;
+type NatSkip = "hour" | "dist" | "dur" | null;
 
 /** Per-`train_table` row 0/1 flags of the trains that pass the filter (null
     = every train). The class filter alone needs no index; the others are

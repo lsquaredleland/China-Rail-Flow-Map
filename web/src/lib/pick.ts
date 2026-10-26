@@ -11,9 +11,9 @@
    iteration order (points() / pickableFlows / activeTrains), which decides
    exact ties. */
 
-export type PickKind = "train" | "station" | "origin" | "section" | "chord";
+type PickKind = "train" | "station" | "origin" | "section" | "chord";
 
-export interface PickLine {
+interface PickLine {
   /** lon, lat pairs: a polyline at pts[off .. off + 2·count). */
   pts: ArrayLike<number>;
   off: number;
@@ -35,13 +35,13 @@ export interface PickCandidate {
   distance?: number;
 }
 
-export interface PickView {
+interface PickView {
   scale: number;
   tx: number;
   ty: number;
 }
 
-export interface PickOptions {
+interface PickOptions {
   /** Trains are pickable only while the clock is paused. Default true. */
   paused?: boolean;
   /** Chords are pickable only outbound. Default "out". */
@@ -51,11 +51,11 @@ export interface PickOptions {
 }
 
 /** Slop within which the busier of two sections wins, px. */
-export const SEG_TIE_PX = 0.75;
+const SEG_TIE_PX = 0.75;
 export const TRAIN_RADIUS = 14;
-export const STATION_RADIUS = 14;
-export const ORIGIN_RADIUS = 15;
-export const SEG_RADIUS = 10;
+const STATION_RADIUS = 14;
+const ORIGIN_RADIUS = 15;
+const SEG_RADIUS = 10;
 
 export function distToSeg(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax,

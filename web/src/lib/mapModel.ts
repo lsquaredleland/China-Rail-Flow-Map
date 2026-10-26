@@ -80,7 +80,7 @@ export function activeTimeline(s: ModelState): DayTimelineVM | undefined {
   return s.cur && s.dir === "out" ? s.cur.timeline : undefined;
 }
 
-export function flowsOf(s: ModelState): FlowVM[] {
+function flowsOf(s: ModelState): FlowVM[] {
   if (!s.cur) return [];
   return s.dir === "out" ? s.cur.flows : s.cur.inFlows;
 }
@@ -91,7 +91,7 @@ export function animStep(tl: DayTimelineVM, animTime: number): number {
 }
 
 /** The isolated train's view-model, if one is isolated and present. */
-export function isolatedTrain(s: ModelState) {
+function isolatedTrain(s: ModelState) {
   if (!s.iso || !s.cur) return null;
   return (s.dir === "out" ? s.cur.deps : s.cur.arrs).find((t) => t.code === s.iso) ?? null;
 }
@@ -329,7 +329,7 @@ export function flowPasses(s: ModelState, caches: ModelCaches): FlowPass[] {
     its position (`end`). Or, for a train without routed sections, its
     dashed-leg chord: whole, or a straight line to the train's position
     (`to`). Empty when nothing is lit yet. */
-export interface IsolatedCorridor {
+interface IsolatedCorridor {
   color: string;
   secs: { s: number; rev: boolean; end?: { lon: number; lat: number } }[];
   chord?: { chord: ChordVM; to?: { lon: number; lat: number } };
@@ -424,7 +424,7 @@ export function infraPasses(s: ModelState, caches: ModelCaches): InfraPass[] {
 
 /** How the dashed chords are drawn and gated. `forPick` is the hover
     variant (also time-gated in a filtered view, where drawing is not). */
-export interface ChordPlan {
+interface ChordPlan {
   alpha: number;
   isolated: boolean;
   gated: boolean;
@@ -605,14 +605,14 @@ const pointsOf = (s: SelInput): CityPointVM[] =>
 
 /* The outbound destination's per-train window (null: no destination, or
    inbound, which has no animation). */
-export function computeDestWindow(s: SelInput): DestWindow | null {
+function computeDestWindow(s: SelInput): DestWindow | null {
   const { cur, panelDest: pd } = s;
   if (!cur || !pd || s.direction !== "out") return null;
   const dest = (cur.dests.find((d) => d.idx === pd.idx) || pd) as DestVM;
   return dest.calls ? destWindow(dest.calls) : null;
 }
 
-export function computeAllowedTrainCodes(s: SelInput): Set<string> | null {
+function computeAllowedTrainCodes(s: SelInput): Set<string> | null {
   const { cur } = s;
   const iso = s.isolatedTrainCode;
   if (iso) {
@@ -648,7 +648,7 @@ export function computeAllowedTrainCodes(s: SelInput): Set<string> | null {
   return allowed;
 }
 
-export function computeCityAllowedArrivalTimes(
+function computeCityAllowedArrivalTimes(
   direction: Direction,
   c: CityPointVM,
   allowedCodes: Set<string>,

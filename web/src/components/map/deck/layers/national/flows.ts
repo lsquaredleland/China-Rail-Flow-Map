@@ -11,7 +11,7 @@ import type { NatView } from "./timeline";
 
 /* ---------- national flows (B, P3.2; A+B, P3.3) ---------- */
 
-export interface NationalFlowsInput {
+interface NationalFlowsInput {
   atlas: DecodedAtlas;
   nf: NationalFlowsPack;
   /** The entry ticks; with `minute` the flows are the trains entered by then (A+B). */
@@ -28,7 +28,7 @@ export interface NationalFlowsInput {
   damped: boolean;
 }
 
-export interface NationalFlows {
+interface NationalFlows {
   layers: Layer[];
   /** Sections drawn (count > 0). */
   sections: number;

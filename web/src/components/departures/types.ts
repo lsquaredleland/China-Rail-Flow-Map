@@ -4,7 +4,7 @@ import type { StationCount } from "../../stationBreakdown";
 import type { EmptyProps } from "./EmptyMessage";
 import type { HistRow, NatRow, NatSortKey } from "../../lib";
 
-export type SortDir = 1 | -1;
+type SortDir = 1 | -1;
 export type SortKey = "dep" | "dur" | "km" | "runs";
 export type CallSortKey = "arr" | "dep" | "dur" | "runs";
 export type ArrSortKey = "dep" | "arr" | "dur" | "km" | "runs";

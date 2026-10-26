@@ -3,7 +3,7 @@
 import type { ScheduleStop } from "../types";
 import { stationName } from "./format";
 
-export interface UnrolledStop extends ScheduleStop {
+interface UnrolledStop extends ScheduleStop {
   unrolledArr: number;
   unrolledDep: number;
 }
@@ -38,7 +38,7 @@ export interface AlignedStop extends ScheduleStop {
   simDepMins: number;
 }
 
-export type TripStatus =
+type TripStatus =
   | { state: "pre"; text: string }
   | { state: "post"; text: string }
   | { state: "stopped"; text: string; stopIdx: number }

@@ -14,11 +14,11 @@ export interface Camera {
   zoom: number;
 }
 
-export function initialDistUnit(): DistUnit {
+function initialDistUnit(): DistUnit {
   return localStore.get("crfa-dist-unit") === "mi" ? "mi" : "km";
 }
 
-export function initialInfra(): boolean {
+function initialInfra(): boolean {
   return localStore.get("crfa-infra") === "1";
 }
 
@@ -65,7 +65,7 @@ export function writeNatFlowsParam(on: boolean): void {
   }
 }
 
-export function initialDark(): boolean {
+function initialDark(): boolean {
   try {
     const params = new URLSearchParams(window.location.search);
     const p = params.get("theme");
@@ -84,7 +84,7 @@ export function initialDark(): boolean {
   );
 }
 
-export function parseInitialCamera(): (Camera & { scale: number }) | null {
+function parseInitialCamera(): (Camera & { scale: number }) | null {
   try {
     const params = new URLSearchParams(window.location.search);
     const lat = parseFloat(params.get("lat") || "");
