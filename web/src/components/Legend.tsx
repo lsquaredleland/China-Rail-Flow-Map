@@ -65,7 +65,7 @@ const BAR_H = 15;
 const TIMESEC_H = 8 + BAR_H + 6; // vertical room the band section takes
 const SAMPLES = [10, 50, 200];
 const NAT_STEPS = [10, 100, 300, 500];
-const NAT_SAMPLES = [100, 500, 2000];
+const NAT_SAMPLES = [10, 100, 1000];
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif';
 
 const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(

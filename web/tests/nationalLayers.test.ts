@@ -1,7 +1,7 @@
 // National-mode deck layers (P2.2): the frame buffers from natPositions, the
 // layer props, and the ?natSynth load. No GPU.
 import { describe, expect, test } from "bun:test";
-import { DATA_FMT, NAT_WIDTH_FACTOR, STATION_R_MAX, STATION_R_MIN, WIDTH_K, classIndex, flowUnits, natCityCounts, natCityR, natPositions, natSelect, natTrainVM, stationR, tooltipHtml } from "../src/lib";
+import { DATA_FMT, NAT_WIDTH_FACTOR, NAT_CITY_R_MIN, WIDTH_K, classIndex, flowUnits, natCityCounts, natCityR, natPositions, natSelect, natTrainVM, stationR, tooltipHtml } from "../src/lib";
 import { nationalFlowsPair } from "./fixture";
 import type { NatFilter } from "../src/lib";
 
@@ -182,17 +182,19 @@ describe("national flow picking and circle size", () => {
     expect(h.id).toBe("nat-seg-highlight");
     expect(h.props.getWidth).toBeCloseTo(Math.max(0.5, flowUnits(n) * WIDTH_K * NAT_WIDTH_FACTOR) + 1.6, 9);
   });
-  test("natCityR: half the origin radius at the reference counts, monotone, bounded", () => {
-    for (const n of [100, 300]) expect(natCityR(n)).toBeCloseTo(stationR(n) / 2, 9);
-    expect(natCityR(0)).toBe(STATION_R_MIN);
+  test("natCityR: ~11 px for the busiest hubs, ~2 px for the smallest, monotone, never above the origin's", () => {
+    expect(natCityR(3000)).toBeGreaterThan(10);
+    expect(natCityR(3000)).toBeLessThan(12);
+    expect(natCityR(2)).toBeLessThanOrEqual(2);
+    expect(natCityR(0)).toBe(NAT_CITY_R_MIN);
+    // well under half the origin radius at the busy end
+    expect(natCityR(2000)).toBeLessThan(stationR(2000) / 2);
     let prev = 0;
     for (let n = 0; n <= 20000; n += 25) {
       const r = natCityR(n);
       expect(r).toBeGreaterThanOrEqual(prev);
-      expect(r).toBeLessThanOrEqual(STATION_R_MAX);
+      expect(r).toBeLessThanOrEqual(stationR(n));
       prev = r;
     }
-    // the top end is compressed: 2000 trains draw smaller than half the origin's 2000
-    expect(natCityR(2000)).toBeLessThan(stationR(2000) / 2);
   });
 });

@@ -169,15 +169,13 @@ export function stationR(trains: number): number {
   );
 }
 
-/** National city circles (departures + arrivals per day): half the origin
-    dots' radius up to NAT_CITY_KNEE trains, then the count's square root
-    grows at half speed so the busiest hubs do not swamp the map. Never below
-    the smallest origin dot, never above the largest. */
-export const NAT_CITY_KNEE = 300;
-const SQRT_CITY_KNEE = Math.sqrt(NAT_CITY_KNEE);
+/** National city circles (departures + arrivals per day), at the national
+    fit: radius = 1.2 + 0.59 n^0.35, a strong compression so the ~3000-train
+    hubs draw about 11 px and the smallest cities about 2 px, leaving the
+    network readable. Floored at NAT_CITY_R_MIN. */
+export const NAT_CITY_R_MIN = 1.5;
 export function natCityR(n: number): number {
-  const u = n <= NAT_CITY_KNEE ? Math.sqrt(n) : SQRT_CITY_KNEE + 0.5 * (Math.sqrt(n) - SQRT_CITY_KNEE);
-  return Math.max(STATION_R_MIN, Math.min(STATION_R_MAX, 0.5 * (1.3 + u * 0.55)));
+  return Math.max(NAT_CITY_R_MIN, 1.2 + 0.59 * Math.pow(Math.max(0, n), 0.35));
 }
 
 /** Zoom growth of a dot with base radius r at zoom progress t in [0, 1]:
