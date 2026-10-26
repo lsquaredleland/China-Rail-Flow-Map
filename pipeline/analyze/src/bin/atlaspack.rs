@@ -129,6 +129,12 @@
 //! `trains` = distinct trains on at least one section. It carries the same
 //! `fmt` as the shared file because its indices are only valid against that
 //! file's section numbering. The counting rule is atlas's (`flows.rs`).
+//! Optional `cities` (per-city national counts): `{idx, dep, arr,
+//! dep_by_class, arr_by_class}`, parallel over the cities with a departure
+//! or arrival (`idx` = shared `city_table` index, ascending). `dep` = distinct
+//! trains that stop at the city and run on, `arr` = distinct trains that
+//! stop there after their first stop: exactly an origin's `outbound` /
+//! `inbound`. The 8 class rows sum to `dep` / `arr`.
 //!
 //! National trains (`atlas-v2-national-trains.json`, P2.2 data source for
 //! the national animation A): `{fmt, n_sec, n_thr, paths, stop_pos, chords,
@@ -765,7 +771,12 @@ fn pack_national(nat: &Value, perm: &[usize]) -> Value {
             "national section {s}: classes sum to {sum}, total {t}"
         );
     }
-    json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class })
+    let mut out = json!({ "fmt": FMT, "trains": get(nat, "trains"), "total": total, "by_class": by_class });
+    // per-city counts are indexed by city_table, which packing leaves alone
+    if let Some(c) = nat.get("cities").filter(|c| !get(c, "idx").is_null() && !arr(get(c, "idx")).is_empty()) {
+        out["cities"] = c.clone();
+    }
+    out
 }
 
 /// The national trains in the shared file's section order (see the

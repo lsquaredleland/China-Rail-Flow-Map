@@ -977,13 +977,9 @@ fn main() {
         for (ti, t) in trains.iter().enumerate() {
             let names = &train_names[ti];
             let cities = &train_cities[ti];
-            let cd_idx = match cities.iter().position(|c| c == home_city) {
-                Some(i) => i,
-                None => continue,
-            };
-            if cd_idx + 1 >= cities.len() {
+            let Some(cd_idx) = flows::departs_from(cities, home_city) else {
                 continue;
-            }
+            };
             outbound += 1;
             let is_fast = ["G", "D", "C", "S"].contains(&t.train_class.as_str());
             let final_city = cities.last().unwrap().clone();
@@ -1201,9 +1197,8 @@ fn main() {
         for (ti, t) in trains.iter().enumerate() {
             let names = &train_names[ti];
             let cities = &train_cities[ti];
-            let cd_in = match (1..cities.len()).find(|&j| &cities[j] == home_city) {
-                Some(j) => j,
-                None => continue,
+            let Some(cd_in) = flows::arrives_at(cities, home_city) else {
+                continue;
             };
             let is_fast = ["G", "D", "C", "S"].contains(&t.train_class.as_str());
             // prefix track distances from stop 0: cumulative km + bad-leg count
@@ -2530,6 +2525,59 @@ fn main() {
             ),
         );
     }
+    // ---- per-city national counts (dep/arr), the origins' counting rules ----
+    // Interned after every other city so existing city_table indices keep
+    // their values; a city with no coordinates is not drawable and left out.
+    let mut national = national;
+    let counts = flows::city_counts(
+        trains
+            .iter()
+            .zip(train_cities.iter())
+            .map(|(t, c)| (class_idx(&t.train_class), c.as_slice())),
+    );
+    let mut rows: Vec<(i64, [u32; 8], [u32; 8])> = Vec::new();
+    let mut no_pt = 0usize;
+    for (zh, (d, a)) in counts.iter() {
+        if !city_pt.contains_key(zh) {
+            no_pt += 1;
+            continue;
+        }
+        let i = intern_city(&mut city_table, &mut city_idx, zh, city_en, &city_pt);
+        rows.push((i, *d, *a));
+    }
+    rows.sort_by_key(|r| r.0);
+    let nc = &mut national.cities;
+    nc.dep_by_class = vec![Vec::new(); 8];
+    nc.arr_by_class = vec![Vec::new(); 8];
+    for (i, d, a) in rows {
+        nc.idx.push(i);
+        nc.dep.push(d.iter().sum());
+        nc.arr.push(a.iter().sum());
+        for c in 0..8 {
+            nc.dep_by_class[c].push(d[c]);
+            nc.arr_by_class[c].push(a[c]);
+        }
+    }
+    // parity: every origin's outbound/inbound is its city's dep/arr
+    for o in origins.iter() {
+        let k = city_idx
+            .get(&o.zh)
+            .and_then(|i| nc.idx.binary_search(i).ok())
+            .unwrap_or_else(|| panic!("origin {} has no national city row", o.zh));
+        assert_eq!(
+            (nc.dep[k] as u64, nc.arr[k] as u64),
+            (o.outbound, o.inbound),
+            "national city counts differ from origin {}",
+            o.zh
+        );
+    }
+    println!(
+        "national cities: {} with trains ({} without coordinates left out); {} origins agree with their dep/arr",
+        nc.idx.len(),
+        no_pt,
+        origins.len()
+    );
+    stats.insert("city_table".into(), city_table.len() as i64);
     let out = AtlasOut {
         build: provenance::build_block(&inp),
         about,
