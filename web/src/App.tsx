@@ -164,6 +164,14 @@ export default function App() {
     if (direction === "in" && !national) setIsolatedTrainCode(null);
   }, [direction, national, setIsolatedTrainCode]);
 
+  // A new origin starts clean: the selected / isolated train and the selected
+  // destination belonged to the previous one (filters reset in selectOrigin).
+  useEffect(() => {
+    setSelectedTrainCode(null);
+    setIsolatedTrainCode(null);
+    setPanelCity(null);
+  }, [originIdx, setSelectedTrainCode, setIsolatedTrainCode, setPanelCity]);
+
   // National mode closes the city panel; its trains file loads only when the
   // animation is turned on (never in the origin view).
   useEffect(() => {
