@@ -70,18 +70,27 @@ export interface Disc {
   col: RGBA;
 }
 
-export interface TrainBuffers {
+/** What the dot layers read: shared by the origin view's `TrainBuffers` and the
+    national frame, so the two marks are built by one function. */
+export interface DotBuffers {
   /** Dot count; the typed arrays are longer (pooled). */
   count: number;
   pos: Float32Array;
+  /** Byte stride of `pos` when the dots are interleaved with other fields (national: 24); default packed xy. */
+  posStride?: number;
   line: Uint8Array;
-  fill: Uint8Array;
+  /** Per-dot fill; absent = opaque white. */
+  fill?: Uint8Array;
   /** Tail count and endpoints (source = pos − heading·len/scale). */
   tailCount: number;
   tailSrc: Float32Array;
   tailTgt: Float32Array;
   tailCol: Uint8Array;
   dwell: Disc[];
+}
+
+export interface TrainBuffers extends DotBuffers {
+  fill: Uint8Array;
   rings: Disc[];
 }
 
@@ -180,14 +189,36 @@ export interface TrainLayerInput {
   animTime: number;
 }
 
-export function trainLayers(inp: TrainLayerInput): Layer[] {
-  const iso = !!inp.isolatedCode;
-  const b = buildTrainBuffers(inp.trains, inp.scale, inp.isolatedCode, inp.selectedCode, inp.hoveredCode);
-  const common = { radiusUnits: "pixels", lineWidthUnits: "pixels", stroked: true, filled: false } as const;
-  const trig = inp.animTime + "|" + inp.scale;
+/** An unfilled ring layer, one disc per ring. `trigger` is the update-trigger of the per-frame accessors. */
+export function ringLayer(id: string, discs: Disc[], trigger: string | number): Layer {
+  return new ScatterplotLayer<Disc>({
+    id,
+    data: discs,
+    getPosition: (d) => d.pos,
+    getRadius: (d) => d.r,
+    getLineWidth: (d) => d.w,
+    getLineColor: (d) => d.col,
+    radiusUnits: "pixels",
+    lineWidthUnits: "pixels",
+    stroked: true,
+    filled: false,
+    pickable: false,
+    updateTriggers: { getPosition: trigger, getRadius: trigger, getLineColor: trigger },
+  });
+}
+
+/** Tails under dots under dwell rings, ids `${prefix}tails | trains | dwell`. `isolated` widens the
+    tails; `bigDot` (default `isolated`) also enlarges the dot. The origin view's dots are never
+    pickable; the national ones are while the clock is paused. */
+export function dotLayers(
+  prefix: "" | "nat-",
+  b: DotBuffers,
+  o: { pickable: boolean; isolated: boolean; bigDot?: boolean; trigger: string | number },
+): Layer[] {
+  const big = o.bigDot ?? o.isolated;
   return [
     new TailLayer({
-      id: "tails",
+      id: prefix + "tails",
       data: {
         length: b.tailCount,
         attributes: {
@@ -197,49 +228,35 @@ export function trainLayers(inp: TrainLayerInput): Layer[] {
         },
       },
       widthUnits: "pixels",
-      getWidth: iso ? 3.5 : 2.5,
+      getWidth: o.isolated ? 3.5 : 2.5,
       pickable: false,
     }),
     new ScatterplotLayer({
-      id: "trains",
+      id: prefix + "trains",
       data: {
         length: b.count,
         attributes: {
-          getPosition: { value: b.pos, size: 2 },
+          getPosition: b.posStride ? { value: b.pos, size: 2, stride: b.posStride, offset: 0 } : { value: b.pos, size: 2 },
           getLineColor: { value: b.line, size: 4 },
-          getFillColor: { value: b.fill, size: 4 },
+          ...(b.fill ? { getFillColor: { value: b.fill, size: 4 } } : {}),
         },
       },
       radiusUnits: "pixels",
       lineWidthUnits: "pixels",
       stroked: true,
       filled: true,
-      getRadius: iso ? 4.15 : 3,
-      getLineWidth: iso ? 2.7 : 2,
-      pickable: false,
+      getRadius: big ? 4.15 : 3,
+      getLineWidth: big ? 2.7 : 2,
+      ...(b.fill ? {} : { getFillColor: [255, 255, 255, 255] as RGBA }),
+      pickable: o.pickable,
       parameters: { depthCompare: "always" },
     }),
-    new ScatterplotLayer<Disc>({
-      ...common,
-      id: "dwell",
-      data: b.dwell,
-      getPosition: (d) => d.pos,
-      getRadius: (d) => d.r,
-      getLineWidth: (d) => d.w,
-      getLineColor: (d) => d.col,
-      pickable: false,
-      updateTriggers: { getPosition: trig, getRadius: trig, getLineColor: trig },
-    }),
-    new ScatterplotLayer<Disc>({
-      ...common,
-      id: "trainring",
-      data: b.rings,
-      getPosition: (d) => d.pos,
-      getRadius: (d) => d.r,
-      getLineWidth: (d) => d.w,
-      getLineColor: (d) => d.col,
-      pickable: false,
-      updateTriggers: { getPosition: trig, getRadius: trig, getLineColor: trig },
-    }),
+    ringLayer(prefix + "dwell", b.dwell, o.trigger),
   ];
+}
+
+export function trainLayers(inp: TrainLayerInput): Layer[] {
+  const b = buildTrainBuffers(inp.trains, inp.scale, inp.isolatedCode, inp.selectedCode, inp.hoveredCode);
+  const trig = inp.animTime + "|" + inp.scale;
+  return [...dotLayers("", b, { pickable: false, isolated: !!inp.isolatedCode, trigger: trig }), ringLayer("trainring", b.rings, trig)];
 }

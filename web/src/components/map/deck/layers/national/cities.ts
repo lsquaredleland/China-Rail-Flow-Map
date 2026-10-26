@@ -3,9 +3,9 @@
    layers. Memo keys: see ./index.ts. */
 import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
-import type { CityPointVM, DecodedAtlas, NationalFlowsPack, NationalIndexPack } from "../../../../../types";
+import type { DecodedAtlas, NationalFlowsPack, NationalIndexPack } from "../../../../../types";
 import { natCityEvents, natCityEventsAt, natCityR, natCityTier, palette, rgba, stationZoomK } from "../../../../../lib";
-import type { NatCityEvents } from "../../../../../lib";
+import type { LabelPoint, NatCityEvents } from "../../../../../lib";
 import { rippleRing } from "../stations";
 import type { Ripple } from "../stations";
 import type { NatView } from "./timeline";
@@ -114,8 +114,8 @@ export const LABEL_TRAINS_PER_UNIT = 10;
 
 /** The drawn cities as label candidates, busiest first (same tiering as the
     circles, so only visible cities are named). Memoised per circle set. */
-const labelMemo = new WeakMap<NationalCityDots, CityPointVM[]>();
-export function nationalLabelPoints(atlas: DecodedAtlas | null | undefined, d: NationalCityDots): CityPointVM[] {
+const labelMemo = new WeakMap<NationalCityDots, LabelPoint[]>();
+export function nationalLabelPoints(atlas: DecodedAtlas | null | undefined, d: NationalCityDots): LabelPoint[] {
   let pts = labelMemo.get(d);
   if (!pts && atlas) {
     pts = d.idx.map((idx, i) => {
@@ -126,13 +126,6 @@ export function nationalLabelPoints(atlas: DecodedAtlas | null | undefined, d: N
         en: c.en,
         pt: c.pt,
         trains: Math.round((d.dep[i] + d.arr[i]) / LABEL_TRAINS_PER_UNIT),
-        fast: 0,
-        endpoint: 0,
-        fastest: 0,
-        median: 0,
-        crow: 0,
-        rail: -1,
-        nn: 0,
       };
     });
     labelMemo.set(d, pts);

@@ -54,8 +54,14 @@ export interface LabelOptions {
 /** `measure(text, fs, weight)` is the rendered text width in px. */
 export type Measure = (text: string, fs: number, weight: string) => number;
 
+/** What the layout reads of a city. Origin views pass whole `CityPointVM`s; the national view
+    has no termini, so `endpoint` / `nn` are absent there (read as 0). */
+export type LabelPoint = Pick<CityPointVM, "idx" | "zh" | "en" | "pt" | "trains"> & Partial<Pick<CityPointVM, "endpoint" | "nn">>;
+
+const endpointOf = (c: LabelPoint) => c.endpoint ?? 0;
+
 export function placeLabels(
-  points: CityPointVM[],
+  points: LabelPoint[],
   view: { scale: number; tx: number; ty: number },
   W: number,
   H: number,
@@ -158,9 +164,9 @@ export function placeLabels(
   // ending at the city outbound, starting there inbound.
   const all = points;
   const ratio = view.scale / fitScale;
-  const cands: CityPointVM[] = [];
+  const cands: LabelPoint[] = [];
   let j: number;
-  let c: CityPointVM;
+  let c: LabelPoint;
   if (ratio < 2) {
     for (j = 0; j < all.length && cands.length < 22; j++)
       cands.push(all[j]);
@@ -171,18 +177,18 @@ export function placeLabels(
     // candidates that were only ever going to collide near the origin.
     for (j = 0; j < all.length; j++) {
       c = all[j];
-      if (c.endpoint >= 5 && cands.indexOf(c) === -1) cands.push(c);
+      if (endpointOf(c) >= 5 && cands.indexOf(c) === -1) cands.push(c);
     }
   } else if (ratio < 5) {
     for (j = 0; j < all.length; j++) {
       c = all[j];
-      if (c.trains >= 15 || (c.endpoint >= 1 && c.trains >= 6))
+      if (c.trains >= 15 || (endpointOf(c) >= 1 && c.trains >= 6))
         cands.push(c);
     }
   } else if (ratio < 14) {
     for (j = 0; j < all.length; j++) {
       c = all[j];
-      if (c.trains >= 5 || (c.endpoint >= 1 && c.trains >= 3))
+      if (c.trains >= 5 || (endpointOf(c) >= 1 && c.trains >= 3))
         cands.push(c);
     }
   } else {
@@ -191,20 +197,20 @@ export function placeLabels(
   // Within a size tier, termini go first, and the most squeezed
   // terminus of the tier goes before its neighbours (Hong Kong's dot
   // sits ~5 px from Shenzhen's at national scale).
-  function tier(c2: CityPointVM) {
+  function tier(c2: LabelPoint) {
     return c2.trains >= 50 ? 0 : c2.trains >= 20 ? 1 : 2;
   }
   cands.sort((a, b) => {
     const ta = tier(a),
       tb = tier(b);
     if (ta !== tb) return ta - tb;
-    const ea = a.endpoint >= 1 ? 0 : 1,
-      eb = b.endpoint >= 1 ? 0 : 1;
+    const ea = endpointOf(a) >= 1 ? 0 : 1,
+      eb = endpointOf(b) >= 1 ? 0 : 1;
     if (ea !== eb) return ea - eb;
-    if (ea === 0 && a.nn !== b.nn) return a.nn - b.nn;
+    if (ea === 0 && (a.nn ?? 0) !== (b.nn ?? 0)) return (a.nn ?? 0) - (b.nn ?? 0);
     return b.trains - a.trains;
   });
-  const unplacedTermini: CityPointVM[] = [];
+  const unplacedTermini: LabelPoint[] = [];
   for (let k = 0; k < cands.length; k++) {
     const t = cands[k];
     let ok: boolean;
@@ -215,7 +221,7 @@ export function placeLabels(
     else if (t.trains >= 5)
       ok = place(t, { fs: 11, weight: "600", pad: 2, off: off(t, 2) });
     else ok = place(t, { fs: 11, weight: "", pad: 2, off: off(t, 2) });
-    if (!ok && t.endpoint >= 1) unplacedTermini.push(t);
+    if (!ok && endpointOf(t) >= 1) unplacedTermini.push(t);
   }
   // Candidates that lost every spot at full size and end routes get
   // two last tries a touch smaller, the second stepped ~30 px out

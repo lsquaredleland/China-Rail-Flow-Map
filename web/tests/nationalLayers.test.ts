@@ -26,16 +26,16 @@ describe("national layers", () => {
     const f = nationalFrame(tl, atlas, 1095, 100);
     const ref = new Float32Array(maxDots(tl) * 6);
     expect(f.count).toBe(natPositions(tl, atlas, 1095, ref));
-    expect(f.buf.length).toBeGreaterThanOrEqual(f.count * 6);
+    expect(f.pos.length).toBeGreaterThanOrEqual(f.count * 6);
     let dwell = 0, moving = 0;
     for (let i = 0; i < f.count; i++) {
-      const flags = f.buf[i * 6 + 5];
+      const flags = f.pos[i * 6 + 5];
       const g = glowOf(["G", "K", ""][flags & 15]);
       expect([...f.line.subarray(i * 4, i * 4 + 4)]).toEqual([g[0], g[1], g[2], 255]);
       if (flags & 16) dwell++;
-      else if (Math.round(12 * f.buf[i * 6 + 4]) > 0) moving++;
+      else if (Math.round(12 * f.pos[i * 6 + 4]) > 0) moving++;
     }
-    expect(f.dwellCount).toBe(dwell);
+    expect(f.dwell.length).toBe(dwell);
     expect(f.tailCount).toBe(moving);
     expect(dwell).toBeGreaterThan(0);
     expect(moving).toBeGreaterThan(0);
@@ -49,7 +49,7 @@ describe("national layers", () => {
     const [tails, dots, rings] = nationalLayers(f, false);
     expect([tails.id, dots.id, rings.id]).toEqual(["nat-tails", "nat-trains", "nat-dwell"]);
     const pos = (dots.props.data as { attributes: { getPosition: { stride: number; value: Float32Array } } }).attributes.getPosition;
-    expect([pos.stride, pos.value]).toEqual([24, f.buf]);
+    expect([pos.stride, pos.value]).toEqual([24, f.pos]);
     expect(dots.props.pickable).toBe(false);
     expect(nationalLayers(f, true)[1].props.pickable).toBe(true);
     expect(tails.props.pickable).toBe(false);
@@ -85,12 +85,12 @@ describe("national layers", () => {
       const k = Math.ceil((tl.start[q] - 1095) / 1440);
       let first = i;
       while (first > 0 && f.qOf[first - 1] === q) first--;
-      const vm = natTrainVM(tl, atlas.data, data.schedules, q, 1095 + 1440 * (k + i - first), f.buf[i * 6], f.buf[i * 6 + 1], f.buf[i * 6 + 2], f.buf[i * 6 + 3]);
+      const vm = natTrainVM(tl, atlas.data, data.schedules, q, 1095 + 1440 * (k + i - first), f.pos[i * 6], f.pos[i * 6 + 1], f.pos[i * 6 + 2], f.pos[i * 6 + 3]);
       expect(vm.code).toBe(atlas.data.train_table[tl.tIdx[q]].code);
       expect(vm.progressPct).toBeGreaterThanOrEqual(0);
       expect(vm.progressPct).toBeLessThanOrEqual(100);
       expect(vm.fromStation).not.toBe("");
-      expect(!!vm.isDwelling).toBe((f.buf[i * 6 + 5] & 16) !== 0);
+      expect(!!vm.isDwelling).toBe((f.pos[i * 6 + 5] & 16) !== 0);
       expect(tooltipHtml({ kind: "train", train: vm }, { data: atlas.data, cur: null as never, direction: "out", distUnit: "km", panelDest: null, dark: false, ferry: false })).toContain(vm.code);
     }
   });
