@@ -40,11 +40,6 @@ export function cardBand(mins: number, dark: boolean): string {
   return rampColor(mins, { ...pal, ramp: lift });
 }
 
-/** "重庆北 Chongqing North": Chinese name then English, once if identical. */
-export function cardStName(zh: string, en?: string): string {
-  return en && en !== zh ? `${zh} ${en}` : zh;
-}
-
 export function CityCard({
   en,
   zh,

@@ -2,7 +2,7 @@
 // train card with its honest states.
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CityCard, TrainCard, cardStName } from "../src/components/MapCards";
+import { CityCard, TrainCard } from "../src/components/MapCards";
 
 const noop = () => {};
 
@@ -53,9 +53,5 @@ describe("TrainCard", () => {
     expect(card("not-departed", "departs 07:30")).toContain("Not yet departed");
     expect(card("arrived", "上海")).toContain("Arrived");
     expect(card("arrived")).not.toContain("En route");
-  });
-  test("station names dedupe identical zh/en", () => {
-    expect(cardStName("重庆北", "Chongqing North")).toBe("重庆北 Chongqing North");
-    expect(cardStName("北京", "北京")).toBe("北京");
   });
 });
