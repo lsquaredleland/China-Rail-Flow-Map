@@ -11,6 +11,7 @@ export interface NationalModeInput {
   isTimelineCollapsed: boolean;
   nationalFlowsFailed: boolean;
   nationalTrainsFailed: boolean;
+  nationalIndexFailed: boolean;
   ensureNationalTrains: () => void;
   ensureNationalFlows: () => void;
   ensureNationalEntries: () => void;
@@ -81,7 +82,15 @@ export function useNationalMode(i: NationalModeInput) {
       ? "The national flow data could not be loaded."
       : i.nationalTrainsFailed && natTrainsOn
         ? "The national train data could not be loaded."
-        : null;
+        : i.nationalIndexFailed
+          ? "The national index could not be loaded."
+          : null;
 
-  return { natFlowsOn, toggleNatFlows, natLayersDrawn, natCity, setNatCity, natCityRow, nationalTrainT, natLoadError };
+  const retryNatLoad = () => {
+    if (i.nationalIndexFailed) i.ensureNationalIndex();
+    else if (i.nationalFlowsFailed && natFlowsOn) i.ensureNationalFlows();
+    else if (i.nationalTrainsFailed && natTrainsOn) i.ensureNationalTrains();
+  };
+
+  return { natFlowsOn, toggleNatFlows, natLayersDrawn, natCity, setNatCity, natCityRow, nationalTrainT, natLoadError, retryNatLoad };
 }

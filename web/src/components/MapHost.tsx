@@ -276,7 +276,7 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
     updateScaleBar(M);
   }, [M, props.distUnit]);
 
-  const { cur, loadError, inLoading, children } = props;
+  const { cur, loadError, onRetry, inLoading, children } = props;
 
   return (
     <div id="mapwrap" ref={wrapRef}>
@@ -291,11 +291,35 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
         onPointerLeave={() => onPointerLeave(M)}
       />
       {(!cur || inLoading || loadError || reloading || deckState !== "ready") && (
-        <div id="loading" className={cur ? "is-passive" : undefined}>
+        <div id="loading" className={cur && !onRetry ? "is-passive" : undefined}>
           {reloading
             ? RELOAD_NOTICE
             : loadError
-            ? "The timetable data could not be loaded (" + loadError + ")."
+            ? (
+                <span>
+                  {loadError.startsWith("The national")
+                    ? loadError
+                    : "The timetable data could not be loaded (" + loadError + ")."}
+                  {onRetry && (
+                    <button
+                      type="button"
+                      onClick={onRetry}
+                      className="mc-btn"
+                      style={{
+                        marginLeft: 8,
+                        padding: "2px 8px",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        borderRadius: "4px",
+                        display: "inline-block",
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      Retry
+                    </button>
+                  )}
+                </span>
+              )
             : deckState === "nowebgl"
             ? "This map needs WebGL2, which is not available in this browser. The tables and panels still work."
             : deckState === "error"

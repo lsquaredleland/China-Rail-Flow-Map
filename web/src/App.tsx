@@ -144,21 +144,31 @@ export default function App() {
 
   const { isTimelineCollapsed, expandTimeline, collapseTimeline, playFrom } =
     useAnimationClock(mapRef, direction, national);
-  const { natFlowsOn, toggleNatFlows, natLayersDrawn, natCity, setNatCity, natCityRow, nationalTrainT, natLoadError } =
-    useNationalMode({
-      national,
-      atlas,
-      selectedTrainCode,
-      isolatedTrainCode,
-      isTimelineCollapsed,
-      nationalFlowsFailed,
-      nationalTrainsFailed,
-      ensureNationalTrains,
-      ensureNationalFlows,
-      ensureNationalEntries,
-      ensureNationalIndex,
-      ensureSchedules,
-    });
+  const {
+    natFlowsOn,
+    toggleNatFlows,
+    natLayersDrawn,
+    natCity,
+    setNatCity,
+    natCityRow,
+    nationalTrainT,
+    natLoadError,
+    retryNatLoad,
+  } = useNationalMode({
+    national,
+    atlas,
+    selectedTrainCode,
+    isolatedTrainCode,
+    isTimelineCollapsed,
+    nationalFlowsFailed,
+    nationalTrainsFailed,
+    nationalIndexFailed,
+    ensureNationalTrains,
+    ensureNationalFlows,
+    ensureNationalEntries,
+    ensureNationalIndex,
+    ensureSchedules,
+  });
   // The national city card: the same panel as the origin view's, with its own rows.
   const natPoint = natCity && natCityRow ? { idx: natCity.idx, zh: natCityRow.zh, en: natCityRow.en, trains: 0 } : null;
   const natRows: [string, string][] | undefined = natCity
@@ -352,6 +362,7 @@ export default function App() {
           distUnit={distUnit}
           panelDest={panelCity}
           loadError={loadError ?? natLoadError}
+          onRetry={loadError ? undefined : retryNatLoad}
           inLoading={direction === "in" && inMapLoading && !national}
           national={national}
           nationalTrains={nationalTrains}

@@ -225,6 +225,7 @@ export function useAtlasData({
       }
       if (flights.nationalFlows) return;
       flights.nationalFlows = true;
+      setNationalFlowsFailed(false);
       fetchData<NationalFlowsPack>(NATIONAL_FLOWS_URL)
         .then((d) => {
           requireFmt(d.fmt, NATIONAL_FLOWS_URL);
@@ -261,6 +262,7 @@ export function useAtlasData({
       }
       if (flights.nationalIndex) return;
       flights.nationalIndex = true;
+      setNationalIndexFailed(false);
       fetchData<NationalIndexPack>(NATIONAL_INDEX_URL)
         .then((d) => {
           nationalIndexRef.current = d;
