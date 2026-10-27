@@ -2,7 +2,7 @@
 
 An interactive, Minard-style animated flow map of trains departing and arriving across China's 102 busiest rail hubs — **11,248 scheduled passenger services** (running 23 Oct – 6 Nov 2026) over more than **50,000 km** of high-speed rail and even more conventional track, drawn with deck.gl (WebGL2); no map tile libraries and no API keys.
 
-**Live Demo:** [china-rail-flow-map-web.vercel.app](https://china-rail-flow-map-web.vercel.app/)
+**Live Demo:** [minard.lsquared.cc](https://minard.lsquared.cc/)
 
 ---
 
