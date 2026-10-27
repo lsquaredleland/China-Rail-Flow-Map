@@ -13,9 +13,9 @@
   },
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/(.*)",
       "has": [{ "type": "host", "value": "china-rail-flow-map-web.vercel.app" }],
-      "destination": "https://minard.lsquared.cc/:path*",
+      "destination": "https://minard.lsquared.cc/$1",
       "permanent": true
     }
   ],
