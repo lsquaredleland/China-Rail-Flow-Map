@@ -6,7 +6,7 @@ the schedule's running times. The recipe command and its inputs are in
 `docs/PIPELINE.md` §3 step 5.
 
 ```
-corridor-router --data ../data --files ../staging/inputs/output \
+corridor-router --data ../data --files <timetable dir> \
     --out <dir> --station-fixes ../data/station_fixes.json \
     [--osm <extract.osm>] [--config <router.toml>] [--threads <n>] \
     [--pair "A,B"] [--limit <n pairs>]
@@ -38,31 +38,6 @@ library (`src/lib.rs`), which `src/bin/cordcheck.rs` uses too.
 | | `canon.rs` | Canonical double-track-merged geometry (`best_for_canon` by `[canon] mode`, `redraw`, `canonical`) |
 | | `validate.rs` | The hidden-stop self-check |
 | **Outputs** | `output.rs` | Writers for `leg_routes.jsonl`, `leg_paths.json`, `pair_paths_canonical.json`, `candidates.json`, `bridges.json`, `validation_wrong_switches.jsonl`, `summary.json` |
-
-Where the code was before this split:
-
-- `main.rs`:
-  - `gen_candidates` moved to `candidates.rs`.
-  - `min_gap_bridge` and `pick_bridge` moved to `bridge.rs`.
-  - `redraw`, `edge_usage` and the `best_for_canon` canonical-geometry
-    selection moved to `canon.rs`.
-  - `osm_segments`, `r1` and the write blocks moved to `output.rs`.
-  - `service_counts` and `stop_point` moved to `evidence.rs` and
-    `Stations::stop_point`.
-  - `validate` moved to `validate.rs`.
-  - `pick_points` moved to `stations.rs`.
-  - The legs and pairs blocks moved to `legs.rs`.
-  - The calibration, bridging and inference blocks moved to `infer.rs`.
-  - The decision block moved to `decide.rs`.
-  - The constants moved to `config.rs`.
-- `inputs.rs` became `china.rs` (file formats), `schedule.rs`
-  (`travel_time`, `dwell`, `parse_hhmm`), `stations.rs` (`clean`, now
-  `normalize_name`) and `baseline.rs` (`PairRec`, `BasePaths`).
-- `model.rs`:
-  - The class table moved to `classes.rs` and is re-exported from `model`.
-  - `Params` and `params()` became `config::ModelConfig` and
-    `DecideConfig`. `model::params()` now returns the model section of the
-    installed config.
 
 ## Configuration
 
@@ -265,5 +240,5 @@ The parts:
 
 Every refactor must leave the outputs unchanged. Run the recipe command
 twice: once as is, and once with `--threads 1`. In both runs every file
-except `summary.json` must be `cmp`-identical to
-`staging/inputs/data/derived/corridor-v3-o17/`.
+except `summary.json` must be `cmp`-identical to a reference run made
+before the change.

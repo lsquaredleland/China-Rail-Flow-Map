@@ -1,15 +1,40 @@
 # Review: China Rail Flow Map — `main` @ `f199472` (Fable, 2026-10-24)
 
-> **Historical record (moved here 2026-10-26 by the pre-main audit, `docs/AUDIT_PRE_MAIN.md`).**
+> **Historical record (moved here 2026-10-26 by the pre-main audit, `docs/history/AUDIT_PRE_MAIN.md`).**
 > Written against the Canvas client before the deck.gl migration. Of its top recommendations:
-> #1 router determinism (O17) and #3 atlas determinism (O18) are done (`optimization-progress.md`);
+> #1 router determinism (O17) and #3 atlas determinism (O18) are done (`optimization-progress.md`, now in this folder);
 > #4 the deploy cache contract is fixed (content-hashed packs, `Content-Encoding: br`, `web/bundle.mjs`);
 > #5 the atlas/audit duplication is gone (shared `analyze/src/*.rs` modules with tests; the two
 > binaries now share 262 identical lines and only `main` by name); the client has 266 `bun test`s
 > and a CI smoke job. #2 (canonical geometry) became the `[canon] mode = "hybrid"` rule (PR #23).
 > File:line references below are to `f199472` and no longer match the tree.
 
-Scope: read-only review of `/Users/leland/Downloads/china-rail-animation` (pipeline + web), with one glance at the `feat/o1-throat-stubs` worktree. Claims are tied to `file:line` on this commit. Two small read-only scripts were run against the shipped `candidates.json` from the handoff (`china-rail-handoff-v3/data/derived/corridor-v3/`); no rebuilds, no 12306 queries. Anything I could not verify from code or on-disk artifacts is marked **(uncertain)**.
+## Status of the findings (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped
+
+| Finding | Status | How |
+|---|---|---|
+| R1 canonical geometry ≠ production | ✅ | `[canon] mode = "hybrid"` (PR #23) |
+| R2 router non-determinism | ✅ | O17 (PR #15) |
+| R3 atlas section non-determinism | ✅ | O18 (PR #13) |
+| R4 class breakdown from the first edge | ✅ | junction rule in `chains.rs`; `audit` checks classes sum to the total |
+| R5 deploy cache contract | ✅ | content-hashed packs (`web/bundle.mjs`) |
+| R6 repo cannot rebuild from a clone | ◐ | `.gitignore` lists subdirs; the OSM extract and `data/raw/` timetables are still not in git |
+| R7 live recipe depends on a splice | ✅ | splice retired with O17 |
+| R8 duplicated atlas/audit code, no tests | ✅ | shared `analyze/src` modules with tests |
+| R9 three OSM parsers | ◐ | one module (`analyze/src/osm.rs`) plus the router's; the node byte scan stays for speed |
+| R10 marginal argmax, not MAP path | ❌ | (recommendation 13, Viterbi) |
+| R11 hard thresholds, no margin column | ❌ | |
+| R12 `audit_pack` reads only `.json` | ✅ | reads `.json.br` (CI `pack-audit`) |
+| R13 linear `nearest_station` scan | ❌ | not revisited |
+| R14 `as any`, unguarded `localStorage` | ✅ | 0 `as any`; `web/src/storage.ts` never throws |
+| R15 per-frame allocations (Canvas) | — | superseded: the Canvas renderer was replaced by deck.gl |
+| R16 contradictory recipe in `PIPELINE.md` | ✅ | one recipe (§3 step 5) |
+| R17 bundle inlined into `index.html` | — | kept by design; deck.gl is a separate lazy chunk |
+| Recs 14–15 topology-cut sections, station identity by OSM id | ❌ | |
+
+Scope: read-only review of `china-rail-animation` (the pre-migration working copy) (pipeline + web), with one glance at the `feat/o1-throat-stubs` worktree. Claims are tied to `file:line` on this commit. Two small read-only scripts were run against the shipped `candidates.json` from the handoff (`china-rail-handoff-v3/data/derived/corridor-v3/`); no rebuilds, no 12306 queries. Anything I could not verify from code or on-disk artifacts is marked **(uncertain)**.
 
 ---
 
@@ -55,7 +80,7 @@ Severity: **H** = wrong output or data loss risk; **M** = fragility that will bi
 | R3 | **M** | **Atlas section non-determinism (O18), root cause.** Chains are seeded by iterating `edge_sig` (a `HashMap`), so section *order* and *direction* (which end is `chain[0]`) change per run; signature ids come from iterating `edge_counts`. The chain *set* is deterministic except on same-signature cycles (break point depends on seed). fmt 5 renumbering (`atlaspack.rs:481-515`) fixes order but not polyline direction / sign bits or the trailing "unseen" sections (`:509`). | `atlas.rs:2615-2628`, `:2638-2684`, in-direction `:2826-2832` |
 | R4 | **M** | **Per-section class breakdown is read from the first edge only.** A section is a chain of constant per-city *count* signature, but counts are not train sets: at a junction node with three flow edges where two share a signature (train X leaves, train Y joins on the same branch), the chain runs through and the 8-class split from `e0` is wrong for the far side. With R3, which end is `e0` is random. Frequency **unmeasured**; the audit has no `sum(classes) == total` check per flow row. | `atlas.rs:2748-2756`, chaining rule `:2648-2662` |
 | R5 | **M** | **Deploy cache contract is wrong.** Fixed asset names + `immutable, max-age=31536000`. Any pack swap leaves warm caches on old data; a `fmt` bump shows the error overlay to returning users until they hard-refresh. `Content-Type: application/octet-stream` and no `Content-Encoding` force the pure-JS brotli decode path (comment at `App.tsx:107` confirms it is the path taken). | `vercel.json`, `web/vercel.json`; `App.tsx:63-68, 86, 98-147` |
-| R6 | **M** | **Repo cannot rebuild from a clone.** `.gitignore` ignores `data/` wholesale; the 15 tracked `data/*.json` were force-added, `data/raw/*.jsonl` (the "irreplaceable" timetables per `PIPELINE.md` §2) and all `derived/` inputs live only in `~/Downloads/china-rail-handoff-v3` (6.4 GB). Any new fixture under `data/` is silently ignored unless `git add -f`. `output/` is a symlink into the handoff. | `.gitignore` (`data/`, `output`), `git ls-files data` (15 files, none in `raw/`) |
+| R6 | **M** | **Repo cannot rebuild from a clone.** `.gitignore` ignores `data/` wholesale; the 15 tracked `data/*.json` were force-added, `data/raw/*.jsonl` (the "irreplaceable" timetables per `PIPELINE.md` §2) and all `derived/` inputs live only in the local handoff folder `china-rail-handoff-v3` (6.4 GB). Any new fixture under `data/` is silently ignored unless `git add -f`. `output/` is a symlink into the handoff. | `.gitignore` (`data/`, `output`), `git ls-files data` (15 files, none in `raw/`) |
 | R7 | **M** | **Live recipe depends on a splice because of R2.** `o9_splice_router.py` keeps every shipped record and replaces only records touching named stations, with a `#cv3o9:` id prefix. This is correct for one fix but means the shipped router output is now a hand-assembled artifact that no single command regenerates. | `scripts/o9_splice_router.py:1-12`; `docs/PIPELINE.md:182-198` |
 | R8 | **M** | **Two 3,000-line binaries share ~900 identical lines and have no tests.** `atlas.rs` (3,611) and `audit.rs` (2,735) share 23 `fn` names (`clean`, `city2`, `dijkstra_chain`, `resolve_leg*`, `leg_key3`, `leg_km`, `load_leg_paths`, …) and the full 540-literal `CORE`/`ALIAS` gazetteer. The whole `analyze` crate has 0 `#[test]`; the workspace has 6, all in `router`. The audit "independently" recounting with a copy of the same code is not independent. | `atlas.rs:7-558`, `audit.rs:7-558`; `comm` of sorted lines = 917 |
 | R9 | **M** | **Three OSM parsers with different failure modes.** `analyze/src/graph.rs` and `router/src/graph.rs` (quick-xml, panic on error), `atlas.rs:1773-1809` (hand byte-scanner on `<node ` that finds `id="` by substring — correct for `filter`'s output which writes `id lat lon` only, but would match `uid="` on a stock OSM file), and `atlas.rs:1843-1909` (quick-xml for HSR flags, `Err(_) => break` **silently truncates** on a malformed byte, which would quietly mark every later way conventional). | as cited |
@@ -131,7 +156,7 @@ Severity: **H** = wrong output or data loss risk; **M** = fragility that will bi
 
 **Architecture.** React 19 shell (`App.tsx`, 1,594 lines, 10 effects) around one imperative canvas component (`MapCanvas.tsx`, 2,959 lines) that holds props in `P.current` and mutable draw state in `S.current`. The atlas is a shared mutable object: staged table loads `Object.assign` into `at.data.origins[i]` (`App.tsx:357-384`) and flip ready flags that re-run `useMemo`s. It works, and it is fast, but it is the kind of design where the invariants live in the authors' heads (the B14/B21 class of bugs came from exactly this). A small typed store (`AtlasStore` with `applyOutTables` etc. as the only writers) would make the phases explicit without a framework change.
 
-**Rendering/perf.** Every frame redraws outline, graticule, the full network backdrop (bbox-culled but not cached), flows, infra, trains, stations and labels (`MapCanvas.tsx:1940-2000`). On a phone at 60 fps that is the dominant cost; `PIPELINE.md` §6.2 already names backdrop caching as the first perf item. Concretely: render outline+graticule+network to an offscreen canvas keyed by `(view, size, DPR, palette)` and `drawImage` it; render static flows to a second layer when not animating. Per-frame allocations (R15) are easy wins: one shared gradient per class (translate the context instead), a reused `Map` for active counts. The 5-min `secFlowSteps` tables (`lib.ts:1360-1392`) are `Map<sec, Uint16Array(numSteps)>` — ~7.5k × ~800 steps × 2 B ≈ 12 MB for a long-span origin; fine on desktop, worth checking on the Oppo (**uncertain**).
+**Rendering/perf.** Every frame redraws outline, graticule, the full network backdrop (bbox-culled but not cached), flows, infra, trains, stations and labels (`MapCanvas.tsx:1940-2000`). On a phone at 60 fps that is the dominant cost; `PIPELINE.md` §6.2 already names backdrop caching as the first perf item. Concretely: render outline+graticule+network to an offscreen canvas keyed by `(view, size, DPR, palette)` and `drawImage` it; render static flows to a second layer when not animating. Per-frame allocations (R15) are easy wins: one shared gradient per class (translate the context instead), a reused `Map` for active counts. The 5-min `secFlowSteps` tables (`lib.ts:1360-1392`) are `Map<sec, Uint16Array(numSteps)>` — ~7.5k × ~800 steps × 2 B ≈ 12 MB for a long-span origin; fine on desktop, worth checking on a phone (**uncertain**).
 
 **State/URL.** `?city=&lat=&lon=&z=` sync with debounce (`App.tsx:321-349`, `MapCanvas.tsx:2017-2023`), persisted dark/direction/unit in `localStorage`. Good; guard `localStorage` with try/catch (R14).
 

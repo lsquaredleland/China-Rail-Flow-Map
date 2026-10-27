@@ -1,13 +1,24 @@
 # deck.gl migration plan: from the Canvas 2D renderer to deck.gl
 
+| Phase | Status |
+|---|---|
+| 0 spike, G0 gate | ✅ |
+| 1 origin view on deck.gl (Canvas deleted in P1c.2) | ✅ |
+| 2 national trains (A) | ✅ |
+| 3 national flows (B), A+B | ✅ |
+| G-MAIN `deckgl` → `main` | ✅ PR #139 (merge commit, 2026-10-27) |
+
+
 Status (2026-10-26): **built.** Phases 0–3 are merged on `deckgl` (origin view on deck.gl,
 Canvas deleted in P1c.2, national mode with trains A, flows B and A+B, the 11k train-export
 pack swapped in on 2026-10-25). Later UI work on `deckgl` (PR #80 onward: the Flows toggle in
 the toolbar, the shared 24h animation bar, map cards, the national table and filters, city
 growth, Play from origin, the Zoom-clarity trial) is recorded in those PRs, so the national
 "three-way control" and "coverage note" described under P3.2 below are superseded. The
-`deckgl` → `main` merge is the owner's gate (G-MAIN, D16); the pre-merge audit is
-`docs/AUDIT_PRE_MAIN.md`. Everything below is the plan and the as-built record per task.
+`deckgl` → `main` merge (G-MAIN, D16) happened on 2026-10-27 (PR #139); the pre-merge audit is
+`docs/history/AUDIT_PRE_MAIN.md`. The P1b diff masks cited below (`docs/deckgl-spike/p1b*/`)
+were deleted in the 2026-10-27 docs cleanup and remain in git history; the four side-by-sides
+are in `docs/history/deckgl-spike/`. Everything below is the plan and the as-built record per task.
 **Gate G0: GO with conditions** (independent gate review 2026-10-25, §11.6; the conditions are
 folded into the P1b tasks as C16–C26 below).
 Each phase is a set of numbered, PR-sized tasks with files, tests, acceptance numbers and a
@@ -1458,7 +1469,7 @@ isolated corridor (static full path) and the train code tag, `OrthographicContro
 deck derives its `viewState` from `S.current.view` each frame), GPU picking of sections/chords (existing CPU `pickSegment` used),
 `onClick`, lazy chunk loading.
 
-Structural differences seen in the side-by-sides (all four screenshots are in `docs/deckgl-spike/`, Canvas on top, deck below):
+Structural differences seen in the side-by-sides (all four screenshots are in `docs/history/deckgl-spike/`, Canvas on top, deck below):
 
 - `city-zoom-x10`: wide flow bands overlap in a different order near the origin (G2). Same colours and widths.
 - `selected-city`: the D3 opaque context pass is a little lighter than Canvas's alpha-blended one (allowed ≤ 2 % at P1b.5).

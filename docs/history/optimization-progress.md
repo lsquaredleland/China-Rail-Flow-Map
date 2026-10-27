@@ -1,11 +1,20 @@
 # Optimization progress log
 
-Companion to `optimization.md` (the plan; phase and bug IDs refer to it). Update this file at the end of every work session.
+Historical record (moved from the repo root 2026-10-27; phases 0–5 are done, open backlog: O2, O3, O7, O19). Companion to `optimization-plan.md` (the plan; phase and bug IDs refer to it).
 
-## How to resume
-1. `cd ~/Downloads/china-rail-flow-map && git status --short --branch` (primary checkout since the 2026-10-24 migration; branch from `main`).
-2. Read the **Status** table and the newest **Session** entry below.
-3. Continue with the first phase not marked done. Never write into `~/Downloads/china-rail-handoff-v3` (only `data/osm` remains there; this repo's `data/osm` links to it).
+## Status at a glance (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped
+
+| Item | Status |
+|---|---|
+| Phases 0–5 | ✅ |
+| O1, O4, O5, O6, O8, O9, O10, O12, O13, O14, O15, O16, O17, O18, O20 | ✅ |
+| O11 U-turn overlap fix | — won't do (owner decision) |
+| O2 continuity gaps over 6 km | ❌ |
+| O3 chord legs at a path end | ❌ |
+| O7 inbound loop trains with non-monotone `sec_cnt` | ❌ documented quirk, gated as a `max` golden |
+| O19 the 0.1–1 km joins at stops | ❌ |
 
 ## Status (end of session 1, 2026-10-24)
 
@@ -90,7 +99,7 @@ ATLAS_OUT=$O/china-flow-atlas-data.json ./target/release/atlas      # ~75 s
 AUDIT_PACK_DIR=$O ./target/release/audit                            # add --pack-only to skip the legacy part
 ./target/release/secdiff --old ../staging/live-v1/china-flow-atlas-data.json --new $O/china-flow-atlas-data.json --edges
 ```
-Staged inputs (APFS clones `cp -c`, read-only from the handoff; H=`/Users/leland/Downloads/china-rail-handoff-v3`):
+Staged inputs (APFS clones `cp -c`, read-only from the handoff; H=`china-rail-handoff-v3`):
 - `H/data/osm/china-rail.osm` → `staging/inputs/data/osm/`
 - `H/data/derived/corridor-v3/{pair_paths_canonical,leg_paths}.json` → `staging/inputs/data/derived/corridor-v3/`
 - `H/data/derived/pair_paths.json`, `H/data/derived/cs_out/pair_paths.json` → `staging/inputs/data/derived/` (only used if `ATLAS_PAIR_PATHS` is unset; a test run showed the result is identical)
@@ -252,7 +261,7 @@ Prototype result (`staging/o4-build/`, overrides config + retrace): needed / res
   - K118 成都 (成都西→广元 宝成线 router leg): 167 → 179 path sections, 1,957 → 2,150 path km, 2 → 0 chord legs.
   - K1807 南京 (石太线): 123 → 137 sections, 1,683 → 1,879 km, 1 → 0 chord legs.
   - C5225 福州 (漳平西→龙岩 router leg): 33 → 36 sections, 493 → 506 km, 1 → 0 chord legs.
-- **Branch** (created from `4dbbfc7` in a separate worktree, `/Users/leland/Downloads/china-rail-o4`, so the shared checkout is untouched): commit `53d2129`, not pushed. `atlas.rs` and `audit.rs` add every `LEG_PATHS` node to `needed` (unconditional).
+- **Branch** (created from `4dbbfc7` in a separate worktree, `china-rail-o4`, so the shared checkout is untouched): commit `53d2129`, not pushed. `atlas.rs` and `audit.rs` add every `LEG_PATHS` node to `needed` (unconditional).
 - **Rebuild** in `staging/o4-ship/`: hard checks PASS, dropped chains 0 / flow lost 0; after rebase, full audit goldens PASS (exit 0).
 - **Goldens rebased:**
   - sections 8,054 → 8,459 and in_sections 7,923 → 8,325: new flow-bearing track creates new sections.
@@ -325,8 +334,8 @@ Read-only; scripts and decoded live pack in `staging/spotcheck/` (`g1.py`, `g2.p
 - Evidence files: `staging/determinism/o17/` (`diff_routes.py`, `classify_paths.py`, `vs-fixed/`, `vs-shipped/`, `oldnoise/`, `atlas-runA/`).
 
 ## Done: repo migration (2026-10-24)
-- Primary checkout is now `~/Downloads/china-rail-flow-map` (fresh clone). `data/derived`, `data/raw`, `output/` (real dir) and `staging/` were copied in with `cp -c`; `data/osm` is a symlink to `~/Downloads/china-rail-handoff-v3/data/osm`, which is all that remains of the old folder.
+- Primary checkout is now this repo (fresh clone). `data/derived`, `data/raw`, `output/` (real dir) and `staging/` were copied in with `cp -c`; `data/osm` is a symlink to the old handoff folder's `data/osm`, which is all that remains of the old folder.
 - Verified from the new home: the staged rebuild (O9 rerun + splice byte-identical to `staging/inputs/.../corridor-v3-o9`), full audit + goldens PASS, `secdiff --edges` 0 vs `staging/o1-build/o1v2`, roundtrip OK, `audit --pack-only` PASS on the committed assets, typecheck + build OK.
 - All worktrees removed; branches pushed. The handoff's unpushed local `main` commit is preserved as `backup/handoff-local-main-3484031`; its old stash 686f72a is saved as `staging/handoff-stash-686f72a.patch`.
-- `~/workspace/your_files` and `~/workspace/goals/china-rail-network-map/files` now point at the new `output/`.
+- The old workspace folders now point at the new `output/`.
 - Follow-up from O1: about 97k joins of 0.1-1 km remain, where the arriving and departing legs end on different station nodes (backlog O19).

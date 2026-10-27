@@ -1,6 +1,8 @@
 # Canvas vs deck.gl benchmark, 2026-10-26
 
-Raw results behind `docs/AUDIT_PRE_MAIN.md` §4. Everything here was produced by
+**Status:** historical snapshot (2026-10-26, before the deck.gl merge). The Canvas renderer it compares against has since been removed; the raw files are kept as the evidence behind `docs/history/AUDIT_PRE_MAIN.md` §4.
+
+Raw results behind `docs/history/AUDIT_PRE_MAIN.md` §4. Everything here was produced by
 `web/tools/perf/compare.mjs` (PR #88) on the same machine in one sitting; the tables in the
 report are `node web/tools/perf/summarize.mjs docs/perf/2026-10-26-canvas-vs-deck` over these files.
 

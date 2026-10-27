@@ -2,13 +2,16 @@
 
 ## Status after follow-ups (updated 2026-10-26)
 
-The findings below (§0–§12) are the historical record and are not edited. ✅ merged into
+The findings below (§0–§12) are the historical record and are not edited. Since then (docs
+cleanup, 2026-10-27): this file, `DECKGL_MIGRATION.md`, the optimization plan and progress log
+moved to `docs/history/`; `PROJECT_NOTES.md`, `docs/benchmarks/` and the P1b diff masks were
+deleted (they remain in git history). ✅ merged into
 `deckgl`, ⏳ in progress, ❌ open.
 
 | Item | Status |
 |---|---|
 | **§0 top actions** | |
-| 1. Merge with `--no-ff` (Vercel ignore rule) | ⏳ at merge time (owner) |
+| 1. Merge with `--no-ff` (Vercel ignore rule) | ✅ merge commit, PR #139 (2026-10-27) |
 | 2. Route-change review (8 rows) | ✅ owner accepted the shipped pack as is (2026-10-26) |
 | 3. Surface a failed national index load | ✅ #127 |
 | 4. ABOUT window from the pack | ✅ #109, pack swap #116 |
@@ -136,7 +139,7 @@ first-frame latency on a slow network) is stated in §4.5.
 
 ### 1.1 Module boundaries (web)
 
-The target layout of `docs/DECKGL_MIGRATION.md` §1.1 is what shipped: `web/src/lib/` (21
+The target layout of `docs/history/DECKGL_MIGRATION.md` §1.1 is what shipped: `web/src/lib/` (21
 modules, 4.9k lines) is pure and bun-tested; `components/map/` (7 modules, 1.2k lines) and
 `components/map/deck/` (9 modules, 2.9k lines) are the engine and the lazy renderer; `components/map/` holds the renderer-agnostic
 engine (`context.ts`, `anim.ts`, `api.ts`, `camera.ts`, `pointer.ts`, `interaction.ts`);
@@ -446,7 +449,7 @@ Reading:
 ### 4.3 National mode (deck.gl only) against the plan's budget
 
 Canvas never had a national mode, so these are absolute numbers against the budget of
-`docs/DECKGL_MIGRATION.md` §4 (M1n: rAF p95 ≤ 16.7 ms and deck CPU ≤ 4 ms unthrottled; M2n at
+`docs/history/DECKGL_MIGRATION.md` §4 (M1n: rAF p95 ≤ 16.7 ms and deck CPU ≤ 4 ms unthrottled; M2n at
 4×: rAF p95 ≤ 33.4 ms on the median of 3 reps and draw+raster p95 ≤ 16.7 ms; M4n GPU ≤ 64 MB;
 M5n national heap delta ≤ 30 MB). Full 11k pack: 3,601 dots and 9,049 lit sections at the 18:15
 sweep.
@@ -578,11 +581,11 @@ ignored props.
 
 | Path | Status | Verdict |
 |---|---|---|
-| `docs/DECKGL_MIGRATION.md` (1,576 lines) | the plan plus per-task as-built notes; status header was stale (fixed in #90) | **Keep** as the record. Nice-to-have later: move §4's as-built notes into a `docs/history/deckgl-as-built.md` and leave a 100-line plan. |
+| `docs/history/DECKGL_MIGRATION.md` (1,576 lines) | the plan plus per-task as-built notes; status header was stale (fixed in #90) | **Keep** as the record. Nice-to-have later: move §4's as-built notes into a `docs/history/deckgl-as-built.md` and leave a 100-line plan. |
 | `docs/THIN_CLIENT.md` | design doc, "nothing built", owner defers | **Keep**; still the record of the pack-format decision. Not acted on (owner instruction). |
 | `docs/review-fable.md` | review of `main` @ `f199472` (Canvas era); top items done | **Archived** → `docs/history/review-fable-2026-10-24.md` with a status note (#90). |
 | `docs/deckgl-spike/*.png` (4 side-by-sides) and `p1b1/`, `p1b2/`, `p1b3/`, `p1b5/` diff masks (46 PNGs, 6.9 MB) | G0 spike and G1 parity evidence; each directory referenced once from the migration doc | **Keep `p1b5/`** (the final G1 masks) and the 4 spike PNGs; `p1b1–p1b3` (3.5 MB) are interim masks superseded by `p1b5` and can be deleted once the doc's three references are reworded. Borderline; not removed. |
-| `docs/history/PROJECT_NOTES.md`, `docs/research/*`, `docs/corridor-v3-report.md`, `docs/corridor-v3-summary.json`, `docs/MANUAL_OVERRIDES.md`, `docs/benchmarks/*` | handoff-era records, referenced from `PIPELINE.md` | Keep. `docs/benchmarks/bench.sh` hard-codes `~/workspace/...` paths from the origin VM; keep as provenance of `benchmark_results.json`. |
+| `docs/history/PROJECT_NOTES.md`, `docs/research/*`, `docs/corridor-v3-report.md`, `docs/corridor-v3-summary.json`, `docs/MANUAL_OVERRIDES.md`, `docs/benchmarks/*` | handoff-era records, referenced from `PIPELINE.md` | Keep. (`docs/benchmarks/` was later removed.) |
 | `optimization.md`, `optimization-progress.md` (repo root) | the pipeline work log, "update at the end of every session" | Keep; nice-to-have: move under `docs/` (the progress log's "How to resume" paths would need updating). |
 | `docs/features.md` | roadmap; #8 and #1 statuses were stale (fixed in #90) | Keep. |
 | `pipeline/goldens-12306fix.proposed.json` | goldens for the 12306 recipe, referenced by `PIPELINE.md:214-218` | Keep. |
@@ -728,7 +731,7 @@ Fable review archived. Still to do for the merge (small, doc-only):
 - `docs/PIPELINE.md:171-181` prose on the pack ("shared + per-direction map/tables files") and
   the "Top-100 cut: #1 广州 1,201/day" numbers predate the 11k pack; mark the paragraph as the
   12306-era description or refresh the numbers from `atlas`'s summary.
-- `docs/DECKGL_MIGRATION.md` §9 (maintainability table) is an estimate table; replace with the
+- `docs/history/DECKGL_MIGRATION.md` §9 (maintainability table) is an estimate table; replace with the
   measured `wc -l` of the shipped layout (`lib/` 4.9k, `components/map/` 1.2k, `deck/` 2.9k,
   top-level components 4.7k, `departures/` 1.8k) or mark it "[estimate, 2026-10-24]".
 - `pipeline/router/README.md` is current; `analyze` has no README (its `lib.rs` header is the
@@ -763,7 +766,7 @@ local-only branch at `539daf2`), `agent-ac31e363…`, `agent-adef11fa…`, `agen
 (detached), `agent-ad099b62…` (`fix/city-point-fallback`, merged), `agent-ad5da65a…`
 (`feat/national-city-counts`, merged, locked), `agent-ae7f76dc…` (`data/swap-11k-national`,
 remote deleted), `agent-a2f82fa3…` (this audit). Plus 4 scratch worktrees under
-`/private/tmp/…/scratchpad/` (`benchwt`, `noease/base`, `p1c2fu/base`, `ripplewt`) and the
+a temporary scratch directory (`benchwt`, `noease/base`, `p1c2fu/base`, `ripplewt`) and the
 audit's own `main-wt`, `pr-wt`. Recommendation: for each, `git -C <path> status --short` to
 confirm nothing uncommitted, then `git worktree remove <path>` (`--force` for the locked
 ones) and `git worktree prune`; delete the local branches whose remotes are gone. Not done by
@@ -774,7 +777,7 @@ this audit (owner rule).
 ## 10. Upstream data issue: placeholder stop lists in the train export
 
 **Confirmed, read-only** (`python3 -I` over
-`/Users/leland/Downloads/china-rail-flow-map/data/raw/train-exports-2026-10-25/trains-all.json`,
+`data/raw/train-exports-2026-10-25/trains-all.json`,
 untracked in git): 11,589 trains; **4,303 trains carry a stop list whose every entry is
 `{"no": "", "name": "", "arrive": "", "depart": ""}`** (the right number of stops, no content),
 all of them `source: discovered` / `phase2-discovery`: by class C 982, D 1,359, G 1,279, K 339,

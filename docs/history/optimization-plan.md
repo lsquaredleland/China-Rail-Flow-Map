@@ -1,16 +1,30 @@
-# China Rail 24h Flow Animation — Pipeline-First Optimization Plan (`optimization.md`)
+# China Rail 24h Flow Animation — Pipeline-First Optimization Plan
 
 _Revised 2026-10-23. Supersedes the earlier client-side chainer plan (summarized in Appendix A)._
 
+## Status (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped. Detail per item: `optimization-progress.md`.
+
+| Phase | Status |
+|---|---|
+| 0. Client fixes on current data | ✅ |
+| 1. Ordered, oriented paths | ✅ |
+| 2. Generated schedules | ✅ |
+| 3. Station-throat stubs | ✅ O1, PR #8 (fmt 6) |
+| 4. Client cleanup on new data | ✅ |
+| 5. Per-train path dedupe | ✅ O6, PR #6 (fmt 5) |
+| Bug ledger B1–B21 (§3) | ✅ addressed by the phases above (per the progress log); chord legs at a path end remain as O3 |
+
 ## 0. Context
 
-- **Active repository:** `/Users/leland/Downloads/china-rail-animation`, branch `explore/24h-train-flow-animation`
-- **Handoff repository (keep clean):** `/Users/leland/Downloads/china-rail-handoff-v3`
+- **Active repository:** `china-rail-animation` (the pre-migration working copy), branch `explore/24h-train-flow-animation`
+- **Handoff repository (keep clean):** `china-rail-handoff-v3`
 - **Preview server:** `http://localhost:8090/` serving `web/dist`
 - **Client checks:**
   ```bash
-  npm --prefix /Users/leland/Downloads/china-rail-animation/web run typecheck
-  npm --prefix /Users/leland/Downloads/china-rail-animation/web run build
+  npm --prefix web run typecheck
+  npm --prefix web run build
   ```
 - **Pipeline rebuild:** `docs/PIPELINE.md` §3 step 5 (corridor-v3 env vars `ATLAS_OVERRIDES` = empty file, `ATLAS_PAIR_PATHS`, `ATLAS_LEG_PATHS`), then `atlaspack`, then `audit`. Verify against the goldens in `docs/PIPELINE.md` §7.
 - **Owner rule:** pipeline changes go through a **staged** rebuild, are verified, and are swapped live only with the owner's approval. Timetable inputs come from `data/raw/*.jsonl`. No new 12306 pulls.

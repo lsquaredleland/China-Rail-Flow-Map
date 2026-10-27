@@ -1,7 +1,7 @@
 // Renderer-agnostic frame-time, memory and load harness: the same scenarios
 // on any build that exposes window.__mapApi, window.__M and window.__draw,
 // so a Canvas build (main) and the deck.gl build (deckgl) are measured the
-// same way. Written for the pre-main audit (docs/AUDIT_PRE_MAIN.md §4); the
+// same way. Written for the pre-main audit (docs/history/AUDIT_PRE_MAIN.md §4); the
 // raw results live under docs/perf/.
 //
 // usage: node tools/perf/compare.mjs <base> --label canvas|deck [--dpr 1,2]

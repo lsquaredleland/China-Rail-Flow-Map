@@ -1,15 +1,30 @@
 # Thin client: where the pipeline / client line should sit
 
-Status: **design document for later implementation.** Nothing here is built. It reviews the
+## Status (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped
+
+| Task | Status | Where |
+|---|---|---|
+| T0 Bench in repo | ✅ | `web/tools/bench/`, `bun run bench` (PR #45) |
+| T1 Manifest + pack id | ❌ | |
+| T2 Facts out of the client (ferry flag, class table, romanised names, section lengths, `pStart`, `boardAbs`, `firstVisit`) | ◐ | only the national trains file (#16, PR #43); the rest is still derived in `web/src/lib` |
+| T3 Client consumes T2 | ❌ | waits on T2 |
+| T4 Binary columnar container | ◐ | tables as safetensors columns (PR #140, `docs/PACK_FORMAT.md`); geometry still JSON |
+| T5 New timetable ingest | ✅ | the 11k train export, on fmt 6 (2026-10-25) |
+| T6 Optional later | ❌ | |
+
+Of the 16 inventory rows marked **move** or **shape** (§3), 2 are done (#3 tables, #16 national
+trains). The text below is the original audit. It reviews the
 owner's "make the client as dumb as possible" premise (2026-10-25), sets out the target data
 contract between the Rust pipeline and the web client, audits every client-side derivation on
 `deckgl` @ `58426d1` against it, and sequences the moves against the deck.gl plan
-(`docs/DECKGL_MIGRATION.md`, Phases 2–3, G-MAIN) and the incoming ≈ 12,000-train data.
+(`docs/history/DECKGL_MIGRATION.md`, Phases 2–3, G-MAIN) and the incoming ≈ 12,000-train data.
 
-Every number is tagged **[measured]** (this audit, bun 1.4.4 / node 22 on an M4 Max, scripts in
-the session scratch directory `scratchpad/thinclient/bench/{measure,columnar}.ts`, not
-committed) or **[estimate]** (with the arithmetic shown). Pack = the committed fmt 6 pack in
-`web/public/assets` (7,157 trains, 102 origins, 7,922 sections).
+Every number is tagged **[measured]** (this audit, bun 1.4.4 / node 22 on an M4 Max, scripts
+since committed as `web/tools/bench/` by T0, `bun run bench`) or **[estimate]** (with the arithmetic shown). Pack = the fmt 6 pack committed at the
+time (the 12306 pack: 7,157 trains, 102 origins, 7,922 sections; the 11k export pack replaced it
+on 2026-10-25).
 
 ---
 
@@ -168,7 +183,7 @@ The owner's rules split the world into facts and interaction. The audit needs a 
 - **R6 Every move is guarded twice.** A fact moved to Rust gets an exact golden in
   `goldens.json` **and** a client oracle test that compares the old client derivation to the
   shipped field on the committed pack before the client code is deleted (the P2.1 pattern).
-  *Reason:* byte-identical-or-re-baseline discipline from `DECKGL_MIGRATION.md` §4.
+  *Reason:* byte-identical-or-re-baseline discipline from `history/DECKGL_MIGRATION.md` §4.
 - **R7 Pack changes are batched.** Additive fields ride together in one fmt bump and one swap.
   *Reason:* (e).
 
@@ -351,7 +366,7 @@ the data it reads. Size/memory are for the committed pack unless marked 12 k.
 
 ## 4. Migration plan (for later; nothing started)
 
-Conventions as in `DECKGL_MIGRATION.md` §4: one PR per task, tests green, no stubs, acceptance
+Conventions as in `history/DECKGL_MIGRATION.md` §4: one PR per task, tests green, no stubs, acceptance
 numbers quoted in the PR. "Swap" = owner-approved replacement of `web/public/assets`. Byte-rule:
 a task that changes pack bytes without changing any decoded value must prove it (decoded
 typed arrays byte-identical, or `secdiff --packs` reports no flow change); a task that changes
@@ -368,6 +383,9 @@ values re-baselines shots and goldens in its own PR with the diff explained.
 | **T6 Optional later** | T4 | (a) TripsLayer keyframes from `pStart` + absolute minutes if D2 is ever turned on; (b) per-origin map files / single archive with ranges if first paint must shrink; (c) Arrow IPC export from TA1 if interop is wanted | — | — |
 
 **Sequencing against the deck plan and G-MAIN**
+
+*(Written before the merge. G-MAIN happened on 2026-10-27, PR #139, so `deckgl` below now
+means `main`, and only the "After G-MAIN" bullet still applies.)*
 
 - T0 and T1's *pipeline* half are independent of `deckgl` and can be built now, **staged**,
   on a branch off `main` (pipeline work goes through PRs per the project rule). Their client
@@ -386,7 +404,7 @@ values re-baselines shots and goldens in its own PR with the diff explained.
   shape. The router's `ScheduleSource` / network seams (`pipeline/router/README.md`) are the
   right place for new schedule data; the thin-client contract starts at `atlas`.
 
-**Budgets to hold (from `DECKGL_MIGRATION.md` §4/§11):** M1/M2 frame time unchanged (no layer
+**Budgets to hold (from `history/DECKGL_MIGRATION.md` §4/§11):** M1/M2 frame time unchanged (no layer
 changes); M4 GPU ≤ 64 MB (unchanged); M6 deck chunk ≤ 300 KB brotli (TA1 reader ≈ 2 KB; no
 Arrow JS); M7 first deck frame ≤ 1.0 s (parse drops, so it improves); new **M15 CPU heap after
 both directions loaded ≤ 60 MB** and **M16 first-paint transfer ≤ 1.1 MB brotli**.
@@ -417,7 +435,7 @@ both directions loaded ≤ 60 MB** and **M16 first-paint transfer ≤ 1.1 MB bro
    client* runs unchanged on another network's pack (then every China literal must go, §1.3 (k)),
    or only that the *pipeline* does? The audit assumes the former.
 9. **Heap budget.** Is ≈ 60 MB JS heap after both directions (M15) the right number for your
-   phone (Oppo Find N6), or do you want a measured target from a device run first?
+   target phone, or do you want a measured target from a device run first?
 
 ---
 
@@ -445,8 +463,7 @@ Client build costs: `prepAtlas` 10.8 ms; `expandOutTables` 9.1 ms / 29.0 MB; `ex
 `buildNational` 17.8 ms, 9.0 MB retained (6,972 trains, 670,796 refs); `natPositions(1095)`
 2.9 ms → 2,668 dots.
 
-Columnar prototype: §1.3 (d). Scripts: `scratchpad/thinclient/bench/measure.ts`,
-`columnar.ts` (session scratch; T0 commits them).
+Columnar prototype: §1.3 (d). Scripts: `web/tools/bench/` (T0).
 
 ## Appendix B. Sources
 
@@ -460,6 +477,6 @@ Columnar prototype: §1.3 (d). Scripts: `scratchpad/thinclient/bench/measure.ts`
 - FlatGeobuf: streaming columnar features with an optional packed Hilbert R-tree; not needed
   while the whole network is always drawn.
 - kepler.gl / DuckDB-WASM: client-side analytics as the contrasting cost model.
-- This repo: `docs/DECKGL_MIGRATION.md` (C19, C23, D3, D8, D12, P2.1, P3.1 as built, §11),
+- This repo: `docs/history/DECKGL_MIGRATION.md` (C19, C23, D3, D8, D12, P2.1, P3.1 as built, §11),
   `docs/PIPELINE.md` §3/§7, `pipeline/analyze/src/bin/atlaspack.rs` header, `flows.rs`,
   `pipeline/goldens.json`, `web/src/lib/*`, `web/src/components/map/deck/**`.
