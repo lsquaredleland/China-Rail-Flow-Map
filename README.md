@@ -1,6 +1,6 @@
 # China Rail Flow Map · 中国铁路流量图
 
-An interactive, Minard-style passenger rail flow atlas across China's top 100 rail cities — rendering **11,248 scheduled passenger services** (running 23 Oct – 6 Nov 2026) across **48,000 km** of high-speed rail and **162,000 km** of total track on a deck.gl (WebGL2) renderer (zero map tile libraries, zero external API keys).
+An interactive, Minard-style animated flow map of trains departing and arriving across China's 102 busiest rail hubs — **11,248 scheduled passenger services** (running 23 Oct – 6 Nov 2026) over more than **50,000 km** of high-speed rail and even more conventional track, drawn with deck.gl (WebGL2); no map tile libraries and no API keys.
 
 **Live Demo:** [china-rail-flow-map-web.vercel.app](https://china-rail-flow-map-web.vercel.app/)
 
@@ -29,7 +29,7 @@ China-Rail-Flow-Map/
 │   ├── tools/            # dev tooling: static server, screenshot diff, perf drivers, headless smoke (CI)
 │   └── bundle.mjs        # Produces web/dist/ (index.html with the entry inlined + hashed assets/)
 ├── pipeline/             # Unified Rust Cargo workspace for OSM & timetable processing
-│   ├── analyze/          # Core graph router, section decomposition (atlas) & v2 packer (atlaspack)
+│   ├── analyze/          # Timetable resolution, section decomposition (atlas), v2 packer (atlaspack), audit
 │   ├── router/           # Corridor-v3 candidate path selector & speed/infrastructure scorer
 │   ├── filter/           # Fast PBF -> railway-only OSM XML extractor
 │   └── outline/          # National boundary polyline generator

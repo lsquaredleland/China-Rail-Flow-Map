@@ -2,7 +2,10 @@
 
 ## Status after follow-ups (updated 2026-10-26)
 
-The findings below (§0–§12) are the historical record and are not edited. ✅ merged into
+The findings below (§0–§12) are the historical record and are not edited. Since then (docs
+cleanup, 2026-10-27): this file, `DECKGL_MIGRATION.md`, the optimization plan and progress log
+moved to `docs/history/`; `PROJECT_NOTES.md`, `docs/benchmarks/` and the P1b diff masks were
+deleted (they remain in git history). ✅ merged into
 `deckgl`, ⏳ in progress, ❌ open.
 
 | Item | Status |

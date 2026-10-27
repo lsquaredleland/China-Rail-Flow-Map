@@ -1,6 +1,6 @@
 # Optimization progress log
 
-Historical record (moved from the repo root 2026-10-27; phases 0–5 are done, open backlog: O2, O3, O7, O19). Companion to `optimization-plan.md` (the plan; phase and bug IDs refer to it). Update this file at the end of every work session.
+Historical record (moved from the repo root 2026-10-27; phases 0–5 are done, open backlog: O2, O3, O7, O19). Companion to `optimization-plan.md` (the plan; phase and bug IDs refer to it).
 
 ## Status at a glance (2026-10-27)
 
@@ -15,11 +15,6 @@ Historical record (moved from the repo root 2026-10-27; phases 0–5 are done, o
 | O3 chord legs at a path end | ❌ |
 | O7 inbound loop trains with non-monotone `sec_cnt` | ❌ documented quirk, gated as a `max` golden |
 | O19 the 0.1–1 km joins at stops | ❌ |
-
-## How to resume
-1. `git status --short --branch` (primary checkout since the 2026-10-24 migration; branch from `main`).
-2. Read the **Status** table and the newest **Session** entry below.
-3. Continue with the first phase not marked done. Never write into `china-rail-handoff-v3` (only `data/osm` remains there; this repo's `data/osm` links to it).
 
 ## Status (end of session 1, 2026-10-24)
 

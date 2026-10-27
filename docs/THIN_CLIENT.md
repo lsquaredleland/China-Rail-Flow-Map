@@ -22,8 +22,9 @@ contract between the Rust pipeline and the web client, audits every client-side 
 (`docs/history/DECKGL_MIGRATION.md`, Phases 2–3, G-MAIN) and the incoming ≈ 12,000-train data.
 
 Every number is tagged **[measured]** (this audit, bun 1.4.4 / node 22 on an M4 Max, scripts
-since committed as `web/tools/bench/` by T0, `bun run bench`) or **[estimate]** (with the arithmetic shown). Pack = the committed fmt 6 pack in
-`web/public/assets` (7,157 trains, 102 origins, 7,922 sections).
+since committed as `web/tools/bench/` by T0, `bun run bench`) or **[estimate]** (with the arithmetic shown). Pack = the fmt 6 pack committed at the
+time (the 12306 pack: 7,157 trains, 102 origins, 7,922 sections; the 11k export pack replaced it
+on 2026-10-25).
 
 ---
 
@@ -382,6 +383,9 @@ values re-baselines shots and goldens in its own PR with the diff explained.
 | **T6 Optional later** | T4 | (a) TripsLayer keyframes from `pStart` + absolute minutes if D2 is ever turned on; (b) per-origin map files / single archive with ranges if first paint must shrink; (c) Arrow IPC export from TA1 if interop is wanted | — | — |
 
 **Sequencing against the deck plan and G-MAIN**
+
+*(Written before the merge. G-MAIN happened on 2026-10-27, PR #139, so `deckgl` below now
+means `main`, and only the "After G-MAIN" bullet still applies.)*
 
 - T0 and T1's *pipeline* half are independent of `deckgl` and can be built now, **staged**,
   on a branch off `main` (pipeline work goes through PRs per the project rule). Their client
