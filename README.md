@@ -32,7 +32,6 @@ China-Rail-Flow-Map/
 │   ├── analyze/          # Core graph router, section decomposition (atlas) & v2 packer (atlaspack)
 │   ├── router/           # Corridor-v3 candidate path selector & speed/infrastructure scorer
 │   ├── filter/           # Fast PBF -> railway-only OSM XML extractor
-│   ├── tiler/            # MVT / PMTiles vector tile encoder
 │   └── outline/          # National boundary polyline generator
 ├── data/                 # Station gazetteers (ZH/EN), OSM station coordinates & corridor overrides
 └── docs/                 # PIPELINE.md (reproduction), PACK_FORMAT.md (tables container),

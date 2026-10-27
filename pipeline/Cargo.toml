@@ -4,7 +4,6 @@ members = [
     "analyze",
     "router",
     "filter",
-    "tiler",
     "outline",
 ]
 

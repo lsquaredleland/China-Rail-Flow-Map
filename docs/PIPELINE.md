@@ -7,8 +7,7 @@
 > paths (`project/`, `deliverable/`) and package contents no longer match this
 > repo. Binaries that exist today: `pipeline/analyze/src/bin/{atlas,atlaspack,audit,chainfill,legclass,osm_export,paths,secdiff}.rs`
 > plus `analyze-rs` (main), `pipeline/filter` (main, `probe`), `pipeline/router`
-> (main, `cordcheck`, `splitcheck`), `pipeline/tiler` (main, `stats`, `validate`)
-> and `pipeline/outline` (main).
+> (main, `cordcheck`, `splitcheck`) and `pipeline/outline` (main).
 
 
 The minimal continuation package for the China rail project: **all source
@@ -88,7 +87,6 @@ pipeline/            Rust Cargo workspace for OSM & timetable processing
   analyze/           analyze-rs: timetable resolution, audit, atlas assembly & packing
   router/            corridor-v3 routing & speed scoring
   filter/            fast OSM PBF -> railway XML extractor
-  tiler/             MVT / PMTiles vector tile encoder
   outline/           national border polyline generator
 data/                stations, gazetteers, overrides, and raw inputs
   raw/               point-in-time timetable JSONL files (stops.jsonl, trains.jsonl, etc.)
@@ -103,13 +101,11 @@ Prerequisites: Rust toolchain, Node 20+ (for web build), `brotli` CLI for packin
 All commands run from the package root unless stated. Timings are the origin VM's
 benchmarks (logs in `docs/benchmarks/`).
 
-### Step 1 — rail geometry + tiles (the base layer)
+### Step 1 — rail geometry (the base layer)
 ```bash
 curl -O https://download.geofabrik.de/asia/china-latest.osm.pbf
 cd pipeline/filter && cargo run --release -- ../../china-latest.osm.pbf ../../data/osm/china-rail.osm
 #   → china-rail.osm (513 MB; 3,068,371 nodes, 499,557 ways)   [~156 s]
-cd ../tiler && cargo run --release -- ../../data/osm/china-rail.osm ../../data/osm/china-rail.pmtiles
-#   → china-rail.pmtiles (5.9 MB)                                [~139 s]
 ```
 
 ### Step 2 — timetable datasets
@@ -466,7 +462,6 @@ the audit + small map kept it on Chengyu. Decide with fresh evidence
 | Removed artifact | Recreate |
 |---|---|
 | `china-rail.osm`, Geofabrik PBF | §3 step 1 |
-| `china-rail.pmtiles` | §3 step 1 |
 | Atlas datasets (five-file v2 pack, combined v1/v2, per-direction) | §3 step 5 |
 | Staged corridor-fix pack + staged atlas + pre-swap backup | §3 step 7 |
 | OSM service layer `.osm.gz` (19 MB) | §3 step 4 |
