@@ -8,7 +8,7 @@ geometry half of T4. The text below is the original audit. It reviews the
 owner's "make the client as dumb as possible" premise (2026-10-25), sets out the target data
 contract between the Rust pipeline and the web client, audits every client-side derivation on
 `deckgl` @ `58426d1` against it, and sequences the moves against the deck.gl plan
-(`docs/DECKGL_MIGRATION.md`, Phases 2–3, G-MAIN) and the incoming ≈ 12,000-train data.
+(`docs/history/DECKGL_MIGRATION.md`, Phases 2–3, G-MAIN) and the incoming ≈ 12,000-train data.
 
 Every number is tagged **[measured]** (this audit, bun 1.4.4 / node 22 on an M4 Max, scripts in
 the session scratch directory `scratchpad/thinclient/bench/{measure,columnar}.ts`, not
@@ -172,7 +172,7 @@ The owner's rules split the world into facts and interaction. The audit needs a 
 - **R6 Every move is guarded twice.** A fact moved to Rust gets an exact golden in
   `goldens.json` **and** a client oracle test that compares the old client derivation to the
   shipped field on the committed pack before the client code is deleted (the P2.1 pattern).
-  *Reason:* byte-identical-or-re-baseline discipline from `DECKGL_MIGRATION.md` §4.
+  *Reason:* byte-identical-or-re-baseline discipline from `history/DECKGL_MIGRATION.md` §4.
 - **R7 Pack changes are batched.** Additive fields ride together in one fmt bump and one swap.
   *Reason:* (e).
 
@@ -355,7 +355,7 @@ the data it reads. Size/memory are for the committed pack unless marked 12 k.
 
 ## 4. Migration plan (for later; nothing started)
 
-Conventions as in `DECKGL_MIGRATION.md` §4: one PR per task, tests green, no stubs, acceptance
+Conventions as in `history/DECKGL_MIGRATION.md` §4: one PR per task, tests green, no stubs, acceptance
 numbers quoted in the PR. "Swap" = owner-approved replacement of `web/public/assets`. Byte-rule:
 a task that changes pack bytes without changing any decoded value must prove it (decoded
 typed arrays byte-identical, or `secdiff --packs` reports no flow change); a task that changes
@@ -390,7 +390,7 @@ values re-baselines shots and goldens in its own PR with the diff explained.
   shape. The router's `ScheduleSource` / network seams (`pipeline/router/README.md`) are the
   right place for new schedule data; the thin-client contract starts at `atlas`.
 
-**Budgets to hold (from `DECKGL_MIGRATION.md` §4/§11):** M1/M2 frame time unchanged (no layer
+**Budgets to hold (from `history/DECKGL_MIGRATION.md` §4/§11):** M1/M2 frame time unchanged (no layer
 changes); M4 GPU ≤ 64 MB (unchanged); M6 deck chunk ≤ 300 KB brotli (TA1 reader ≈ 2 KB; no
 Arrow JS); M7 first deck frame ≤ 1.0 s (parse drops, so it improves); new **M15 CPU heap after
 both directions loaded ≤ 60 MB** and **M16 first-paint transfer ≤ 1.1 MB brotli**.
@@ -464,6 +464,6 @@ Columnar prototype: §1.3 (d). Scripts: `scratchpad/thinclient/bench/measure.ts`
 - FlatGeobuf: streaming columnar features with an optional packed Hilbert R-tree; not needed
   while the whole network is always drawn.
 - kepler.gl / DuckDB-WASM: client-side analytics as the contrasting cost model.
-- This repo: `docs/DECKGL_MIGRATION.md` (C19, C23, D3, D8, D12, P2.1, P3.1 as built, §11),
+- This repo: `docs/history/DECKGL_MIGRATION.md` (C19, C23, D3, D8, D12, P2.1, P3.1 as built, §11),
   `docs/PIPELINE.md` §3/§7, `pipeline/analyze/src/bin/atlaspack.rs` header, `flows.rs`,
   `pipeline/goldens.json`, `web/src/lib/*`, `web/src/components/map/deck/**`.

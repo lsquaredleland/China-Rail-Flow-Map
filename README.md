@@ -35,9 +35,10 @@ China-Rail-Flow-Map/
 │   ├── tiler/            # MVT / PMTiles vector tile encoder
 │   └── outline/          # National boundary polyline generator
 ├── data/                 # Station gazetteers (ZH/EN), OSM station coordinates & corridor overrides
-└── docs/                 # PIPELINE.md (reproduction), PACK_FORMAT.md (tables container), DECKGL_MIGRATION.md
-                          # (renderer as-built record), THIN_CLIENT.md (pipeline/client split, partly built),
-                          # research/ (routing evidence), history/ (finished plans, audits and reviews)
+└── docs/                 # PIPELINE.md (reproduction), PACK_FORMAT.md (tables container),
+                          # THIN_CLIENT.md (pipeline/client split, partly built), research/ (routing evidence),
+                          # history/ (finished plans, audits, reviews; DECKGL_MIGRATION.md holds the renderer
+                          # decisions that code comments cite as C19, C23, D3, ...)
 ```
 
 ---

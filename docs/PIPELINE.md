@@ -190,7 +190,7 @@ file are 宜昌 174, 香港 110 and 拉萨 12. (The earlier 12306-era pack was a
 #1 广州 1,201/day … #100 麻城 137/day.)
 - **Infrastructure (`atlas-v2-shared.json`)**: `sections` (4,519 HSR / 4,587 conv, current pack; 12306-era: 4,274 / 3,257) and `in_sections` (4,495 HSR / 4,560 conv; 12306-era: 4,146 / 3,116) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h.
 - **8-Class Flow Breakdown (`out-map` / `in-map`)**: `flows` and `in_flows` rows pack `[sec_idx, total, g, d, c, s, z, t, k, plain]` (trailing zero counts stripped).
-- **National table (`atlas-v2-national.json`, P3.1; shipped since 2026-10-25)**: `{fmt, trains, total, by_class}`, arrays parallel to `sections`: distinct trains/day per section, every train counted once nationally, split into the same 8 classes. Format and rule: `atlaspack.rs` header and `docs/DECKGL_MIGRATION.md` (P3.1 as built).
+- **National table (`atlas-v2-national.json`, P3.1; shipped since 2026-10-25)**: `{fmt, trains, total, by_class}`, arrays parallel to `sections`: distinct trains/day per section, every train counted once nationally, split into the same 8 classes. Format and rule: `atlaspack.rs` header and `docs/history/DECKGL_MIGRATION.md` (P3.1 as built).
 - **Per-Train Section Indices (`out-tables` / `in-tables`)**: packs ordered section index lists (`dep_secs` / `arr_secs`) and per-call section cutoff counts (`sec_cnt`), allowing the client to highlight exact city-pair train corridors at 100% opacity over ~18% ghosted trunks.
 **Actual live recipe (verified 2026-10-25: the train-export pack).** The
 committed pack is built from the train export (`data/raw/train-exports-2026-10-25`,

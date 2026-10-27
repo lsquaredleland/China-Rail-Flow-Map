@@ -136,7 +136,7 @@ first-frame latency on a slow network) is stated in §4.5.
 
 ### 1.1 Module boundaries (web)
 
-The target layout of `docs/DECKGL_MIGRATION.md` §1.1 is what shipped: `web/src/lib/` (21
+The target layout of `docs/history/DECKGL_MIGRATION.md` §1.1 is what shipped: `web/src/lib/` (21
 modules, 4.9k lines) is pure and bun-tested; `components/map/` (7 modules, 1.2k lines) and
 `components/map/deck/` (9 modules, 2.9k lines) are the engine and the lazy renderer; `components/map/` holds the renderer-agnostic
 engine (`context.ts`, `anim.ts`, `api.ts`, `camera.ts`, `pointer.ts`, `interaction.ts`);
@@ -446,7 +446,7 @@ Reading:
 ### 4.3 National mode (deck.gl only) against the plan's budget
 
 Canvas never had a national mode, so these are absolute numbers against the budget of
-`docs/DECKGL_MIGRATION.md` §4 (M1n: rAF p95 ≤ 16.7 ms and deck CPU ≤ 4 ms unthrottled; M2n at
+`docs/history/DECKGL_MIGRATION.md` §4 (M1n: rAF p95 ≤ 16.7 ms and deck CPU ≤ 4 ms unthrottled; M2n at
 4×: rAF p95 ≤ 33.4 ms on the median of 3 reps and draw+raster p95 ≤ 16.7 ms; M4n GPU ≤ 64 MB;
 M5n national heap delta ≤ 30 MB). Full 11k pack: 3,601 dots and 9,049 lit sections at the 18:15
 sweep.
@@ -578,7 +578,7 @@ ignored props.
 
 | Path | Status | Verdict |
 |---|---|---|
-| `docs/DECKGL_MIGRATION.md` (1,576 lines) | the plan plus per-task as-built notes; status header was stale (fixed in #90) | **Keep** as the record. Nice-to-have later: move §4's as-built notes into a `docs/history/deckgl-as-built.md` and leave a 100-line plan. |
+| `docs/history/DECKGL_MIGRATION.md` (1,576 lines) | the plan plus per-task as-built notes; status header was stale (fixed in #90) | **Keep** as the record. Nice-to-have later: move §4's as-built notes into a `docs/history/deckgl-as-built.md` and leave a 100-line plan. |
 | `docs/THIN_CLIENT.md` | design doc, "nothing built", owner defers | **Keep**; still the record of the pack-format decision. Not acted on (owner instruction). |
 | `docs/review-fable.md` | review of `main` @ `f199472` (Canvas era); top items done | **Archived** → `docs/history/review-fable-2026-10-24.md` with a status note (#90). |
 | `docs/deckgl-spike/*.png` (4 side-by-sides) and `p1b1/`, `p1b2/`, `p1b3/`, `p1b5/` diff masks (46 PNGs, 6.9 MB) | G0 spike and G1 parity evidence; each directory referenced once from the migration doc | **Keep `p1b5/`** (the final G1 masks) and the 4 spike PNGs; `p1b1–p1b3` (3.5 MB) are interim masks superseded by `p1b5` and can be deleted once the doc's three references are reworded. Borderline; not removed. |
@@ -728,7 +728,7 @@ Fable review archived. Still to do for the merge (small, doc-only):
 - `docs/PIPELINE.md:171-181` prose on the pack ("shared + per-direction map/tables files") and
   the "Top-100 cut: #1 广州 1,201/day" numbers predate the 11k pack; mark the paragraph as the
   12306-era description or refresh the numbers from `atlas`'s summary.
-- `docs/DECKGL_MIGRATION.md` §9 (maintainability table) is an estimate table; replace with the
+- `docs/history/DECKGL_MIGRATION.md` §9 (maintainability table) is an estimate table; replace with the
   measured `wc -l` of the shipped layout (`lib/` 4.9k, `components/map/` 1.2k, `deck/` 2.9k,
   top-level components 4.7k, `departures/` 1.8k) or mark it "[estimate, 2026-10-24]".
 - `pipeline/router/README.md` is current; `analyze` has no README (its `lib.rs` header is the
