@@ -1,5 +1,5 @@
 // Summarises compare.mjs result files into Markdown tables (median of the
-// reps, with the min–max spread), as used in docs/AUDIT_PRE_MAIN.md §4.
+// reps, with the min–max spread), as used in docs/history/AUDIT_PRE_MAIN.md §4.
 // usage: node tools/perf/summarize.mjs <dir with *.json from compare.mjs>
 import fs from "node:fs";
 import path from "node:path";

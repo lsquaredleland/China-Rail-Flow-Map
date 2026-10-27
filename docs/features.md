@@ -15,7 +15,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
 | 5 | Two-City Comparison / "Sphere of Influence" View | Frontend-only | Proposed |
 | 6 | 1-Transfer Connection Finder (`Origin → Hub → Destination`) | Frontend-only | Proposed |
 | 7 | Interactive Marey Stringline Diagram (Time × Distance Graph) | Pipeline + Frontend | Proposed |
-| 8 | National All-Trains Backbone Map ("No Origin Selected" Overview) | Pipeline + Frontend | Completed (national mode, `docs/DECKGL_MIGRATION.md` Phases 2–3) |
+| 8 | National All-Trains Backbone Map ("No Origin Selected" Overview) | Pipeline + Frontend | Completed (national mode, `docs/history/DECKGL_MIGRATION.md` Phases 2–3) |
 
 ---
 
@@ -23,7 +23,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
 
 ### 1. Corridor & Single-Train Route Inspector
 - **Status:** Partly built. Clicking a train (table row, map dot) opens its timetable with "Isolate on map" (its whole run as a corridor, every other train hidden) and "Play from origin"; a minimised map card keeps the state. The section-click → table filter half is not built.
-- **Data Available:** Every departure (`DepVM.secs`) and arrival (`ArrVM.secs`) already carries the exact array of track section indices it traverses, and `MapCanvas` already hit-tests individual track sections (`{ kind: "seg", s, n }` in `Hit`).
+- **Data Available:** Every departure (`DepVM.secs`) and arrival (`ArrVM.secs`) already carries the exact array of track section indices it traverses, and the map already hit-tests individual track sections (`{ kind: "seg", s, n }` in `Hit`).
 - **Description:**
   - **Hover/click a train in `DeparturesTable`** to trace that single train's exact path on the map, highlighting all its calling cities and showing its commercial speed (`km / duration`).
   - **Click any track section on the map** to filter the timetable to only the trains running over that specific piece of track (answering *"Which trains cross this bridge or mountain pass?"*).
@@ -32,7 +32,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
 - **Status:** **Completed**
 - **Data Available:** Clicking a bar in `Histograms` (hour of day, distance bin, or duration bin) currently filters only `DeparturesTable`, while `App.tsx` only recomputes map flows for train-class filters (`selectedClasses`). Because `DepVM.secs` and `ArrVM.secs` hold per-train section lists, `App.tsx` can recompute section flows (`FlowVM[]`) and destination/source aggregates (`DestVM[]` / `SrcVM[]`) across any combination of active histogram filters.
 - **Description:**
-  - Lift histogram filter state (`selectedHour`, `selectedDistBin`, `selectedDurBin`) so that selecting any combination of hour, distance bracket, duration bracket, and train class dynamically updates **both** the `MapCanvas` proportional flow bands and the `Histograms` cross-filtered overlays.
+  - Lift histogram filter state (`selectedHour`, `selectedDistBin`, `selectedDurBin`) so that selecting any combination of hour, distance bracket, duration bracket, and train class dynamically updates **both** the map's proportional flow bands and the `Histograms` cross-filtered overlays.
   - Optional time-of-day scrubber / multi-bar selection for watching overnight `Z`/`T`/`K` sleeper corridors vs. morning HSR waves.
 - **UX / Design Notes:**
   - **Mobile UX consideration:** On mobile viewports, the histograms sit below the map above the departures table, so scrolling back and forth between the histogram bars and the map canvas can feel clunky. When implementing, consider a compact floating filter pill/summary bar on the map (or sticky mini-controls) so mobile users can see and clear active histogram filters without losing sight of the map.
@@ -51,15 +51,15 @@ This document tracks potential features to explore for the **China Rail Flow Map
 
 ### 5. Two-City Comparison / "Sphere of Influence" View
 - **Status:** Proposed
-- **Data Available:** All 100 origins are loaded into memory in Phase 1 (`OutMapData`).
+- **Data Available:** All 102 origins are loaded into memory in Phase 1 (`OutMapData`).
 - **Description:**
   - A "Compare with…" picker that overlays two origins in contrasting colors (e.g., Chengdu vs. Chongqing, or Beijing vs. Shanghai) to visualize overlapping corridors and compare which third cities are faster or more frequently served from City A vs. City B.
 
 ### 6. 1-Transfer Connection Finder (`Origin → Hub → Destination`)
 - **Status:** Proposed
-- **Data Available:** Once tables load, all 100 cities' departure/arrival tables and intermediate calls (`CallVM`) are in memory, allowing outbound calls from City A to be joined with inbound calls to City B.
+- **Data Available:** Once tables load, all 102 cities' departure/arrival tables and intermediate calls (`CallVM`) are in memory, allowing outbound calls from City A to be joined with inbound calls to City B.
 - **Description:**
-  - When clicking an unreached city (or a city with few direct trains), calculate and display the best 1-transfer itineraries across the top 100 hubs, including same-station vs. cross-city station transfers (`tsZh === bsZh`) and layover times.
+  - When clicking an unreached city (or a city with few direct trains), calculate and display the best 1-transfer itineraries across the 102 origin hubs, including same-station vs. cross-city station transfers (`tsZh === bsZh`) and layover times.
 
 ---
 
@@ -72,7 +72,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
   - When a user selects a city pair (e.g., Beijing ⇄ Shanghai), render an interactive **Marey diagram** (time on X-axis, station distance on Y-axis) showing all trains on that corridor and visualizing where high-speed `G` trains overtake stopping trains at intermediate stations.
 
 ### 8. National All-Trains Backbone Map ("No Origin Selected" Overview)
-- **Status:** **Completed** as national mode ("National Beta" in the header): the pipeline emits `atlas-v2-national` (per-section totals, every train once), `-national-trains` (whole runs), `-national-entries` (section entry minutes) and `-national-index` (per-train filter facts); the client draws the flows, the growing city circles and every train on one 24h clock, with the origin view's components (`docs/DECKGL_MIGRATION.md`, Phases 2–3).
+- **Status:** **Completed** as national mode ("National Beta" in the header): the pipeline emits `atlas-v2-national` (per-section totals, every train once), `-national-trains` (whole runs), `-national-entries` (section entry minutes) and `-national-index` (per-train filter facts); the client draws the flows, the growing city circles and every train on one 24h clock, with the origin view's components (`docs/history/DECKGL_MIGRATION.md`, Phases 2–3).
 - **Data Available:** Shared `train_table` and `sections` in `SharedData` (`pipeline/analyze/src/bin/atlaspack.rs`).
 - **Description:**
-  - Deduplicate every train across all 100 origins or emit a pre-aggregated national section flow array from `atlaspack` so users can view the **entire national rail volume** at once before clicking into a specific origin city.
+  - Deduplicate every train across all 102 origins or emit a pre-aggregated national section flow array from `atlaspack` so users can view the **entire national rail volume** at once before clicking into a specific origin city.
