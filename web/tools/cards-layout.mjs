@@ -57,7 +57,7 @@ const runCase = async ([w, h, expanded]) => {
     const r = (e) => { const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
     const one = (sel) => [...document.querySelectorAll(sel)].map(r).filter(Boolean).map((b, i) => ({ sel: `${sel}#${i}`, ...b }));
     return {
-      cards: [...one(".map-card"), ...one("#destPanel")],
+      cards: [...one(".map-card:not(.active-filter-bar)"), ...one("#destPanel")],
       others: [
         "#legend", "#scalebar", ".tl-expand-btn", ".timeline-bar-dock", ".timeline-collapsed-bar",
         ".toolbar", "header", ".active-filter-bar",
