@@ -9,12 +9,12 @@ The findings below (§0–§12) are the historical record and are not edited. �
 |---|---|
 | **§0 top actions** | |
 | 1. Merge with `--no-ff` (Vercel ignore rule) | ⏳ at merge time (owner) |
-| 2. Route-change review (8 rows) | ❌ owner |
-| 3. Surface a failed national index load | ❌ queued |
+| 2. Route-change review (8 rows) | ✅ owner accepted the shipped pack as is (2026-10-26) |
+| 3. Surface a failed national index load | ✅ #127 |
 | 4. ABOUT window from the pack | ✅ #109, pack swap #116 |
 | 5. Decide the trials | ✅ Zoom clarity kept as a parameter #107; `NatLayer` simplified #111 |
-| 6. Phone: cap the card column | ❌ owner decision |
-| 7. Accessibility | ❌ queued |
+| 6. Phone: cap the card column | ✅ superseded by the mobile redesign (#133, collapsed KEY legend, stacked bottom row) |
+| 7. Accessibility | ✅ #128 (the animation live-region announcer is being removed at the owner's request) |
 | 8. Tests and flake | ✅ #106, #108, #117, #118 |
 | 9. Maintainability | ✅ see §1 |
 | 10. Hygiene | ✅ mostly, see §9 |
@@ -24,17 +24,17 @@ The findings below (§0–§12) are the historical record and are not edited. �
 | S3 `layers/national/{timeline,trains,flows,cities,index}.ts` | ✅ #102 |
 | S4 timetable modal unroll, `lib/tripStatus` | ✅ #103 |
 | S5 `Histograms` takes rows | ✅ #110 |
-| S6 `MapCanvas` → `MapHost` | ⏳ #119 |
+| S6 `MapCanvas` → `MapHost` | ✅ #119 |
 | S7 `atlas.rs` `main()` split (byte-identical pack) | ✅ #100 |
 | S8 `audit.rs` split (identical output) | ✅ #104 |
-| §1.2 unused exports | ⏳ after the UI refactors |
+| §1.2 unused exports | ✅ #123 |
 | §1.3 stale comments, `NatData` move | ✅ #96 |
 | §1.4 trials | ✅ #107, #111 |
 | §1.5 one `stationName` / `fmtDurationWords`; one dot/ring builder | ✅ #101, #105 |
 | §1.6 caller-side logging | ✅ #98 |
 | **§2 Component reuse** | |
 | R3 one `DestinationPanel` | ✅ #113 |
-| R4 windowed origin tables | ⏳ in progress |
+| R4 windowed origin tables | ✅ #121 |
 | R5 one `Histograms` input | ✅ #110 |
 | R10 `dotLayers` / `ringLayer` | ✅ #105 |
 | R12 `LabelPoint` | ✅ #105 |
@@ -42,14 +42,18 @@ The findings below (§0–§12) are the historical record and are not edited. �
 | **§4 Performance report** | ✅ this document, `docs/perf/2026-10-26-canvas-vs-deck/` |
 | **§5 Unused files, stale docs** | ✅ #89, #90, #91 |
 | **§6 Tests / CI** | ✅ #106, #108, #117, #118 |
-| **§7 Accessibility and mobile** | ❌ queued; the phone panel cap is an owner decision |
+| **§7 Accessibility and mobile** | ✅ #128; mobile redesign #133, #134 and direct pushes |
 | **§8 Docs** | ✅ #99, #115 |
-| **§9 Hygiene** | ✅ 38 merged branches deleted, spikes kept as tags `spike/deckgl-f04acf8` and `spike/national-anim-600b3de`, 16 stale worktrees removed, root `vercel.json` removed #95; ❌ `exp/canonical-production-geometry` and `backup/handoff-local-main-3484031` (owner) |
-| **§10 Upstream data note** | ❌ for the owner to send |
-| **§11 Before merge** | ✅ 11.1 security headers #93 (no CSP, fonts not self-hosted); ❌ 11.2 index-failure notice (= top action 3); ✅ 11.5 provenance #109/#116; ✅ 11.8–11.9 pinning and `engines` #94 |
+| **§9 Hygiene** | ✅ 38 merged branches deleted, spikes kept as tags `spike/deckgl-f04acf8` and `spike/national-anim-600b3de`, stale worktrees removed, root `vercel.json` removed #95; `exp/canonical-production-geometry` and `backup/handoff-local-main-3484031` deleted (owner, 2026-10-26) |
+| **§10 Upstream data note** | ✅ recorded as a known property of the export, not necessarily a bug (owner): the stop lists of discovered trains are empty in `trains-all.json` and come from `train-operating-days.json` |
+| **§11 Before merge** | ✅ 11.1 security headers #93 (no CSP and fonts not self-hosted, owner: no); ✅ 11.2 index-failure notice #127; ✅ 11.5 provenance #109/#116; ✅ 11.8–11.9 pinning and `engines` #94 |
 
-Other fixes since the audit: footer style and the 21/28 Oct copy #97, swipe hint only on
-overflow #114, docs refreshed after the refactors #115.
+Other changes since the audit: footer style and the 21/28 Oct copy #97, swipe hint only on
+overflow #114, docs refreshed #115/#120, faster CI (path filters, split and parallel layout
+check) #124/#130/#135, departures table columns #131/#132, mobile redesign #133 and desktop
+layers popover #134, plus direct pushes for small mobile tweaks (title, station list, class
+button, top bar, 36px controls, city list, default phone view). Vercel: only `main` and
+`deckgl` deploy (`git.deploymentEnabled`), and `deckgl` only on a `[deploy]` commit.
 
 
 Audit of the long-lived integration branch `deckgl` before it merges into `main`. Read-only

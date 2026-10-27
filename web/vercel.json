@@ -4,6 +4,13 @@
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
   "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in main) git diff --quiet HEAD^ HEAD -- . ;; deckgl) if git log -1 --pretty=%B | grep -qF \"[deploy]\"; then exit 1; fi; exit 0 ;; *) exit 0 ;; esac",
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true,
+      "deckgl": true
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
