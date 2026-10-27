@@ -7,6 +7,7 @@
    Sections are appended per concern; keep each under its own banner. */
 import type {
   ActiveTrainVM,
+  ArrVM,
   ChordVM,
   CityPointVM,
   DayTimelineVM,
@@ -730,7 +731,25 @@ export function isTrainShown(
   return trainShownAt(code, animTime, sel?.allowedCodes ?? null, sel?.win ?? null);
 }
 
+/** The cities drawn while a train is isolated (shared by the origin and national
+    views): only the train's far end, beside the origin marker. `ends` are
+    `city_table` indices; null (nothing isolated) shows every city. */
+export function isolatedCityIdxs(ends: (number | null | undefined)[] | null): Set<number> | null {
+  return ends ? new Set(ends.filter((i): i is number => typeof i === "number" && i >= 0)) : null;
+}
+
+/** The origin view's isolated train's far end (outbound: its final stop's city
+    among the dests; inbound: the city it started from); the origin marker is
+    always drawn. Null when no train is isolated. */
+export function originIsolatedCities(cur: OriginVM | null, dir: Direction, iso: string | null | undefined): Set<number> | null {
+  if (!iso || !cur) return null;
+  const t = dir === "out" ? cur.deps.find((d) => d.code === iso) : cur.arrs.find((a) => a.code === iso);
+  return isolatedCityIdxs(t ? [dir === "out" ? (t as DepVM).tcIdx : (t as ArrVM).fcIdx] : []);
+}
+
 export interface StationInput {
+  /** City idx set to draw (null: all); see isolatedCityIdxs. */
+  shown?: ReadonlySet<number> | null;
   points: CityPointVM[];
   panelDest: CityPointVM | null;
   /** idx of the hovered station, -1 when none. */
@@ -826,10 +845,12 @@ export function stationStates(s: StationInput, sel: SelCache | null): StationSta
 
   const out: StationState[] = [];
   let hasPd = false;
+  const shown = s.shown ?? null;
   for (let i = 0; i < s.points.length; i++) {
     if (pd && s.points[i].idx === pd.idx) hasPd = true;
+    if (shown && !shown.has(s.points[i].idx)) continue;
     out.push(one(s.points[i]));
   }
-  if (pd && !hasPd) out.push(one(pd));
+  if (pd && !hasPd && (!shown || shown.has(pd.idx))) out.push(one(pd));
   return out;
 }
