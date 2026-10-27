@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { Direction } from "../types";
 import type { MapApi } from "../components/MapHost";
+import { track } from "../lib/analytics";
 
 /** Start the clock at `mins` and play: the animation is enabled, the clock is
     set to the minute, then it runs (setAnimEnabled first, since it sets the
@@ -42,6 +43,7 @@ export function useAnimationClock(
 
   const expandTimeline = () => {
     setIsTimelineCollapsed(false);
+    track("animation_play", { mode: national ? "national" : "origin", via: "timeline" });
     // Turning the animation on sets its start time (anim.ts animStartMins).
     mapRef.current?.setAnimEnabled?.(true);
     mapRef.current?.setSpeed?.(30);
@@ -51,6 +53,7 @@ export function useAnimationClock(
   // "Play from origin": open the bar and run the clock from this minute.
   const playFrom = (mins: number) => {
     setIsTimelineCollapsed(false);
+    track("animation_play", { mode: national ? "national" : "origin", via: "train" });
     startPlayback(mapRef.current, mins);
   };
 
