@@ -5,7 +5,7 @@
 export const SPEED_MULTIPLIERS: { label: string; secs: number }[] = [
   { label: "1×", secs: 60 },
   { label: "2×", secs: 30 },
-  { label: "3×", secs: 20 },
+  { label: "3×", secs: 15 },
 ];
 
 /** The seconds-per-day the next tap selects. A speed that is not a
