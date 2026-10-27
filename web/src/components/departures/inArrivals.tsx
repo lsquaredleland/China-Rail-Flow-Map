@@ -101,8 +101,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   const depNote = (
     <>
       Every train arriving in the selected city &mdash; from wherever
-      it starts &mdash; for every train in the timetable window. &ldquo;Stops&rdquo; counts the stops the train
-      makes before reaching {cur.en}.
+      it starts &mdash; for every train in the timetable window.
     </>
   );
   const tableNode = (
