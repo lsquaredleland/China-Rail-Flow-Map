@@ -93,8 +93,8 @@ for (const [w, h] of [[390, 844], [390, 664], [360, 740], [1280, 800]]) {
     }
   }
 }
-// Open 24h bar on phones: the collapse button is fully on screen and the
-// tick labels do not intersect each other.
+// Open 24h bar on phones (one compact row): the collapse button is fully on
+// screen, nothing overflows, and the tick labels and status badges are gone.
 for (const [w, h] of [[390, 844], [360, 740], [470, 844]]) {
   for (const national of [false, true]) {
     const pg = await browser.newPage();
@@ -124,6 +124,7 @@ for (const [w, h] of [[390, 844], [360, 740], [470, 844]]) {
     else if (t.collapse.x < 0 || t.collapse.r > w || t.collapse.y < 0) fails.push(`${tag}: collapse button off screen`);
     if (t.badges) fails.push(`${tag}: ${t.badges} status badge/zone labels still visible`);
     if (t.scrollW > t.clientW) fails.push(`${tag}: bar overflows (${t.scrollW} > ${t.clientW})`);
+    if (t.ticks.some((k) => k.r > k.x)) fails.push(`${tag}: tick labels still shown on the phone bar`);
     for (let i = 0; i < t.ticks.length; i++) {
       if (t.ticks[i].x < 0 || t.ticks[i].r > w) fails.push(`${tag}: tick "${t.ticks[i].t}" off screen`);
       for (let j = i + 1; j < t.ticks.length; j++) if (hit2(t.ticks[i], t.ticks[j])) fails.push(`${tag}: ticks "${t.ticks[i].t}" and "${t.ticks[j].t}" overlap`);

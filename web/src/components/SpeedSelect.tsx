@@ -1,27 +1,31 @@
-/** Phone-width speed control: a compact dropdown in multipliers instead of
-    the 15s / 30s / 60s segmented control (which stays on desktop). One place
-    to change the mapping: seconds per 24h day for each multiplier. */
+/** Phone-width speed control: one button showing the multiplier, tapping it
+    cycles 1x -> 2x -> 3x -> 1x (the 15s / 30s / 60s segmented control stays on
+    desktop). One place to change the mapping: seconds per 24h day for each
+    multiplier. */
 export const SPEED_MULTIPLIERS: { label: string; secs: number }[] = [
   { label: "1×", secs: 60 },
   { label: "2×", secs: 30 },
   { label: "3×", secs: 20 },
 ];
 
+/** The seconds-per-day the next tap selects. A speed that is not a
+    multiplier (set elsewhere, e.g. 15) restarts the cycle at 1x. */
+export function nextSpeed(secs: number): number {
+  const i = SPEED_MULTIPLIERS.findIndex((o) => o.secs === secs);
+  return SPEED_MULTIPLIERS[(i + 1) % SPEED_MULTIPLIERS.length].secs;
+}
+
 export default function SpeedSelect({ speed, onSetSpeed }: { speed: number; onSetSpeed: (secs: number) => void }) {
-  const known = SPEED_MULTIPLIERS.some((o) => o.secs === speed);
+  const cur = SPEED_MULTIPLIERS.find((o) => o.secs === speed);
   return (
-    <select
+    <button
+      type="button"
       className="tb-speed-select"
-      aria-label="Animation speed"
-      value={String(speed)}
-      onChange={(e) => onSetSpeed(Number(e.target.value))}
+      aria-label={`Animation speed ${cur ? cur.label : speed + "s"}, tap to change`}
+      onClick={() => onSetSpeed(nextSpeed(speed))}
     >
-      {!known && <option value={String(speed)}>{speed}s</option>}
-      {SPEED_MULTIPLIERS.map((o) => (
-        <option key={o.secs} value={String(o.secs)}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      <b>{cur ? cur.label : speed + "s"}</b>
+      <small>SPEED</small>
+    </button>
   );
 }

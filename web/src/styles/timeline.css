@@ -418,25 +418,44 @@
   box-shadow: 0 0 8px #C8302A;
 }
 
-/* The phone speed dropdown (SpeedSelect); the segmented control is for desktop. */
+/* The phone speed button (SpeedSelect); the segmented control is for desktop. */
 .tb-speed-select { display: none; }
-/* Phones: the collapse button is pinned top-right and always reachable; the
-   speed switch and Finish wrap onto a second line; the day-end tick label is
-   short so it cannot run into its neighbours. */
+/* Phones: one compact row. A black play square at the left, the red clock with
+   DAY n beside it over the slider in the middle, a tap-to-cycle speed column
+   and the collapse chevron in ruled columns at the right. The wrappers become
+   `display: contents` so the pieces sit on one grid. */
 @media (max-width: 640px) {
-  .timeline-bar-dock { padding: 8px 12px 6px; }
-  .tb-row { flex-wrap: wrap; gap: 8px 10px; padding-right: 40px; }
-  .tb-right { display: contents; }
-  .tb-right .tb-speed-group, .tb-right .tb-btn-action.is-text { order: 2; }
-  .tb-right .tb-btn-action.is-icon { position: absolute; top: 0; right: 0; width: 36px; height: 36px; }
-  .tb-tick-long { display: none; }
-  .tb-zone-label, .tb-left .tb-badge { display: none; }
-  .tb-speed-group { display: none; }
-  .tb-right .tb-speed-select {
-    display: inline-block; order: 2;
-    height: 28px; padding: 0 6px;
-    border: 1.5px solid var(--tl-line); border-radius: 0;
-    background: transparent; color: var(--tl-ink);
-    font-size: 12px; font-weight: 700;
+  .timeline-bar-dock {
+    display: grid; gap: 0; padding: 0;
+    grid-template-columns: 56px minmax(0, 1fr) 64px 48px;
+    grid-template-rows: auto auto;
   }
+  .tb-row, .tb-left, .tb-right, .tb-scrub { display: contents; }
+  .tb-play { grid-column: 1; grid-row: 1 / 3; width: auto; height: auto; min-height: 64px; }
+  .tb-play svg { width: 22px; height: 22px; }
+  .tb-time {
+    grid-column: 2; grid-row: 1;
+    flex-direction: row-reverse; justify-content: flex-end; align-items: baseline; gap: 8px;
+    padding: 8px 12px 0;
+  }
+  .tb-clock { font-size: 26px; color: var(--tl-accent); }
+  .tb-day-label { font-size: 11px; letter-spacing: 0.06em; }
+  .tb-zones, .tb-track { grid-column: 2; }
+  .tb-zones { grid-row: 2; align-self: end; margin: 0 12px 4px; width: auto; height: 22px; }
+  .tb-track { grid-row: 2; align-self: end; margin: 0 12px 11px; width: auto; }
+  .tb-ticks, .tb-zone-label, .tb-badge, .tb-speed-group, .tb-speed-caption,
+  .tb-btn-action.is-text { display: none; }
+  .tb-right .tb-speed-select {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    grid-column: 3; grid-row: 1 / 3;
+    border: 0; border-left: 1.5px solid var(--tl-track); border-radius: 0;
+    background: transparent; color: var(--tl-ink); padding: 0; min-height: 64px;
+  }
+  .tb-speed-select b { font-size: 22px; font-weight: 800; line-height: 1; }
+  .tb-speed-select small { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; color: var(--tl-muted); }
+  .tb-right .tb-btn-action.is-icon {
+    grid-column: 4; grid-row: 1 / 3; width: auto; height: auto;
+    border: 0; border-left: 1.5px solid var(--tl-track);
+  }
+  .tb-btn-action.is-icon svg { transform: rotate(180deg); width: 20px; height: 20px; }
 }
