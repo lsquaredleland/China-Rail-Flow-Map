@@ -3,7 +3,7 @@
    no-op there. A Measurement ID is public (it ships in every page). */
 
 const GA_ID = "G-Z5R7L1HYS1";
-const PROD_HOST = "china-rail-flow-map-web.vercel.app";
+const PROD_HOST = "minard.lsquared.cc";
 
 type Gtag = (...args: unknown[]) => void;
 type Params = Record<string, string | number | boolean>;

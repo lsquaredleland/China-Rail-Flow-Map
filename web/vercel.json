@@ -11,6 +11,14 @@
       "deckgl": true
     }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "china-rail-flow-map-web.vercel.app" }],
+      "destination": "https://minard.lsquared.cc/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
