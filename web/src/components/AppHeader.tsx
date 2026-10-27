@@ -115,14 +115,15 @@ export default function AppHeader({
       </div>
       </div>
       <p className={"subtitle" + (subOpen ? " open" : "")} onClick={() => setSubOpen((v) => !v)}>
-        Flow diagram of trains departing and arriving across China&rsquo;s
-        top rail cities. The width of each line refers to the number of
-        daily trains along that particular piece of track &mdash; spanning{" "}
+        A Minard inspired animated flow diagram of trains departing and
+        arriving across China&rsquo;s top rail hubs. The width of each line
+        corresponds to the number of trains that traverse said corridor.
+        Spanning{" "}
         <b>{trainCount ? trainCount.toLocaleString("en-US") : "…"}</b>{" "}
-        scheduled passenger services across China&rsquo;s{" "}
-        <b>{distUnit === "mi" ? "30,000 mi" : "48,000 km"}</b> high-speed
-        rail network ({distUnit === "mi" ? "100,000 mi" : "162,000 km"} of
-        total track).
+        scheduled passenger services across over{" "}
+        <b>{distUnit === "mi" ? "30,000 mi" : "50,000 km"}</b> of high speed
+        rail (and even more conventional rail). Click on a city pair to see
+        how traffic flows between them.
       </p>
       {compact && (
         <p className="mob-stats" aria-hidden="true">
