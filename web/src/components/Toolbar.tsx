@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { CityPointVM, Direction, DistUnit, OriginVM, RawOrigin } from "../types";
 import { FLOW_CLASSES } from "../lib";
@@ -72,8 +72,32 @@ export default function Toolbar({
   // (the panels are `display: contents` there).
   const [panel, setPanel] = useState<"filters" | "more" | null>(null);
   const toggle = (p: "filters" | "more") => setPanel((v) => (v === p ? null : p));
+  // Wide screens: the layers panel is a popover. Esc closes it (focus returns
+  // to its button) and so does a click anywhere outside it.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (panel !== "more") return;
+    const wide = () => window.matchMedia("(min-width: 641px)").matches;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setPanel(null);
+      document.getElementById("moreBtn")?.focus();
+    };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (wide() && t && !t.closest("#tbMore, #moreBtn")) setPanel(null);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [panel]);
+  // A dot on the layers button while any option differs from its default.
+  const layersChanged = !showNetwork || showLabels || showInfra || zoomClarity || (national && !showFlows) || distUnit !== "km";
   return (
-    <div className="toolbar">
+    <div className="toolbar" ref={rootRef}>
       {!national && (
       <>
       <div className="group city-picker">
@@ -126,7 +150,8 @@ export default function Toolbar({
         id="moreBtn"
         type="button"
         aria-label="Map options"
-        className="tb-mob-btn"
+        title="Map options"
+        className="tb-mob-btn tb-layers-btn"
         aria-expanded={panel === "more" ? "true" : "false"}
         aria-controls="tbMore"
         onClick={() => toggle("more")}
@@ -135,50 +160,11 @@ export default function Toolbar({
           <path d="M12 3 3 8l9 5 9-5zM3 12.5l9 5 9-5M3 16.5l9 5 9-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
         </svg>
         <span className="tb-mob-lbl">Map options</span>
+        {layersChanged && <span className="tb-dot" title="Some map options are changed" />}
         <span className="tb-mob-lbl" aria-hidden="true"> ▾</span>
       </button>
-      <div id="tbFilters" className={"tb-panel" + (panel === "filters" ? " open" : "")}>
-      <div
-        className="group cls-filter"
-        role="group"
-        aria-label="Filter map and table by train class"
-      >
-        <span className="cls-label">Class:</span>
-        <button
-          type="button"
-          className="cls-btn"
-          aria-pressed={selectedClasses.length === 0 ? "true" : "false"}
-          onClick={() => onClearClasses()}
-        >
-          All
-        </button>
-        {FLOW_CLASSES.map((cls) => {
-          const active = selectedClasses.includes(cls);
-          const label = cls === "plain" ? "普" : cls;
-          const enabled = availableClasses.has(cls);
-          return (
-            <button
-              key={cls}
-              type="button"
-              className="cls-btn"
-              aria-pressed={active ? "true" : "false"}
-              disabled={!enabled}
-              title={
-                !enabled
-                  ? panelCity
-                    ? `No ${label} trains between ${cur?.en || "origin"} and ${panelCity.en}`
-                    : `No ${label} trains for ${cur?.en || "origin"}`
-                  : undefined
-              }
-              onClick={() => onToggleClass(cls)}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-      </div>
-      <div id="tbMore" className={"tb-panel" + (panel === "more" ? " open" : "")}>
+      <div id="tbMore" className={"tb-panel tb-pop" + (panel === "more" ? " open" : "")} role="group" aria-label="Map options">
+      <span className="tb-pop-h">View</span>
       <div className="group">
         <button
           id="btnCountry"
@@ -196,8 +182,24 @@ export default function Toolbar({
             Origin close-up
           </button>
         )}
+        <button
+          id="btnOut"
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => mapRef.current?.zoomCenter(1 / 1.45)}
+        >
+          &minus;
+        </button>
+        <button
+          id="btnIn"
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => mapRef.current?.zoomCenter(1.45)}
+        >
+          +
+        </button>
       </div>
-      <div className="spacer"></div>
+      <span className="tb-pop-h">Map layers</span>
       <div className="group">
         <button
           id="tglNetwork"
@@ -243,23 +245,8 @@ export default function Toolbar({
         >
           Zoom clarity
         </button>
-        <button
-          id="btnOut"
-          type="button"
-          aria-label="Zoom out"
-          onClick={() => mapRef.current?.zoomCenter(1 / 1.45)}
-        >
-          &minus;
-        </button>
-        <button
-          id="btnIn"
-          type="button"
-          aria-label="Zoom in"
-          onClick={() => mapRef.current?.zoomCenter(1.45)}
-        >
-          +
-        </button>
       </div>
+      <span className="tb-pop-h">Units &amp; theme</span>
       <div className="group units" role="group" aria-label="Distance units">
         <button
           id="unitKm"
@@ -302,6 +289,47 @@ export default function Toolbar({
         >
           Night
         </button>
+      </div>
+      </div>
+      <div id="tbFilters" className={"tb-panel" + (panel === "filters" ? " open" : "")}>
+      <div
+        className="group cls-filter"
+        role="group"
+        aria-label="Filter map and table by train class"
+      >
+        <span className="cls-label">Class:</span>
+        <button
+          type="button"
+          className="cls-btn"
+          aria-pressed={selectedClasses.length === 0 ? "true" : "false"}
+          onClick={() => onClearClasses()}
+        >
+          All
+        </button>
+        {FLOW_CLASSES.map((cls) => {
+          const active = selectedClasses.includes(cls);
+          const label = cls === "plain" ? "普" : cls;
+          const enabled = availableClasses.has(cls);
+          return (
+            <button
+              key={cls}
+              type="button"
+              className="cls-btn"
+              aria-pressed={active ? "true" : "false"}
+              disabled={!enabled}
+              title={
+                !enabled
+                  ? panelCity
+                    ? `No ${label} trains between ${cur?.en || "origin"} and ${panelCity.en}`
+                    : `No ${label} trains for ${cur?.en || "origin"}`
+                  : undefined
+              }
+              onClick={() => onToggleClass(cls)}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       </div>
     </div>
