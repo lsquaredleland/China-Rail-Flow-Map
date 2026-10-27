@@ -31,6 +31,7 @@
   color: var(--ink-soft);
 }
 .dep-st { display: inline-block; }
+.dep-st-more { display: none; }
 .dep-st b { color: var(--ink); font-weight: 700; }
 .dep-st-en { opacity: 0.8; }
 .dep-of { color: var(--ink-soft); font-weight: 500; font-size: 0.7em; }
@@ -176,6 +177,7 @@
   display: flex; align-items: center; justify-content: center;
 }
 .dep-chip button:hover { border-color: transparent; background: rgba(128, 128, 128, 0.25); }
+.dep-swipe { margin: 0 0 6px; font-size: 12px; color: var(--ink-soft); font-style: italic; }
 .dep-scroll { overflow-x: auto; overflow-y: auto; max-height: 50dvh; -webkit-overflow-scrolling: touch; border: 1px solid var(--rule); }
 #depTable {
   border-collapse: collapse;
@@ -216,7 +218,7 @@
   background: var(--paper-deep) !important;
   box-shadow: inset 4px 0 0 var(--rust);
 }
-#depTable tbody tr:nth-child(even) { background: var(--row-alt); }
+#depTable tbody tr.alt { background: var(--row-alt); }
 #depTable td.num, #depTable th.num { text-align: right; }
 .c-time { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 500; }
 .c-train { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -288,3 +290,13 @@
 }
 .dep-chip.is-isolated b { margin-left: 4px; color: #FFFFFF; }
 .dep-chip.is-isolated button { color: #FFFFFF; }
+/* ---------- run days + national table ---------- */
+.c-runs { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.runs-label { color: var(--ink-soft); }
+/* The windowed tables: one fixed row height (set on the row), cells do not wrap. */
+.win-table tbody td { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 190px; }
+.win-table tbody tr.win-spacer { height: auto; cursor: default; background: none !important; }
+.win-table tbody tr.win-spacer td { padding: 0; border: 0; }
+.win-table tbody tr.win-spacer:hover { background: none !important; }
+.nat-table { min-width: 760px; }
+.nat-table tbody td { max-width: 280px; padding-top: 4px; padding-bottom: 4px; vertical-align: middle; }

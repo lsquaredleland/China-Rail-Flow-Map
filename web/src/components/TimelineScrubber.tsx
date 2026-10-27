@@ -5,7 +5,8 @@ import {
   type FC,
   type RefObject,
 } from "react";
-import type { MapApi, AnimState } from "./MapCanvas";
+import type { MapApi, AnimState } from "./MapHost";
+import SpeedSelect from "./SpeedSelect";
 import type { Direction } from "../types";
 
 export interface TimelineScrubberProps {
@@ -74,7 +75,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
   const rushBadgeRef = useRef<HTMLDivElement | null>(null);
   const rushBadgeTextRef = useRef<HTMLSpanElement | null>(null);
-  const finishTickRef = useRef<HTMLSpanElement | null>(null);
+  const finishTickRef = useRef<HTMLButtonElement | null>(null);
 
   // Un-rendered transient state kept in refs for 60fps direct-DOM execution
   const currentPlayingRef = useRef(false);
@@ -87,8 +88,11 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(30);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  // National mode (D13): Running / Trains counters, a one-day clock with no finish.
+  const [isNational, setIsNational] = useState(false);
+  const currentNationalRef = useRef(false);
 
-  // Subscribe to MapCanvas animation ticks with direct DOM updates (0% React re-render overhead)
+  // Subscribe to MapHost animation ticks with direct DOM updates (0% React re-render overhead)
   useEffect(() => {
     const handleAnimUpdate = (state: AnimState) => {
       const totM = state.totalMins || 1440;
@@ -145,7 +149,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       // 4. Time period / Rush hour badge
       if (rushBadgeRef.current && rushBadgeTextRef.current) {
         const rushColor = dark ? "#E54035" : "#C8302A";
-        if (t >= totM) {
+        if (t >= totM && !state.national) {
           rushBadgeTextRef.current.textContent = "ALL ARRIVED";
           rushBadgeRef.current.style.borderColor = "#10B981";
           rushBadgeRef.current.style.color = "#10B981";
@@ -178,7 +182,13 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         setIsPlaying(state.isPlaying);
       }
 
-      // 6. Sync speed preset button if changed externally
+      // 6. Flip the national labels only when the mode changes
+      if (state.national !== currentNationalRef.current) {
+        currentNationalRef.current = state.national;
+        setIsNational(state.national);
+      }
+
+      // 7. Sync speed preset button if changed externally
       const spd = state.speed;
       if (spd && spd !== currentSpeedRef.current) {
         currentSpeedRef.current = spd;
@@ -211,7 +221,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       if (pollInterval) clearInterval(pollInterval);
       if (unsub) unsub();
     };
-  }, [mapRef, direction, dark]);
+  }, [mapRef, direction, dark, isNational]); // a mode flip remounts counters: re-pull the state
 
   // Global Keyboard Shortcuts (Space, ArrowLeft, ArrowRight, Home)
   useEffect(() => {
@@ -311,10 +321,9 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
   const handleExpand = () => {
     setIsCollapsed(false);
-    currentTimeRef.current = 360;
+    // Turning the animation on sets its start time (anim.ts animStartMins).
     mapRef.current?.setAnimEnabled?.(true);
     mapRef.current?.setSpeed?.(30);
-    mapRef.current?.setTime?.(360);
     mapRef.current?.setPlaying?.(true);
   };
 
@@ -382,22 +391,24 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
               0
             </span>
             <span className="tb-metric-lbl">
-              {direction === "out" ? "DEPARTED" : "BOARDED"}
+              {isNational ? "RUNNING" : direction === "out" ? "DEPARTED" : "BOARDED"}
             </span>
           </div>
 
-          <div className="tb-metric-col">
-            <span ref={arrivedValRef} className="tb-metric-val is-ink">
-              0
-            </span>
-            <span className="tb-metric-lbl">ARRIVED</span>
-          </div>
+          {!isNational && (
+            <div className="tb-metric-col">
+              <span ref={arrivedValRef} className="tb-metric-val is-ink">
+                0
+              </span>
+              <span className="tb-metric-lbl">ARRIVED</span>
+            </div>
+          )}
 
           <div className="tb-metric-col">
             <span ref={totalValRef} className="tb-metric-val is-total">
               0
             </span>
-            <span className="tb-metric-lbl">TOTAL</span>
+            <span className="tb-metric-lbl">{isNational ? "TRAINS" : "TOTAL"}</span>
           </div>
         </div>
 
@@ -405,6 +416,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
         <div className="tb-right">
           <span className="tb-speed-caption">A DAY IN</span>
 
+          <SpeedSelect speed={speed} onSetSpeed={handleSetSpeed} />
           <div className="tb-speed-group">
             <button
               type="button"
@@ -515,49 +527,57 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
         {/* Ticks & Labels Row */}
         <div className="tb-ticks">
-          <span
+          <button
+            type="button"
             className="tb-tick-item at-0"
             onClick={() => handleSliderInput(0)}
             title="Day 1 00:00"
           >
             00:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-6"
             onClick={() => handleSliderInput(188)}
             title="Day 1 06:00"
           >
             06:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-12"
             onClick={() => handleSliderInput(375)}
             title="Day 1 12:00"
           >
             12:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-18"
             onClick={() => handleSliderInput(562)}
             title="Day 1 18:00"
           >
             18:00
-          </span>
-          <span
+          </button>
+          <button
+            type="button"
             className="tb-tick-item at-24"
             onClick={() => handleSliderInput(750)}
             title="Day 1 24:00 (Day 1 departures complete)"
           >
-            24:00 · Day 1 ends
-          </span>
-          <span
-            ref={finishTickRef}
-            className="tb-tick-item at-end"
-            onClick={handleJumpToFinish}
-            title="All trains arrived"
-          >
-            All arrived
-          </span>
+            24:00<span className="tb-tick-long"> · Day 1 ends</span>
+          </button>
+          {!isNational && (
+            <button
+              type="button"
+              ref={finishTickRef}
+              className="tb-tick-item at-end"
+              onClick={handleJumpToFinish}
+              title="All trains arrived"
+            >
+              All arrived
+            </button>
+          )}
         </div>
       </div>
     </div>

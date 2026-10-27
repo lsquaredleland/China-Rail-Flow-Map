@@ -90,12 +90,19 @@ export function palette(dark: boolean): Palette {
 
 /* ---------- scales & formatting ---------- */
 
-// Minard width scale: strictly proportional to trains/day at every zoom —
-// width = k(zoom) * trains, k = 0.08 px per train at national-fit scale,
-// with only a 0.5 px hairline floor so 1-train sections stay visible.
-export const WIDTH_K = 0.08;
+// Width scale: width = k(zoom) * flowUnits(trains/day), k = 0.06 px per
+// unit at national-fit scale, with a 0.5 px hairline floor so 1-train
+// sections stay visible. flowUnits is the train count itself up to
+// WIDTH_KNEE, then grows with its square root (same value and slope at the
+// knee), so the busiest corridors don't swamp the map.
+export const WIDTH_K = 0.06;
+export const WIDTH_KNEE = 40;
+const SQRT_KNEE = Math.sqrt(WIDTH_KNEE);
+export function flowUnits(n: number): number {
+  return n <= WIDTH_KNEE ? n : WIDTH_KNEE + 2 * SQRT_KNEE * (Math.sqrt(n) - SQRT_KNEE);
+}
 export function flowWidth(n: number, scale: number, fitScale: number): number {
-  return Math.max(0.5, n * WIDTH_K * (scale / fitScale));
+  return Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale));
 }
 
 function rgbStr(c: [number, number, number]): string {
@@ -153,13 +160,22 @@ export function rampColor(mins: number, pal: Palette): string {
 
 // Dot radius is a screen-space size, clamped so a destination stays a
 // marker at any zoom instead of swelling into a blob over the track.
-export const STATION_R_MIN = 2;
-export const STATION_R_MAX = 26;
+const STATION_R_MIN = 2;
+const STATION_R_MAX = 26;
 export function stationR(trains: number): number {
   return Math.max(
     STATION_R_MIN,
     Math.min(STATION_R_MAX, 1.3 + Math.sqrt(trains) * 0.55),
   );
+}
+
+/** National city circles (departures + arrivals per day), at the national
+    fit: radius = 1.2 + 0.59 n^0.35, a strong compression so the ~3000-train
+    hubs draw about 11 px and the smallest cities about 2 px, leaving the
+    network readable. Floored at NAT_CITY_R_MIN. */
+export const NAT_CITY_R_MIN = 1.5;
+export function natCityR(n: number): number {
+  return Math.max(NAT_CITY_R_MIN, 1.2 + 0.59 * Math.pow(Math.max(0, n), 0.35));
 }
 
 /** Zoom growth of a dot with base radius r at zoom progress t in [0, 1]:
@@ -168,4 +184,62 @@ export function stationR(trains: number): number {
 export function stationZoomK(r: number, t: number): number {
   const kmax = 3 - (r - STATION_R_MIN) / (STATION_R_MAX - STATION_R_MIN);
   return 1 + (kmax - 1) * t;
+}
+
+/* ---------- RGBA tuples for WebGL layers ---------- */
+
+export type RGBA = [number, number, number, number];
+
+const rgbaCache = new Map<string, RGBA>();
+
+/** Parses a palette colour (`#rgb`, `#rrggbb`, `rgb(r,g,b)`, `rgba(r,g,b,a)`)
+    into a 0-255 `[r, g, b, a]` tuple, the CSS alpha times `alpha`. The tuple is
+    cached and shared: callers must not mutate it. */
+export function rgba(css: string, alpha = 1): RGBA {
+  const key = css + "|" + alpha;
+  const hit = rgbaCache.get(key);
+  if (hit) return hit;
+  let r: number, g: number, b: number, a = 1;
+  if (css[0] === "#") {
+    const h = css.length === 4 ? css.slice(1).replace(/./g, (x) => x + x) : css.slice(1);
+    r = parseInt(h.slice(0, 2), 16);
+    g = parseInt(h.slice(2, 4), 16);
+    b = parseInt(h.slice(4, 6), 16);
+  } else {
+    const m = css.match(/[\d.]+/g);
+    if (!m || m.length < 3) throw new Error("rgba(): unsupported colour " + css);
+    r = +m[0];
+    g = +m[1];
+    b = +m[2];
+    if (m.length > 3) a = +m[3];
+  }
+  const out: RGBA = [r, g, b, Math.round(255 * a * alpha)];
+  rgbaCache.set(key, out);
+  return out;
+}
+
+/** The palette's CSS colours as RGBA tuples (the same values, one parse). */
+export function paletteRGBA(dark: boolean) {
+  const p = palette(dark);
+  return {
+    paper: rgba(p.paper),
+    network: rgba(p.network),
+    graticule: rgba(p.graticule),
+    flow: rgba(p.flow),
+    flowHi: rgba(p.flowHi),
+    chord: rgba(p.chord),
+    infraLine: rgba(p.infraLine),
+    infraHsr: rgba(p.infraHsr),
+    infraConv: rgba(p.infraConv),
+    dot: rgba(p.dot),
+    dotEdge: rgba(p.dotEdge),
+    label: rgba(p.label),
+    labelHalo: rgba(p.labelHalo),
+    origin: rgba(p.origin),
+    outline: rgba(p.outline),
+    dashLine: rgba(p.dashLine),
+    landFill: rgba(p.landFill),
+    /** Dashed Qiongzhou ferry crossing (hard-coded in the Canvas network layer). */
+    ferry: rgba(dark ? "#38BDF8" : "#0284C7"),
+  };
 }

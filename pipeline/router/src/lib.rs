@@ -7,6 +7,7 @@
 //!   baseline   optional production geometry (`Baseline`)
 //!   graph      OSM extract -> rail graph (`NetworkConfig`)
 //!   china      today's implementations of all four, plus the file layout
+//!   export     a second schedule source: a train export with a calendar
 //! Routing + model:
 //!   legs, candidates, bridge, evidence, model, infer, decide, canon, validate
 //! Outputs:
@@ -22,6 +23,7 @@ pub mod classes;
 pub mod config;
 pub mod decide;
 pub mod evidence;
+pub mod export;
 pub mod graph;
 pub mod infer;
 pub mod legs;

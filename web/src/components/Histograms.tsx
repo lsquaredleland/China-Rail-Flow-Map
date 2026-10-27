@@ -1,22 +1,19 @@
 import { useMemo, useRef, useState } from "react";
-import type {
-  CityPointVM,
-  DestVM,
-  Direction,
-  DistBinFilter,
-  DistUnit,
-  DurBinFilter,
-  OriginVM,
-  SrcVM,
-} from "../types";
+import type { CityPointVM, Direction, DistBinFilter, DistUnit, DurBinFilter } from "../types";
+import type { HistRow } from "../lib";
 
 export type { DistBinFilter, DurBinFilter };
 
 interface Props {
-  cur: OriginVM;
+  /** The trains to bin: the origin's departures or arrivals, or every national train. */
+  rows: HistRow[];
+  /** The pinned city's calls, binned beside `rows` (given with `panelCity`). */
+  subRows?: HistRow[];
+  /** The place the trains run from or to, for the captions ("Guangzhou", "China"). */
+  where: string;
   unit: DistUnit;
   direction: Direction;
-  panelCity?: CityPointVM | null;
+  panelCity?: Pick<CityPointVM, "en"> | null;
   selectedClasses?: string[];
   selectedHour?: number | null;
   selectedHours?: number[];
@@ -42,13 +39,13 @@ const BASE = 84; // baseline y; axis labels hang below it
 const PLOT_W = W - PAD_L - PAD_R;
 const PLOT_H = BASE - TOP;
 
-interface Tick {
+export interface Tick {
   x: number;
   label: string;
   anchor: "start" | "middle" | "end";
 }
 
-function Chart({
+export function Chart({
   counts,
   subCounts,
   ticks,
@@ -259,7 +256,9 @@ function trainsWord(n: number): string {
 }
 
 export default function Histograms({
-  cur,
+  rows,
+  subRows,
+  where,
   unit,
   direction,
   panelCity,
@@ -325,41 +324,7 @@ export default function Histograms({
     durTicks,
     durTitles,
   } = useMemo(() => {
-    const fullCity = panelCity
-      ? (inbound
-          ? cur.srcs.find((s) => s.idx === panelCity.idx)
-          : cur.dests.find((d) => d.idx === panelCity.idx)) || panelCity
-      : null;
-
-    const rows = inbound
-      ? cur.arrs.map((a) => ({
-          time: a.arr,
-          distKm: a.distKm,
-          dur: a.dur,
-          cls: a.cls,
-        }))
-      : cur.deps.map((d) => ({
-          time: d.dep,
-          distKm: d.distKm,
-          dur: d.dur,
-          cls: d.cls,
-        }));
-
-    const baseSubRows = fullCity
-      ? inbound
-        ? ((fullCity as SrcVM).inCalls || []).map((c) => ({
-            time: c.arr.arr,
-            distKm: c.arr.distKm,
-            dur: c.arr.dur,
-            cls: c.arr.cls,
-          }))
-        : ((fullCity as DestVM).calls || []).map((c) => ({
-            time: c.dep.dep,
-            distKm: c.dep.distKm,
-            dur: c.dep.dur,
-            cls: c.dep.cls,
-          }))
-      : rows;
+    const baseSubRows = panelCity ? subRows ?? [] : rows;
 
     const matchesClass = (r: { cls: string }) =>
       !hasClassFilter || selectedClasses!.includes(r.cls);
@@ -394,7 +359,7 @@ export default function Histograms({
     };
 
     const hasOtherForHour =
-      fullCity ||
+      panelCity ||
       hasClassFilter ||
       activeDistBins.length > 0 ||
       activeDurBins.length > 0;
@@ -405,7 +370,7 @@ export default function Histograms({
       : null;
 
     const hasOtherForDist =
-      fullCity ||
+      panelCity ||
       hasClassFilter ||
       activeHours.length > 0 ||
       activeDurBins.length > 0;
@@ -416,7 +381,7 @@ export default function Histograms({
       : null;
 
     const hasOtherForDur =
-      fullCity ||
+      panelCity ||
       hasClassFilter ||
       activeHours.length > 0 ||
       activeDistBins.length > 0;
@@ -439,8 +404,8 @@ export default function Histograms({
       }
     }
     const prep = inbound ? "from " : "to ";
-    const subDesc = fullCity
-      ? prep + fullCity.en + (hasClassFilter ? " (" + clsText + ")" : "")
+    const subDesc = panelCity
+      ? prep + panelCity.en + (hasClassFilter ? " (" + clsText + ")" : "")
       : clsText;
     const hTitles = hours.map((c, h) => {
       const base = pad2(h) + ":00–" + pad2(h + 1) + ":00 · ";
@@ -610,7 +575,8 @@ export default function Histograms({
       durTitles: tTitles,
     };
   }, [
-    cur,
+    rows,
+    subRows,
     unit,
     inbound,
     panelCity,
@@ -622,7 +588,7 @@ export default function Histograms({
     activeDurBins,
   ]);
 
-  if ((inbound ? cur.arrs.length : cur.deps.length) === 0) return null;
+  if (rows.length === 0) return null;
 
   const hourTicks: Tick[] = [0, 6, 12, 18, 23].map((h) => ({
     x: PAD_L + ((h + 0.5) / 24) * PLOT_W,
@@ -792,7 +758,7 @@ export default function Histograms({
             (inbound ? "arrivals" : "departures") +
             " by hour of day " +
             (inbound ? "in " : "from ") +
-            cur.en +
+            where +
             (panelCity
               ? " with " +
                 (inbound ? "arrivals from " : "calls at ") +
@@ -834,7 +800,7 @@ export default function Histograms({
           ariaLabel={
             "Histogram of trains " +
             (inbound ? "arriving in " : "from ") +
-            cur.en +
+            where +
             " by journey distance " +
             (inbound ? "from their origin" : "to their final destination") +
             (panelCity
@@ -890,7 +856,7 @@ export default function Histograms({
           ariaLabel={
             "Histogram of trains " +
             (inbound ? "arriving in " : "from ") +
-            cur.en +
+            where +
             " by journey duration in 1-hour bins"
           }
         />

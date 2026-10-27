@@ -1,52 +1,148 @@
 @media (max-width: 640px) {
+  /* Top bar (owner mock): picker, an OUT/IN toggle, Filters, Map options on one
+     row; the header's stats as one line under it. */
+  .stats { display: none; }
+  .toolbar .city-picker { flex: 1 1 0; min-width: 0; }
+  .toolbar .city-picker label { display: none; }
+  .toolbar .units[aria-label="Direction"] { display: none; }
+  .toolbar .tb-mob-btn { flex: 0 0 36px; width: 36px; height: 36px; }
+  .toolbar .tb-dir-btn {
+    flex-direction: column; gap: 2px;
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .tb-dir-lbl { font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+  .mob-stats { display: block; margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .mob-stats b { color: var(--ink); font-weight: 800; font-size: 15px; }
+  .mob-stats span:first-child b { color: var(--rust); }
+  /* The description: two lines, tap for the rest. */
+  .subtitle { cursor: pointer; }
+  .subtitle.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  /* One control height on phones: the Origin City | National Beta switch's 36 px. */
+  /* The Chinese title on its own line. */
+  h1 .zh { display: block; }
+  h1 .zh-sep { display: none; }
+  /* Station breakdown: the first two, the rest behind "+N more". */
+  .dep-stations:not(.open) .dep-st:nth-of-type(n+3) { display: none; }
+  .dep-stations .dep-st-more {
+    display: inline;
+    margin-left: 6px; padding: 0; border: 0; background: none;
+    font: inherit; color: var(--ink); text-decoration: underline; cursor: pointer;
+  }
+  /* Class filter behind its own button, like the top Filters. */
+  .dep-tools .cls-filter { display: none; flex: 1 1 100%; }
+  /* The class button sits right of the search box and matches it. */
+  .dep-tools { column-gap: 8px; }
+  .dep-tools #depFilter { flex: 1 1 0; width: auto; min-width: 0; }
+  .dep-tools .dep-showing { flex: 1 1 100%; }
+  .dep-tools .dep-cls-btn {
+    flex: 0 0 36px; width: 36px; height: 36px; min-height: 36px;
+    border: 1.5px solid var(--panel-edge); border-radius: 3px; background: var(--field);
+  }
+  .dep-tools.cls-open .cls-filter { display: inline-flex; }
   #mapwrap { height: 68vh; height: 68dvh; min-height: 400px; }
   header { padding: 12px 16px 10px; }
+  /* Compact on phones: the header switcher and dropdown buttons are ~36 px
+     tall, the buttons inside the dropdown panels 40 px. */
+  .mode-switch button { min-height: 36px; padding: 4px 12px; font-size: 13px; }
   .subtitle {
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .stats { gap: 3px 16px; font-size: 11.5px; }
-  .stats > div b { font-size: 18px; }
+  .stats { flex-wrap: nowrap; gap: 8px; font-size: 11.5px; }
+  .stats > div { flex: 1 1 0; min-width: 0; }
+  .stats > div b { font-size: 22px; line-height: 1.1; }
+  .stats > div span { display: block; font-size: 9.5px; letter-spacing: 0.04em; }
+  /* Short stat labels: the long text stays in the DOM for screen readers. */
+  .stats > div span[data-short] { font-size: 0; }
+  .stats > div span[data-short]::after { content: attr(data-short); font-size: 9.5px; }
   .toolbar { padding: 8px 14px; }
+  /* Filters and map options fold into two dropdown panels. */
+  .tb-mob-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+    flex: 0 0 40px; width: 40px; min-width: 0; padding: 0;
+  }
+  .tb-mob-lbl { display: none; }
+  .tb-mob-btn .tb-badge {
+    position: absolute; top: -7px; right: -7px;
+    min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--rust); color: #fff; font-size: 10px; line-height: 1;
+  }
+  /* In national mode there is no direction switch: icons sit at the right. */
+  .toolbar > #filtersBtn:first-child { margin-left: auto; }
+  .tb-panel { display: none; flex: 1 1 100%; flex-wrap: wrap; gap: 8px 6px; align-items: center; }
+  .tb-panel.open { display: flex; }
+  .tb-panel .spacer { display: none; }
+  .toolbar .units[aria-label="Direction"] { flex: 1 1 0; min-width: 0; }
+  .toolbar .units[aria-label="Direction"] button { flex: 1 1 0; }
+  .toolbar button { min-width: 40px; }
+  .toolbar .units[aria-label="Direction"] button { min-width: 0; }
   footer { padding: 8px 14px; }
   #departures { padding: 18px 14px 24px; }
   .hist-strip { flex-direction: column; gap: 14px; margin-top: 12px; }
   #legendNotes { padding: 2px 14px calc(24px + env(safe-area-inset-bottom, 0px)); }
   #depTable th, #depTable td { padding: 6px 8px; }
   .hint { display: none; }
-  .active-filter-bar {
-    top: 8px; left: 8px;
-    padding: 4px 6px;
-    gap: 4px;
-    max-width: calc(100% - 16px);
+  .filter-pill { font-size: 11.5px; }
+  #legendCol { left: 10px; bottom: 10px; width: min(190px, calc(100vw - 20px)); }
+  /* Bottom row: KEY at the left, the animation pill in the middle, the scale
+     bar at the right. An open legend is taller, so it stacks above the pill. */
+  #mapwrap:has(.tl-expand-wrap) #legendCol:has(#legendBody:not(.collapsed)) { bottom: 54px; }
+  /* Plain scale bar on phones: just the bar and its label. */
+  #scalebar {
+    right: 10px; bottom: 10px;
+    background: none; border: 0; box-shadow: none; padding: 0;
   }
-  .filter-pill { font-size: 11px; padding: 2px 5px 2px 7px; }
-  #legendCol { left: 10px; bottom: 10px; width: min(216px, calc(100vw - 20px)); }
-  #scalebar { right: 10px; bottom: 10px; }
-  #legend { padding: 8px 10px; }
-  #legendBody.collapsed { display: none; }
-  #legendToggle {
-    display: inline-block;
-    margin-top: 6px;
-    font-size: 11px;
-    padding: 3px 8px;
+  #scalebar .sb-label { text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper); }
+  .stats:empty { display: none; }
+  /* The pill sits right after KEY (not centred): the scale bar at the right grows
+     to ~130px at the phone default zoom and a centred pill ran into it. */
+  .tl-expand-wrap { bottom: 10px; left: 58px; right: auto; transform: none; width: auto; justify-content: flex-start; }
+  .tl-expand-btn.is-over-map { min-height: 36px; padding: 4px 12px; font-size: 11.5px; white-space: nowrap; }
+  .tl-expand-btn span[data-short] { font-size: 0; }
+  .tl-expand-btn span[data-short]::after { content: attr(data-short); font-size: 11.5px; }
+  #depTable .train-cell.is-link { display: inline-flex; align-items: center; min-height: 44px; }
+  #legend { padding: 6px 8px 7px; }
+  #legend svg { width: 100%; height: auto; }
+  .lg-head { margin-bottom: 4px; }
+  #legend h2 { font-size: 9.5px; letter-spacing: 0.08em; line-height: 1.3; }
+  .cls-btn { min-height: 36px; min-width: 36px; }
+  /* The origin picker is one framed row: FROM, the city in bold, a chevron. */
+  .city-picker {
+    flex: 1 1 100%; position: relative;
+    border: 1.5px solid var(--ink); background: var(--field);
+    padding: 0 12px; gap: 10px;
   }
-  #legend h2 { margin-bottom: 0; }
-  .city-picker { flex: 1 1 100%; }
-  .city-picker .combo { flex: 1; }
+  .city-picker::after {
+    content: ""; position: absolute; right: 16px; top: 50%;
+    width: 8px; height: 8px; margin-top: -6px;
+    border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
+    transform: rotate(45deg); pointer-events: none;
+  }
+  .city-picker .combo { flex: 1; min-width: 0; position: static; }
   .city-picker label { flex: 0 0 auto; }
+  .lb-long { display: none; }
+  .lb-short { display: inline; }
   #originSearch {
     width: 100%;
-    min-height: 44px;
+    min-height: 34px;
     font-size: 16px;
-    padding: 9px 10px;
+    font-weight: 800;
+    border: 0; background: transparent;
+    padding: 0 24px 0 0;
+    text-overflow: ellipsis;
   }
-  #originList { left: 0; right: 0; width: auto; max-height: 46vh; }
+  #originSearch:focus-visible { outline-offset: 6px; }
+  /* The city list spans the full toolbar width (not just the picker), so the
+     "#N City 城市 — n trains" rows fit. The picker starts 14px from the edge. */
+  #originList { left: 0; right: auto; width: calc(100vw - 28px); max-height: 46vh; }
   #originList .opt { padding: 13px 12px; }
-  .toolbar button { min-height: 44px; padding: 8px 12px; }
-  #depFilter { min-height: 44px; font-size: 16px; }
+  .toolbar button { min-height: 36px; padding: 4px 10px; font-size: 13px; }
+  .toolbar .tb-mob-btn { min-height: 36px; padding: 0; }
+  #depFilter { min-height: 36px; height: 36px; padding: 4px 10px; }
   footer { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
   #destPanel {
     top: auto; left: 10px; right: 10px;
@@ -58,15 +154,7 @@
   #destMin,
   #destClose { width: 36px; height: 36px; font-size: 18px; }
   .dp-actions { top: 8px; right: 8px; }
-  .tsm-hud.dp-hud { top: 10px; right: 10px; }
   #destPanel .dp-title { padding-right: 92px; }
-  .dep-swipe {
-    display: block;
-    margin: 0 0 6px;
-    font-size: 12px;
-    color: var(--ink-soft);
-    font-style: italic;
-  }
   .dep-fade {
     display: block;
     position: absolute; top: 0; right: 0; bottom: 0;

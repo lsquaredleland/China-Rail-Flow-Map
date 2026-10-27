@@ -3,9 +3,9 @@ import type { RefObject } from "react";
 import { local as localStore, session as sessionStore } from "../storage";
 import type { DecodedAtlas, Direction, DistUnit } from "../types";
 import { enName } from "../lib";
-import type { MapApi } from "../components/MapCanvas";
+import type { MapApi } from "../components/MapHost";
 
-/* URL and persisted state: the ?city/lat/lon/z/theme query, and the
+/* URL and persisted state: the ?city/lat/lon/z/theme/national query, and the
    direction, unit, infrastructure and theme choices kept in storage. */
 
 export interface Camera {
@@ -14,11 +14,11 @@ export interface Camera {
   zoom: number;
 }
 
-export function initialDistUnit(): DistUnit {
+function initialDistUnit(): DistUnit {
   return localStore.get("crfa-dist-unit") === "mi" ? "mi" : "km";
 }
 
-export function initialInfra(): boolean {
+function initialInfra(): boolean {
   return localStore.get("crfa-infra") === "1";
 }
 
@@ -26,7 +26,46 @@ export function initialDirection(): Direction {
   return localStore.get("crfa-direction") === "in" ? "in" : "out";
 }
 
-export function initialDark(): boolean {
+/* National mode (D11): ?national=1, kept in the URL only (not persisted). */
+export function initialNational(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get("national") === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeNationalParam(on: boolean): void {
+  const params = new URLSearchParams(window.location.search);
+  if (on) params.set("national", "1");
+  else params.delete("national");
+  const search = params.toString();
+  if (window.location.search !== (search ? "?" + search : "")) {
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? "?" + search : ""}`);
+  }
+}
+
+/* National mode's Flows toggle: on unless ?natLayer=none (the default view: flows
+   and city circles, no animation). URL only, like ?national. */
+export function initialNatFlows(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get("natLayer") !== "none";
+  } catch {
+    return true;
+  }
+}
+
+export function writeNatFlowsParam(on: boolean): void {
+  const params = new URLSearchParams(window.location.search);
+  if (on) params.delete("natLayer");
+  else params.set("natLayer", "none");
+  const search = params.toString();
+  if (window.location.search !== (search ? "?" + search : "")) {
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? "?" + search : ""}`);
+  }
+}
+
+function initialDark(): boolean {
   try {
     const params = new URLSearchParams(window.location.search);
     const p = params.get("theme");
@@ -45,7 +84,7 @@ export function initialDark(): boolean {
   );
 }
 
-export function parseInitialCamera(): (Camera & { scale: number }) | null {
+function parseInitialCamera(): (Camera & { scale: number }) | null {
   try {
     const params = new URLSearchParams(window.location.search);
     const lat = parseFloat(params.get("lat") || "");
@@ -60,6 +99,23 @@ export function parseInitialCamera(): (Camera & { scale: number }) | null {
     /* ignore */
   }
   return null;
+}
+
+/* Phones opening the default origin with no camera in the URL start on this
+   view (owner): ?city=Guangzhou&lat=27.4849&lon=113.3280&z=5.17. */
+const PHONE_DEFAULT_CAMERA = { lat: 27.4849, lon: 113.328, z: 5.17 };
+function phoneDefaultCamera(): (Camera & { scale: number }) | null {
+  try {
+    if (!window.matchMedia("(max-width: 640px)").matches) return null;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("national") === "1") return null;
+    const city = params.get("city");
+    if (city && city !== "Guangzhou" && city !== "广州") return null;
+    const { lat, lon, z } = PHONE_DEFAULT_CAMERA;
+    return { lon, lat, zoom: z, scale: (256 * Math.pow(2, z)) / 360 };
+  } catch {
+    return null;
+  }
 }
 
 export function matchesCity(o: { zh: string; en: string }, query: string): boolean {
@@ -158,7 +214,7 @@ export function useUrlSync({
   /** Browser back/forward landed on another city. */
   onCityFromUrl: (idx: number) => void;
 }) {
-  const [initialCamera] = useState(parseInitialCamera);
+  const [initialCamera] = useState(() => parseInitialCamera() ?? phoneDefaultCamera());
   const lastCameraRef = useRef<Camera | null>(initialCamera);
 
   const syncUrl = (idx: number, cam?: Camera | null) => {

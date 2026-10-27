@@ -1,11 +1,13 @@
 /* Outbound with a destination: every train calling at that city. */
 import type { DestVM, OriginVM } from "../../types";
-import { fmtTime } from "../../lib";
+import { fmtTime, runRank } from "../../lib";
 import HeadCount, { OfTotal } from "./HeadCount";
+import WindowedTable, { ORIGIN_ROW_H } from "./WindowedTable";
 import TrainCell from "./TrainCell";
+import RunsCell from "./RunsCell";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
-import { callStations } from "../../stationBreakdown";
+import { callStation, callStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, CallSortKey } from "./types";
 
 export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): ModeView {
@@ -50,6 +52,10 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
   });
   const { key: ck, dir: cdir } = callSort;
   list.sort((a, b) => {
+    if (ck === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.dep.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.dep.t], atlas?.data.calendar);
+      if (dd) return dd * cdir;
+    }
     if (ck === "dur") {
       const va = a.dur;
       const vb = b.dur;
@@ -114,8 +120,8 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
       whether it ends its journey there or only calls on the way
       through. &ldquo;Arrives&rdquo; and &ldquo;Departs&rdquo; are the
       times at {destFilter.en}&rsquo;s station; &ldquo;Duration&rdquo; is
-      the travel time from {cur.en} to {destFilter.en}; &ldquo;Final
-      destination&rdquo; is where the train is ultimately bound.
+      the travel time from {cur.en} to {destFilter.en}; &ldquo;Station&rdquo;
+      is the {destFilter.en} station the train stops at.
     </>
   );
   const chipNode = (
@@ -135,7 +141,9 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
     </span>
   );
   const tableNode = (
-    <table id="depTable" className="calls">
+    <WindowedTable n={list.length} rowH={ORIGIN_ROW_H} cols={9} className="calls">
+      {(w) => (
+      <>
       <thead>
         <tr>
           <th scope="col">Train</th>
@@ -146,19 +154,9 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
             aria-sort={cAriaSort("dep")}
             onClick={() => onCallSort("dep")}
           >
-            Departs {cur.en} <span className="arrow">{cArrow("dep")}</span>
+            Departs <span className="arrow">{cArrow("dep")}</span>
           </th>
           <th scope="col">From</th>
-          <th
-            scope="col"
-            className="sortable"
-            data-sort="arr"
-            aria-sort={cAriaSort("arr")}
-            onClick={() => onCallSort("arr")}
-          >
-            Arrives {destFilter.en}{" "}
-            <span className="arrow">{cArrow("arr")}</span>
-          </th>
           <th
             scope="col"
             className="sortable"
@@ -168,26 +166,46 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
           >
             Duration <span className="arrow">{cArrow("dur")}</span>
           </th>
-          <th scope="col">Departs {destFilter.en}</th>
-          <th scope="col">Final destination</th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="arr"
+            aria-sort={cAriaSort("arr")}
+            onClick={() => onCallSort("arr")}
+          >
+            Arrives <span className="arrow">{cArrow("arr")}</span>
+          </th>
+          <th scope="col">Station</th>
+          <th scope="col">Departs</th>
           <th scope="col">Status</th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="runs"
+            aria-sort={cAriaSort("runs")}
+            onClick={() => onCallSort("runs")}
+          >
+            Runs <span className="arrow">{cArrow("runs")}</span>
+          </th>
         </tr>
       </thead>
       <tbody id="depBody">
         {list.length === 0 ? (
           <tr>
-            <td colSpan={8} className="dep-empty">
+            <td colSpan={9} className="dep-empty">
               No trains match that filter.
             </td>
           </tr>
         ) : (
-          list.map((c, i) => {
+          <>{w.top}{list.map((c, i) => {
+          if (i < w.first || i >= w.last) return null;
             const d = c.dep;
             const isSelected = selectedTrainCodes.includes(d.code);
+            const st = callStation(c, atlas ? atlas.data.station_table : [], atlas?.schedules);
             return (
               <tr
                 key={i}
-                className={isSelected ? "dep-row-selected" : undefined}
+                {...w.tr(i, isSelected ? "dep-row-selected" : undefined)}
                 onClick={(e) =>
                   handleRowClick(
                     d.code,
@@ -210,23 +228,18 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
                   {d.fsZh}
                   {d.fsEn ? <span className="to-stn">{d.fsEn}</span> : null}
                 </td>
+                <td className="c-time">{fmtTime(c.dur)}</td>
                 <td className="c-time">
                   {c.arr}
                   {c.dayOff > 0 ? (
                     <span className="plus"> +{c.dayOff}d</span>
                   ) : null}
                 </td>
-                <td className="c-time">{fmtTime(c.dur)}</td>
-                <td className="c-time">{c.term ? "—" : c.depAt}</td>
                 <td>
-                  <span className="to-city">
-                    {d.tcEn} &middot; {d.tcZh}
-                  </span>
-                  <span className="to-stn">
-                    {d.tsZh}
-                    {d.tsEn ? " · " + d.tsEn : ""}
-                  </span>
+                  {st ? st.zh : null}
+                  {st && st.en ? <span className="to-stn">{st.en}</span> : null}
                 </td>
+                <td className="c-time">{c.term ? "—" : c.depAt}</td>
                 <td>
                   <span
                     className={
@@ -236,12 +249,15 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
                     {c.term ? "Terminates here" : "Intermediate stop"}
                   </span>
                 </td>
+                <RunsCell atlas={atlas} t={d.t} />
               </tr>
             );
-          })
+          })}{w.bottom}</>
         )}
       </tbody>
-    </table>
+      </>
+      )}
+    </WindowedTable>
   );
   return { heading, depNote, stations, chipNode, count, total: calls.length, showingNote, tableNode };
 }

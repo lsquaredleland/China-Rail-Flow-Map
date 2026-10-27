@@ -10,7 +10,8 @@ import type {
   OriginVM,
   SrcVM,
 } from "../types";
-import { classIndex, FLOW_CLASSES } from "../lib";
+import { classIndex, FLOW_CLASSES, selectNatRows, sortNatRows } from "../lib";
+import type { HistRow, NatSortKey } from "../lib";
 import Histograms from "./Histograms";
 import FilterToolbar from "./departures/FilterToolbar";
 import LoadingSection from "./departures/LoadingSection";
@@ -20,6 +21,8 @@ import { inArrivalsMode } from "./departures/inArrivals";
 import { inCallsMode } from "./departures/inCalls";
 import { outCallsMode } from "./departures/outCalls";
 import { outDeparturesMode } from "./departures/outDepartures";
+import { natTrainsMode } from "./departures/natTrains";
+import type { NatData } from "./departures/types";
 import type {
   ArrSortKey,
   CallSortKey,
@@ -32,6 +35,9 @@ import type {
 
 interface Props {
   cur: OriginVM | null;
+  /** National mode: the national trains stand in for the origin's rows, and
+      every class button is enabled, as in the toolbar. */
+  national?: NatData;
   unit: DistUnit;
   direction: Direction;
   /** The city pinned on the map: a DestVM outbound, a SrcVM inbound. */
@@ -50,6 +56,8 @@ interface Props {
   atlas?: DecodedAtlas | null;
   onSelectOrigin?: (idx: number) => void;
   onSelectTrain?: (code: string) => void;
+  /** Toggle single-train isolation (the timetable's "Isolate on map"); a plain row click calls it. */
+  onToggleIsolate?: (code: string) => void;
   isolatedTrainCode?: string | null;
   onClearTrainIsolation?: () => void;
   onSelectCity?: (city: CityPointVM | null) => void;
@@ -82,6 +90,7 @@ interface Props {
    turns it into a heading, note and table. */
 export default function DeparturesTable({
   cur,
+  national,
   unit,
   direction,
   panelCity,
@@ -93,6 +102,7 @@ export default function DeparturesTable({
   atlas,
   onSelectOrigin,
   onSelectTrain,
+  onToggleIsolate,
   isolatedTrainCode,
   onClearTrainIsolation,
   onSelectCity,
@@ -156,6 +166,12 @@ export default function DeparturesTable({
     e: MouseEvent,
     currentList: { code: string }[],
   ) => {
+    const plain = !e.shiftKey && !e.metaKey && !e.ctrlKey;
+    // Isolation belongs to the outbound animation and national mode.
+    if (plain && onToggleIsolate && (national || direction === "out")) {
+      onToggleIsolate(code);
+      return;
+    }
     if (!onSelectTrainCodes) return;
     if (e.shiftKey && lastClickedRowIdxRef.current !== null) {
       const start = Math.min(lastClickedRowIdxRef.current, idx);
@@ -184,6 +200,10 @@ export default function DeparturesTable({
     }
   };
   const [sort, setSort] = useState<SortState<SortKey>>({
+    key: "dep",
+    dir: 1,
+  });
+  const [natSort, setNatSort] = useState<SortState<NatSortKey>>({
     key: "dep",
     dir: 1,
   });
@@ -241,6 +261,7 @@ export default function DeparturesTable({
   // Available train classes for the current origin/direction (or active city pair).
   const classCounts = useMemo(() => {
     if (!cur) return {};
+    if (national) return national.classCounts;
     const counts: Record<string, number> = {};
     if (destFilter) {
       for (const c of destFilter.calls) {
@@ -266,7 +287,7 @@ export default function DeparturesTable({
       }
     }
     return counts;
-  }, [cur, direction, destFilter, srcFilter]);
+  }, [cur, direction, destFilter, srcFilter, national]);
 
   // Helper predicate for class + histogram filters on a train row.
   const matchesRowFilters = (
@@ -311,6 +332,19 @@ export default function DeparturesTable({
     return true;
   };
 
+  // National mode: the selected, searched trains, sorted (memoised: 11k rows).
+  const natRows = national?.rows ?? null;
+  const natSel = national?.sel ?? null;
+  const natList = useMemo(() => {
+    if (!natRows) return [];
+    // An isolated train narrows the table to that train, as in the origin view.
+    const picked = isolatedTrainCode
+      ? natRows.filter((r) => r.code === isolatedTrainCode)
+      : selectNatRows(natRows, natSel);
+    const found = q ? picked.filter((r) => r.hay.indexOf(q) !== -1) : picked;
+    return sortNatRows(found, natSort.key, natSort.dir);
+  }, [natRows, natSel, q, natSort, isolatedTrainCode]);
+
   const hasExtraFilters =
     !!q ||
     Boolean(isolatedTrainCode) ||
@@ -328,6 +362,52 @@ export default function DeparturesTable({
     setInCallSort({ key: "arr", dir: 1 });
   }, [srcFilter]);
 
+  // The swipe hint shows only when the table is wider than its box.
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [overflowsX, setOverflowsX] = useState(false);
+  const measureOverflow = () => {
+    const el = wrapRef.current?.querySelector<HTMLElement>(".dep-scroll");
+    const over = !!el && el.scrollWidth > el.clientWidth + 1;
+    setOverflowsX((v) => (v === over ? v : over));
+  };
+  useEffect(measureOverflow);
+  useEffect(() => {
+    window.addEventListener("resize", measureOverflow);
+    return () => window.removeEventListener("resize", measureOverflow);
+  }, []);
+
+  const tablesReady = direction === "out" ? outTablesReady : inTablesReady;
+  // The histograms bin the origin's departures (outbound) or arrivals (inbound);
+  // in national mode every national train. A pinned city adds its own calls.
+  const hist = useMemo(() => {
+    if (cur) {
+      if (!tablesReady) return null;
+      const rows: HistRow[] =
+        direction === "in"
+          ? cur.arrs.map((a) => ({ time: a.arr, distKm: a.distKm, dur: a.dur, cls: a.cls }))
+          : cur.deps.map((d) => ({ time: d.dep, distKm: d.distKm, dur: d.dur, cls: d.cls }));
+      let subRows: HistRow[] | undefined;
+      if (activeCity) {
+        subRows =
+          direction === "in"
+            ? ((cur.srcs.find((s) => s.idx === activeCity.idx) || (activeCity as SrcVM)).inCalls || []).map((c) => ({
+                time: c.arr.arr,
+                distKm: c.arr.distKm,
+                dur: c.arr.dur,
+                cls: c.arr.cls,
+              }))
+            : ((cur.dests.find((d) => d.idx === activeCity.idx) || (activeCity as DestVM)).calls || []).map((c) => ({
+                time: c.dep.dep,
+                distKm: c.dep.distKm,
+                dur: c.dep.dur,
+                cls: c.dep.cls,
+              }));
+      }
+      return { rows, subRows, where: cur.en };
+    }
+    return national ? { rows: national.histRows, subRows: undefined, where: "China" } : null;
+  }, [cur, direction, activeCity, national, tablesReady]);
+
   const handleClearChip = () => {
     setQuery("");
     onClearFilter();
@@ -335,7 +415,6 @@ export default function DeparturesTable({
   };
 
   /* ---------------- tables still in flight ---------------- */
-  const tablesReady = direction === "out" ? outTablesReady : inTablesReady;
   if (cur && !tablesReady) {
     return (
       <LoadingSection
@@ -358,6 +437,7 @@ export default function DeparturesTable({
     selectedTrainCodes,
     handleRowClick,
     onSelectTrain,
+    onToggleIsolate,
     handleClearChip,
     emptyProps: {
       atlas,
@@ -367,6 +447,8 @@ export default function DeparturesTable({
       tablesLoaded: tablesReady,
       onSelectOrigin,
     },
+    natSort,
+    setNatSort,
     sort,
     setSort,
     callSort,
@@ -377,8 +459,9 @@ export default function DeparturesTable({
     setInCallSort,
   };
 
-  const view: ModeView =
-    cur && destFilter
+  const view: ModeView = national
+    ? natTrainsMode(ctx, national, natList)
+    : cur && destFilter
       ? outCallsMode(ctx, cur, destFilter)
       : cur && srcFilter
         ? inCallsMode(ctx, cur, srcFilter)
@@ -391,12 +474,14 @@ export default function DeparturesTable({
       <h2>{view.heading}</h2>
       <StationLine stations={view.stations} />
       <p className="dep-note">{view.depNote}</p>
-      {cur ? (
+      {hist && (
         <Histograms
-          cur={cur}
+          rows={hist.rows}
+          subRows={hist.subRows}
+          where={hist.where}
           unit={unit}
-          direction={direction}
-          panelCity={activeCity}
+          direction={national ? "out" : direction}
+          panelCity={cur ? activeCity : null}
           selectedClasses={selectedClasses}
           selectedHour={selectedHour}
           selectedHours={activeHours}
@@ -411,7 +496,7 @@ export default function DeparturesTable({
           onSelectDurBin={setSelectedDurBin}
           onSelectDurBins={onSelectDurBins}
         />
-      ) : null}
+      )}
       <FilterToolbar
         cur={cur}
         activeCity={activeCity}
@@ -435,10 +520,11 @@ export default function DeparturesTable({
         onSelectDurBins={onSelectDurBins}
         setSelectedDurBin={setSelectedDurBin}
         showingNote={view.showingNote}
+        allClasses={!!national}
       />
-      <p className="dep-swipe">Swipe sideways for all columns &rarr;</p>
-      <div className="dep-scrollwrap">
-        <div className="dep-scroll">{view.tableNode}</div>
+      {overflowsX && <p className="dep-swipe">Swipe sideways for all columns &rarr;</p>}
+      <div className="dep-scrollwrap" ref={wrapRef}>
+        {view.tableNode}
         <div className="dep-fade" aria-hidden="true"></div>
       </div>
     </section>

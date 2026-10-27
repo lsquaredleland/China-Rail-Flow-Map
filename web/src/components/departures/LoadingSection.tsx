@@ -78,9 +78,7 @@ export default function LoadingSection({
     note = (
       <>
         Every train arriving in the selected city &mdash; from wherever
-        it starts &mdash; across the two timetable dates &mdash; Wednesday
-        21 October 2026 (national) and Wednesday 28 October 2026
-        (intercity C/S). &ldquo;Stops&rdquo; counts the stops the train
+        it starts &mdash; for every train in the timetable window. &ldquo;Stops&rdquo; counts the stops the train
         makes before reaching {cur.en}.
       </>
     );
@@ -97,9 +95,7 @@ export default function LoadingSection({
     note = (
       <>
         Every train departing the selected city &mdash; from any of its
-        stations &mdash; across the two timetable dates &mdash; Wednesday 21
-        October 2026 (national) and Wednesday 28 October 2026
-        (intercity C/S). &ldquo;Stops&rdquo; counts the stops the train makes after leaving
+        stations &mdash; for every train in the timetable window. &ldquo;Stops&rdquo; counts the stops the train makes after leaving
         its origin-city station.
       </>
     );

@@ -80,7 +80,10 @@ describe("pack decode", () => {
         }
         for (const [, s0, s1] of o.dep_chord_legs[i]) {
           expect(s0).toBeGreaterThanOrEqual(0);
-          expect(s1).toBeLessThan(n);
+          expect(s0).toBeLessThanOrEqual(s1);
+          // s1 = n: a trailing leg with no track after it (D86 / D87's
+          // unmatched Laos stops end the path), an empty range at the end.
+          expect(s1).toBeLessThanOrEqual(n);
         }
       }
   });
@@ -126,17 +129,13 @@ describe("path continuity", () => {
 
   test(`jumps >= ${JUMP_KM} km outside chord legs`, () => {
     const { out, nChordTrains } = gaps();
-    expect(nChordTrains).toBe(3);
-    // KNOWN: the committed pack has 7 unflagged jumps of 23-27 km on 7
-    // trains (K1160 K1132 C780 K903 K1068 K904 K876), i.e. spots where the
-    // router left a hole without marking a chord leg. The target is 0; when
-    // a rebuild fixes them this count must drop, so update it then.
-    expect(out.map((g) => g.train).sort()).toEqual(
-      ["C780", "K1068", "K1132", "K1160", "K876", "K903", "K904"].sort(),
-    );
-    expect(out.length).toBe(7);
-    // and nothing may be worse than the known worst case
-    expect(Math.max(...out.map((g) => g.km))).toBeLessThan(30);
+    // 7 trains with chord legs on the 11k pack: G3935 G3936 G3939 G3957
+    // G3958, and D86 / D87 whose Laos stops are unmatched.
+    expect(nChordTrains).toBe(7);
+    // The 12306 pack had 7 unflagged jumps of 23-27 km (K1160 K1132 C780
+    // K903 K1068 K904 K876); PR #55's chain cuts and row_path fix closed
+    // them, so the target of 0 holds on the 11k pack.
+    expect(out).toEqual([]);
   });
 });
 

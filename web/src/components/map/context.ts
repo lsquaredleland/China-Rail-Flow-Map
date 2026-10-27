@@ -8,14 +8,22 @@ import type {
   DayTimelineVM,
   Direction,
   DistUnit,
+  NatLayers,
+  NationalEntriesPack,
+  NationalFlowsPack,
+  NationalIndexPack,
+  NationalTimeline,
+  NationalTrainsData,
   FlowVM,
   Hit,
   OriginVM,
   PrepTrain,
 } from "../../types";
-import { flowWidth } from "../../lib";
-import type { DestWindow } from "../../lib";
+import { flowWidth, isFilteredView as isFilteredViewOf } from "../../lib";
+import type { DestWindow, NatFilter } from "../../lib";
 import type { LegendHandle } from "../Legend";
+import type { DeckHandle } from "./deck/DeckHost";
+import type { NationalCityDots } from "./deck/layers/national";
 
 export interface AnimState {
   time: number; // minutes from midnight (0 up to totalMins)
@@ -27,6 +35,10 @@ export interface AnimState {
   arrived: number;
   total: number;
   enabled: boolean;
+  /** National mode (D13): the clock spans one day and wraps; `departed` is `running`. */
+  national: boolean;
+  /** Distinct trains on the line at `time` in national mode (0 otherwise). */
+  running: number;
 }
 export type AnimListener = (state: AnimState) => void;
 
@@ -65,15 +77,32 @@ export interface Props {
   distUnit: DistUnit;
   panelDest: CityPointVM | null;
   loadError: string | null;
+  onRetry?: () => void;
   /** True while the lazily-fetched inbound map file is still in
       flight: the map shows the standard loading affordance over the
       canvas. */
   inLoading: boolean;
+  /** National mode (D13, map-only): every national train, no origin state drawn. */
+  national?: boolean;
+  /** The national trains file and its schedules, once loaded. */
+  nationalTrains?: NationalTrainsData | null;
+  /** National mode: the day's flows (B), the trains (A), or both (A+B). */
+  nationalLayers?: NatLayers;
+  /** The national flows file (B) and its entry ticks (A+B), once loaded. */
+  nationalFlows?: NationalFlowsPack | null;
+  nationalEntries?: NationalEntriesPack | null;
+  /** The national filters (class, hour, distance, duration, train code) that
+      the flows, city circles and dots follow; `nationalIndex` answers all but
+      the class filter once loaded. */
+  nationalFilter?: NatFilter;
+  nationalIndex?: NationalIndexPack | null;
   onSelectDest: (d: CityPointVM | null) => void;
   selectedTrainCode?: string | null;
   onSelectTrain?: (code: string | null) => void;
   isolatedTrainCode?: string | null;
   onSelectIsolatedTrain?: (code: string | null) => void;
+  /** National mode: a click on a city circle (null on empty map). */
+  onSelectNatCity?: (c: { idx: number; dep: number; arr: number } | null) => void;
   legendRef: RefObject<LegendHandle | null>;
   initialCamera?: { lon: number; lat: number; zoom?: number; scale?: number } | null;
   onViewChange?: (view: {
@@ -143,6 +172,19 @@ function createMapState() {
     } | null,
     chordDepCache: null as { cur: OriginVM; firstDep: Map<number, number> } | null,
     animTime: 360,
+    /* National mode: trains in the timeline and dots in the last frame (set by the deck host). */
+    natN: 0,
+    natRunning: 0,
+    /* The last national frame's dots for picking (CPU scan, P2.3). */
+    natPick: null as { tl: NationalTimeline; count: number; buf: Float32Array; qOf: Int32Array; m: number } | null,
+    /* The isolated national train's run (boarding minute, minutes to its last stop), for the clock loop. */
+    natLoop: null as { start: number; dur: number } | null,
+    /* The last national frame's flow counts per section, for hover. */
+    natCounts: null as ArrayLike<number> | null,
+    /* The last national frame's city circles, for hover. */
+    natCities: null as NationalCityDots | null,
+    /** Origin-view cities not yet lit by the animation (null when not animating). */
+    unlitCities: null as Set<number> | null,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: false,
@@ -151,30 +193,11 @@ function createMapState() {
     animRafId: null as number | null,
   };
 }
-export type MapState = ReturnType<typeof createMapState>;
-
-/* Backdrop layer cache (paper + outline + graticule + network): see
-   drawBackdrop. `layer` is built on the second consecutive frame with
-   an unchanged key, so panning/zooming never pays for it. */
-export interface BackdropCache {
-  key: string;
-  atlas: unknown;
-  outline: unknown;
-  layer: HTMLCanvasElement | null;
-  state: {
-    lineWidth: number;
-    strokeStyle: string | CanvasGradient | CanvasPattern;
-    fillStyle: string | CanvasGradient | CanvasPattern;
-    lineCap: CanvasLineCap;
-    lineJoin: CanvasLineJoin;
-    lineDash: number[];
-    globalAlpha: number;
-  } | null;
-}
+type MapState = ReturnType<typeof createMapState>;
 
 /* Everything the layer modules share: the latest props (`P`), the engine
    state (`S`), the DOM refs and the camera / view-model helpers. One stable
-   object per MapCanvas, so every layer is a plain function of `(M, ...)`
+   object per MapHost, so every layer is a plain function of `(M, ...)`
    and nothing closes over a stale render. */
 export interface MapCtx {
   P: { current: Props };
@@ -186,10 +209,6 @@ export interface MapCtx {
   scaleLabelRef: RefObject<HTMLDivElement | null>;
   scaleBarRef: RefObject<HTMLDivElement | null>;
   viewReportTimerRef: { current: number | null };
-  bgRef: { current: BackdropCache };
-  /* Motion-tail gradients, one per (colour, length), in the train's local
-     frame (see drawTrains). */
-  tailGradRef: { current: Map<string, CanvasGradient> };
   X: (lon: number) => number;
   Y: (lat: number) => number;
   toLon: (px: number) => number;
@@ -201,6 +220,19 @@ export interface MapCtx {
   activeTrainsAt: (tl: DayTimelineVM, t: number) => ActiveTrainVM[];
   isFilteredView: () => boolean;
   flowsSet: () => DecodedSet | null;
+  /* The single way to request a frame. MapHost installs it (the deck host's
+     render once mounted); until then it is a no-op. */
+  render: () => void;
+  /* What every frame ends with: the Legend, the scale bar and the debounced
+     view report. Installed by MapHost; the lazily loaded deck host calls it
+     instead of importing map/ modules. */
+  frameTail: () => void;
+  /* Tells the deck host the canvas size / DPR changed (resize() calls it just
+     before the render() that follows). Installed by MapHost. */
+  syncRendererSize: () => void;
+  /* The deck renderer's handle while it is mounted (the host sets and clears
+     it); interaction.ts pick() asks it for GPU candidates. */
+  deck?: DeckHandle;
 }
 
 type MapRefs = Pick<
@@ -220,8 +252,9 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     P,
     S,
     ...refs,
-    bgRef: { current: { key: "", atlas: null, outline: null, layer: null, state: null } },
-    tailGradRef: { current: new Map() },
+    render: () => {},
+    frameTail: () => {},
+    syncRendererSize: () => {},
     /* ---------- camera helpers ---------- */
     X: (lon) => lon * S.current.view.scale + S.current.view.tx,
     Y: (lat) => -lat * S.current.view.scale + S.current.view.ty,
@@ -240,10 +273,11 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
       if (!cur) return [];
       return P.current.direction === "out" ? cur.flows : cur.inFlows;
     },
-    // Inbound has no timeline: the animation is outbound-only.
+    // Inbound has no timeline: the animation is outbound-only. National mode
+    // has none either: its clock is one day (1440) and wraps.
     activeTimeline: () => {
       const cur = P.current.cur;
-      return cur && P.current.direction === "out" ? cur.timeline : undefined;
+      return cur && P.current.direction === "out" && !P.current.national ? cur.timeline : undefined;
     },
     // The dots at minute t, computed once per frame however many passes ask.
     activeTrainsAt: (tl, t) => {
@@ -255,17 +289,7 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     },
     /* A filtered view (class, histogram or train filter) is a subset of the
        full origin `baseCur`; selecting a city alone is not a filter. */
-    isFilteredView: () => {
-      const cur = P.current.cur;
-      const baseCur = P.current.baseCur;
-      if (!cur || !baseCur || cur === baseCur) return false;
-      return (
-        cur.deps.length !== baseCur.deps.length ||
-        cur.arrs.length !== baseCur.arrs.length ||
-        cur.flows.length !== baseCur.flows.length ||
-        cur.maxFlow !== baseCur.maxFlow
-      );
-    },
+    isFilteredView: () => isFilteredViewOf(P.current.cur, P.current.baseCur),
     flowsSet: () => {
       const atlas = P.current.atlas;
       if (!atlas) return null;

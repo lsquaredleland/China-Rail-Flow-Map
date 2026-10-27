@@ -1,7 +1,15 @@
-/* Camera: fit/zoom maths, the distance scale bar, canvas resize and the
-   debounced view report. */
+/* Camera: fit/zoom maths, the distance scale bar, canvas resize, the
+   debounced view report and the per-frame tail. */
 import type { MapCtx } from "./context";
-import { draw } from "./render";
+import {
+  fitCountryView,
+  fitExtentView,
+  fitGuangzhouInitialView,
+  fitHomeView,
+  palette as makePalette,
+  stationT as stationTOf,
+  zoomBounds,
+} from "../../lib";
 
 /* ---------- distance scale bar ----------
    The projection is equirectangular (px = lon/lat degrees x view.scale),
@@ -54,63 +62,57 @@ export function fitExtent(
 ) {
   const { S } = M;
   const { W, H, view } = S.current;
-  const s = Math.min(W / (lon1 - lon0), H / (lat1 - lat0)) * (pad || 0.97);
-  view.scale = s;
-  view.tx = (W - (lon0 + lon1) * s) / 2;
-  view.ty = (H + (lat0 + lat1) * s) / 2;
+  Object.assign(view, fitExtentView(W, H, lon0, lat0, lon1, lat1, pad));
 }
 
 export function fitCountryCalc(M: MapCtx) {
   const { S, P } = M;
   const atlas = P.current.atlas;
   if (!atlas) return;
-  const e = atlas.extent;
-  fitExtent(M, e.lon0, e.lat0, e.lon1, e.lat1, 0.97);
+  const { W, H, view } = S.current;
+  Object.assign(view, fitCountryView(W, H, atlas.extent));
   S.current.fitScale = S.current.view.scale;
 }
 
-export function fitGuangzhouInitialCalc(M: MapCtx) {
+function fitGuangzhouInitialCalc(M: MapCtx) {
   fitCountryCalc(M);
   // Regional extent matching initial launch: Guangzhou near bottom,
   // Hunan/Hubei/Henan corridors extending north.
-  fitExtent(M, 102.0, 20.8, 122.5, 36.8, 0.96);
+  const { W, H, view } = M.S.current;
+  Object.assign(view, fitGuangzhouInitialView(W, H));
 }
 
 export function fitHomeCalc(M: MapCtx) {
-  const { P } = M;
+  const { S, P } = M;
   const cur = P.current.cur;
   if (!cur) return;
-  const pt = cur.o.pt;
-  fitExtent(M, pt[0] - 1.7, pt[1] - 1.3, pt[0] + 1.7, pt[1] + 1.3, 0.98);
+  const { W, H, view } = S.current;
+  Object.assign(view, fitHomeView(W, H, cur.o.pt));
 }
 
 /* Zoom progress for station sizes: 0 at the national fit, 1 at the
    maximum zoom (fitScale * 60, see zoomAt), log-spaced. Once per
    frame/pick; each dot's growth then follows its own base radius. */
 export function stationT(M: MapCtx) {
-  const { S } = M;
-  const { view, fitScale } = S.current;
-  const t = Math.log(view.scale / fitScale) / Math.log(60);
-  return Math.min(1, Math.max(0, t));
+  const { view, fitScale } = M.S.current;
+  return stationTOf(view, fitScale);
 }
 
 export function zoomAt(M: MapCtx, px: number, py: number, factor: number) {
   const { S } = M;
   const st = S.current;
-  const ns = Math.min(
-    st.fitScale * 60,
-    Math.max(st.fitScale * 0.55, st.view.scale * factor),
-  );
+  const { min, max } = zoomBounds(st.fitScale);
+  const ns = Math.min(max, Math.max(min, st.view.scale * factor));
   const k = ns / st.view.scale;
   st.view.tx = px - (px - st.view.tx) * k;
   st.view.ty = py - (py - st.view.ty) * k;
   st.view.scale = ns;
   st.interacted = true;
-  draw(M);
+  M.render();
 }
 
 
-export function reportViewChange(M: MapCtx) {
+function reportViewChange(M: MapCtx) {
   const { S, P, toLon, toLat } = M;
   if (!P.current.onViewChange) return;
   const st = S.current;
@@ -127,7 +129,7 @@ export function reportViewChange(M: MapCtx) {
 }
 
 
-export function scheduleViewReport(M: MapCtx) {
+function scheduleViewReport(M: MapCtx) {
   const { P, viewReportTimerRef } = M;
   if (!P.current.onViewChange) return;
   if (viewReportTimerRef.current) clearTimeout(viewReportTimerRef.current);
@@ -137,15 +139,23 @@ export function scheduleViewReport(M: MapCtx) {
 }
 
 
+/** Padding-box extent: the border-box size less two border widths (CSS lengths such as "1.5px"). */
+export function paddingBoxSize(borderBox: number, borderA: string, borderB: string): number {
+  return borderBox - (parseFloat(borderA) || 0) - (parseFloat(borderB) || 0);
+}
+
 export function resize(M: MapCtx) {
   const { S, P, toLon, toLat, canvasRef, wrapRef } = M;
   const wrap = wrapRef.current;
   const canvas = canvasRef.current;
-  if (!wrap || !canvas) return;
+  if (!wrap) return;
   const st = S.current;
+  // The canvases fill the padding box, so the world is laid out in it: the border-inclusive rect
+  // minus the borders (clientWidth / clientHeight would round to whole pixels). P1c.3.
   const r = wrap.getBoundingClientRect();
-  const newW = Math.max(50, r.width);
-  const newH = Math.max(50, r.height);
+  const cs = getComputedStyle(wrap);
+  const newW = Math.max(50, paddingBoxSize(r.width, cs.borderLeftWidth, cs.borderRightWidth));
+  const newH = Math.max(50, paddingBoxSize(r.height, cs.borderTopWidth, cs.borderBottomWidth));
   // When the user has taken the camera, keep the same geographic
   // centre at the same zoom across the resize (fold / unfold,
   // rotation): remember the centre in lon/lat before the size
@@ -159,8 +169,10 @@ export function resize(M: MapCtx) {
   st.DPR = Math.min(3, window.devicePixelRatio || 1);
   st.W = newW;
   st.H = newH;
-  canvas.width = Math.round(st.W * st.DPR);
-  canvas.height = Math.round(st.H * st.DPR);
+  if (canvas) {
+    canvas.width = Math.round(st.W * st.DPR);
+    canvas.height = Math.round(st.H * st.DPR);
+  }
   if (P.current.atlas && P.current.cur) {
     if (!st.interacted) {
       if (!st.initialViewApplied && P.current.initialCamera) {
@@ -183,5 +195,42 @@ export function resize(M: MapCtx) {
       st.view.ty = st.H / 2 + keepCentre.lat * st.view.scale;
     }
   }
-  draw(M);
+  M.syncRendererSize();
+  M.render();
+}
+
+
+/* The end of every frame: Legend, scale bar, view report. */
+export function frameTail(M: MapCtx) {
+  const { S, P } = M;
+  const st = S.current;
+  const pal = makePalette(P.current.dark);
+  if (P.current.legendRef.current)
+    P.current.legendRef.current.draw(
+      pal,
+      st.view.scale / st.fitScale,
+      !P.current.national,
+      P.current.showInfra,
+      st.animEnabled,
+      stationT(M),
+    );
+  updateScaleBar(M);
+  // Only a moved view re-arms the debounce: the animation loop draws
+  // every frame and would otherwise keep postponing the URL update.
+  const vk = st.view.scale + "|" + st.view.tx + "|" + st.view.ty;
+  if (vk !== st.viewKey) {
+    st.viewKey = vk;
+    scheduleViewReport(M);
+  }
+}
+
+export function scheduleDraw(M: MapCtx) {
+  const { S } = M;
+  const st = S.current;
+  if (st.rafPending) return;
+  st.rafPending = true;
+  requestAnimationFrame(() => {
+    st.rafPending = false;
+    M.render();
+  });
 }

@@ -1,4 +1,40 @@
+import { useState } from "react";
 import type { Direction, DistUnit, OriginVM } from "../types";
+
+/** The phone toolbar's one-line stats ("1,498 trains daily · 653 direct cities ·
+    359 busiest/day"): the same three numbers as the header's stat row. */
+export function compactStats(o: {
+  cur: OriginVM | null;
+  viewCur: OriginVM | null;
+  direction: Direction;
+  filtered: boolean;
+  outTablesReady: boolean;
+  inTablesReady: boolean;
+  trainCount: number;
+  national?: { cities: number | null; maxFlow: number | null } | null;
+}): [string, string][] | null {
+  const n = (v: number | null | undefined) => (v == null ? "…" : v.toLocaleString("en-US"));
+  if (o.national) {
+    return [
+      [n(o.trainCount || null), "trains running"],
+      [n(o.national.cities), "cities"],
+      [n(o.national.maxFlow), "busiest/day"],
+    ];
+  }
+  const { cur, viewCur } = o;
+  if (!cur || !viewCur) return null;
+  return o.direction === "out"
+    ? [
+        [n(o.filtered && o.outTablesReady ? viewCur.deps.length : cur.o.outbound), "trains daily"],
+        [n(viewCur.dests.length), "direct cities"],
+        [n(viewCur.maxFlow), "busiest/day"],
+      ]
+    : [
+        [n(o.filtered && o.inTablesReady ? viewCur.arrs.length : cur.o.inbound), "trains daily"],
+        [n(viewCur.srcs.length), "direct cities"],
+        [n(viewCur.maxInFlow), "busiest/day"],
+      ];
+}
 
 export default function AppHeader({
   cur,
@@ -10,6 +46,11 @@ export default function AppHeader({
   selectedTrainCodes,
   outTablesReady,
   inTablesReady,
+  trainCount,
+  national,
+  isNational,
+  onSetNational,
+  compact,
 }: {
   cur: OriginVM | null;
   viewCur: OriginVM | null;
@@ -21,9 +62,21 @@ export default function AppHeader({
   selectedTrainCodes: string[];
   outTablesReady: boolean;
   inTablesReady: boolean;
+  /** Trains in the pack (train_table rows); 0 until the pack loads. */
+  trainCount: number;
+  /** National mode: the pack-wide numbers the stat row shows (null while the flows load). */
+  national?: { cities: number | null; maxFlow: number | null } | null;
+  /** National mode is on; `onSetNational` switches between it and the origin view. */
+  isNational: boolean;
+  onSetNational: (on: boolean) => void;
+  /** Phones: the three stats as one line under the description (compactStats). */
+  compact?: [string, string][] | null;
 }) {
+  // Phones clamp the description to two lines; a tap shows the rest.
+  const [subOpen, setSubOpen] = useState(false);
   return (
     <header>
+      <div className="head-row">
       <h1>
         <span className="cr-logo-wrap">
           <svg
@@ -38,20 +91,65 @@ export default function AppHeader({
           </svg>
         </span>
         <span>
-          China Rail Flow Map <span className="zh">· 铁路客流图</span>
+          China Rail Flow Map <span className="zh"><span className="zh-sep">· </span>铁路客流图</span>
         </span>
       </h1>
-      <p className="subtitle">
+      <div className="group units mode-switch" role="group" aria-label="View">
+        <button
+          id="modeOrigin"
+          type="button"
+          aria-pressed={isNational ? "false" : "true"}
+          onClick={() => onSetNational(false)}
+        >
+          Origin City
+        </button>
+        <button
+          id="tglNational"
+          type="button"
+          aria-pressed={isNational ? "true" : "false"}
+          onClick={() => onSetNational(true)}
+          title="Every covered train in China on one 24h clock (beta)"
+        >
+          National Beta
+        </button>
+      </div>
+      </div>
+      <p className={"subtitle" + (subOpen ? " open" : "")} onClick={() => setSubOpen((v) => !v)}>
         Flow diagram of trains departing and arriving across China&rsquo;s
         top rail cities. The width of each line refers to the number of
         daily trains along that particular piece of track &mdash; spanning{" "}
-        <b>7,253</b> scheduled daily passenger services (of over{" "}
-        <b>12,000</b> nationwide) across China&rsquo;s{" "}
+        <b>{trainCount ? trainCount.toLocaleString("en-US") : "…"}</b>{" "}
+        scheduled passenger services across China&rsquo;s{" "}
         <b>{distUnit === "mi" ? "30,000 mi" : "48,000 km"}</b> high-speed
         rail network ({distUnit === "mi" ? "100,000 mi" : "162,000 km"} of
         total track).
       </p>
+      {compact && (
+        <p className="mob-stats" aria-hidden="true">
+          {compact.map(([v, l], i) => (
+            <span key={l}>
+              {i > 0 && " · "}
+              <b>{v}</b> {l}
+            </span>
+          ))}
+        </p>
+      )}
       <div className="stats" id="stats">
+        {national && (
+          <>
+            <div>
+              <b>{trainCount ? trainCount.toLocaleString("en-US") : "…"}</b>{" "}
+              <span>trains running</span>
+            </div>
+            <div>
+              <b>{national.cities?.toLocaleString("en-US") ?? "…"}</b> <span>cities connected</span>
+            </div>
+            <div>
+              <b>{national.maxFlow?.toLocaleString("en-US") ?? "…"}</b>{" "}
+              <span data-short="trains/day, busiest">trains/day on the busiest corridor</span>
+            </div>
+          </>
+        )}
         {cur &&
           viewCur &&
           (() => {
@@ -73,7 +171,7 @@ export default function AppHeader({
                       : cur.o.outbound
                     ).toLocaleString("en-US")}
                   </b>{" "}
-                  <span>
+                  <span data-short={selectedClasses.length || hasHistFilter ? undefined : "trains depart daily"}>
                     {hasHistFilter
                       ? filterLabel
                       : selectedClasses.length > 0
@@ -88,11 +186,11 @@ export default function AppHeader({
                 </div>
                 <div>
                   <b>{viewCur.dests.length}</b>{" "}
-                  <span>cities with a direct connection</span>
+                  <span data-short="direct cities">cities with a direct connection</span>
                 </div>
                 <div>
                   <b>{viewCur.maxFlow}</b>{" "}
-                  <span>trains/day on the busiest corridors</span>
+                  <span data-short="trains/day, busiest">trains/day on the busiest corridors</span>
                 </div>
               </>
             ) : (
@@ -104,7 +202,7 @@ export default function AppHeader({
                       : cur.o.inbound
                     ).toLocaleString("en-US")}
                   </b>{" "}
-                  <span>
+                  <span data-short={selectedClasses.length || hasHistFilter ? undefined : "trains arrive daily"}>
                     {hasHistFilter
                       ? filterLabel
                       : selectedClasses.length > 0
@@ -119,11 +217,11 @@ export default function AppHeader({
                 </div>
                 <div>
                   <b>{viewCur.srcs.length}</b>{" "}
-                  <span>cities with a direct connection</span>
+                  <span data-short="direct cities">cities with a direct connection</span>
                 </div>
                 <div>
                   <b>{viewCur.maxInFlow}</b>{" "}
-                  <span>trains/day on the busiest corridors</span>
+                  <span data-short="trains/day, busiest">trains/day on the busiest corridors</span>
                 </div>
               </>
             );

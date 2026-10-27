@@ -365,5 +365,3 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
 
   return res;
 }
-
-export const prepOrigin = buildOrigin;

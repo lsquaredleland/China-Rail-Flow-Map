@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use analyze_rs::chains;
 use analyze_rs::cn::*;
+use analyze_rs::entries;
 use analyze_rs::geo::*;
 use analyze_rs::inputs;
 use analyze_rs::legs::*;
@@ -13,6 +14,7 @@ use analyze_rs::model::*;
 use analyze_rs::names::*;
 use analyze_rs::pack;
 use analyze_rs::polyline::*;
+use analyze_rs::provenance;
 use analyze_rs::timetable::*;
 
 #[derive(Default, Clone)]
@@ -106,6 +108,57 @@ fn expand_tables(t: &mut Value, out: bool) {
     }
 }
 
+fn arr(v: &Value) -> Vec<Value> {
+    v.as_array().cloned().unwrap_or_default()
+}
+
+fn int(v: &Value) -> i64 {
+    v.as_i64().unwrap()
+}
+
+fn ints(v: &Value) -> Vec<i64> {
+    v.as_array()
+        .map(|a| a.iter().map(|x| x.as_i64().unwrap()).collect())
+        .unwrap_or_default()
+}
+
+fn int_rows(v: &Value) -> Vec<Vec<i64>> {
+    v.as_array()
+        .map(|a| a.iter().map(ints).collect())
+        .unwrap_or_default()
+}
+
+/// `[[t, rows]]` chord lists -> train -> rows.
+fn chord_map(v: &Value) -> HashMap<usize, Vec<Vec<i64>>> {
+    v.as_array()
+        .into_iter()
+        .flatten()
+        .map(|c| (c[0].as_u64().unwrap() as usize, int_rows(&c[1])))
+        .collect()
+}
+
+/// Section id of a signed path entry (`!id` = travelled against the stored order).
+fn sec_of(v: i64) -> usize {
+    (if v >= 0 { v } else { !v }) as usize
+}
+
+/// Flow sections among a path's entries (throats, ids >= `n`, excluded).
+fn flow_len(path: &[Value], n: usize) -> i64 {
+    path.iter()
+        .filter(|v| sec_of(v.as_i64().unwrap()) < n)
+        .count() as i64
+}
+
+/// The pack files `audit_pack` checks, loaded once.
+struct PackFiles {
+    shared: Value,
+    out_map: Value,
+    in_map: Value,
+    out_t: Value,
+    in_t: Value,
+    sch: Value,
+}
+
 /// Phase 1-2 checks on a packed v2 build (env AUDIT_PACK_DIR): oriented
 /// per-train path continuity outside chord legs, monotone call cutoffs,
 /// schedule coverage, and the Chengdu goldens. Returns whether the hard
@@ -129,13 +182,100 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         load("atlas-v2-in-tables.json"),
     );
     let sch = load("atlas-v2-schedules.json");
+
     match shared.get("build") {
         Some(b) => println!("AUDIT pack build: {b}"),
         None => println!("AUDIT pack build: none (pack predates the provenance block)"),
     }
-    let arr = |v: &Value| -> Vec<Value> { v.as_array().cloned().unwrap_or_default() };
-    let int = |v: &Value| v.as_i64().unwrap();
+    let mut ok = check_formats(&shared, &out_map, &in_map, &out_t, &in_t);
+    ok &= check_city_points(&shared);
+    if ok {
+        expand_tables(&mut out_t, true);
+        expand_tables(&mut in_t, false);
+    }
+    let f = PackFiles {
+        shared,
+        out_map,
+        in_map,
+        out_t,
+        in_t,
+        sch,
+    };
+    ok &= check_flow_classes(&f);
+    let paths = check_paths_and_cutoffs(&f);
+    ok &= paths.sec_cnt_over == 0;
+    ok &= check_schedules(&f);
+    let stops = check_dep_stop_pos(&f);
+    ok &= stops.bad == 0 && stops.call_miss == 0;
+    let (shared, out_map, in_map) = (&f.shared, &f.out_map, &f.in_map);
+    let (out_t, in_t, sch) = (&f.out_t, &f.in_t, &f.sch);
+    let mut g: BTreeMap<String, i64> = BTreeMap::new();
+    g.insert("dep_stops_total".into(), stops.total);
+    g.insert("dep_rows_with_uncalled_stations".into(), stops.rows_extra);
+    g.insert("dep_stops_time_regressions".into(), stops.time_back);
+    let n = |v: &Value| arr(v).len() as i64;
+    g.insert("origins".into(), n(&out_map["origins"]));
+    g.insert("sections".into(), n(&shared["sections"]));
+    g.insert("in_sections".into(), n(&shared["in_sections"]));
+    g.insert("schedules_trains".into(), n(&sch["schedules"]));
+    let about_bad = check_about(shared);
+    ok &= about_bad == 0;
+    g.insert("about_mismatch".into(), about_bad);
+    g.insert("chord_leg_rows".into(), paths.chord_legs as i64);
+    g.insert("continuity_gaps_le6km".into(), paths.throat_gaps as i64);
+    g.insert(
+        "continuity_gaps_gt6km".into(),
+        (paths.gaps - paths.throat_gaps) as i64,
+    );
+    g.insert("continuity_gaps_gt100m".into(), paths.gaps_100m as i64);
+    g.insert("throats".into(), paths.throats as i64);
+    g.insert("dep_rows_jump_gt35km_outside_chords".into(), paths.jump_out);
+    g.insert("dep_rows_jump_gt35km_inside_chords".into(), paths.jump_in);
+    g.insert("nonmonotone_sec_cnt_trains".into(), paths.non_mono as i64);
+    ok &= audit_national(dir, shared, out_map, out_t, &mut g);
+    ok &= audit_national_trains(dir, shared, out_t, in_t, sch, &mut g);
+    ok &= audit_national_entries(dir, shared, sch, &mut g);
+    ok &= audit_national_cities(dir, shared, out_map, sch, &mut g);
+    chengdu_counters(shared, out_map, in_map, &mut g);
+    println!(
+        "AUDIT pack hard checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    (ok, g)
+}
+
+/// `shared.about` is optional; when present it must be what the calendar
+/// derives (`provenance::about_block`). Returns 1 on a mismatch, else 0.
+fn check_about(shared: &Value) -> i64 {
+    let calendar: Vec<String> = arr(&shared["calendar"])
+        .iter()
+        .filter_map(|d| d.as_str().map(String::from))
+        .collect();
+    let bad = shared
+        .get("about")
+        .is_some_and(|a| Some(a) != provenance::about_block(&calendar).as_ref());
+    println!(
+        "AUDIT pack about: {} ({} calendar dates)",
+        match shared.get("about") {
+            None => "none",
+            Some(_) if bad => "MISMATCH with the calendar",
+            Some(_) => "matches the calendar",
+        },
+        calendar.len()
+    );
+    i64::from(bad)
+}
+
+/// Every table and map file carries `fmt: 6`.
+fn check_formats(
+    shared: &Value,
+    out_map: &Value,
+    in_map: &Value,
+    out_t: &Value,
+    in_t: &Value,
+) -> bool {
     let mut ok = true;
+
     for (name, t) in [("out-tables", &out_t), ("in-tables", &in_t)] {
         let fmt = t.get("fmt").and_then(Value::as_i64);
         println!("AUDIT pack {name} fmt: {fmt:?}");
@@ -150,55 +290,34 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         println!("AUDIT pack {name} fmt: {fmt:?}");
         ok &= fmt == Some(6);
     }
-    if ok {
-        expand_tables(&mut out_t, true);
-        expand_tables(&mut in_t, false);
-    }
-    let ends = |key: &str| -> Vec<([f64; 2], [f64; 2])> {
-        arr(&shared[key])
-            .iter()
-            .map(|s| {
-                let p = decode_poly4(s["g"].as_str().unwrap());
-                (p[0], *p.last().unwrap())
-            })
-            .collect()
-    };
-    // O1: path entries >= the section count are throats (`throats[v - n]`),
-    // so the end lists run sections then throats and index by entry id
-    let throat_ends: Vec<([f64; 2], [f64; 2])> = arr(&shared["throats"])
+    ok
+}
+
+// every city point is a real place in China's box (a [0,0] point once
+// stretched the client's fitted extent to the Gulf of Guinea)
+fn check_city_points(shared: &Value) -> bool {
+    let bad_city_pts: Vec<String> = arr(&shared["city_table"])
         .iter()
-        .map(|s| {
-            let p = decode_poly4(s.as_str().unwrap());
-            (p[0], *p.last().unwrap())
+        .filter(|c| {
+            let (lon, lat) = (c["pt"][0].as_f64(), c["pt"][1].as_f64());
+            !matches!((lon, lat), (Some(x), Some(y))
+                if (70.0..=140.0).contains(&x) && (15.0..=56.0).contains(&y))
         })
+        .map(|c| c["zh"].as_str().unwrap_or("?").to_string())
         .collect();
-    let (n_out, n_in) = (
-        arr(&shared["sections"]).len(),
-        arr(&shared["in_sections"]).len(),
+    println!(
+        "AUDIT pack city points outside lon 70-140 / lat 15-56: {} {bad_city_pts:?}",
+        bad_city_pts.len()
     );
-    let (mut out_ends, mut in_ends) = (ends("sections"), ends("in_sections"));
-    out_ends.extend(&throat_ends);
-    in_ends.extend(&throat_ends);
-    // flow sections among a path's entries (throats excluded)
-    let flow_len = |path: &[Value], n: usize| -> i64 {
-        path.iter()
-            .filter(|v| {
-                let v = v.as_i64().unwrap();
-                ((if v >= 0 { v } else { !v }) as usize) < n
-            })
-            .count() as i64
-    };
-    let codes: Vec<String> = arr(&shared["train_table"])
-        .iter()
-        .map(|t| t["code"].as_str().unwrap().to_string())
-        .collect();
-    let zh: Vec<String> = arr(&out_map["origins"])
-        .iter()
-        .map(|o| o["zh"].as_str().unwrap().to_string())
-        .collect();
-    // ---- flow rows: [sec, total, g, d, c, s, z, t, k, plain]; the class
-    // columns must add up to the total (a wrong class split under a right
-    // total passes every other check) ----
+    bad_city_pts.is_empty()
+}
+
+/// Flow rows: `[sec, total, g, d, c, s, z, t, k, plain]`; the class columns
+/// must add up to the total (a wrong class split under a right total passes
+/// every other check).
+fn check_flow_classes(f: &PackFiles) -> bool {
+    let (out_map, in_map) = (&f.out_map, &f.in_map);
+
     let (mut class_rows, mut class_bad) = (0u64, 0u64);
     for (m, key) in [(&out_map, "flows"), (&in_map, "in_flows")] {
         for o in arr(&m["origins"]).iter() {
@@ -214,7 +333,67 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     println!(
         "AUDIT pack flow class columns: {class_rows} rows, {class_bad} where sum(classes) != total"
     );
-    ok &= class_bad == 0;
+    class_bad == 0
+}
+
+/// `(first point, last point)` of every section polyline under `key`.
+fn section_ends(shared: &Value, key: &str) -> Vec<([f64; 2], [f64; 2])> {
+    arr(&shared[key])
+        .iter()
+        .map(|s| {
+            let p = decode_poly4(s["g"].as_str().unwrap());
+            (p[0], *p.last().unwrap())
+        })
+        .collect()
+}
+
+/// What the path-continuity and cutoff checks count.
+struct PathStats {
+    throats: usize,
+    chord_legs: u64,
+    gaps: u64,
+    gaps_100m: u64,
+    throat_gaps: u64,
+    jump_out: i64,
+    jump_in: i64,
+    non_mono: usize,
+    sec_cnt_over: u64,
+}
+
+/// Oriented per-train path continuity outside chord legs, and monotone call
+/// cutoffs, over the out and in tables.
+fn check_paths_and_cutoffs(f: &PackFiles) -> PathStats {
+    let (shared, out_map) = (&f.shared, &f.out_map);
+    let (out_t, in_t) = (&f.out_t, &f.in_t);
+
+    // O1: path entries >= the section count are throats (`throats[v - n]`),
+    // so the end lists run sections then throats and index by entry id
+    let throat_ends: Vec<([f64; 2], [f64; 2])> = arr(&shared["throats"])
+        .iter()
+        .map(|s| {
+            let p = decode_poly4(s.as_str().unwrap());
+            (p[0], *p.last().unwrap())
+        })
+        .collect();
+    let (n_out, n_in) = (
+        arr(&shared["sections"]).len(),
+        arr(&shared["in_sections"]).len(),
+    );
+    let (mut out_ends, mut in_ends) = (
+        section_ends(shared, "sections"),
+        section_ends(shared, "in_sections"),
+    );
+    out_ends.extend(&throat_ends);
+    in_ends.extend(&throat_ends);
+
+    let codes: Vec<String> = arr(&shared["train_table"])
+        .iter()
+        .map(|t| t["code"].as_str().unwrap().to_string())
+        .collect();
+    let zh: Vec<String> = arr(&out_map["origins"])
+        .iter()
+        .map(|o| o["zh"].as_str().unwrap().to_string())
+        .collect();
     // ---- path continuity: exit of oriented section k-1 -> entry of k ----
     let mut worst: Vec<(f64, String)> = Vec::new();
     let (mut checked, mut gaps, mut chord_rows, mut chord_legs) = (0u64, 0u64, 0u64, 0u64);
@@ -227,10 +406,12 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     let mut sec_cnt_over = 0u64;
     // outbound rows with a > 35 km jump, inside chord legs only / outside
     let (mut jump_in, mut jump_out) = (0i64, 0i64);
+    // and outbound rows with a > 20 km jump outside chord legs (report only)
+    let mut jump20_out = 0i64;
     for (label, tables, secs_key, chords_key, rows_key, ends, n_secs) in [
         (
             "out",
-            &out_t,
+            out_t,
             "dep_secs",
             "dep_chord_legs",
             "deps",
@@ -239,7 +420,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         ),
         (
             "in",
-            &in_t,
+            in_t,
             "arr_secs",
             "arr_chord_legs",
             "arrs",
@@ -275,7 +456,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                         (b, a)
                     }
                 };
-                let (mut j_in, mut j_out) = (false, false);
+                let (mut j_in, mut j_out, mut j20_out) = (false, false, false);
                 for k in 1..path.len() {
                     let gap = hav_km_ll(oriented(path[k - 1]).1, oriented(path[k]).0);
                     if exempt.contains(&k) {
@@ -283,6 +464,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                         continue;
                     }
                     j_out |= gap > 35.0;
+                    j20_out |= gap > 20.0;
                     checked += 1;
                     if gap > 0.1 {
                         gaps_100m += 1;
@@ -307,36 +489,11 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
                 }
                 if label == "out" {
                     jump_out += j_out as i64;
+                    jump20_out += j20_out as i64;
                     jump_in += (j_in && !j_out) as i64;
                 }
             }
-            // ---- cutoffs: per train, sec_cnt never decreases as calls
-            // move away from this city (outbound: later arrival; inbound:
-            // later boarding = shorter ride) ----
-            let calls_key = if label == "out" { "calls" } else { "in_calls" };
-            let mut per: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
-            for cell in arr(&o[calls_key]).iter() {
-                for r in arr(cell).iter() {
-                    let (idx, t1, t2, off) = (int(&r[0]), int(&r[1]), int(&r[2]), int(&r[3]));
-                    let cnt = int(&r[if label == "out" { 5 } else { 6 }]);
-                    let len = flow_len(&arr(&o[secs_key][idx as usize]), n_secs);
-                    if cnt > len {
-                        sec_cnt_over += 1;
-                    }
-                    let key = if label == "out" {
-                        off * 1440 + t1
-                    } else {
-                        off * 1440 + t2 - t1
-                    };
-                    per.entry(idx).or_default().push((key, cnt));
-                }
-            }
-            for v in per.values_mut() {
-                v.sort();
-                if v.windows(2).any(|w| w[1].1 < w[0].1) {
-                    worst.push((-1.0, format!("{} {label} non-monotone sec_cnt", zh[oi])));
-                }
-            }
+            sec_cnt_over += check_cutoffs(o, label, secs_key, n_secs, &zh[oi], &mut worst);
         }
     }
     let non_mono: Vec<&(f64, String)> = worst.iter().filter(|w| w.0 < 0.0).collect();
@@ -366,8 +523,64 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         non_mono.len()
     );
     println!("AUDIT pack outbound rows with a > 35 km jump: {jump_out} outside chord legs, {jump_in} only inside");
-    ok &= sec_cnt_over == 0;
-    // ---- schedules: every row's train has one, consistent with the row ----
+    println!("AUDIT pack outbound rows with a > 20 km jump: {jump20_out} outside chord legs");
+    PathStats {
+        throats: throat_ends.len(),
+        chord_legs,
+        gaps,
+        gaps_100m,
+        throat_gaps,
+        jump_out,
+        jump_in,
+        non_mono: non_mono.len(),
+        sec_cnt_over,
+    }
+}
+
+/// Cutoffs of one origin: per train, sec_cnt never decreases as calls move
+/// away from this city (outbound: later arrival; inbound: later boarding =
+/// shorter ride). Pushes each non-monotone train onto `worst` (gap -1) and
+/// returns the cutoffs beyond their path's flow-section count.
+fn check_cutoffs(
+    o: &Value,
+    label: &str,
+    secs_key: &str,
+    n_secs: usize,
+    city: &str,
+    worst: &mut Vec<(f64, String)>,
+) -> u64 {
+    let mut sec_cnt_over = 0u64;
+    let calls_key = if label == "out" { "calls" } else { "in_calls" };
+    let mut per: HashMap<i64, Vec<(i64, i64)>> = HashMap::new();
+    for cell in arr(&o[calls_key]).iter() {
+        for r in arr(cell).iter() {
+            let (idx, t1, t2, off) = (int(&r[0]), int(&r[1]), int(&r[2]), int(&r[3]));
+            let cnt = int(&r[if label == "out" { 5 } else { 6 }]);
+            let len = flow_len(&arr(&o[secs_key][idx as usize]), n_secs);
+            if cnt > len {
+                sec_cnt_over += 1;
+            }
+            let key = if label == "out" {
+                off * 1440 + t1
+            } else {
+                off * 1440 + t2 - t1
+            };
+            per.entry(idx).or_default().push((key, cnt));
+        }
+    }
+    for v in per.values_mut() {
+        v.sort();
+        if v.windows(2).any(|w| w[1].1 < w[0].1) {
+            worst.push((-1.0, format!("{city} {label} non-monotone sec_cnt")));
+        }
+    }
+    sec_cnt_over
+}
+
+/// Schedules: every row's train has one, consistent with the row.
+fn check_schedules(f: &PackFiles) -> bool {
+    let (shared, out_t, in_t, sch) = (&f.shared, &f.out_t, &f.in_t, &f.sch);
+
     let scheds = arr(&sch["schedules"]);
     let extra = arr(&sch["extra_stations"]).len();
     let n_st = arr(&shared["station_table"]).len() as i64;
@@ -424,10 +637,26 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         "AUDIT pack schedules: {} trains, extra_stations {extra}, bad station idx {bad_idx}; {rows_n} dep/arr rows: {missing} without schedule, {mismatch} inconsistent",
         scheds.len()
     );
-    ok &= extra == 0 && bad_idx == 0 && missing == 0 && mismatch == 0;
-    // ---- station-level stops (dep_stop_pos): one position per schedule
-    // stop after boarding, monotone, ending at the path end; and every city
-    // call is one of those stops (same arrival minute, same position) ----
+    extra == 0 && bad_idx == 0 && missing == 0 && mismatch == 0
+}
+
+/// What the station-stop checks count.
+struct StopStats {
+    total: i64,
+    bad: i64,
+    time_back: i64,
+    rows_extra: i64,
+    call_miss: i64,
+}
+
+// ---- station-level stops (dep_stop_pos): one position per schedule
+// stop after boarding, monotone, ending at the path end; and every city
+// call is one of those stops (same arrival minute, same position) ----
+fn check_dep_stop_pos(f: &PackFiles) -> StopStats {
+    let (shared, out_t, sch) = (&f.shared, &f.out_t, &f.sch);
+    let scheds = arr(&sch["schedules"]);
+    let n_out = arr(&shared["sections"]).len();
+
     let (mut st_total, mut st_bad, mut st_time_back, mut st_rows_extra) = (0i64, 0i64, 0i64, 0i64);
     let mut call_miss = 0i64;
     for o in arr(&out_t["origins"]).iter() {
@@ -503,25 +732,28 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     println!(
         "AUDIT pack dep_stop_pos: {st_total} station stops; {st_bad} rows inconsistent (count/order/path end), {st_time_back} with times going back, {call_miss} city calls not matching a stop; {st_rows_extra} dep rows have stations without a city call"
     );
-    ok &= st_bad == 0 && call_miss == 0;
-    let mut g: BTreeMap<String, i64> = BTreeMap::new();
-    g.insert("dep_stops_total".into(), st_total);
-    g.insert("dep_rows_with_uncalled_stations".into(), st_rows_extra);
-    g.insert("dep_stops_time_regressions".into(), st_time_back);
+    StopStats {
+        total: st_total,
+        bad: st_bad,
+        time_back: st_time_back,
+        rows_extra: st_rows_extra,
+        call_miss,
+    }
+}
+
+/// Chengdu goldens (PIPELINE.md section 7 shape).
+fn chengdu_counters(
+    shared: &Value,
+    out_map: &Value,
+    in_map: &Value,
+    g: &mut BTreeMap<String, i64>,
+) {
     let n = |v: &Value| arr(v).len() as i64;
-    g.insert("origins".into(), n(&out_map["origins"]));
-    g.insert("sections".into(), n(&shared["sections"]));
-    g.insert("in_sections".into(), n(&shared["in_sections"]));
-    g.insert("schedules_trains".into(), scheds.len() as i64);
-    g.insert("chord_leg_rows".into(), chord_legs as i64);
-    g.insert("continuity_gaps_le6km".into(), throat_gaps as i64);
-    g.insert("continuity_gaps_gt6km".into(), (gaps - throat_gaps) as i64);
-    g.insert("continuity_gaps_gt100m".into(), gaps_100m as i64);
-    g.insert("throats".into(), throat_ends.len() as i64);
-    g.insert("dep_rows_jump_gt35km_outside_chords".into(), jump_out);
-    g.insert("dep_rows_jump_gt35km_inside_chords".into(), jump_in);
-    g.insert("nonmonotone_sec_cnt_trains".into(), non_mono.len() as i64);
-    // Chengdu goldens (PIPELINE.md section 7 shape)
+    let zh: Vec<String> = arr(&out_map["origins"])
+        .iter()
+        .map(|o| o["zh"].as_str().unwrap().to_string())
+        .collect();
+
     let cities: Vec<String> = arr(&shared["city_table"])
         .iter()
         .map(|c| c["zh"].as_str().unwrap().to_string())
@@ -556,11 +788,1052 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
             g.insert(format!("chengdu_{k}"), v);
         }
     }
+}
+
+/// P3.1 national table (`atlas-v2-national.json`; skipped while a pack has
+/// none). Hard checks: section-parallel shape and `fmt`; classes sum to the
+/// total; never below any origin's flow row (total and per class) on the
+/// same section; and never below an independent recount from out-tables'
+/// per-train `paths` (distinct trains whose path enters the section). The
+/// recount is a lower bound, not an equality: the national table also
+/// counts track a train runs before its first selected-city departure
+/// (from its inbound legs), which no outbound path holds.
+fn audit_national(
+    dir: &Path,
+    shared: &Value,
+    out_map: &Value,
+    out_t: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let name = "atlas-v2-national.json";
+    if !pack::exists(dir, name) {
+        println!("AUDIT national: no {name} in this pack, skipped");
+        return true;
+    }
+    let nat = pack::read_json(dir, name);
+    let n = shared["sections"].as_array().unwrap().len();
+    let total = ints(&nat["total"]);
+    let by_class: Vec<Vec<i64>> = nat["by_class"]
+        .as_array()
+        .map(|a| a.iter().map(ints).collect())
+        .unwrap_or_default();
+    let fmt = nat["fmt"].as_i64();
+    if fmt != Some(6)
+        || total.len() != n
+        || by_class.len() != 8
+        || by_class.iter().any(|c| c.len() != n)
+    {
+        println!(
+            "AUDIT national FAIL: fmt {fmt:?}, total {} / by_class {:?} entries for {n} sections",
+            total.len(),
+            by_class.iter().map(Vec::len).collect::<Vec<_>>()
+        );
+        return false;
+    }
+    let class_bad = (0..n)
+        .filter(|&s| by_class.iter().map(|c| c[s]).sum::<i64>() != total[s])
+        .count();
+    let (rows, below) = flow_rows_above_national(out_map, &total, &by_class);
+    let (classes, cnt, cls_cnt, path_trains) = out_path_recount(shared, out_t, n);
+
+    let short = (0..n)
+        .filter(|&s| total[s] < cnt[s] || (0..8).any(|c| by_class[c][s] < cls_cnt[c][s]))
+        .count();
+    let equal = (0..n).filter(|&s| total[s] == cnt[s]).count();
+    let trains = nat["trains"].as_i64().unwrap_or(-1);
+    let widest = (0..n)
+        .max_by_key(|&s| (total[s], std::cmp::Reverse(s)))
+        .unwrap_or(0);
+    let most_added = (0..n)
+        .max_by_key(|&s| (total[s] - cnt[s], std::cmp::Reverse(s)))
+        .unwrap_or(0);
+    for (label, s) in [("widest", widest), ("most added", most_added), ("first", 0)] {
+        println!(
+            "AUDIT national spot check, {label} section {s}: national {} (classes {:?}), out-path recount {} (classes {:?})",
+            total[s],
+            by_class.iter().map(|c| c[s]).collect::<Vec<_>>(),
+            cnt[s],
+            cls_cnt.iter().map(|c| c[s]).collect::<Vec<_>>()
+        );
+    }
     println!(
-        "AUDIT pack hard checks: {}",
+        "AUDIT national: {trains} trains ({path_trains} with an outbound path) over {n} sections; {class_bad} sections where sum(classes) != total; {below} of {rows} origin flow rows above national; {short} sections below the out-path recount, {equal} equal to it"
+    );
+    let ok = class_bad == 0
+        && below == 0
+        && short == 0
+        && trains >= path_trains
+        && trains <= classes.len() as i64;
+    g.insert("national_sections".into(), n as i64);
+    g.insert("national_trains".into(), trains);
+    g.insert("national_total_sum".into(), total.iter().sum());
+    g.insert("national_widest".into(), total[widest]);
+    g.insert("national_eq_out_recount".into(), equal as i64);
+    println!(
+        "AUDIT national checks: {}",
         if ok { "PASS" } else { "FAIL" }
     );
-    (ok, g)
+    ok
+}
+
+/// Every origin's map flow rows (delta-coded section ids): how many there
+/// are and how many exceed the national table (total or any class).
+fn flow_rows_above_national(out_map: &Value, total: &[i64], by_class: &[Vec<i64>]) -> (u64, u64) {
+    let (mut rows, mut below) = (0u64, 0u64);
+    for o in out_map["origins"].as_array().unwrap() {
+        let mut sec = 0i64;
+        for r in o["flows"].as_array().unwrap() {
+            let r = ints(r);
+            sec += r[0];
+            let s = sec as usize;
+            rows += 1;
+            if total[s] < r[1] || r[2..].iter().enumerate().any(|(c, &v)| by_class[c][s] < v) {
+                below += 1;
+            }
+        }
+    }
+    (rows, below)
+}
+
+/// Independent recount from the per-train outbound paths: the train classes,
+/// distinct trains per section and per class, and the trains with a path.
+fn out_path_recount(
+    shared: &Value,
+    out_t: &Value,
+    n: usize,
+) -> (Vec<usize>, Vec<i64>, Vec<Vec<i64>>, i64) {
+    let classes: Vec<usize> = shared["train_table"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| class_idx(t["class"].as_str().unwrap()))
+        .collect();
+    let mut cnt = vec![0i64; n];
+    let mut cls_cnt = vec![vec![0i64; n]; 8];
+    let mut path_trains = 0i64;
+    for (t, p) in out_t["paths"].as_array().unwrap().iter().enumerate() {
+        let mut secs: Vec<usize> = ints(p)
+            .into_iter()
+            .map(|v| (if v >= 0 { v } else { !v }) as usize)
+            .filter(|&s| s < n)
+            .collect();
+        secs.sort_unstable();
+        secs.dedup();
+        path_trains += !secs.is_empty() as i64;
+        for s in secs {
+            cnt[s] += 1;
+            cls_cnt[classes[t]][s] += 1;
+        }
+    }
+    (classes, cnt, cls_cnt, path_trains)
+}
+
+/// The national table's per-city rows.
+struct CityRows {
+    idx: Vec<i64>,
+    dep: Vec<i64>,
+    arr: Vec<i64>,
+    dbc: Vec<Vec<i64>>,
+    abc: Vec<Vec<i64>>,
+}
+
+/// National per-city counts (`atlas-v2-national.json` `cities`) and the
+/// per-train index (`atlas-v2-national-index.json`); skipped while a pack has
+/// neither. Hard checks: the class rows sum to `dep` / `arr`; every origin's
+/// `outbound` / `inbound` is its city's `dep` / `arr` (all origins); and with
+/// every train selected the index sums to `total`, `cities.dep` and
+/// `cities.arr`, also per class.
+fn audit_national_cities(
+    dir: &Path,
+    shared: &Value,
+    out_map: &Value,
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let (nat_name, ix_name) = ("atlas-v2-national.json", "atlas-v2-national-index.json");
+    if !pack::exists(dir, nat_name) {
+        return true;
+    }
+    let nat = pack::read_json(dir, nat_name);
+    if nat.get("cities").is_none() {
+        println!("AUDIT national cities: none in this pack, skipped");
+        return true;
+    }
+    let Some((mut ok, cr)) = check_city_rows(shared, out_map, &nat, g) else {
+        return false;
+    };
+    if !pack::exists(dir, ix_name) {
+        println!("AUDIT national index: no {ix_name} in this pack, skipped");
+        return ok;
+    }
+    let ix = pack::read_json(dir, ix_name);
+    let Some(index_ok) = check_national_index(shared, &nat, &ix, &cr, sch, g) else {
+        return false;
+    };
+    ok &= index_ok;
+    println!(
+        "AUDIT national cities+index checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    ok
+}
+
+/// Shape, class sums and origin parity of `cities`; `None` on a shape failure.
+fn check_city_rows(
+    shared: &Value,
+    out_map: &Value,
+    nat: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> Option<(bool, CityRows)> {
+    let c = &nat["cities"];
+    let (idx, dep, arr) = (ints(&c["idx"]), ints(&c["dep"]), ints(&c["arr"]));
+    let (dbc, abc) = (int_rows(&c["dep_by_class"]), int_rows(&c["arr_by_class"]));
+    let k = idx.len();
+    let n_city = shared["city_table"].as_array().unwrap().len() as i64;
+    let mut bad = 0u64;
+    let shape = dep.len() == k
+        && arr.len() == k
+        && dbc.len() == 8
+        && abc.len() == 8
+        && dbc.iter().chain(abc.iter()).all(|r| r.len() == k)
+        && idx.windows(2).all(|w| w[0] < w[1])
+        && idx.iter().all(|&i| (0..n_city).contains(&i));
+    if !shape {
+        println!("AUDIT national cities FAIL: shape ({k} cities)");
+        return None;
+    }
+    for i in 0..k {
+        bad += (dbc.iter().map(|r| r[i]).sum::<i64>() != dep[i]) as u64;
+        bad += (abc.iter().map(|r| r[i]).sum::<i64>() != arr[i]) as u64;
+        bad += (dep[i] + arr[i] == 0) as u64;
+    }
+    // origin parity
+    let by_zh: HashMap<&str, i64> = shared["city_table"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c["zh"].as_str().unwrap(), i as i64))
+        .collect();
+    let (mut origins, mut parity_bad) = (0u64, 0u64);
+    for o in out_map["origins"].as_array().unwrap() {
+        origins += 1;
+        let hit = by_zh
+            .get(o["zh"].as_str().unwrap())
+            .and_then(|i| idx.binary_search(i).ok());
+        parity_bad += (hit.map(|j| (dep[j], arr[j]))
+            != Some((
+                o["outbound"].as_i64().unwrap(),
+                o["inbound"].as_i64().unwrap(),
+            ))) as u64;
+    }
+    println!(
+        "AUDIT national cities: {k} cities; {bad} rows whose classes do not sum or are empty; {parity_bad} of {origins} origins whose outbound/inbound differ from dep/arr"
+    );
+    let ok = bad == 0 && parity_bad == 0 && origins > 0;
+    g.insert("national_cities".into(), k as i64);
+    g.insert(
+        "national_cities_origin_parity_bad".into(),
+        parity_bad as i64,
+    );
+    Some((
+        ok,
+        CityRows {
+            idx,
+            dep,
+            arr,
+            dbc,
+            abc,
+        },
+    ))
+}
+
+/// The per-train index (`atlas-v2-national-index.json`): shape, ranges, and
+/// that selecting every train reproduces the national and city counts.
+/// `None` on a shape failure.
+fn check_national_index(
+    shared: &Value,
+    nat: &Value,
+    ix: &Value,
+    cr: &CityRows,
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> Option<bool> {
+    let CityRows {
+        idx,
+        dep,
+        arr,
+        dbc,
+        abc,
+    } = cr;
+    let k = idx.len();
+    let mut ok = true;
+
+    let tt = shared["train_table"].as_array().unwrap();
+    let n_sec = shared["sections"].as_array().unwrap().len();
+    let lists = |key: &str| -> Vec<Vec<i64>> {
+        // delta-coded ascending ids -> absolute ids
+        int_rows(&ix[key])
+            .into_iter()
+            .map(|r| {
+                let mut a = 0;
+                r.into_iter()
+                    .map(|d| {
+                        a += d;
+                        a
+                    })
+                    .collect()
+            })
+            .collect()
+    };
+    let (secs, idep, iarr) = (lists("secs"), lists("dep"), lists("arr"));
+    let (hour, dkm, dmi, dur) = (
+        ints(&ix["hour"]),
+        ints(&ix["dist_km"]),
+        ints(&ix["dist_mi"]),
+        ints(&ix["dur"]),
+    );
+    let n = tt.len();
+    let shaped = ix["fmt"].as_i64() == Some(6)
+        && ix["n_train"].as_u64() == Some(n as u64)
+        && ix["n_sec"].as_u64() == Some(n_sec as u64)
+        && [
+            secs.len(),
+            idep.len(),
+            iarr.len(),
+            hour.len(),
+            dkm.len(),
+            dmi.len(),
+            dur.len(),
+        ]
+        .iter()
+        .all(|&l| l == n);
+    if !shaped {
+        println!("AUDIT national index FAIL: shape for {n} trains / {n_sec} sections");
+        return None;
+    }
+    let range_bad = (0..n)
+        .filter(|&t| {
+            !(-1..24).contains(&hour[t])
+                || !(-1..=30).contains(&dkm[t])
+                || !(-1..=40).contains(&dmi[t])
+                || !(-1..=24).contains(&dur[t])
+                || secs[t].iter().any(|&s| s < 0 || s >= n_sec as i64)
+        })
+        .count();
+    let total = ints(&nat["total"]);
+    let by_class = int_rows(&nat["by_class"]);
+    let (mut tot, mut cls) = (vec![0i64; n_sec], vec![vec![0i64; n_sec]; 8]);
+    let (mut d_cls, mut a_cls) = (vec![vec![0i64; k]; 8], vec![vec![0i64; k]; 8]);
+    let mut city_bad = 0u64;
+    for t in 0..n {
+        let ci = class_idx(tt[t]["class"].as_str().unwrap());
+        for &s in &secs[t] {
+            tot[s as usize] += 1;
+            cls[ci][s as usize] += 1;
+        }
+        for (ids, cls_rows) in [(&idep[t], &mut d_cls), (&iarr[t], &mut a_cls)] {
+            for &i in ids.iter() {
+                match idx.binary_search(&i) {
+                    Ok(j) => cls_rows[ci][j] += 1,
+                    Err(_) => city_bad += 1,
+                }
+            }
+        }
+    }
+    let sec_bad = (0..n_sec).filter(|&s| tot[s] != total[s]).count()
+        + (0..8)
+            .map(|c| (0..n_sec).filter(|&s| cls[c][s] != by_class[c][s]).count())
+            .sum::<usize>();
+    let dep_bad = (0..8)
+        .map(|c| (0..k).filter(|&j| d_cls[c][j] != dbc[c][j]).count())
+        .sum::<usize>();
+    let arr_bad = (0..8)
+        .map(|c| (0..k).filter(|&j| a_cls[c][j] != abc[c][j]).count())
+        .sum::<usize>();
+    println!(
+        "AUDIT national index: {n} trains; {range_bad} rows out of range; selecting every train: {sec_bad} section / {dep_bad} dep / {arr_bad} arr count mismatches (by class), {city_bad} cities outside the city counts"
+    );
+    ok &= range_bad == 0 && sec_bad == 0 && dep_bad == 0 && arr_bad == 0 && city_bad == 0;
+    g.insert("national_index_trains".into(), n as i64);
+    if ix.get("dep_min").is_some() || ix.get("arr_min").is_some() {
+        ok &= audit_national_event_minutes(ix, &idep, &iarr, idx, (dep, arr), sch, g);
+    }
+    Some(ok)
+}
+
+/// The index's optional event minutes (`dep_min` / `arr_min`): aligned with
+/// `dep` / `arr`, all in 0..1439; per city the events are exactly
+/// `cities.dep` / `cities.arr` (so the count with minute <= 1439 is the
+/// total); and every minute is a minute of the train's schedule rows:
+/// a departure's is a departure minute of a row but the last, an arrival's
+/// an arrival minute of a row but the first (mod 1440). Counts the
+/// departures / arrivals whose minute is not there (`minute_bad`).
+fn audit_national_event_minutes(
+    ix: &Value,
+    idep: &[Vec<i64>],
+    iarr: &[Vec<i64>],
+    idx: &[i64],
+    (dep, arr): (&[i64], &[i64]),
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let mins = |k: &str| -> Option<Vec<Vec<i64>>> {
+        ix[k].as_array().map(|a| {
+            a.iter()
+                .map(|r| {
+                    r.as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|x| x.as_i64().unwrap())
+                        .collect()
+                })
+                .collect()
+        })
+    };
+    let (Some(dm), Some(am)) = (mins("dep_min"), mins("arr_min")) else {
+        println!("AUDIT national index minutes FAIL: only one of dep_min / arr_min");
+        return false;
+    };
+    let n = idep.len();
+    let schedules = sch["schedules"].as_array().unwrap();
+    let (mut shape_bad, mut range_bad, mut minute_bad, mut events) = (0u64, 0u64, 0u64, 0i64);
+    let mut per_city = [vec![0i64; idx.len()], vec![0i64; idx.len()]];
+    if dm.len() != n || am.len() != n || schedules.len() != n {
+        println!("AUDIT national index minutes FAIL: shape for {n} trains");
+        return false;
+    }
+    for t in 0..n {
+        shape_bad += (dm[t].len() != idep[t].len() || am[t].len() != iarr[t].len()) as u64;
+        if shape_bad > 0 {
+            continue;
+        }
+        let rows = schedules[t].as_array().unwrap();
+        let col = |r: &Value, c: usize| r[c].as_i64().unwrap();
+        let tod = |v: i64| (v >= 0).then_some(v.rem_euclid(1440));
+        let deps: HashSet<i64> = rows[..rows.len().saturating_sub(1)]
+            .iter()
+            .filter_map(|r| tod(col(r, 2)))
+            .collect();
+        let arrs: HashSet<i64> = rows.iter().skip(1).filter_map(|r| tod(col(r, 1))).collect();
+        for (k, (ids, ms, set)) in [(&idep[t], &dm[t], &deps), (&iarr[t], &am[t], &arrs)]
+            .into_iter()
+            .enumerate()
+        {
+            for (&id, &m) in ids.iter().zip(ms.iter()) {
+                events += 1;
+                range_bad += !(0..1440).contains(&m) as u64;
+                minute_bad += !set.contains(&m) as u64;
+                if let Ok(j) = idx.binary_search(&id) {
+                    per_city[k][j] += 1;
+                }
+            }
+        }
+    }
+    let city_bad = (0..idx.len())
+        .filter(|&j| per_city[0][j] != dep[j] || per_city[1][j] != arr[j])
+        .count();
+    println!(
+        "AUDIT national index minutes: {events} events; {shape_bad} rows misaligned, {range_bad} outside 0..1439, {minute_bad} not a schedule minute of the train; {city_bad} cities whose event count differs from dep/arr"
+    );
+    g.insert("national_index_events".into(), events);
+    g.insert("national_index_minute_bad".into(), minute_bad as i64);
+    shape_bad == 0 && range_bad == 0 && minute_bad == 0 && city_bad == 0
+}
+
+/// The national trains file, decoded once for the checks below.
+struct NatTrains<'a> {
+    nt: &'a Value,
+    paths: Vec<Vec<i64>>,
+    stop_pos: Vec<Vec<i64>>,
+    chords: HashMap<usize, Vec<Vec<i64>>>,
+    /// Section, throat and extra-piece end points, by path id.
+    ends: Vec<([f64; 2], [f64; 2])>,
+    n_sec: usize,
+    n_extra: usize,
+    train_table: &'a Vec<Value>,
+    scheds: &'a Vec<Value>,
+}
+
+/// P2.2 national trains (`atlas-v2-national-trains.json`; skipped while a
+/// pack has none). Hard checks: shape, `fmt` and id bases against the shared
+/// file, every id resolvable; the train set is exactly the trains with an
+/// out- or in-tables path; recounting distinct trains per section (and per
+/// class) from the whole paths reproduces `atlas-v2-national.json` exactly
+/// (when present; a piece listed in `on_sec` counts on its section); every
+/// out-tables path is the tail of its train's whole
+/// path, with its stop positions and chord legs; stop positions are one per
+/// schedule stop after the first, monotone, ending at the path end.
+/// Counters: path continuity outside chord legs (as for the table rows),
+/// chord legs, and reversals where the head meets the out-tables tail.
+fn audit_national_trains(
+    dir: &Path,
+    shared: &Value,
+    out_t: &Value,
+    in_t: &Value,
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let name = "atlas-v2-national-trains.json";
+    if !pack::exists(dir, name) {
+        println!("AUDIT national trains: no {name} in this pack, skipped");
+        return true;
+    }
+    let nt = pack::read_json(dir, name);
+    let Some(d) = read_national_trains(shared, &nt, sch) else {
+        return false;
+    };
+    let (set_diff, trains, out_p) = train_set_diff(&d, out_t, in_t);
+    let (recount_eq, recount_ok) = recount_vs_national(dir, shared, &d, trains);
+    let TailStats {
+        tail_eq,
+        tail_bad,
+        seam_rev,
+        stops_bad,
+        stops_total,
+        checked,
+        gaps,
+        gaps_100m,
+        chord_legs,
+        worst,
+    } = check_tails_and_joins(&d, out_t, &out_p);
+
+    println!(
+        "AUDIT national trains: {trains} trains ({set_diff} differ from the trains with a table row); {tail_eq} end with their out-tables path ({tail_bad} do not); {stops_total} stop positions, {stops_bad} trains inconsistent (count/order/path end); {} extra pieces; {seam_rev} reversals where the head meets the out-tables path",
+        d.n_extra
+    );
+    println!(
+        "AUDIT national trains continuity: {gaps} gaps > 3 km, {gaps_100m} > 0.1 km in {checked} joins outside {chord_legs} chord legs"
+    );
+    for (gap, what) in worst.iter().take(10) {
+        println!("   {gap:>8.1} km  {what}");
+    }
+    let ok = set_diff == 0 && recount_ok && tail_bad == 0 && stops_bad == 0;
+    g.insert("national_trains_trains".into(), trains);
+    if recount_eq >= 0 {
+        g.insert("national_trains_recount_eq".into(), recount_eq);
+    }
+    g.insert("national_trains_out_tail_eq".into(), tail_eq);
+    g.insert("national_trains_stops_total".into(), stops_total);
+    g.insert("national_trains_chord_legs".into(), chord_legs);
+    g.insert("national_trains_gaps_gt3km".into(), gaps);
+    g.insert("national_trains_gaps_gt100m".into(), gaps_100m);
+    println!(
+        "AUDIT national trains checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    ok
+}
+
+/// Decode the file and check its shape, `fmt` and id bases against shared;
+/// `None` (after printing why) on a failure.
+fn read_national_trains<'a>(
+    shared: &'a Value,
+    nt: &'a Value,
+    sch: &'a Value,
+) -> Option<NatTrains<'a>> {
+    let polys = |v: &Value| -> Vec<Vec<[f64; 2]>> {
+        v.as_array()
+            .into_iter()
+            .flatten()
+            .map(|s| decode_poly4(s.as_str().unwrap()))
+            .collect()
+    };
+
+    let sec_geo: Vec<Vec<[f64; 2]>> = shared["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| decode_poly4(s["g"].as_str().unwrap()))
+        .collect();
+    let (n_sec, n_thr) = (sec_geo.len(), shared["throats"].as_array().unwrap().len());
+    let extra = polys(&nt["extra"]);
+    let ends: Vec<([f64; 2], [f64; 2])> = sec_geo
+        .iter()
+        .chain(polys(&shared["throats"]).iter())
+        .chain(extra.iter())
+        .map(|p| (p[0], *p.last().unwrap()))
+        .collect();
+    let paths = int_rows(&nt["paths"]);
+    let stop_pos = int_rows(&nt["stop_pos"]);
+    let chords = chord_map(&nt["chords"]);
+    let train_table = shared["train_table"].as_array().unwrap();
+    let scheds = sch["schedules"].as_array().unwrap();
+    let fmt = nt["fmt"].as_i64();
+    let shape_ok = fmt == Some(6)
+        && nt["n_sec"].as_u64() == Some(n_sec as u64)
+        && nt["n_thr"].as_u64() == Some(n_thr as u64)
+        && paths.len() == train_table.len()
+        && stop_pos.len() == train_table.len();
+    let bad_ids = paths
+        .iter()
+        .flatten()
+        .filter(|&&v| sec_of(v) >= ends.len())
+        .count();
+    if !shape_ok || bad_ids > 0 {
+        println!(
+            "AUDIT national trains FAIL: fmt {fmt:?}, n_sec {} / n_thr {} vs shared {n_sec} / {n_thr}, {} paths and {} stop lists for {} trains, {bad_ids} ids out of range",
+            nt["n_sec"],
+            nt["n_thr"],
+            paths.len(),
+            stop_pos.len(),
+            train_table.len()
+        );
+        return None;
+    }
+    Some(NatTrains {
+        nt,
+        paths,
+        stop_pos,
+        chords,
+        ends,
+        n_sec,
+        n_extra: extra.len(),
+        train_table,
+        scheds,
+    })
+}
+
+/// The train set is exactly the trains with an out- or in-tables path.
+/// Returns the number of differing trains, the train count, and the
+/// out-tables paths.
+fn train_set_diff(d: &NatTrains, out_t: &Value, in_t: &Value) -> (usize, i64, Vec<Vec<i64>>) {
+    let paths = &d.paths;
+
+    let (out_p, in_p) = (int_rows(&out_t["paths"]), int_rows(&in_t["paths"]));
+    let set_diff = (0..paths.len())
+        .filter(|&t| {
+            let has_row = out_p.get(t).is_some_and(|p| !p.is_empty())
+                || in_p.get(t).is_some_and(|p| !p.is_empty());
+            paths[t].is_empty() == has_row
+        })
+        .count();
+    let trains = paths.iter().filter(|p| !p.is_empty()).count() as i64;
+    (set_diff, trains, out_p)
+}
+
+/// A <-> B: recounting distinct trains per section and class from the whole
+/// paths reproduces the national table. Returns the sections that agree
+/// (-1 without a national file) and whether the check passes.
+fn recount_vs_national(dir: &Path, shared: &Value, d: &NatTrains, trains: i64) -> (i64, bool) {
+    let (nt, paths, n_sec, train_table) = (d.nt, &d.paths, d.n_sec, d.train_table);
+    let _ = shared;
+
+    let classes: Vec<usize> = train_table
+        .iter()
+        .map(|t| class_idx(t["class"].as_str().unwrap()))
+        .collect();
+    // geometry-only pieces on a section a head covers only part of
+    let on_sec: HashMap<usize, usize> = int_rows(&nt["on_sec"])
+        .iter()
+        .map(|r| (r[0] as usize, r[1] as usize))
+        .collect();
+    let mut cnt = vec![0i64; n_sec];
+    let mut cls_cnt = vec![vec![0i64; n_sec]; 8];
+    for (t, p) in paths.iter().enumerate() {
+        let mut secs: Vec<usize> = p
+            .iter()
+            .filter_map(|&v| {
+                let id = sec_of(v);
+                if id < n_sec {
+                    Some(id)
+                } else {
+                    on_sec.get(&id).copied()
+                }
+            })
+            .collect();
+        secs.sort_unstable();
+        secs.dedup();
+        for s in secs {
+            cnt[s] += 1;
+            cls_cnt[classes[t]][s] += 1;
+        }
+    }
+    let (mut recount_eq, mut recount_ok) = (-1i64, true);
+    let nat_name = "atlas-v2-national.json";
+    if pack::exists(dir, nat_name) {
+        let nat = pack::read_json(dir, nat_name);
+        let total = ints(&nat["total"]);
+        let by_class = int_rows(&nat["by_class"]);
+        recount_eq = (0..n_sec)
+            .filter(|&s| {
+                total.get(s) == Some(&cnt[s])
+                    && (0..8)
+                        .all(|c| by_class.get(c).and_then(|v| v.get(s)) == Some(&cls_cnt[c][s]))
+            })
+            .count() as i64;
+        let nat_trains = nat["trains"].as_i64().unwrap_or(-1);
+        recount_ok = recount_eq == n_sec as i64 && nat_trains == trains;
+        println!(
+            "AUDIT national trains vs national table: {trains} vs {nat_trains} trains; recount equal (total and every class) on {recount_eq} of {n_sec} sections"
+        );
+    }
+    (recount_eq, recount_ok)
+}
+
+/// What the out-tables tail, stop position and continuity checks count.
+struct TailStats {
+    tail_eq: i64,
+    tail_bad: i64,
+    seam_rev: i64,
+    stops_bad: i64,
+    stops_total: i64,
+    checked: u64,
+    gaps: i64,
+    gaps_100m: i64,
+    chord_legs: i64,
+    worst: Vec<(f64, String)>,
+}
+
+/// Out-tables tail, stop positions, chord legs and continuity of every whole
+/// path.
+fn check_tails_and_joins(d: &NatTrains, out_t: &Value, out_p: &[Vec<i64>]) -> TailStats {
+    let (paths, stop_pos, chords) = (&d.paths, &d.stop_pos, &d.chords);
+    let (ends, n_sec, train_table, scheds) = (&d.ends, d.n_sec, d.train_table, d.scheds);
+    let is_flow = |v: i64| sec_of(v) < n_sec;
+
+    let (out_sp, out_ch) = (int_rows(&out_t["stop_pos"]), chord_map(&out_t["chords"]));
+    let (mut tail_eq, mut tail_bad, mut seam_rev) = (0i64, 0i64, 0i64);
+    let (mut stops_bad, mut stops_total) = (0i64, 0i64);
+    let (mut checked, mut gaps, mut gaps_100m, mut chord_legs) = (0u64, 0i64, 0i64, 0i64);
+    let mut worst: Vec<(f64, String)> = Vec::new();
+    for (t, w) in paths.iter().enumerate() {
+        if w.is_empty() {
+            continue;
+        }
+        let sp = &stop_pos[t];
+        let o = out_p.get(t).cloned().unwrap_or_default();
+        if !o.is_empty() {
+            let fine = w.ends_with(&o) && {
+                let off = (w.len() - o.len()) as i64;
+                let osp = &out_sp[t];
+                let tail_sp: Vec<i64> = sp[sp.len().saturating_sub(osp.len())..]
+                    .iter()
+                    .map(|p| p - off)
+                    .collect();
+                let tail_legs: Vec<Vec<i64>> = chords
+                    .get(&t)
+                    .into_iter()
+                    .flatten()
+                    .filter(|l| l[1] >= off)
+                    .map(|l| vec![l[0], l[1] - off, l[2] - off])
+                    .collect();
+                // the head's last flow section against the tail's first
+                let head_last = w[..off as usize].iter().rev().find(|&&v| is_flow(v));
+                let tail_first = o.iter().find(|&&v| is_flow(v));
+                if let (Some(&a), Some(&b)) = (head_last, tail_first) {
+                    seam_rev += (a == !b) as i64;
+                }
+                sp.len() >= osp.len()
+                    && tail_sp == *osp
+                    && tail_legs == out_ch.get(&t).cloned().unwrap_or_default()
+            };
+            if fine {
+                tail_eq += 1;
+            } else {
+                tail_bad += 1;
+            }
+        }
+        let n_stops = scheds.get(t).and_then(Value::as_array).map_or(0, Vec::len);
+        stops_total += sp.len() as i64;
+        if sp.len() + 1 != n_stops
+            || sp.windows(2).any(|x| x[1] < x[0])
+            || sp.last() != Some(&(w.len() as i64))
+        {
+            stops_bad += 1;
+        }
+        // continuity outside chord legs, as for the table rows
+        let mut exempt: HashSet<usize> = HashSet::new();
+        for l in chords.get(&t).into_iter().flatten() {
+            chord_legs += 1;
+            exempt.extend(l[1] as usize..=l[2] as usize);
+        }
+        let oriented = |v: i64| {
+            let (a, b) = ends[sec_of(v)];
+            if v >= 0 {
+                (a, b)
+            } else {
+                (b, a)
+            }
+        };
+        for k in 1..w.len() {
+            if exempt.contains(&k) {
+                continue;
+            }
+            checked += 1;
+            let gap = hav_km_ll(oriented(w[k - 1]).1, oriented(w[k]).0);
+            gaps_100m += (gap > 0.1) as i64;
+            if gap > 3.0 {
+                gaps += 1;
+                let code = train_table[t]["code"].as_str().unwrap_or("?");
+                worst.push((gap, format!("{code} at {k}/{}", w.len())));
+            }
+        }
+    }
+    worst.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    TailStats {
+        tail_eq,
+        tail_bad,
+        seam_rev,
+        stops_bad,
+        stops_total,
+        checked,
+        gaps,
+        gaps_100m,
+        chord_legs,
+        worst,
+    }
+}
+
+/// P3.3 national entries (`atlas-v2-national-entries.json`; skipped while a
+/// pack has none). Hard checks: shape, `fmt` and `n_sec` against the shared
+/// file; every array sorted, every tick in the day; per section and class
+/// the entry count equals `atlas-v2-national.json` (so the A+B counts at
+/// 24:00 are B exactly) and `trains` its train count; recomputing the
+/// entries from the national trains file (`entries::from_pack`) gives the
+/// shipped arrays exactly; every entry lies between the times of the stops
+/// that bracket it on the path (the last stop at or before the entry: its
+/// arrival, or the departure at the first stop; the next stop: its
+/// arrival), a check independent of the interpolation. Counters: entries past
+/// midnight of the boarding day (wrapped) and the trains they belong to.
+fn audit_national_entries(
+    dir: &Path,
+    shared: &Value,
+    sch: &Value,
+    g: &mut BTreeMap<String, i64>,
+) -> bool {
+    let name = "atlas-v2-national-entries.json";
+    if !pack::exists(dir, name) {
+        println!("AUDIT national entries: no {name} in this pack, skipped");
+        return true;
+    }
+    let ne = pack::read_json(dir, name);
+    let Some((n_sec, tpm, rows)) = read_entry_rows(shared, &ne) else {
+        return false;
+    };
+
+    let day = 1440 * tpm;
+    let unsorted = rows
+        .iter()
+        .flatten()
+        .filter(|s| s.windows(2).any(|w| w[1] < w[0]))
+        .count();
+    let out_of_day = rows
+        .iter()
+        .flatten()
+        .flatten()
+        .filter(|&&v| !(0..day).contains(&v))
+        .count();
+    let total: i64 = rows.iter().flatten().map(|s| s.len() as i64).sum();
+    let (eq_b, b_ok) = entries_match_national(dir, &ne, &rows, n_sec);
+    let (recompute_eq, recompute_ok, bracket_bad, wrapped, wrapped_trains) =
+        entries_recompute_and_brackets(dir, shared, sch, &rows, n_sec, tpm);
+
+    println!(
+        "AUDIT national entries: {} trains, {total} entries in {n_sec} sections x 8 classes at {tpm} ticks/min; {unsorted} unsorted arrays, {out_of_day} ticks outside the day; recompute equal on {recompute_eq} sections; {bracket_bad} entries outside their stop bracket; {wrapped} entries in {wrapped_trains} trains past the boarding day's midnight (wrapped)",
+        ne["trains"]
+    );
+    let ok = unsorted == 0 && out_of_day == 0 && b_ok && recompute_ok && bracket_bad == 0;
+    g.insert("national_entries_total".into(), total);
+    if eq_b >= 0 {
+        g.insert("national_entries_eq_national".into(), eq_b);
+    }
+    if recompute_eq >= 0 {
+        g.insert("national_entries_recompute_eq".into(), recompute_eq);
+        g.insert("national_entries_bracket_bad".into(), bracket_bad);
+        g.insert("national_entries_wrapped".into(), wrapped);
+    }
+    println!(
+        "AUDIT national entries checks: {}",
+        if ok { "PASS" } else { "FAIL" }
+    );
+    ok
+}
+
+type ClassRows = Vec<Vec<Vec<i64>>>;
+
+/// Decode `by_class` (class x section x ticks) and check the shape against
+/// shared; `None` (after printing why) on a failure. Returns
+/// `(n_sec, ticks_per_min, rows)`.
+fn read_entry_rows(shared: &Value, ne: &Value) -> Option<(usize, i64, ClassRows)> {
+    let n_sec = shared["sections"].as_array().unwrap().len();
+    let tpm = ne["ticks_per_min"].as_u64().unwrap_or(0) as i64;
+    let rows: Vec<Vec<Vec<i64>>> = ne["by_class"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            c.as_array()
+                .into_iter()
+                .flatten()
+                .map(|s| {
+                    s.as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|x| x.as_i64().unwrap())
+                        .collect()
+                })
+                .collect()
+        })
+        .collect();
+    let shape_ok = ne["fmt"].as_i64() == Some(6)
+        && ne["n_sec"].as_u64() == Some(n_sec as u64)
+        && tpm > 0
+        && rows.len() == 8
+        && rows.iter().all(|c| c.len() == n_sec);
+    if !shape_ok {
+        println!(
+            "AUDIT national entries FAIL: fmt {:?}, n_sec {} vs shared {n_sec}, ticks_per_min {tpm}, {} class rows",
+            ne["fmt"],
+            ne["n_sec"],
+            rows.len()
+        );
+        return None;
+    }
+    Some((n_sec, tpm, rows))
+}
+
+/// A+B at 24:00 == B: the entry counts per section and class equal the
+/// national table's. Returns the sections that agree (-1 without a national
+/// file) and whether the check passes.
+fn entries_match_national(
+    dir: &Path,
+    ne: &Value,
+    rows: &[Vec<Vec<i64>>],
+    n_sec: usize,
+) -> (i64, bool) {
+    let (mut eq_b, mut b_ok) = (-1i64, true);
+    let nat_name = "atlas-v2-national.json";
+    if pack::exists(dir, nat_name) {
+        let nat = pack::read_json(dir, nat_name);
+        let at = |v: &Value, s: usize| v.get(s).and_then(Value::as_i64);
+        eq_b = (0..n_sec)
+            .filter(|&s| {
+                let n: i64 = (0..8).map(|c| rows[c][s].len() as i64).sum();
+                at(&nat["total"], s) == Some(n)
+                    && (0..8).all(|c| at(&nat["by_class"][c], s) == Some(rows[c][s].len() as i64))
+            })
+            .count() as i64;
+        b_ok = eq_b == n_sec as i64 && ne["trains"] == nat["trains"];
+        println!(
+            "AUDIT national entries vs national table: {} vs {} trains; counts equal (total and every class) on {eq_b} of {n_sec} sections",
+            ne["trains"], nat["trains"]
+        );
+    }
+    (eq_b, b_ok)
+}
+
+/// Recompute the entries from the national trains file and check every
+/// entry against the stops that bracket it on its path. Returns
+/// `(recompute_eq, recompute_ok, bracket_bad, wrapped, wrapped_trains)`.
+fn entries_recompute_and_brackets(
+    dir: &Path,
+    shared: &Value,
+    sch: &Value,
+    rows: &[Vec<Vec<i64>>],
+    n_sec: usize,
+    tpm: i64,
+) -> (i64, bool, i64, i64, i64) {
+    let (mut recompute_eq, mut recompute_ok) = (-1i64, true);
+    let (mut bracket_bad, mut wrapped, mut wrapped_trains) = (0i64, 0i64, 0i64);
+    let nt_name = "atlas-v2-national-trains.json";
+    if pack::exists(dir, nt_name) {
+        let nt = pack::read_json(dir, nt_name);
+        let trains = entries::from_pack(shared, &nt, &sch["schedules"]);
+        let mine = entries::by_class(&trains, n_sec, tpm as u32);
+        recompute_eq = (0..n_sec)
+            .filter(|&s| {
+                (0..8).all(|c| {
+                    mine[c][s].len() == rows[c][s].len()
+                        && mine[c][s]
+                            .iter()
+                            .zip(&rows[c][s])
+                            .all(|(a, b)| *a as i64 == *b)
+                })
+            })
+            .count() as i64;
+        recompute_ok = recompute_eq == n_sec as i64;
+        let train_table = shared["train_table"].as_array().unwrap();
+        let st_name = |t: usize, j: usize| -> String {
+            let st = sch["schedules"][t][j][0].as_u64().unwrap_or(0) as usize;
+            shared["station_table"][st]["zh"]
+                .as_str()
+                .unwrap_or("?")
+                .to_string()
+        };
+        let clock = |a: f64| {
+            let m = a.rem_euclid(1440.0);
+            format!("{:02}:{:04.1}", (m / 60.0).floor() as i64, m % 60.0)
+        };
+        let mut spots: Vec<String> = Vec::new();
+        let mut spot_cls = [false; 8];
+        for tr in &trains {
+            let sp: Vec<usize> = nt["stop_pos"][tr.t]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap() as usize)
+                .collect();
+            let m = &tr.motion;
+            let mut any_wrap = false;
+            for (k, &(s, i, a)) in tr.entries.iter().enumerate() {
+                // stop j >= 1 sits before path entry sp[j - 1]: the train
+                // has reached every stop before entry i (the boarding stop
+                // is left at the start) and not yet any stop after it; a
+                // stop at the entry itself lies inside the bracket. The
+                // arrival, not the departure, bounds it below: a stop
+                // followed only by zero-length pieces is at the entry's
+                // distance, and the dot reaches it on arrival
+                let prev = sp.iter().take_while(|&&p| p < i).count();
+                let next = sp.iter().take_while(|&&p| p <= i).count();
+                let lo = match prev {
+                    0 => m.start,
+                    j => m.stops[j - 1].arr,
+                };
+                // the terminus sits at the path end, so some stop follows
+                let hi = m.stops[next].arr;
+                let outside = !(lo - 1e-9..=hi + 1e-9).contains(&a);
+                bracket_bad += outside as i64;
+                // spot checks: the middle entry of the first train of each
+                // class bucket, the first entry that wraps past midnight,
+                // the first misses
+                let first_wrap = a >= 1440.0 && wrapped == 0;
+                if a >= 1440.0 {
+                    wrapped += 1;
+                    any_wrap = true;
+                }
+                let first = !spot_cls[tr.cls] && k == tr.entries.len() / 2;
+                spot_cls[tr.cls] |= first;
+                if first || first_wrap || (outside && bracket_bad <= 5) {
+                    spots.push(format!(
+                        "{}{} section {s}: entry {} (abs {a:.2}) between {} {} and {} {}",
+                        match (outside, a >= 1440.0) {
+                            (true, _) => "[OUTSIDE] ",
+                            (_, true) => "[wrap] ",
+                            _ => "",
+                        },
+                        train_table[tr.t]["code"].as_str().unwrap_or("?"),
+                        clock(a),
+                        st_name(tr.t, prev),
+                        clock(lo),
+                        st_name(tr.t, next + 1),
+                        clock(hi),
+                    ));
+                }
+            }
+            wrapped_trains += any_wrap as i64;
+        }
+        for s in &spots {
+            println!("AUDIT national entries spot check: {s}");
+        }
+    }
+    (
+        recompute_eq,
+        recompute_ok,
+        bracket_bad,
+        wrapped,
+        wrapped_trains,
+    )
 }
 
 /// Gate the pack counters against goldens.json: {"exact": {k: v}, "max":
@@ -1023,8 +2296,9 @@ fn main() {
     // atomic edge -> per-city DISTINCT train counts (dedup, as production)
     let mut edge_counts: HashMap<(i64, i64), HashMap<usize, u64>> = HashMap::new();
     let mut edge_class_counts: HashMap<(i64, i64), HashMap<usize, [u32; 8]>> = HashMap::new();
+    let mut edge_trains = chains::EdgeTrains::new();
     for (ci, w) in works.iter().enumerate() {
-        for (legs, cidx) in w.train_leg_keys.iter().zip(w.train_cls.iter()) {
+        for (k, (legs, cidx)) in w.train_leg_keys.iter().zip(w.train_cls.iter()).enumerate() {
             let mut eset: HashSet<(i64, i64)> = HashSet::new();
             for key in legs.iter() {
                 let seqs = match leg_seqs(key, &leg_cache, &variant_cache) {
@@ -1049,7 +2323,10 @@ fn main() {
                     }
                 }
             }
+            let mark = chains::train_mark(ci, k);
             for e in eset {
+                let m = edge_trains.entry(e).or_insert(0);
+                *m = m.wrapping_add(mark);
                 *edge_counts.entry(e).or_default().entry(ci).or_insert(0) += 1;
                 edge_class_counts
                     .entry(e)
@@ -1063,7 +2340,9 @@ fn main() {
     // intern count signatures: a global section has constant per-city counts
     let (sig_list, edge_sig) = chains::intern_sigs(&edge_counts, &edge_class_counts);
     println!("distinct signatures: {}", sig_list.len());
-    let section_chains = chains::build_section_chains(&edge_sig);
+    // (no walk cuts: they only split chains of equal counts, which the
+    // recounts below do not see)
+    let section_chains = chains::build_section_chains(&edge_sig, &edge_trains, &HashSet::new());
     // section endpoint station names (nearest real station point)
     let mut station_pts_all: HashMap<String, [f64; 2]> = HashMap::new();
     for (a, b) in path_map.keys() {

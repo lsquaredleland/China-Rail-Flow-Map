@@ -1,13 +1,14 @@
 import type { MouseEvent, ReactNode } from "react";
-import type { DecodedAtlas, DistUnit, OriginVM } from "../../types";
+import type { DecodedAtlas, DistUnit, OriginVM, RawTrain } from "../../types";
 import type { StationCount } from "../../stationBreakdown";
 import type { EmptyProps } from "./EmptyMessage";
+import type { HistRow, NatRow, NatSortKey } from "../../lib";
 
-export type SortDir = 1 | -1;
-export type SortKey = "dep" | "dur" | "km";
-export type CallSortKey = "arr" | "dep" | "dur";
-export type ArrSortKey = "dep" | "arr" | "dur" | "km";
-export type InCallSortKey = "board" | "arr" | "dur";
+type SortDir = 1 | -1;
+export type SortKey = "dep" | "dur" | "km" | "runs";
+export type CallSortKey = "arr" | "dep" | "dur" | "runs";
+export type ArrSortKey = "dep" | "arr" | "dur" | "km" | "runs";
+export type InCallSortKey = "board" | "arr" | "dur" | "runs";
 
 export interface SortState<K> {
   key: K;
@@ -55,8 +56,11 @@ export interface DepCtx {
     currentList: { code: string }[],
   ) => void;
   onSelectTrain?: (code: string) => void;
+  onToggleIsolate?: (code: string) => void;
   handleClearChip: () => void;
   emptyProps: EmptyProps;
+  natSort: SortState<NatSortKey>;
+  setNatSort: (f: (s: SortState<NatSortKey>) => SortState<NatSortKey>) => void;
   sort: SortState<SortKey>;
   setSort: (f: (s: SortState<SortKey>) => SortState<SortKey>) => void;
   callSort: SortState<CallSortKey>;
@@ -67,4 +71,18 @@ export interface DepCtx {
   setInCallSort: (
     f: (s: SortState<InCallSortKey>) => SortState<InCallSortKey>,
   ) => void;
+}
+
+/** What national mode hands the shared departures section instead of an origin. */
+export interface NatData {
+  /** Every train's row; null while the schedules load. */
+  rows: NatRow[] | null;
+  /** The same trains as the histograms bin them. */
+  histRows: HistRow[];
+  /** natSelect's flags per train_table row (null = all). */
+  sel: Uint8Array | null;
+  trainTable: readonly RawTrain[];
+  calendar?: readonly string[];
+  /** Trains per class (FLOW_CLASSES names) for the class buttons. */
+  classCounts: Record<string, number>;
 }

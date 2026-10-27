@@ -1,8 +1,10 @@
 /* Inbound, no source: every train arriving in the origin city. */
 import type { ArrVM, OriginVM } from "../../types";
-import { fmtDist, fmtTime } from "../../lib";
+import { fmtDist, fmtTime, runRank } from "../../lib";
 import EmptyMessage from "./EmptyMessage";
+import WindowedTable, { ORIGIN_ROW_H } from "./WindowedTable";
 import TrainCell from "./TrainCell";
+import RunsCell from "./RunsCell";
 import HeadCount from "./HeadCount";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
@@ -21,6 +23,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
     arrSort,
     setArrSort,
     emptyProps,
+    atlas,
   } = ctx;
   let showingNote: string;
   const arrs = cur.arrs;
@@ -34,6 +37,10 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   );
   const { key: ak, dir: adir } = arrSort;
   list.sort((a, b) => {
+    if (ak === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.t], atlas?.data.calendar);
+      if (dd) return dd * adir;
+    }
     if (ak === "dur" || ak === "km") {
       const va = ak === "dur" ? a.dur : a.km;
       const vb = ak === "dur" ? b.dur : b.km;
@@ -94,18 +101,17 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   const depNote = (
     <>
       Every train arriving in the selected city &mdash; from wherever
-      it starts &mdash; across the two timetable dates &mdash; Wednesday
-      21 October 2026 (national) and Wednesday 28 October 2026
-      (intercity C/S). &ldquo;Stops&rdquo; counts the stops the train
+      it starts &mdash; for every train in the timetable window. &ldquo;Stops&rdquo; counts the stops the train
       makes before reaching {cur.en}.
     </>
   );
   const tableNode = (
-    <table id="depTable">
+    <WindowedTable n={list.length} rowH={ORIGIN_ROW_H} cols={8}>
+      {(w) => (
+      <>
       <thead>
         <tr>
           <th scope="col">Train</th>
-          <th scope="col">Origin</th>
           <th
             scope="col"
             className="sortable"
@@ -115,6 +121,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
           >
             Departs <span className="arrow">{aArrow("dep")}</span>
           </th>
+          <th scope="col">Origin</th>
           <th
             scope="col"
             className="sortable"
@@ -145,24 +152,29 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
           <th scope="col" className="num">
             Stops
           </th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="runs"
+            aria-sort={aAriaSort("runs")}
+            onClick={() => onArrSort("runs")}
+          >
+            Runs <span className="arrow">{aArrow("runs")}</span>
+          </th>
         </tr>
       </thead>
       <tbody id="depBody">
         {list.length === 0 ? (
           <tr>
-            <td colSpan={7} className="dep-empty">
+            <td colSpan={8} className="dep-empty">
               <EmptyMessage {...emptyProps} />
             </td>
           </tr>
         ) : (
-          list.map((a, i) => (
+          <>{w.top}{list.map((a, i) => i < w.first || i >= w.last ? null : (
             <tr
               key={i}
-              className={
-                selectedTrainCodes.includes(a.code)
-                  ? "dep-row-selected"
-                  : undefined
-              }
+              {...w.tr(i, selectedTrainCodes.includes(a.code) ? "dep-row-selected" : undefined)}
               onClick={(e) => handleRowClick(a.code, i, e, list)}
             >
               <td className="c-train">
@@ -173,6 +185,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
                   }
                 />
               </td>
+              <td className="c-time">{a.dep}</td>
               <td>
                 <span className="to-city">
                   {a.fcEn} &middot; {a.fcZh}
@@ -182,7 +195,6 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
                   {a.fsEn ? " · " + a.fsEn : ""}
                 </span>
               </td>
-              <td className="c-time">{a.dep}</td>
               <td className="c-time">
                 {a.arr}
                 {a.dayOff > 0 ? (
@@ -192,11 +204,14 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
               <td className="c-time">{fmtTime(a.dur)}</td>
               <td className="num c-time">{fmtDist(a.km, unit)}</td>
               <td className="num">{a.stops}</td>
+              <RunsCell atlas={atlas} t={a.t} />
             </tr>
-          ))
+          ))}{w.bottom}</>
         )}
       </tbody>
-    </table>
+      </>
+      )}
+    </WindowedTable>
   );
   return { heading, depNote, stations, count, total: arrs.length, showingNote, tableNode };
 }

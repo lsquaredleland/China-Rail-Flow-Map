@@ -4,7 +4,7 @@
    has replaced them. One page reload picks up the new index.html. */
 import { session } from "./storage";
 
-export const RELOAD_KEY = "staleReloadAt";
+const RELOAD_KEY = "staleReloadAt";
 export const RELOAD_COOLDOWN_MS = 60_000;
 export const RELOAD_NOTICE = "A newer version of the map is available — reloading…";
 
@@ -31,6 +31,37 @@ export function onStaleReload(cb: (() => void) | null): void {
   listener = cb;
 }
 
+/* Pure decision for a failed dynamic import() of a hashed chunk: reload once
+   (a new deploy replaced the chunk), unless offline (a reload would not help)
+   or a reload already happened within the cooldown. */
+export function importFailureDecision(
+  lastReloadAt: number | null,
+  now: number,
+  online: boolean,
+): "reload" | "error" {
+  if (!online) return "error";
+  if (lastReloadAt !== null && now - lastReloadAt >= 0 && now - lastReloadAt < RELOAD_COOLDOWN_MS) return "error";
+  return "reload";
+}
+
+function startReload(): void {
+  listener?.();
+  // Brief pause so the notice is readable rather than a flash.
+  setTimeout(() => location.reload(), 800);
+}
+
+/* Returns true if a reload was started (the caller should then stop). */
+export function maybeReloadForFailedImport(): boolean {
+  const raw = session.get(RELOAD_KEY);
+  const last = raw === null || !Number.isFinite(+raw) ? null : +raw;
+  const now = Date.now();
+  const online = typeof navigator === "undefined" || navigator.onLine !== false;
+  if (importFailureDecision(last, now, online) !== "reload") return false;
+  session.set(RELOAD_KEY, String(now));
+  startReload();
+  return true;
+}
+
 /* Returns true if a reload was started (the caller should then stop). */
 export function maybeReloadForStale(status: number, url: string): boolean {
   const raw = session.get(RELOAD_KEY);
@@ -38,8 +69,6 @@ export function maybeReloadForStale(status: number, url: string): boolean {
   const now = Date.now();
   if (staleDecision(status, url, last, now) !== "reload") return false;
   session.set(RELOAD_KEY, String(now));
-  listener?.();
-  // Brief pause so the notice is readable rather than a flash.
-  setTimeout(() => location.reload(), 800);
+  startReload();
   return true;
 }

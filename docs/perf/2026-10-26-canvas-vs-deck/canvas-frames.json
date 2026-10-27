@@ -1,0 +1,2638 @@
+{
+ "label": "canvas",
+ "base": "http://127.0.0.1:54384",
+ "national": null,
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+ "machine": {
+  "cpu": "Apple M4 Max",
+  "cores": 14,
+  "memGB": 36,
+  "platform": "Darwin 25.6.0",
+  "loadavg": [
+   3.17,
+   3.72,
+   4.05
+  ],
+  "node": "v22.23.0"
+ },
+ "browser": "Chrome/155.0.8059.85",
+ "frames": 300,
+ "reps": 3,
+ "dprs": [
+  1,
+  2
+ ],
+ "throttles": [
+  1,
+  4
+ ],
+ "startedAt": "2026-10-26T08:27:56.987Z",
+ "durationS": 669,
+ "rows": [
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.66,
+    "p50": 1.7,
+    "p95": 2.3,
+    "max": 3
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.91,
+    "p50": 7,
+    "p95": 7.9,
+    "max": 16.1
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75002912,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 0.79,
+    "p50": 0.8,
+    "p95": 1,
+    "max": 1.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 5.66,
+    "p50": 6.2,
+    "p95": 7,
+    "max": 7.5
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75021940,
+    "jsHeapTotal": 75759616,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.42,
+    "p50": 1.4,
+    "p95": 1.7,
+    "max": 2.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.79,
+    "p50": 6.9,
+    "p95": 7.4,
+    "max": 16.5
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75059680,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 1,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 51,
+     "longestTaskMs": 51,
+     "maxRafGapMs": 66.6,
+     "frames": 116,
+     "elapsed": 2002
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 52,
+     "longestTaskMs": 52,
+     "maxRafGapMs": 66.6,
+     "frames": 115,
+     "elapsed": 2002
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 74,
+     "longestTaskMs": 74,
+     "maxRafGapMs": 83.3,
+     "frames": 115,
+     "elapsed": 2001
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 3.45,
+    "p50": 3.6,
+    "p95": 5.2,
+    "max": 8
+   },
+   "drawPlusRasterMs": {
+    "mean": 17.35,
+    "p50": 20.8,
+    "p95": 25.6,
+    "max": 28.4
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75037992,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 21.74,
+    "p50": 16.7,
+    "p95": 33.4,
+    "max": 50
+   },
+   "droppedPct": 30.1,
+   "drawJsMs": {
+    "mean": 2.9,
+    "p50": 2.8,
+    "p95": 4.1,
+    "max": 20.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 17.43,
+    "p50": 19.2,
+    "p95": 23.5,
+    "max": 32.2
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75059872,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 23.97,
+    "p50": 16.7,
+    "p95": 33.4,
+    "max": 33.5
+   },
+   "droppedPct": 43.8,
+   "drawJsMs": {
+    "mean": 4.67,
+    "p50": 4.5,
+    "p95": 5.7,
+    "max": 23.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 22.2,
+    "p50": 21.8,
+    "p95": 25.6,
+    "max": 45.7
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75114392,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 1,
+   "throttle": 4,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 720,
+     "longestTaskMs": 228,
+     "maxRafGapMs": 416.7,
+     "frames": 78,
+     "elapsed": 2002
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 677,
+     "longestTaskMs": 216,
+     "maxRafGapMs": 416.6,
+     "frames": 81,
+     "elapsed": 2002
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 508,
+     "longestTaskMs": 290,
+     "maxRafGapMs": 366.8,
+     "frames": 91,
+     "elapsed": 2002
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.68,
+    "p50": 1.7,
+    "p95": 2.4,
+    "max": 2.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.82,
+    "p50": 9.5,
+    "p95": 11.5,
+    "max": 18.2
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74969536,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 0.8,
+    "p50": 0.8,
+    "p95": 1,
+    "max": 1.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 7.59,
+    "p50": 8.4,
+    "p95": 9.5,
+    "max": 10.1
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74989212,
+    "jsHeapTotal": 76546048,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.33,
+    "p50": 1.3,
+    "p95": 1.6,
+    "max": 1.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.32,
+    "p50": 9.3,
+    "p95": 9.8,
+    "max": 19.7
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75024908,
+    "jsHeapTotal": 76546048,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 1,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 104,
+     "longestTaskMs": 54,
+     "maxRafGapMs": 66.8,
+     "frames": 114,
+     "elapsed": 2002
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 52,
+     "longestTaskMs": 52,
+     "maxRafGapMs": 99.9,
+     "frames": 112,
+     "elapsed": 2002
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 72,
+     "longestTaskMs": 72,
+     "maxRafGapMs": 99.9,
+     "frames": 115,
+     "elapsed": 2002
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 3.4,
+    "p50": 3.5,
+    "p95": 4.7,
+    "max": 6.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 28.4,
+    "p50": 33.7,
+    "p95": 41.5,
+    "max": 52.2
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75100132,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 31.77,
+    "p50": 33.3,
+    "p95": 50,
+    "max": 66.6
+   },
+   "droppedPct": 73.9,
+   "drawJsMs": {
+    "mean": 2.9,
+    "p50": 2.9,
+    "p95": 4.1,
+    "max": 18.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 27.92,
+    "p50": 30.7,
+    "p95": 37.1,
+    "max": 39.7
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75119548,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 37.74,
+    "p50": 33.4,
+    "p95": 50.1,
+    "max": 66.7
+   },
+   "droppedPct": 100,
+   "drawJsMs": {
+    "mean": 5.23,
+    "p50": 5,
+    "p95": 6.4,
+    "max": 21.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 34.63,
+    "p50": 34.4,
+    "p95": 37.8,
+    "max": 53.6
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75173024,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 1,
+   "dpr": 2,
+   "throttle": 4,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 689,
+     "longestTaskMs": 215,
+     "maxRafGapMs": 416.6,
+     "frames": 80,
+     "elapsed": 2001
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 592,
+     "longestTaskMs": 189,
+     "maxRafGapMs": 366.7,
+     "frames": 86,
+     "elapsed": 2001
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 509,
+     "longestTaskMs": 292,
+     "maxRafGapMs": 350,
+     "frames": 91,
+     "elapsed": 2001
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.69,
+    "p50": 1.7,
+    "p95": 2.3,
+    "max": 2.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.91,
+    "p50": 7,
+    "p95": 7.8,
+    "max": 12.7
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74932096,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 0.8,
+    "p50": 0.8,
+    "p95": 1.1,
+    "max": 1.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 5.93,
+    "p50": 6.5,
+    "p95": 7.3,
+    "max": 7.6
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74950964,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.42,
+    "p50": 1.4,
+    "p95": 1.6,
+    "max": 2.1
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.96,
+    "p50": 6.9,
+    "p95": 7.4,
+    "max": 12.2
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74988572,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 1,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 55,
+     "longestTaskMs": 55,
+     "maxRafGapMs": 66.7,
+     "frames": 113,
+     "elapsed": 2002
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 0,
+     "longestTaskMs": 0,
+     "maxRafGapMs": 50,
+     "frames": 116,
+     "elapsed": 2002
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 70,
+     "longestTaskMs": 70,
+     "maxRafGapMs": 83.3,
+     "frames": 115,
+     "elapsed": 2002
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 3.35,
+    "p50": 3.6,
+    "p95": 4.8,
+    "max": 8.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 17.33,
+    "p50": 20.4,
+    "p95": 24.8,
+    "max": 45.3
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75023516,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 20.96,
+    "p50": 16.7,
+    "p95": 33.4,
+    "max": 50.1
+   },
+   "droppedPct": 25.4,
+   "drawJsMs": {
+    "mean": 2.54,
+    "p50": 2.5,
+    "p95": 3.9,
+    "max": 13.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 17.45,
+    "p50": 20.1,
+    "p95": 23.4,
+    "max": 28.2
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75042380,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 24.53,
+    "p50": 16.7,
+    "p95": 33.4,
+    "max": 50
+   },
+   "droppedPct": 46.8,
+   "drawJsMs": {
+    "mean": 4.9,
+    "p50": 4.8,
+    "p95": 6.1,
+    "max": 13.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 22.03,
+    "p50": 21.8,
+    "p95": 24.5,
+    "max": 40
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75092888,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 1,
+   "throttle": 4,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 658,
+     "longestTaskMs": 202,
+     "maxRafGapMs": 383.3,
+     "frames": 82,
+     "elapsed": 2001
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 588,
+     "longestTaskMs": 184,
+     "maxRafGapMs": 350,
+     "frames": 87,
+     "elapsed": 2001
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 509,
+     "longestTaskMs": 287,
+     "maxRafGapMs": 350,
+     "frames": 92,
+     "elapsed": 2002
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.75,
+    "p50": 1.8,
+    "p95": 2.3,
+    "max": 2.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.79,
+    "p50": 9.6,
+    "p95": 11.1,
+    "max": 13.3
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75038896,
+    "jsHeapTotal": 76546048,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 0.81,
+    "p50": 0.8,
+    "p95": 1,
+    "max": 1.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.03,
+    "p50": 8.7,
+    "p95": 9.7,
+    "max": 10.4
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75058244,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.32,
+    "p50": 1.3,
+    "p95": 1.5,
+    "max": 2
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.31,
+    "p50": 9.3,
+    "p95": 9.7,
+    "max": 20.5
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75094156,
+    "jsHeapTotal": 76546048,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 1,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 55,
+     "longestTaskMs": 55,
+     "maxRafGapMs": 66.7,
+     "frames": 111,
+     "elapsed": 2003
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 56,
+     "longestTaskMs": 56,
+     "maxRafGapMs": 66.6,
+     "frames": 113,
+     "elapsed": 2002
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 68,
+     "longestTaskMs": 68,
+     "maxRafGapMs": 83.2,
+     "frames": 115,
+     "elapsed": 2001
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 3.42,
+    "p50": 3.6,
+    "p95": 5,
+    "max": 6.5
+   },
+   "drawPlusRasterMs": {
+    "mean": 27.93,
+    "p50": 33.2,
+    "p95": 41.3,
+    "max": 46
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75066636,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 31.05,
+    "p50": 33.3,
+    "p95": 50,
+    "max": 50.1
+   },
+   "droppedPct": 72.9,
+   "drawJsMs": {
+    "mean": 2.8,
+    "p50": 2.9,
+    "p95": 4.1,
+    "max": 13.8
+   },
+   "drawPlusRasterMs": {
+    "mean": 28.31,
+    "p50": 31,
+    "p95": 41.3,
+    "max": 44.1
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75067144,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 37.23,
+    "p50": 33.4,
+    "p95": 50.1,
+    "max": 50.1
+   },
+   "droppedPct": 100,
+   "drawJsMs": {
+    "mean": 5.1,
+    "p50": 4.9,
+    "p95": 6.2,
+    "max": 20.5
+   },
+   "drawPlusRasterMs": {
+    "mean": 34.12,
+    "p50": 34,
+    "p95": 36.5,
+    "max": 46.5
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75138108,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 2,
+   "dpr": 2,
+   "throttle": 4,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 673,
+     "longestTaskMs": 209,
+     "maxRafGapMs": 400.1,
+     "frames": 81,
+     "elapsed": 2001
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 582,
+     "longestTaskMs": 187,
+     "maxRafGapMs": 350,
+     "frames": 86,
+     "elapsed": 2002
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 517,
+     "longestTaskMs": 285,
+     "maxRafGapMs": 349.9,
+     "frames": 91,
+     "elapsed": 2002
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.69,
+    "p50": 1.8,
+    "p95": 2.4,
+    "max": 3.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 7.01,
+    "p50": 7.2,
+    "p95": 8,
+    "max": 15.8
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74928100,
+    "jsHeapTotal": 76808192,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 0.8,
+    "p50": 0.8,
+    "p95": 1.1,
+    "max": 2.9
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.06,
+    "p50": 6.5,
+    "p95": 7.3,
+    "max": 7.7
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74947392,
+    "jsHeapTotal": 76808192,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.45,
+    "p50": 1.4,
+    "p95": 1.7,
+    "max": 2.1
+   },
+   "drawPlusRasterMs": {
+    "mean": 6.65,
+    "p50": 6.7,
+    "p95": 7.1,
+    "max": 9.1
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 74984004,
+    "jsHeapTotal": 76808192,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 1,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 52,
+     "longestTaskMs": 52,
+     "maxRafGapMs": 66.7,
+     "frames": 112,
+     "elapsed": 2003
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 83,
+     "longestTaskMs": 83,
+     "maxRafGapMs": 83.3,
+     "frames": 115,
+     "elapsed": 2001
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 63,
+     "longestTaskMs": 63,
+     "maxRafGapMs": 66.6,
+     "frames": 116,
+     "elapsed": 2001
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 3.22,
+    "p50": 3.3,
+    "p95": 4.6,
+    "max": 6
+   },
+   "drawPlusRasterMs": {
+    "mean": 17,
+    "p50": 20.1,
+    "p95": 25.1,
+    "max": 30
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75080576,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 21.24,
+    "p50": 16.7,
+    "p95": 33.4,
+    "max": 50
+   },
+   "droppedPct": 27.1,
+   "drawJsMs": {
+    "mean": 2.55,
+    "p50": 2.5,
+    "p95": 3.9,
+    "max": 18.6
+   },
+   "drawPlusRasterMs": {
+    "mean": 17.33,
+    "p50": 19.2,
+    "p95": 23.3,
+    "max": 28.1
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75100128,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 1,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 23.63,
+    "p50": 16.7,
+    "p95": 33.4,
+    "max": 50
+   },
+   "droppedPct": 41.5,
+   "drawJsMs": {
+    "mean": 4.62,
+    "p50": 4.5,
+    "p95": 5.6,
+    "max": 25.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 21.75,
+    "p50": 21.5,
+    "p95": 23.6,
+    "max": 42
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75154728,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 1280,
+      "h": 509,
+      "bytes": 2606080
+     }
+    ],
+    "canvasBytes": 2606080,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 1,
+   "throttle": 4,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 826,
+     "longestTaskMs": 203,
+     "maxRafGapMs": 366.6,
+     "frames": 72,
+     "elapsed": 2002
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 548,
+     "longestTaskMs": 181,
+     "maxRafGapMs": 316.6,
+     "frames": 90,
+     "elapsed": 2002
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 503,
+     "longestTaskMs": 282,
+     "maxRafGapMs": 350,
+     "frames": 91,
+     "elapsed": 2002
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.2,
+    "p50": 1.2,
+    "p95": 2,
+    "max": 2.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.76,
+    "p50": 9.5,
+    "p95": 11.2,
+    "max": 15.4
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75081656,
+    "jsHeapTotal": 76546048,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 0.79,
+    "p50": 0.8,
+    "p95": 1,
+    "max": 1.3
+   },
+   "drawPlusRasterMs": {
+    "mean": 8.11,
+    "p50": 8.7,
+    "p95": 9.7,
+    "max": 10.5
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75101536,
+    "jsHeapTotal": 76808192,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 1.39,
+    "p50": 1.4,
+    "p95": 1.6,
+    "max": 2.2
+   },
+   "drawPlusRasterMs": {
+    "mean": 9.78,
+    "p50": 9.7,
+    "p95": 10.4,
+    "max": 18.7
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75138048,
+    "jsHeapTotal": 76808192,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 1,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 105,
+     "longestTaskMs": 54,
+     "maxRafGapMs": 66.7,
+     "frames": 111,
+     "elapsed": 2002
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 53,
+     "longestTaskMs": 53,
+     "maxRafGapMs": 66.7,
+     "frames": 112,
+     "elapsed": 2003
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 72,
+     "longestTaskMs": 72,
+     "maxRafGapMs": 83.3,
+     "frames": 114,
+     "elapsed": 2003
+    }
+   ]
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 16.67,
+    "p50": 16.7,
+    "p95": 16.8,
+    "max": 16.8
+   },
+   "droppedPct": 0,
+   "drawJsMs": {
+    "mean": 3.42,
+    "p50": 3.7,
+    "p95": 4.7,
+    "max": 7.2
+   },
+   "drawPlusRasterMs": {
+    "mean": 27.79,
+    "p50": 32.4,
+    "p95": 41.4,
+    "max": 46.3
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75077932,
+    "jsHeapTotal": 76021760,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 144.7847646139189,
+    "tx": -15758.322440172455,
+    "ty": 3603.559105519944
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    360,
+    1440
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 10,
+   "rafIntervalMs": {
+    "mean": 30.66,
+    "p50": 33.3,
+    "p95": 50,
+    "max": 50.1
+   },
+   "droppedPct": 72.9,
+   "drawJsMs": {
+    "mean": 2.72,
+    "p50": 2.7,
+    "p95": 4,
+    "max": 10
+   },
+   "drawPlusRasterMs": {
+    "mean": 27.49,
+    "p50": 30.2,
+    "p95": 36.4,
+    "max": 51.7
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75078884,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "view": {
+    "scale": 30.562500000000007,
+    "tx": -2790.640625000001,
+    "ty": 1134.8875000000003
+   },
+   "national": null,
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "frames": 300,
+   "sweep": [
+    1035,
+    1155
+   ],
+   "W": 1280,
+   "H": 509.375,
+   "DPR": 2,
+   "fitScale": 14.47847646139189,
+   "zoomRatio": 2.11,
+   "rafIntervalMs": {
+    "mean": 36.56,
+    "p50": 33.3,
+    "p95": 50,
+    "max": 66.7
+   },
+   "droppedPct": 98.7,
+   "drawJsMs": {
+    "mean": 4.97,
+    "p50": 4.8,
+    "p95": 6.1,
+    "max": 20.4
+   },
+   "drawPlusRasterMs": {
+    "mean": 33.77,
+    "p50": 33.6,
+    "p95": 36.1,
+    "max": 43
+   },
+   "natDots": 0,
+   "natFlows": 0,
+   "deckMetrics": null,
+   "memory": {
+    "jsHeapUsed": 75147660,
+    "jsHeapTotal": 76283904,
+    "nodes": 37578,
+    "canvases": [
+     {
+      "id": "map",
+      "w": 2560,
+      "h": 1019,
+      "bytes": 10434560
+     }
+    ],
+    "canvasBytes": 10434560,
+    "deckPre": null,
+    "deckPost": null
+   }
+  },
+  {
+   "label": "canvas",
+   "rep": 3,
+   "dpr": 2,
+   "throttle": 4,
+   "view": "switch",
+   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "switches": [
+    {
+     "zh": "北京",
+     "longTaskMs": 650,
+     "longestTaskMs": 204,
+     "maxRafGapMs": 399.9,
+     "frames": 82,
+     "elapsed": 2002
+    },
+    {
+     "zh": "上海",
+     "longTaskMs": 589,
+     "longestTaskMs": 185,
+     "maxRafGapMs": 366.6,
+     "frames": 87,
+     "elapsed": 2001
+    },
+    {
+     "zh": "广州",
+     "longTaskMs": 496,
+     "longestTaskMs": 279,
+     "maxRafGapMs": 350,
+     "frames": 91,
+     "elapsed": 2001
+    }
+   ]
+  }
+ ],
+ "loads": []
+}

@@ -1,7 +1,9 @@
 /* Outbound, no destination: every train departing the origin city. */
-import { fmtDist, fmtTime } from "../../lib";
+import { fmtDist, fmtTime, runRank } from "../../lib";
+import WindowedTable, { ORIGIN_ROW_H } from "./WindowedTable";
 import EmptyMessage from "./EmptyMessage";
 import TrainCell from "./TrainCell";
+import RunsCell from "./RunsCell";
 import HeadCount from "./HeadCount";
 import { byClass, classTag, depDayOffset } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
@@ -21,6 +23,7 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
     setSort,
     emptyProps,
     cur,
+    atlas,
   } = ctx;
   let showingNote: string;
   const deps = cur ? cur.deps : [];
@@ -34,6 +37,10 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   );
   const { key, dir } = sort;
   list.sort((a, b) => {
+    if (key === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.t], atlas?.data.calendar);
+      if (dd) return dd * dir;
+    }
     if (key === "dur" || key === "km") {
       const va = key === "dur" ? a.dur : a.km;
       const vb = key === "dur" ? b.dur : b.km;
@@ -85,14 +92,14 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   const depNote = (
     <>
       Every train departing the selected city &mdash; from any of its
-      stations &mdash; across the two timetable dates &mdash; Wednesday 21
-      October 2026 (national) and Wednesday 28 October 2026 (intercity
-      C/S). &ldquo;Stops&rdquo; counts the stops the train makes after leaving
+      stations &mdash; for every train in the timetable window. &ldquo;Stops&rdquo; counts the stops the train makes after leaving
       its origin-city station.
     </>
   );
   const tableNode = (
-    <table id="depTable">
+    <WindowedTable n={list.length} rowH={ORIGIN_ROW_H} cols={9}>
+      {(w) => (
+      <>
       <thead>
         <tr>
           <th scope="col">Train</th>
@@ -106,8 +113,8 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
             Departs <span className="arrow">{arrow("dep")}</span>
           </th>
           <th scope="col">From</th>
-          <th scope="col">To</th>
           <th scope="col">Arrives</th>
+          <th scope="col">To</th>
           <th
             scope="col"
             className="sortable"
@@ -129,24 +136,29 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
           <th scope="col" className="num">
             Stops
           </th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="runs"
+            aria-sort={ariaOf("runs")}
+            onClick={() => onSort("runs")}
+          >
+            Runs <span className="arrow">{arrow("runs")}</span>
+          </th>
         </tr>
       </thead>
       <tbody id="depBody">
         {!cur ? null : list.length === 0 ? (
           <tr>
-            <td colSpan={8} className="dep-empty">
+            <td colSpan={9} className="dep-empty">
               <EmptyMessage {...emptyProps} />
             </td>
           </tr>
         ) : (
-          list.map((d, i) => (
+          <>{w.top}{list.map((d, i) => i < w.first || i >= w.last ? null : (
             <tr
               key={i}
-              className={
-                selectedTrainCodes.includes(d.code)
-                  ? "dep-row-selected"
-                  : undefined
-              }
+              {...w.tr(i, selectedTrainCodes.includes(d.code) ? "dep-row-selected" : undefined)}
               onClick={(e) => handleRowClick(d.code, i, e, list)}
             >
               <td className="c-train">
@@ -162,6 +174,12 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
                 {d.fsZh}
                 {d.fsEn ? <span className="to-stn">{d.fsEn}</span> : null}
               </td>
+              <td className="c-time">
+                {d.arr}
+                {depDayOffset(d) > 0 ? (
+                  <span className="plus"> +{depDayOffset(d)}d</span>
+                ) : null}
+              </td>
               <td>
                 <span className="to-city">
                   {d.tcEn} &middot; {d.tcZh}
@@ -171,20 +189,17 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
                   {d.tsEn ? " · " + d.tsEn : ""}
                 </span>
               </td>
-              <td className="c-time">
-                {d.arr}
-                {depDayOffset(d) > 0 ? (
-                  <span className="plus"> +{depDayOffset(d)}d</span>
-                ) : null}
-              </td>
               <td className="c-time">{fmtTime(d.dur)}</td>
               <td className="num c-time">{fmtDist(d.km, unit)}</td>
               <td className="num">{d.stops}</td>
+              <RunsCell atlas={atlas} t={d.t} />
             </tr>
-          ))
+          ))}{w.bottom}</>
         )}
       </tbody>
-    </table>
+      </>
+      )}
+    </WindowedTable>
   );
   return { heading, depNote, stations, count, total: deps.length, showingNote, tableNode };
 }

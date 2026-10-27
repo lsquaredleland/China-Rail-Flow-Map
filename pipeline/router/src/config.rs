@@ -26,6 +26,32 @@ pub struct Config {
     pub evidence: EvidenceConfig,
     pub decide: DecideConfig,
     pub canon: CanonConfig,
+    pub schedule: ScheduleConfig,
+}
+
+/// Which `ScheduleSource` the run reads (an input choice, not a
+/// threshold; here so the recipe file names it).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScheduleKind {
+    /// The timetable deliverables in `--files` (`china::TimetableJson`).
+    #[default]
+    Timetables,
+    /// One train export with an operating calendar (`export::TrainExport`).
+    Export,
+}
+
+/// The schedule input.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ScheduleConfig {
+    /// "timetables" | "export".                             [timetables]
+    pub source: ScheduleKind,
+    /// Export: the train file, relative to `--files`.
+    pub export: String,
+    /// Export: stop-list supplements for its placeholder stop lists,
+    /// relative to `--files`, first match wins.             [none]
+    pub supplements: Vec<String>,
 }
 
 /// OSM extract -> rail graph. Defaults: China's `railway=rail` /
@@ -192,6 +218,16 @@ pub struct ModelConfig {
     pub reversal_penalty: f64,
     /// ...whose dwell is shorter than this (min).  [6]
     pub reversal_dwell_min: i64,
+    /// Log-penalty per turn-back inside a candidate path: a train runs a
+    /// leg without stopping, so it cannot reverse between its stations
+    /// (e.g. at a junction). 0 = off.               [0]
+    pub inner_reversal_penalty: f64,
+    /// A turn-back is a heading change above 150 degrees between the
+    /// path this far (km) before a node and this far after it. [1.0]
+    pub inner_reversal_km: f64,
+    /// ...and not within this distance (km) of any station point, where a
+    /// train may reverse (a stop or a technical stop). [1.5]
+    pub inner_reversal_station_km: f64,
     /// Log-likelihood of a run faster than ever observed. [-30]
     pub infeasible_loglik: f64,
 }
@@ -209,6 +245,9 @@ impl Default for ModelConfig {
             gap_kmh: 80.0,
             reversal_penalty: 4.0,
             reversal_dwell_min: 6,
+            inner_reversal_penalty: 0.0,
+            inner_reversal_km: 1.0,
+            inner_reversal_station_km: 1.5,
             infeasible_loglik: -30.0,
         }
     }
@@ -414,5 +453,18 @@ mod tests {
         assert_eq!(p.canon.margin_rel, 0.2);
         assert_eq!(p.canon.rounds, 4);
         assert!(toml::from_str::<Config>("[canon]\nmode = \"longest\"\n").is_err());
+    }
+
+    #[test]
+    fn schedule_defaults_to_the_timetables() {
+        assert_eq!(Config::default().schedule.source, ScheduleKind::Timetables);
+        let p: Config = toml::from_str(
+            "[schedule]\nsource = \"export\"\nexport = \"t.json\"\nsupplements = [\"s.json\"]\n",
+        )
+        .unwrap();
+        assert_eq!(p.schedule.source, ScheduleKind::Export);
+        assert_eq!(p.schedule.export, "t.json");
+        assert_eq!(p.schedule.supplements, ["s.json"]);
+        assert!(toml::from_str::<Config>("[schedule]\nsource = \"gtfs\"\n").is_err());
     }
 }

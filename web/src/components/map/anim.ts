@@ -1,13 +1,71 @@
 /* The 24h animation clock: play / pause / seek / speed and listeners. */
 import type { MapCtx, AnimState, AnimListener } from "./context";
-import { draw } from "./render";
-import { getSelCache } from "./trains";
+import { getSelCache } from "../../lib";
 
 
 /* ---------- 24h timeline animation controls ---------- */
+
+/** Where the clock starts (and wraps back to): midnight in national mode;
+    for an origin, the first departure of the trains on show: those to the
+    selected city when one is selected, else the whole (filtered) timeline. */
+function animStartMins(M: MapCtx): number {
+  if (M.P.current.national) return 0;
+  const tl = M.activeTimeline();
+  if (!tl) return 0;
+  const allowed = getSelCache(M.P.current, M.S.current)?.allowedCodes;
+  if (allowed && allowed.size) {
+    let first = Infinity;
+    for (const code of allowed) {
+      const pt = tl.getPrepTrain(code);
+      if (pt && pt.depMins < first) first = pt.depMins;
+    }
+    if (isFinite(first)) return Math.floor(first);
+  }
+  return Math.floor(tl.firstDepMins);
+}
+
+/** The isolated train's run on the clock, or null when no train is isolated: from its departure
+    (origin view) or first stop (national) for `dur` minutes. The national clock is one wrapping day. */
+function isoRun(M: MapCtx): { start: number; dur: number; wrap: boolean } | null {
+  const code = M.P.current.isolatedTrainCode;
+  if (!code) return null;
+  if (M.P.current.national) {
+    const r = M.S.current.natLoop;
+    return r && r.dur > 0 ? { start: ((r.start % 1440) + 1440) % 1440, dur: r.dur, wrap: true } : null;
+  }
+  const pt = M.activeTimeline()?.getPrepTrain(code);
+  return pt && pt.arrMins > pt.depMins ? { start: pt.depMins, dur: pt.arrMins - pt.depMins, wrap: false } : null;
+}
+
+/** Where the clock goes `deltaMins` after `t` when an isolated train passes its final stop: back
+    to its start. Null when no train is isolated or the train is not mid-run. */
+export function isoLoopTime(M: MapCtx, t: number, deltaMins: number): number | null {
+  const run = isoRun(M);
+  if (!run) return null;
+  const e = run.wrap ? (((t - run.start) % 1440) + 1440) % 1440 : t - run.start;
+  return e >= 0 && e < run.dur && e + deltaMins >= run.dur ? run.start : null;
+}
+
 export function getAnimState(M: MapCtx): AnimState {
   const { S, P, activeTimeline } = M;
   const st = S.current;
+  if (P.current.national) {
+    // National mode (D13): no origin timeline, so the clock is one day and
+    // wraps; the counters are the dots on the line and the trains drawn.
+    return {
+      time: st.animTime,
+      totalMins: 1440,
+      totalDays: 1,
+      isPlaying: st.animPlaying,
+      speed: st.animSpeed,
+      departed: st.natRunning,
+      arrived: 0,
+      total: st.natN,
+      enabled: st.animEnabled,
+      national: true,
+      running: st.natRunning,
+    };
+  }
   const cur = P.current.cur;
   const tl = activeTimeline();
   let total = tl ? tl.totalTrains : 0;
@@ -16,7 +74,7 @@ export function getAnimState(M: MapCtx): AnimState {
   const totalMins = tl ? tl.totalMins : 1440;
   const totalDays = tl ? tl.totalDays : 1;
 
-  const sel = getSelCache(M);
+  const sel = getSelCache(P.current, st);
   const allowedCodes = sel?.allowedCodes ?? null;
   if (allowedCodes && cur && tl) {
     total = allowedCodes.size;
@@ -44,6 +102,8 @@ export function getAnimState(M: MapCtx): AnimState {
     arrived,
     total,
     enabled: st.animEnabled,
+    national: false,
+    running: 0,
   };
 }
 
@@ -78,11 +138,12 @@ export function animLoop(M: MapCtx, timestamp: number) {
       // Accelerate tail playback (Day 2-3) by 2.5x so watching terminal arrivals stays dynamic
       const tailMult = st.animTime > 1440 ? 2.5 : 1.0;
       const deltaMins = (dt / Math.max(1, st.animSpeed)) * 1440 * tailMult;
-      st.animTime = st.animTime + deltaMins;
-      if (st.animTime >= totalMins) {
-        st.animTime = 0;
+      const looped = isoLoopTime(M, st.animTime, deltaMins);
+      st.animTime = looped ?? st.animTime + deltaMins;
+      if (looped === null && st.animTime >= totalMins) {
+        st.animTime = animStartMins(M);
       }
-      draw(M);
+      M.render();
       notifyAnimListeners(M);
     }
   }
@@ -102,9 +163,10 @@ export function setPlaying(M: MapCtx, playing: boolean) {
   if (playing) {
     if (!st.animEnabled) {
       st.animEnabled = true;
+      st.animTime = animStartMins(M);
     }
     if (st.animTime >= totalMins) {
-      st.animTime = 0;
+      st.animTime = animStartMins(M);
     }
     st.lastRafTimestamp = null;
     if (st.animRafId !== null) {
@@ -134,7 +196,7 @@ export function setTime(M: MapCtx, tMins: number) {
   const tl = activeTimeline();
   const totalMins = tl ? tl.totalMins : 1440;
   st.animTime = Math.max(0, Math.min(totalMins, tMins));
-  draw(M);
+  M.render();
   notifyAnimListeners(M);
 }
 
@@ -149,8 +211,9 @@ export function setSpeed(M: MapCtx, secPerDay: number) {
 export function setAnimEnabled(M: MapCtx, enabled: boolean) {
   const { S } = M;
   const st = S.current;
+  if (enabled && !st.animEnabled) st.animTime = animStartMins(M);
   st.animEnabled = enabled;
-  draw(M);
+  M.render();
   notifyAnimListeners(M);
 }
 

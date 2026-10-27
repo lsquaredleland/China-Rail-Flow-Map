@@ -79,6 +79,8 @@ pub struct Cand {
     pub head_end: f64,
     /// Line names by km, longest first (top 3).
     pub lines: Vec<(String, f64)>,
+    /// Turn-backs inside the path (see `inner_reversals`).
+    pub reversals: u32,
 }
 
 impl Cand {
@@ -141,6 +143,14 @@ impl Cand {
         let mut lines: Vec<(String, f64)> = lines.into_iter().map(|(_, n, d)| (n, d)).collect();
         lines.truncate(3);
         let (head_start, head_end) = end_bearings(g, &nodes);
+        let pts: Vec<[f64; 2]> = nodes.iter().map(|&i| g.coords[i as usize]).collect();
+        let reversals = inner_reversals(
+            &nodes,
+            &pts,
+            &g.at_station,
+            &gaps_at,
+            params().inner_reversal_km,
+        );
         Cand {
             nodes,
             km,
@@ -153,6 +163,7 @@ impl Cand {
             head_start,
             head_end,
             lines,
+            reversals,
         }
     }
 
@@ -164,6 +175,80 @@ impl Cand {
         }
         Some(self.run_min[c] + params().overhead)
     }
+}
+
+/// Turn-backs inside a path (`pts`, [lat, lon]; `nodes` its node ids): runs
+/// of nodes where the heading from the point `win_km` back along the path
+/// to the node and the heading from the node to the point `win_km` ahead
+/// differ by more than 150 degrees. A route turns back once; a spike from
+/// joining overlapping pieces (out and back, often over the other track)
+/// turns back twice in quick succession, so two turn-backs less than
+/// 4 `win_km` apart along the path cancel, as does one that runs back over
+/// nodes it came in on, or one at a station (`at_station` by node; a train
+/// may reverse there). Nodes closer than `win_km` to either end, and
+/// windows that cross a gap jump (`gaps_at`, step i = node i -> i + 1), are
+/// not tested.
+pub fn inner_reversals(
+    nodes: &[u32],
+    pts: &[[f64; 2]],
+    at_station: &[bool],
+    gaps_at: &[usize],
+    win_km: f64,
+) -> u32 {
+    let n = pts.len();
+    if n < 3 || win_km <= 0.0 {
+        return 0;
+    }
+    let mut cum = vec![0.0f64; n];
+    for i in 1..n {
+        cum[i] = cum[i - 1] + hav(pts[i - 1], pts[i]);
+    }
+    // gaps before step i, so a window a..b crosses one iff the counts differ
+    let mut gaps_before = vec![0usize; n];
+    for i in 1..n {
+        gaps_before[i] = gaps_before[i - 1] + gaps_at.contains(&(i - 1)) as usize;
+    }
+    // path km of each turn-back (its first node)
+    let mut turns: Vec<f64> = Vec::new();
+    let (mut back, mut ahead, mut inside) = (0usize, 0usize, false);
+    for i in 1..n - 1 {
+        while back + 1 < i && cum[i] - cum[back + 1] >= win_km {
+            back += 1;
+        }
+        ahead = ahead.max(i);
+        while ahead < n - 1 && cum[ahead] - cum[i] < win_km {
+            ahead += 1;
+        }
+        let turn = cum[i] - cum[back] >= win_km
+            && cum[ahead] - cum[i] >= win_km
+            && gaps_before[back] == gaps_before[ahead]
+            && {
+                let d =
+                    (bearing(pts[back], pts[i]) - bearing(pts[i], pts[ahead])).rem_euclid(360.0);
+                d.min(360.0 - d) > 150.0
+            };
+        if turn
+            && !inside
+            && !at_station.get(nodes[i] as usize).copied().unwrap_or(false)
+            && !nodes[i + 1..=ahead]
+                .iter()
+                .any(|v| nodes[back..i].contains(v))
+        {
+            turns.push(cum[i]);
+        }
+        inside = turn;
+    }
+    let mut count = 0u32;
+    let mut k = 0;
+    while k < turns.len() {
+        if k + 1 < turns.len() && turns[k + 1] - turns[k] < 4.0 * win_km {
+            k += 2;
+        } else {
+            count += 1;
+            k += 1;
+        }
+    }
+    count
 }
 
 fn end_bearings(g: &Graph, nodes: &[u32]) -> (f64, f64) {
@@ -372,16 +457,27 @@ impl Calibration {
     }
 }
 
-/// Emission log-score of each candidate for one leg (scheduled minutes
-/// `m`, class `c`): learned run-time likelihood + length prior.
-pub fn emissions(cal: &Calibration, cands: &[Cand], c: usize, m: f64) -> Vec<f64> {
+/// Shape log-prior of each candidate, timetable-free: length prior per
+/// ln(length / shortest) plus the inner-reversal penalty per turn-back.
+pub fn shape_priors(cands: &[Cand]) -> Vec<f64> {
     let kmin = cands.iter().map(|k| k.km).fold(f64::INFINITY, f64::min);
     cands
         .iter()
-        .map(|k| match k.predict(c) {
-            Some(p) if p > 0.0 && m > 0.0 => {
-                cal.loglik(c, (m / p).ln()) - params().length_prior * (k.km / kmin).ln()
-            }
+        .map(|k| {
+            -params().length_prior * (k.km / kmin).ln()
+                - params().inner_reversal_penalty * k.reversals as f64
+        })
+        .collect()
+}
+
+/// Emission log-score of each candidate for one leg (scheduled minutes
+/// `m`, class `c`): learned run-time likelihood + shape prior.
+pub fn emissions(cal: &Calibration, cands: &[Cand], c: usize, m: f64) -> Vec<f64> {
+    cands
+        .iter()
+        .zip(shape_priors(cands))
+        .map(|(k, prior)| match k.predict(c) {
+            Some(p) if p > 0.0 && m > 0.0 => cal.loglik(c, (m / p).ln()) + prior,
             _ => params().infeasible_loglik * 2.0,
         })
         .collect()
@@ -500,7 +596,42 @@ mod tests {
             head_start: hs,
             head_end: he,
             lines: Vec::new(),
+            reversals: 0,
         }
+    }
+
+    #[test]
+    fn inner_reversals_count_turn_backs_not_curves_or_spikes() {
+        // 0.001 deg lat ~ 0.111 km; north 1.1 km on one track, then back
+        // south 1.1 km on the parallel one (other nodes)
+        let north: Vec<[f64; 2]> = (0..=10).map(|i| [i as f64 * 0.001, 100.0]).collect();
+        let south: Vec<[f64; 2]> = (0..10)
+            .rev()
+            .map(|i| [i as f64 * 0.001, 100.0001])
+            .collect();
+        let ids = |n: usize| (0..n as u32).collect::<Vec<u32>>();
+        let mut back: Vec<[f64; 2]> = north.clone();
+        back.extend(south.iter().copied());
+        assert_eq!(inner_reversals(&ids(back.len()), &back, &[], &[], 0.5), 1);
+        // the same over its own nodes: a spike, not a route
+        let mut retrace: Vec<u32> = ids(11);
+        retrace.extend((0..10).rev());
+        assert_eq!(inner_reversals(&retrace, &back, &[], &[], 0.5), 0);
+        // at a station: a train may reverse there
+        let st: Vec<bool> = (0..back.len()).map(|i| (4..=16).contains(&i)).collect();
+        assert_eq!(inner_reversals(&ids(back.len()), &back, &st, &[], 0.5), 0);
+        // the turn sits in a window that crosses a gap jump: not tested
+        assert_eq!(inner_reversals(&ids(back.len()), &back, &[], &[10], 0.5), 0);
+        // out and back and on again (two quick turn-backs) cancel
+        let mut spike = back.clone();
+        spike.extend((1..=10).map(|i| [i as f64 * 0.001, 100.0002]));
+        assert_eq!(inner_reversals(&ids(spike.len()), &spike, &[], &[], 0.5), 0);
+        // a right-angle bend is not a turn-back
+        let mut bend = north.clone();
+        bend.extend((1..=10).map(|i| [0.01, 100.0 + i as f64 * 0.001]));
+        assert_eq!(inner_reversals(&ids(bend.len()), &bend, &[], &[], 0.5), 0);
+        // a turn-back closer than the window to an end is not tested
+        assert_eq!(inner_reversals(&ids(back.len()), &back, &[], &[], 2.0), 0);
     }
 
     #[test]

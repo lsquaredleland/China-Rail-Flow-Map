@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import type { CityPointVM, DestVM, Direction, DistUnit, SrcVM } from "../types";
 import { sourceRows, stationRows } from "../lib";
+import { CityCard, InSlot } from "./MapCards";
 
 interface Props {
-  point: CityPointVM | null;
+  point: Pick<CityPointVM, "idx" | "zh" | "en" | "trains"> | null;
+  /** The table rows. Default: the origin view's rows for `point` (a DestVM
+      outbound, a SrcVM inbound); national mode passes its own. */
+  rows?: [string, string][];
   direction: Direction;
-  cityEn: string; // the selected city (origin outbound, destination inbound)
-  cityZh: string;
+  /** The selected city (origin outbound, destination inbound); none in national mode. */
+  cityEn?: string;
+  cityZh?: string;
   unit: DistUnit;
+  /** Minimised card line before the count; national mode has no origin
+      ("120 departures · 98 arrivals"). Default: "from <city>". */
+  sub?: string;
+  /** Replaces the "See all N trains" link (national: jump to that city's origin view). */
+  link?: { label: string; onClick: () => void } | null;
   onClose: () => void;
 }
 
@@ -18,10 +28,13 @@ interface Props {
    city — App owns that coupling. */
 export default function DestinationPanel({
   point,
+  rows: givenRows,
   direction,
-  cityEn,
+  cityEn = "",
   cityZh,
   unit,
+  sub,
+  link,
   onClose,
 }: Props) {
   // Minimized keeps the selection (map highlight, flows, table filter);
@@ -47,9 +60,10 @@ export default function DestinationPanel({
 
   if (!point) return null;
   const rows =
-    direction === "out"
+    givenRows ??
+    (direction === "out"
       ? stationRows(point as DestVM, cityEn, unit)
-      : sourceRows(point as SrcVM, cityEn, unit);
+      : sourceRows(point as SrcVM, cityEn, unit));
 
   const scrollToDepartures = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -59,47 +73,24 @@ export default function DestinationPanel({
 
   if (minimized) {
     return (
-      <div
-        className="tsm-hud dp-hud"
-        role="dialog"
-        aria-label={`${point.en} city details (minimized)`}
-      >
-        <div
-          className="tsm-hud-main dp-hud-main"
-          onClick={() => setMin(false)}
-        >
-          <div className="tsm-hud-route">
-            {point.en} &middot; {point.zh}
-          </div>
-          <div className="tsm-hud-status">
-            {direction === "out" ? "from " : "to "}
-            {cityEn}
-            {point.trains > 0 ? ` · ${point.trains} trains` : ""}
-          </div>
-        </div>
-        <button
-          ref={expandBtn}
-          type="button"
-          className="tsm-hud-expand"
-          onClick={() => setMin(false)}
-          title="Expand city details"
-        >
-          ⤢ Details
-        </button>
-        <button
-          type="button"
-          className="tsm-hud-close"
-          onClick={onClose}
-          title="Close city details"
-          aria-label="Close city details"
-        >
-          ✕
-        </button>
-      </div>
+      <CityCard
+        en={point.en}
+        zh={point.zh}
+        sub={
+          sub !== undefined
+            ? sub
+            : `${direction === "out" ? "from " : "to "}${cityEn}`
+        }
+        count={point.trains}
+        onExpand={() => setMin(false)}
+        onClose={onClose}
+        expandRef={expandBtn}
+      />
     );
   }
 
   return (
+    <InSlot>
     <div id="destPanel">
       <div className="dp-actions">
         <button
@@ -127,10 +118,12 @@ export default function DestinationPanel({
         <div className="dp-title">
           {point.en} &middot; {point.zh}
         </div>
-        <div className="dp-sub">
-          {direction === "out" ? "from " : "to "}
-          {cityEn} &middot; {cityZh}
-        </div>
+        {cityEn && (
+          <div className="dp-sub">
+            {direction === "out" ? "from " : "to "}
+            {cityEn} &middot; {cityZh}
+          </div>
+        )}
         <table>
           <tbody>
             {rows.map((r) => {
@@ -144,7 +137,20 @@ export default function DestinationPanel({
             })}
           </tbody>
         </table>
-        {point.trains > 0 && (
+        {link ? (
+          <div className="dp-link-row">
+            <a
+              href="#"
+              className="dp-link"
+              onClick={(e) => {
+                e.preventDefault();
+                link.onClick();
+              }}
+            >
+              {link.label}
+            </a>
+          </div>
+        ) : point.trains > 0 && (
           <div className="dp-link-row">
             <a
               href="#departures"
@@ -157,5 +163,6 @@ export default function DestinationPanel({
         )}
       </div>
     </div>
+    </InSlot>
   );
 }

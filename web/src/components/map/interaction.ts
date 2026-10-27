@@ -1,268 +1,220 @@
 /* Hit-testing and the floating tooltip. */
-import type {
-  ActiveTrainVM,
-  ChordVM,
-  CityPointVM,
-  DestVM,
-  FlowVM,
-  Hit,
-  SrcVM,
-} from "../../types";
+import type { ChordVM, FlowVM, Hit } from "../../types";
 import {
-  esc,
-  sourceRowsHtml,
-  stationLabel,
+  isFerrySection,
+  isTrainShown as modelIsTrainShown,
+  natTrainVM,
   stationR,
   stationZoomK,
-  stationRowsHtml,
-  trainDistAt,
+  tooltipHtml,
+  pickableChords,
+  pickableFlows,
+  pickPriority,
+  TRAIN_RADIUS,
 } from "../../lib";
+import type { PickCandidate } from "../../lib";
 import type { MapCtx } from "./context";
 import { stationT } from "./camera";
-import { getActiveDestSectionCounts, getDestSectionCounts } from "./flows";
-import { isTrainShown } from "./trains";
+import { getDestSectionCounts, modelState } from "./flows";
 
 
 /* ---------- hit testing & tooltip ---------- */
-export function distToSeg(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number {
-  const dx = bx - ax,
-    dy = by - ay;
-  const len2 = dx * dx + dy * dy;
-  let t = len2 === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / len2;
-  t = Math.max(0, Math.min(1, t));
-  const ex = ax + t * dx - px,
-    ey = ay + t * dy - py;
-  return Math.sqrt(ex * ex + ey * ey);
-}
+/* Picking (D6): GPU candidates from the deck handle, then the priority and
+   distances recomputed exactly in lib/pick.ts. One single-pass
+   rectangle query on hairline proxy layers (sections + chords) plus exact scans
+   for stations and, while paused, trains. Layer data is read back through the
+   layers' own fields: chords by `info.object`, flow paths through the pass's
+   `idxToSec` prop (C19).
+   GPU query radius: the hit radius plus 2 px, because the nearest drawn pixel of
+   a 1 px proxy can be that much farther than its centre; lib/pick.ts applies
+   the exact radii. */
+const SEC_RADIUS = 12;
 
-export function pickStation(M: MapCtx, px: number, py: number): Hit | null {
-  const { S, P, X, Y, points } = M;
+/* Stations, the origin and trains are not picked on the GPU: they are at most a few thousand
+   dots, a one-pass query shows only the top dot of any pixel (dots closer than about 1 px
+   hide each other, e.g. 东莞 / 望牛墩, or trains 0.05 px apart), and the exact scan costs
+   microseconds. The candidates go through the same pickPriority. */
+function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandidate[], hits: Hit[]) {
+  const { S, P, X, Y } = M;
   const cur = P.current.cur;
-  if (!cur) return null;
+  if (!cur) return;
   const { W, H } = S.current;
-  const pts = points();
-  let best: CityPointVM | null = null;
   const sk = stationT(M);
-  let bestD2 = Infinity;
+  const pts = M.points();
+  // With a destination selected (the two-city focus), only that city and the
+  // origin answer the pointer until the focus is closed.
+  const pd = P.current.panelDest;
   for (let i = 0; i < pts.length; i++) {
     const c = pts[i];
+    if (pd && c.idx !== pd.idx) continue;
+    if (S.current.unlitCities?.has(c.idx)) continue;
     const x = X(c.pt[0]),
       y = Y(c.pt[1]);
     if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+    const radius = 14 * stationZoomK(stationR(c.trains), sk);
     const dx = px - x,
-      dy = py - y,
-      d2 = dx * dx + dy * dy;
-    const hitR = 14 * stationZoomK(stationR(c.trains), sk);
-    if (d2 <= hitR * hitR && d2 <= bestD2) {
-      best = c;
-      bestD2 = d2;
-    }
+      dy = py - y;
+    if (dx * dx + dy * dy > radius * radius) continue;
+    cands.push({ kind: "station", index: i, pos: [c.pt[0], c.pt[1]], radius });
+    hits.push({ kind: "station", station: c });
   }
-  const cx = X(cur.o.pt[0]),
-    cy = Y(cur.o.pt[1]);
-  const odx = px - cx,
-    ody = py - cy,
-    od2 = odx * odx + ody * ody;
-  if (od2 <= 15 * 15 && (best === null || od2 <= bestD2))
-    return { kind: "origin" };
-  return best ? { kind: "station", station: best } : null;
+  cands.push({ kind: "origin", index: 0, pos: [cur.o.pt[0], cur.o.pt[1]] });
+  hits.push({ kind: "origin" });
 }
 
-export function pickSegment(M: MapCtx, px: number, py: number): Hit | null {
-  const { S, P, X, Y, toLon, toLat, flowsList, activeTimeline, flowsSet } = M;
+/* Paused only: the active trains, filtered by isTrainShown (no isolation filter). */
+function isTrainShown(M: MapCtx, code: string): boolean {
+  return modelIsTrainShown(M.P.current, M.S.current, M.S.current.animTime, code);
+}
+
+function trainCandidates(M: MapCtx, cands: PickCandidate[], hits: Hit[]) {
+  const { S, activeTimeline, activeTrainsAt } = M;
+  const st = S.current;
+  if (!st.animEnabled || st.animPlaying) return;
+  const timeline = activeTimeline();
+  if (!timeline) return;
+  const trains = activeTrainsAt(timeline, st.animTime);
+  for (let i = 0; i < trains.length; i++) {
+    const tr = trains[i];
+    if (!isTrainShown(M, tr.code)) continue;
+    cands.push({ kind: "train", index: i, pos: [tr.lon, tr.lat] });
+    hits.push({ kind: "train", train: tr });
+  }
+}
+
+/* National mode (P2.3): the same exact scan over the current frame's dots, paused
+   only. The candidate index is the dot's index; the view-model is built for the
+   winner only. */
+function pickNational(M: MapCtx, px: number, py: number): Hit | null {
+  return pickNationalTrain(M, px, py) ?? pickNationalCity(M, px, py) ?? pickNationalFlow(M, px, py);
+}
+
+/* A national flow line near the pointer: the busiest section whose hairline
+   pick proxy is within SEC_RADIUS (the origin view's rule: busier wins). */
+function pickNationalFlow(M: MapCtx, px: number, py: number): Hit | null {
+  const { S, deck } = M;
+  const counts = S.current.natCounts;
+  if (!deck || !counts) return null;
+  const infos = deck.pickRect({
+    x: px - SEC_RADIUS,
+    y: py - SEC_RADIUS,
+    width: 2 * SEC_RADIUS + 1,
+    height: 2 * SEC_RADIUS + 1,
+    layerIds: ["pick-flows-national"],
+  });
+  let best: Hit | null = null;
+  for (const info of infos) {
+    if (!info.layer || info.index < 0) continue;
+    const s = (info.layer.props as unknown as LayerProps).idxToSec?.[info.index];
+    const n = s === undefined ? 0 : counts[s] ?? 0;
+    if (n > 0 && (!best || (best.kind === "seg" && n > best.n))) best = { kind: "seg", s: s!, n };
+  }
+  return best;
+}
+
+/* A city circle under the pointer (the smallest, as it is drawn on top). */
+export function pickNationalCity(M: MapCtx, px: number, py: number): Hit | null {
+  const { S, X, Y } = M;
+  const d = S.current.natCities;
+  if (!d) return null;
+  let best = -1;
+  for (let i = 0; i < d.idx.length; i++) {
+    const dx = px - X(d.pos[i][0]), dy = py - Y(d.pos[i][1]);
+    if (dx * dx + dy * dy > (d.r[i] + 2) * (d.r[i] + 2)) continue;
+    if (best < 0 || d.r[i] < d.r[best]) best = i;
+  }
+  return best < 0 ? null : { kind: "natCity", idx: d.idx[best], dep: d.dep[best], arr: d.arr[best] };
+}
+
+function pickNationalTrain(M: MapCtx, px: number, py: number): Hit | null {
+  const { S, P, X, Y } = M;
+  const st = S.current;
+  const f = st.natPick;
+  const data = P.current.nationalTrains;
   const atlas = P.current.atlas;
-  const cur = P.current.cur;
-  const set = flowsSet();
-  if (!atlas || !cur || !set) return null;
-  const sec = set;
-  const flows = flowsList();
-  const lon = toLon(px),
-    lat = toLat(py);
-  const thrDeg = 12 / S.current.view.scale;
-  let segBest: FlowVM | null = null;
-  let bestDist = 10;
-  let i: number, k: number;
-  const destSecCounts = getDestSectionCounts(M);
-  const st = S.current;
-  const isAnimated = st.animEnabled && !P.current.showInfra;
-  const timeline = activeTimeline();
-  const step =
-    isAnimated && timeline
-      ? Math.min(
-          timeline.numSteps - 1,
-          Math.max(0, Math.floor(st.animTime / timeline.stepMins)),
-        )
-      : 0;
-
-  let activeDestCounts: Map<number, number> | null = null;
-  if (destSecCounts && isAnimated && timeline && st.animTime < timeline.totalMins) {
-    activeDestCounts = getActiveDestSectionCounts(M, st.animTime);
+  if (!f || !data || !atlas || !st.animEnabled || st.animPlaying) return null;
+  const cands: PickCandidate[] = [];
+  const lim2 = TRAIN_RADIUS * TRAIN_RADIUS;
+  for (let i = 0; i < f.count; i++) {
+    const lon = f.buf[i * 6], lat = f.buf[i * 6 + 1];
+    const dx = px - X(lon), dy = py - Y(lat);
+    if (dx * dx + dy * dy >= lim2) continue;
+    cands.push({ kind: "train", index: i, pos: [lon, lat] });
   }
-
-  let activeIsoSecs: Set<number> | null = null;
-  if (P.current.isolatedTrainCode && isAnimated && timeline && st.animTime < timeline.totalMins) {
-    activeIsoSecs = new Set<number>();
-    const isoTrain = (P.current.direction === "out" ? cur.deps : cur.arrs).find(
-      (t) => t.code === P.current.isolatedTrainCode,
-    );
-    const isoPt = isoTrain ? timeline.getPrepTrain(isoTrain.code) : undefined;
-    if (isoTrain && isoPt && st.animTime >= isoTrain.depMins) {
-      const targetDist = trainDistAt(isoPt, st.animTime);
-      const secStarts = isoPt.secStarts;
-      let curSecIdx = 0;
-      while (
-        curSecIdx < isoPt.secs.length - 1 &&
-        secStarts[curSecIdx + 1] <= targetDist
-      ) {
-        curSecIdx++;
-      }
-      for (let j = 0; j <= curSecIdx; j++) {
-        activeIsoSecs.add(isoPt.secs[j]);
-      }
-    }
-  }
-
-  for (i = 0; i < flows.length; i++) {
-    const f = flows[i];
-    const s = f.s;
-    // When a city pair is selected, restrict segment picking ONLY to sections that belong to the city pair
-    if (
-      destSecCounts &&
-      (!destSecCounts.has(s) || (destSecCounts.get(s) ?? 0) <= 0)
-    ) {
-      continue;
-    }
-    if (isAnimated && timeline && st.animTime < timeline.totalMins) {
-      if (activeDestCounts) {
-        if ((activeDestCounts.get(s) ?? 0) <= 0) continue;
-      } else if (activeIsoSecs !== null) {
-        if (!activeIsoSecs.has(s)) continue;
-      } else {
-        const activeN = timeline.secFlowSteps.get(s)?.[step] ?? 0;
-        if (activeN <= 0) continue;
-      }
-    }
-    if (
-      lon < sec.bb[s * 4] - thrDeg ||
-      lon > sec.bb[s * 4 + 2] + thrDeg ||
-      lat < sec.bb[s * 4 + 1] - thrDeg ||
-      lat > sec.bb[s * 4 + 3] + thrDeg
-    )
-      continue;
-    const off = sec.off[s],
-      cnt = sec.len[s];
-    for (k = 0; k + 1 < cnt; k++) {
-      const d = distToSeg(
-        px,
-        py,
-        X(sec.pts[off + k * 2]),
-        Y(sec.pts[off + k * 2 + 1]),
-        X(sec.pts[off + k * 2 + 2]),
-        Y(sec.pts[off + k * 2 + 3]),
-      );
-      if (
-        d < bestDist - 0.75 ||
-        (d <= bestDist + 0.75 && segBest && f.n > segBest.n)
-      ) {
-        if (d < bestDist || (segBest && f.n > segBest.n)) {
-          segBest = f;
-          bestDist = Math.min(d, bestDist);
-        }
-      }
-    }
-  }
-  if (segBest) {
-    const destSecCounts = getDestSectionCounts(M);
-    const subN =
-      destSecCounts && destSecCounts.has(segBest.s)
-        ? destSecCounts.get(segBest.s)
-        : undefined;
-    return { kind: "seg", s: segBest.s, n: segBest.n, subN };
-  }
-  if (P.current.direction !== "out" || destSecCounts) return null;
-  let chordBest: ChordVM | null = null;
-  for (i = 0; i < cur.chords.length; i++) {
-    const ch = cur.chords[i];
-    if (isAnimated && timeline && st.animTime < timeline.totalMins) {
-      if (P.current.isolatedTrainCode) {
-        const isoTrain = cur.deps?.find((t) => t.code === P.current.isolatedTrainCode);
-        if (!isoTrain || isoTrain.tcIdx !== ch.b || st.animTime < isoTrain.depMins) {
-          continue;
-        }
-      } else {
-        const destTrains = (cur.deps || []).filter((d) => d.tcIdx === ch.b);
-        const hasDeparted = destTrains.some((d) => st.animTime >= d.depMins);
-        if (!hasDeparted) continue;
-      }
-    }
-    if (
-      lon < ch.bb.x0 - thrDeg ||
-      lon > ch.bb.x1 + thrDeg ||
-      lat < ch.bb.y0 - thrDeg ||
-      lat > ch.bb.y1 + thrDeg
-    )
-      continue;
-    for (k = 0; k + 1 < ch.count; k++) {
-      const dd = distToSeg(
-        px,
-        py,
-        X(ch.flat[k * 2]),
-        Y(ch.flat[k * 2 + 1]),
-        X(ch.flat[k * 2 + 2]),
-        Y(ch.flat[k * 2 + 3]),
-      );
-      if (dd < bestDist) {
-        chordBest = ch;
-        bestDist = dd;
-      }
-    }
-  }
-  return chordBest ? { kind: "chord", chord: chordBest } : null;
+  const win = pickPriority(cands, px, py, st.view, { paused: true });
+  if (!win) return null;
+  const i = win.index, q = f.qOf[i];
+  let j = i;
+  while (j > 0 && f.qOf[j - 1] === q) j--;
+  const a = f.m + 1440 * (Math.ceil((f.tl.start[q] - f.m) / 1440) + (i - j));
+  const o = i * 6;
+  return {
+    kind: "train",
+    train: natTrainVM(f.tl, atlas.data, data.schedules, q, a, f.buf[o], f.buf[o + 1], f.buf[o + 2], f.buf[o + 3]),
+  };
 }
 
-export function pickTrain(M: MapCtx, px: number, py: number): Hit | null {
-  const { S, P, X, Y, activeTimeline, activeTrainsAt } = M;
-  const st = S.current;
-  // Paused only: moving train tooltips are strictly active when visualization is paused
-  if (!st.animEnabled || st.animPlaying) return null;
-  const cur = P.current.cur;
-  if (!cur) return null;
-  const timeline = activeTimeline();
-  if (!timeline) return null;
-  const activeTrains = activeTrainsAt(timeline, st.animTime);
-  if (!activeTrains || activeTrains.length === 0) return null;
-
-  let bestDist = 14;
-  let bestTrain: ActiveTrainVM | null = null;
-  for (let i = 0; i < activeTrains.length; i++) {
-    const tr = activeTrains[i];
-    if (!isTrainShown(M, tr.code)) {
-      continue;
-    }
-    const tx = X(tr.lon);
-    const ty = Y(tr.lat);
-    const d = Math.hypot(px - tx, py - ty);
-    if (d < bestDist) {
-      bestDist = d;
-      bestTrain = tr;
-    }
-  }
-  return bestTrain ? { kind: "train", train: bestTrain } : null;
-}
+type LayerProps = { idxToSec?: Int32Array };
 
 export function pick(M: MapCtx, px: number, py: number): Hit | null {
-  const tr = pickTrain(M, px, py);
-  if (tr) return tr;
-  const c = pickStation(M, px, py);
-  if (c) return c;
-  return pickSegment(M, px, py);
+  const deck = M.deck;
+  if (!deck) return null;
+  const { S, P } = M;
+  const cur = P.current.cur;
+  const set = M.flowsSet();
+  // National mode: dots only; origin stations / flows are not drawn there (D13).
+  if (P.current.national) return pickNational(M, px, py);
+  if (!cur) return null;
+  const st = S.current;
+  const paused = st.animEnabled && !st.animPlaying;
+  const q = (radius: number, layerIds: string[]) =>
+    deck.pickRect({ x: px - radius, y: py - radius, width: 2 * radius + 1, height: 2 * radius + 1, layerIds });
+  const infos = q(SEC_RADIUS, ["pick-chords", "pick-flows-all", "pick-flows-focus"]);
+
+  const cands: PickCandidate[] = [];
+  const hits: Hit[] = [];
+  stationCandidates(M, px, py, cands, hits);
+  trainCandidates(M, cands, hits);
+  const direction = P.current.direction;
+  const destSecCounts = getDestSectionCounts(M);
+  let flowIdx: Map<number, number> | null = null;
+  let flows: FlowVM[] = [];
+  let chordList: ChordVM[] | null = null;
+  const seen = new Set<number>();
+
+  for (const info of infos) {
+    const layer = info.layer;
+    if (!layer || info.index < 0) continue;
+    const props = layer.props as unknown as LayerProps;
+    const id = layer.id;
+    if (id === "pick-chords") {
+      if (direction !== "out" || destSecCounts) continue;
+      const ch = (info.object as { ch?: ChordVM } | null)?.ch;
+      if (!ch) continue;
+      chordList ??= pickableChords(modelState(M), st);
+      const index = chordList.indexOf(ch);
+      if (index < 0) continue;
+      cands.push({ kind: "chord", index, line: { pts: ch.flat, off: 0, count: ch.count } });
+      hits.push({ kind: "chord", chord: ch });
+    } else if (props.idxToSec && set) {
+      const s = props.idxToSec[info.index];
+      if (seen.has(s)) continue;
+      seen.add(s);
+      if (!flowIdx) {
+        flows = pickableFlows(modelState(M), st);
+        flowIdx = new Map();
+        for (let i = 0; i < flows.length; i++) flowIdx.set(flows[i].s, i);
+      }
+      const index = flowIdx.get(s);
+      if (index === undefined) continue; // drawn but not hoverable
+      const f = flows[index];
+      cands.push({ kind: "section", index, n: f.n, line: { pts: set.pts, off: set.off[s], count: set.len[s] } });
+      const subN = destSecCounts && destSecCounts.has(s) ? destSecCounts.get(s) : undefined;
+      hits.push({ kind: "seg", s, n: f.n, subN });
+    }
+  }
+  const win = pickPriority(cands, px, py, st.view, { paused, direction, destSelected: !!destSecCounts });
+  return win ? hits[cands.indexOf(win)] : null;
 }
 
 export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
@@ -273,141 +225,16 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
   if (!atlas || !cur || !tooltip) return;
   const st = S.current;
   st.lastTip = { hit, x: px, y: py };
-  let html = "";
-  if (hit.kind === "origin") {
-    html =
-      "<div class='t-title'>" +
-      esc(cur.o.zh) +
-      " &middot; " +
-      esc(cur.en) +
-      "</div>" +
-      (P.current.direction === "out"
-        ? "<div>The origin &mdash; " +
-          cur.o.outbound +
-          " trains a day leave " +
-          esc(cur.en) +
-          " for " +
-          cur.dests.length +
-          " cities, no change of train.</div>"
-        : "<div>The destination &mdash; " +
-          cur.o.inbound +
-          " trains a day arrive in " +
-          esc(cur.en) +
-          " from " +
-          cur.srcs.length +
-          " cities, no change of train.</div>");
-  } else if (hit.kind === "station") {
-    const c = hit.station;
-    if (P.current.panelDest && P.current.panelDest.idx === c.idx) {
-      const isOrigin = atlas.data.origins.some((o) => o.zh === c.zh);
-      html =
-        "<div class='t-title'>" +
-        esc(c.zh) +
-        " &middot; " +
-        esc(c.en) +
-        "</div><div class='t-sub'>" +
-        (isOrigin
-          ? "Click again to set as origin city"
-          : "Click again to clear selection") +
-        "</div>";
-    } else {
-      html =
-        "<div class='t-title'>" +
-        esc(c.zh) +
-        " &middot; " +
-        esc(c.en) +
-        "</div>" +
-        (P.current.direction === "out"
-          ? stationRowsHtml(c as DestVM, cur.en, P.current.distUnit)
-          : sourceRowsHtml(c as SrcVM, cur.en, P.current.distUnit));
-    }
-  } else if (hit.kind === "chord") {
-    const ch = hit.chord;
-    html =
-      "<div class='t-title'>" +
-      esc(stationLabel(atlas.data, ch.a)) +
-      " &rarr; " +
-      esc(stationLabel(atlas.data, ch.b)) +
-      "</div>" +
-      "<table>" +
-      "<tr><td>Trains / day</td><td>" +
-      ch.n +
-      "</td></tr>" +
-      "</table>" +
-      "<div class='t-sub'>No track routing &mdash; drawn straight</div>";
-  } else if (hit.kind === "seg") {
-    const set = flowsSet();
-    const isFerry =
-      set &&
-      set.bb[hit.s * 4 + 1] < 20.15 &&
-      set.bb[hit.s * 4 + 3] > 20.20 &&
-      set.bb[hit.s * 4] > 110.0 &&
-      set.bb[hit.s * 4 + 2] < 110.3;
-
-    if (hit.subN !== undefined && hit.subN > 0 && P.current.panelDest) {
-      const destName = P.current.panelDest.en;
-      html =
-        "<div class='t-title'>" +
-        hit.subN +
-        (hit.subN === 1 ? " train" : " trains") +
-        (P.current.direction === "out" ? " to " : " from ") +
-        esc(destName) +
-        " <span style='opacity:0.75;font-size:0.9em'>(of " +
-        hit.n +
-        " total)</span></div>";
-    } else {
-      html =
-        "<div class='t-title'>" +
-        hit.n +
-        (hit.n === 1 ? " train" : " trains") +
-        " per day on this section</div>";
-    }
-    if (isFerry) {
-      const blueCol = P.current.dark ? "#38BDF8" : "#0284C7";
-      html +=
-        `<div class='t-sub' style='color:${blueCol};font-weight:600'>` +
-        "粤海铁路轮渡 (Guangdong–Hainan Train Ferry) &middot; Qiongzhou Strait crossing</div>";
-    }
-  } else if (hit.kind === "train") {
-    const tr = hit.train;
-    const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
-    const badgeColor = isHighSpeed ? "#F59E0B" : "#0284C7";
-    const fromDisplay =
-      tr.fromStationEn && tr.fromStationEn !== tr.fromStation
-        ? `${esc(tr.fromStation)} <span style='font-size:11px;font-weight:400;opacity:0.8;'>(${esc(tr.fromStationEn)})</span>`
-        : esc(tr.fromStation || "");
-    const toDisplay =
-      tr.toStationEn && tr.toStationEn !== tr.toStation
-        ? `${esc(tr.toStation)} <span style='font-size:11px;font-weight:400;opacity:0.8;'>(${esc(tr.toStationEn)})</span>`
-        : esc(tr.toStation || "");
-    const dwellName =
-      tr.dwellStationEn && tr.dwellStationEn !== tr.dwellStation
-        ? `${esc(tr.dwellStation || "")} (${esc(tr.dwellStationEn)})`
-        : esc(tr.dwellStation || "");
-
-    html =
-      "<div class='t-title' style='display:flex;align-items:center;gap:6px;margin-bottom:6px;'>" +
-      `<span style='background:${badgeColor};color:#fff;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;font-family:monospace;'>${esc(tr.code)}</span>` +
-      `<span style='font-size:13px;font-weight:600;'>${fromDisplay} &rarr; ${toDisplay}</span>` +
-      "</div>" +
-      (tr.isDwelling
-        ? (tr.dwellStatus === "origin"
-          ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName} &middot; ${esc(tr.dwellDetail || "")}</div>`
-          : tr.dwellStatus === "dest"
-            ? `<div style='font-size:12px;color:#10B981;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${dwellName} &middot; Final Stop</div>`
-            : `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
-        : "") +
-      (tr.onChord
-        ? "<div style='font-size:12px;color:#9CA3AF;margin-bottom:6px;'>No track geometry on this leg (straight-line stand-in)</div>"
-        : "") +
-      "<table style='width:100%;margin-bottom:4px;'>" +
-      `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +
-      `<tr><td>Arrival</td><td style='text-align:right'><b>${esc(tr.arrTime)}</b></td></tr>` +
-      `<tr><td>Duration</td><td style='text-align:right'>${Math.floor(tr.durMins / 60)}h ${tr.durMins % 60}m</td></tr>` +
-      `<tr><td>Journey Progress</td><td style='text-align:right'><b>${tr.progressPct}%</b></td></tr>` +
-      "</table>" +
-      `<div class='t-sub' style='margin-top:6px;color:${badgeColor};font-weight:600;'>Click train to inspect full station schedule</div>`;
-  }
+  const set = flowsSet();
+  const html = tooltipHtml(hit, {
+    data: atlas.data,
+    cur,
+    direction: P.current.direction,
+    distUnit: P.current.distUnit,
+    panelDest: P.current.panelDest,
+    dark: P.current.dark,
+    ferry: hit.kind === "seg" && !!set && isFerrySection(set.bb, hit.s),
+  });
   tooltip.innerHTML = html;
   tooltip.classList.add("show");
   const tw = tooltip.offsetWidth,
@@ -433,6 +260,7 @@ export function sameHit(a: Hit | null, b: Hit | null): boolean {
   if (a.kind === "seg" && b.kind === "seg") return a.s === b.s;
   if (a.kind === "chord" && b.kind === "chord") return a.chord === b.chord;
   if (a.kind === "train" && b.kind === "train") return a.train.code === b.train.code;
+  if (a.kind === "natCity" && b.kind === "natCity") return a.idx === b.idx;
   if (a.kind === "station" && b.kind === "station")
     return a.station === b.station;
   return true; // origin

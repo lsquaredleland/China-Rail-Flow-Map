@@ -3,8 +3,10 @@
 import type {
   ActiveTrainVM,
   AtlasVM,
+  ChordLeg,
   ChordSpan,
   DayTimelineVM,
+  DecodedAtlas,
   DecodedSet,
   OriginVM,
   PrepTrain,
@@ -21,7 +23,7 @@ interface SecGeometryCache {
 
 const secGeometryCache = new WeakMap<DecodedSet, SecGeometryCache>();
 
-function getSecGeometry(secSet: DecodedSet): SecGeometryCache {
+export function getSecGeometry(secSet: DecodedSet): SecGeometryCache {
   const cached = secGeometryCache.get(secSet);
   if (cached) return cached;
   const numSections = secSet.len.length;
@@ -53,38 +55,16 @@ function getSecGeometry(secSet: DecodedSet): SecGeometryCache {
   return result;
 }
 
-/** Realistic train velocity ramp profile between stops:
- *  Accelerates smoothly from station stop (sin^2 ramp), cruises at top leg speed,
- *  and decelerates smoothly into the next station platform. */
-export function trainEase(tau: number, durMins: number): number {
-  if (tau <= 0) return 0;
-  if (tau >= 1) return 1;
-  const accelMins = Math.min(3, durMins * 0.25);
-  const a = Math.max(0.01, Math.min(0.35, accelMins / durMins));
-  const denom = 1 - a;
-  if (tau <= a) {
-    return (0.5 * tau - (a / (2 * Math.PI)) * Math.sin((Math.PI * tau) / a)) / denom;
-  }
-  if (tau >= 1 - a) {
-    const tPrime = 1 - tau;
-    const rem = (0.5 * tPrime - (a / (2 * Math.PI)) * Math.sin((Math.PI * tPrime) / a)) / denom;
-    return 1 - rem;
-  }
-  return (0.5 * a + (tau - a)) / denom;
-}
-
-/** Normalized instantaneous speed fraction in [0, 1] (0 at station halt, 1 at full cruise). */
+/** Tail taper: the speed fraction in [0, 1] a train's tail length follows, 0 at a station halt
+ *  and 1 at cruise (sin^2 ramp over the first and last quarter of a leg, at most 3 min).
+ *  Presentation only: positions stay linear in time. */
 export function trainSpeedFrac(tau: number, durMins: number): number {
   if (tau <= 0 || tau >= 1) return 0;
   const accelMins = Math.min(3, durMins * 0.25);
   const a = Math.max(0.01, Math.min(0.35, accelMins / durMins));
-  if (tau <= a) {
-    return Math.sin((Math.PI * tau) / (2 * a)) ** 2;
-  }
-  if (tau >= 1 - a) {
-    return Math.sin((Math.PI * (1 - tau)) / (2 * a)) ** 2;
-  }
-  return 1.0;
+  if (tau <= a) return Math.sin((Math.PI * tau) / (2 * a)) ** 2;
+  if (tau >= 1 - a) return Math.sin((Math.PI * (1 - tau)) / (2 * a)) ** 2;
+  return 1;
 }
 
 // Scratch result of trainState (single-threaded; avoids per-call allocation).
@@ -142,7 +122,7 @@ function trainState(pt: PrepTrain, t: number) {
   const legDur = Math.max(1, legEndTime - legStartTime);
   const tau = Math.max(0, Math.min(1, (t - legStartTime) / legDur));
   r.speedFrac = trainSpeedFrac(tau, legDur);
-  r.dist = legStartDist + trainEase(tau, legDur) * (legEndDist - legStartDist);
+  r.dist = legStartDist + tau * (legEndDist - legStartDist);
 }
 
 /** Distance along the train's route at simulation minute `t`: the single
@@ -153,7 +133,7 @@ export function trainDistAt(pt: PrepTrain, t: number): number {
 }
 
 /** Inverse of trainDistAt: the first minute the train has reached `dist`,
-    found by bisecting the easing curve within the leg that contains it. */
+    found by inverting the linear leg that contains it. */
 function timeAtDist(pt: PrepTrain, dist: number): number {
   let legStartDist = 0;
   let legStartTime = pt.depMins;
@@ -176,14 +156,7 @@ function timeAtDist(pt: PrepTrain, dist: number): number {
   if (span <= 0) return legEndTime;
   const frac = Math.max(0, Math.min(1, (dist - legStartDist) / span));
   const legDur = Math.max(1, legEndTime - legStartTime);
-  let lo = 0;
-  let hi = 1;
-  for (let it = 0; it < 14; it++) {
-    const mid = (lo + hi) / 2;
-    if (trainEase(mid, legDur) < frac) lo = mid;
-    else hi = mid;
-  }
-  return legStartTime + hi * legDur;
+  return legStartTime + frac * legDur;
 }
 
 /** The throat span containing route distance `d` (spans are sorted and disjoint). */
@@ -200,6 +173,110 @@ function throatAt(spans: ThroatSpan[], d: number): ThroatSpan | undefined {
   }
   const c = best >= 0 ? spans[best] : undefined;
   return c && d <= c.d1 && c.d1 > c.d0 ? c : undefined;
+}
+
+/** Per-train distance space over the train's whole path (flow sections and
+    throats), so the dot moves through stations; chord legs and stops index
+    it. `firstStopJ` is the schedule row of the first stop after boarding
+    (-1: no stop distances). Shared by the origin and national timelines. */
+export function prepTrainPath(
+  path: number[],
+  stopPos: number[],
+  chordLegs: ChordLeg[],
+  atlas: Pick<DecodedAtlas, "sec" | "thr">,
+  firstStopJ: number,
+) {
+  const secSet = atlas.sec;
+  const thrSet = atlas.thr;
+  const { secLengths } = getSecGeometry(secSet);
+  const thrGeo = getSecGeometry(thrSet);
+  const nSecAll = secSet.len.length;
+  const nPath = path.length;
+  const endPt = (i: number, atEnd: boolean): [number, number] => {
+    const v = path[i];
+    const id = v < 0 ? ~v : v;
+    const set = id < nSecAll ? secSet : thrSet;
+    const g = id < nSecAll ? id : id - nSecAll;
+    const k = atEnd !== v < 0 ? set.len[g] - 1 : 0;
+    return [set.pts[set.off[g] + k * 2], set.pts[set.off[g] + k * 2 + 1]];
+  };
+
+  // Legs without track geometry get a virtual length in distance space: at
+  // the widest join inside the leg's [s0, s1] window (one per join), as long
+  // as the crow-flies gap there. The dot crosses it on a straight line.
+  const virt = new Float64Array(nPath + 1);
+  const virtStop = new Int32Array(nPath + 1).fill(-1); // stop the gap departs from
+  for (const leg of chordLegs) {
+    let bestJ = -1;
+    let bestGap = 0;
+    for (let j = Math.max(1, leg[1]); j <= Math.min(nPath - 1, leg[2]); j++) {
+      const gap = haversineKm(endPt(j - 1, true), endPt(j, false));
+      if (gap > bestGap) {
+        bestGap = gap;
+        bestJ = j;
+      }
+    }
+    if (bestJ > 0) {
+      virt[bestJ] = bestGap;
+      virtStop[bestJ] = leg[0];
+    }
+  }
+
+  let nSecs = 0;
+  for (let i = 0; i < nPath; i++) if ((path[i] < 0 ? ~path[i] : path[i]) < nSecAll) nSecs++;
+  let totalDist = 0;
+  const pathStarts = new Float64Array(nPath); // where each path entry's own track starts
+  const secStarts = new Float64Array(nSecs); // the same, for the flow sections only
+  const chordSpans: ChordSpan[] = [];
+  const throatSpans: ThroatSpan[] = [];
+  let fi = 0;
+  for (let i = 0; i < nPath; i++) {
+    if (virt[i] > 0) {
+      const p0 = endPt(i - 1, true);
+      const p1 = endPt(i, false);
+      chordSpans.push({
+        d0: totalDist,
+        d1: totalDist + virt[i],
+        lon0: p0[0],
+        lat0: p0[1],
+        lon1: p1[0],
+        lat1: p1[1],
+      });
+      totalDist += virt[i];
+    }
+    pathStarts[i] = totalDist;
+    const v = path[i];
+    const id = v < 0 ? ~v : v;
+    if (id < nSecAll) {
+      secStarts[fi++] = totalDist;
+      totalDist += secLengths[id] || 0;
+    } else {
+      const len = thrGeo.secLengths[id - nSecAll] || 0;
+      throatSpans.push({ d0: totalDist, d1: totalDist + len, thr: id - nSecAll, rev: v < 0 });
+      totalDist += len;
+    }
+  }
+
+  // Route distance of each stop. A stop that departs across a chord gap at
+  // its own join sits on the near side of it; the terminus is the path end.
+  const nStops = stopPos.length;
+  const stopDist = new Float64Array(firstStopJ >= 0 ? nStops : 0);
+  if (firstStopJ >= 0) {
+    let prevDist = 0;
+    for (let i = 0; i < nStops; i++) {
+      const k = stopPos[i];
+      const dist =
+        i === nStops - 1
+          ? totalDist
+          : Math.max(
+              prevDist,
+              k >= nPath ? totalDist : virt[k] > 0 && virtStop[k] === firstStopJ + i ? pathStarts[k] - virt[k] : pathStarts[k],
+            );
+      prevDist = dist;
+      stopDist[i] = dist;
+    }
+  }
+  return { totalDist, pathStarts, secStarts, chordSpans, throatSpans, stopDist };
 }
 
 interface TrainEntries {
@@ -222,6 +299,7 @@ export function buildDayTimeline(
       numSteps: 12,
       totalMins: 60,
       totalDays: 1,
+      firstDepMins: 0,
       secFlowSteps: new Map(),
       maxFlowSteps: new Uint16Array(12),
       getActiveTrains: () => [],
@@ -254,73 +332,16 @@ export function buildDayTimeline(
     const routeSecs = train.secs || [];
 
     const secRevs = train.secRevs;
-    const nSecs = routeSecs.length;
-    // Distance space runs over the whole path (flow sections and throats),
-    // so the dot moves through stations; chord legs and stops index it.
-    const path = train.path || [];
-    const nPath = path.length;
-    const endPt = (i: number, atEnd: boolean): [number, number] => {
-      const v = path[i];
-      const id = v < 0 ? ~v : v;
-      const set = id < nSecAll ? secSet : thrSet;
-      const g = id < nSecAll ? id : id - nSecAll;
-      const k = atEnd !== v < 0 ? set.len[g] - 1 : 0;
-      return [set.pts[set.off[g] + k * 2], set.pts[set.off[g] + k * 2 + 1]];
-    };
-
-    // Legs without track geometry get a virtual length in distance space: at
-    // the widest join inside the leg's [s0, s1] window (one per join), as long
-    // as the crow-flies gap there. The dot crosses it on a straight line.
-    const virt = new Float64Array(nPath + 1);
-    const virtStop = new Int32Array(nPath + 1).fill(-1); // stop the gap departs from
-    for (const leg of train.chordLegs || []) {
-      let bestJ = -1;
-      let bestGap = 0;
-      for (let j = Math.max(1, leg[1]); j <= Math.min(nPath - 1, leg[2]); j++) {
-        const gap = haversineKm(endPt(j - 1, true), endPt(j, false));
-        if (gap > bestGap) {
-          bestGap = gap;
-          bestJ = j;
-        }
-      }
-      if (bestJ > 0) {
-        virt[bestJ] = bestGap;
-        virtStop[bestJ] = leg[0];
-      }
-    }
-
-    let totalDist = 0;
-    const pathStarts = new Float64Array(nPath); // where each path entry's own track starts
-    const secStarts = new Float64Array(nSecs); // the same, for the flow sections only
-    const chordSpans: ChordSpan[] = [];
-    const throatSpans: ThroatSpan[] = [];
-    let fi = 0;
-    for (let i = 0; i < nPath; i++) {
-      if (virt[i] > 0) {
-        const p0 = endPt(i - 1, true);
-        const p1 = endPt(i, false);
-        chordSpans.push({
-          d0: totalDist,
-          d1: totalDist + virt[i],
-          lon0: p0[0],
-          lat0: p0[1],
-          lon1: p1[0],
-          lat1: p1[1],
-        });
-        totalDist += virt[i];
-      }
-      pathStarts[i] = totalDist;
-      const v = path[i];
-      const id = v < 0 ? ~v : v;
-      if (id < nSecAll) {
-        secStarts[fi++] = totalDist;
-        totalDist += secLengths[id] || 0;
-      } else {
-        const len = thrGeo.secLengths[id - nSecAll] || 0;
-        throatSpans.push({ d0: totalDist, d1: totalDist + len, thr: id - nSecAll, rev: v < 0 });
-        totalDist += len;
-      }
-    }
+    const nStops = train.stopPos.length;
+    const sched = atlas.schedules ? atlas.schedules[train.t] : undefined;
+    const schedOk = !!sched && nStops > 0 && nStops === train.stops && sched.length > nStops;
+    const { totalDist, secStarts, chordSpans, throatSpans, stopDist } = prepTrainPath(
+      train.path || [],
+      train.stopPos,
+      train.chordLegs || [],
+      atlas,
+      schedOk ? sched!.length - nStops : -1,
+    );
 
     const dur = train.dur > 0 ? train.dur : 1;
     const depMins =
@@ -340,9 +361,7 @@ export function buildDayTimeline(
     // path position (dep_stop_pos), with the schedule's times. The terminus
     // is the final stop, at the path end.
     const stops: PrepTrainStop[] = [];
-    const sched = atlas.schedules ? atlas.schedules[train.t] : undefined;
-    const nStops = train.stopPos.length;
-    if (sched && nStops > 0 && nStops === train.stops && sched.length > nStops) {
+    if (schedOk) {
       const b = sched.length - 1 - nStops;
       const rb = sched[b];
       // schedule minutes run from the train's first day; shift them into the
@@ -350,22 +369,12 @@ export function buildDayTimeline(
       const depB = rb[3] * 1440 + rb[2] + (rb[1] >= 0 && rb[2] < rb[1] ? 1440 : 0);
       const rel = (day: number, m: number) => day * 1440 + m - depB + depMins;
       const stTable = atlas.data.station_table;
-      let prevDist = 0;
       for (let i = 0; i < nStops; i++) {
         const j = b + 1 + i;
         const r = sched[j];
         const st = stTable[r[0]];
         const isTerm = i === nStops - 1;
-        const k = train.stopPos[i];
-        // A stop that departs across a chord gap at its own join sits on the
-        // near side of it.
-        const dist = isTerm
-          ? totalDist
-          : Math.max(
-              prevDist,
-              k >= nPath ? totalDist : virt[k] > 0 && virtStop[k] === j ? pathStarts[k] - virt[k] : pathStarts[k],
-            );
-        prevDist = dist;
+        const dist = stopDist[i];
         stops.push({
           cityZh: st ? st.zh : "",
           cityEn: st ? st.en : "",
@@ -428,9 +437,12 @@ export function buildDayTimeline(
   ): DayTimelineVM {
     // Track max arrival time across all services (ending time of the bar varies depending on the last train)
     let maxArrMins = 0;
+    let firstDepMins = Infinity;
     for (let ti = 0; ti < trains.length; ti++) {
       if (trains[ti].arrMins > maxArrMins) maxArrMins = trains[ti].arrMins;
+      if (trains[ti].depMins < firstDepMins) firstDepMins = trains[ti].depMins;
     }
+    if (!isFinite(firstDepMins)) firstDepMins = 0;
     const totalMins = spanMins ?? Math.max(60, Math.ceil(maxArrMins / 5) * 5);
     const totalDays = Math.max(1, Math.ceil(totalMins / 1440));
     const numSteps = Math.ceil(totalMins / stepMins);
@@ -691,6 +703,7 @@ export function buildDayTimeline(
       numSteps,
       totalMins,
       totalDays,
+      firstDepMins,
       secFlowSteps,
       maxFlowSteps,
       getActiveTrains,

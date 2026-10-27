@@ -5,12 +5,12 @@
 
 /** One shared track section: encoded geometry plus optional HSR flag
     (v2 dropped the endpoint station indices). */
-export interface RawSection {
+interface RawSection {
   g: string; // Google-polyline-encoded track geometry, precision 1e4
   h?: number; // 1 for high-speed rail (HSR), omitted/0 for conventional rail
 }
 
-export interface RawCity {
+interface RawCity {
   zh: string;
   en: string;
   pt: [number, number]; // [lon, lat] of the city's principal station point
@@ -24,10 +24,14 @@ export interface RawStation {
 export interface RawTrain {
   code: string;
   class: string; // "G" | "D" | "C" | "S" | "K" | ... | "plain"
+  /** Train-export packs: one "0"/"1" per `calendar` date (runs that day). */
+  days?: string;
+  /** Train-export packs: "daily" | "weekday-set" | "date-specific" | "irregular" | "alternate-day". */
+  pattern?: string;
 }
 
 /** A leg with no track routing, drawn straight. a/b are station-table indices. */
-export interface RawChord {
+interface RawChord {
   a: number;
   b: number;
   n: number; // trains/day
@@ -43,22 +47,22 @@ export type RawFlow = number[];
      1 if the train terminates in this city else 0,
      optional sec_cnt (number of section indices from origin to this stop)].
     Clock times are integer minutes since midnight. */
-export type RawCall = [number, number, number, number, number, number?];
+type RawCall = [number, number, number, number, number, number?];
 
 /** [city index, trains, fast, terminating, fastest min, median min, crow km, rail km]
     rail km is -1 when unknown (e.g. Hong Kong's unrouted tunnel leg). */
-export type RawDest = [number, number, number, number, number, number, number, number];
+type RawDest = [number, number, number, number, number, number, number, number];
 
 /** Parallel in shape to RawDest, for a city sending trains INTO the origin:
     [city index, trains, fast, originating, fastest min, median min, crow km, rail km]. */
-export type RawSrc = RawDest;
+type RawSrc = RawDest;
 
 /** One train arriving in the origin city, as seen from a source city:
     [index into the origin's arrs, boarding minutes at the source city,
      arrival minutes in the origin city, arrival day offset from boarding day,
      1 if the train originates in the source city else 0, boarding-station index,
      optional sec_cnt (number of section indices from boarding stop to origin)]. */
-export type RawInCall = [number, number, number, number, number, number, number?];
+type RawInCall = [number, number, number, number, number, number, number?];
 
 /** One train arriving in the origin city, positional:
     [train-table index, origin-station index (where the train truly starts),
@@ -66,7 +70,7 @@ export type RawInCall = [number, number, number, number, number, number, number?
      arrival-station index in this city, arrival minutes in this city,
      duration minutes origin to this city, stops before this city,
      rail journey km from the origin; -1 when unknown]. */
-export type RawArr = [
+type RawArr = [
   number, number, number, number, number, number, number, number, number,
 ];
 
@@ -75,7 +79,7 @@ export type RawArr = [
      to-station index, to-city index, arrival minutes,
      duration minutes, stops,
      exact journey distance by rail to the final stop; -1 when any leg is unrouted]. */
-export type RawDep = [
+type RawDep = [
   number, number, number, number, number, number, number, number, number,
 ];
 
@@ -120,6 +124,11 @@ export interface SharedData {
   /** fmt 6 (O1): station-throat pieces, geometry only. Path entry `n + j`
       (n = that direction's section count) is throat j; never a flow. */
   throats: string[];
+  /** Train-export packs only: the schedule window's dates (ISO, in order). */
+  calendar?: string[];
+  /** Train-export packs: the timetable source sentence and the schedule
+      window (`from`/`to`, ISO), written by the pipeline. Optional. */
+  about?: { source: string; from: string; to: string };
 }
 
 /** atlas-v2-out-map.json: every origin's identity + outbound map
@@ -135,7 +144,7 @@ export type ChordLeg = [number, number, number];
 /** One origin's entry in atlas-v2-out-tables.json (fmt 6): the per-row
     paths are not stored; `dep_off` locates each dep row's slice of its
     train's full path. */
-export interface OutTablesPackOrigin {
+interface OutTablesPackOrigin {
   deps: RawDep[];
   calls: RawCall[][];
   dep_off: number[];
@@ -152,8 +161,32 @@ export interface OutTablesPack {
   origins: OutTablesPackOrigin[];
 }
 
+/** atlas-v2-national-trains.json (P2.2 data source), as shipped: every
+    national train's whole run, in the out-tables per-train shape.
+    `paths[t]` / `stop_pos[t]` are indexed by train_table t (`[]` = not a
+    national train); signed ids >= n_sec + n_thr are `extra` geometry pieces
+    (polylines like the throats). `stop_pos[t]` has one entry per schedule
+    stop after the first. `on_sec` ([piece, section]) is for counting only. */
+export interface NationalTrainsPack {
+  fmt: number;
+  n_sec: number;
+  n_thr: number;
+  paths: number[][];
+  stop_pos: number[][];
+  chords: [number, ChordLeg[]][];
+  extra: string[];
+  on_sec: [number, number][];
+}
+
+/** What national mode loads: the trains file, checked against the shared
+    pack, and the schedules that time it (`schedules[t]`, same t). */
+export interface NationalTrainsData {
+  trains: NationalTrainsPack;
+  schedules: SchedulesData["schedules"];
+}
+
 /** One origin's out tables, expanded to per-row paths. */
-export interface OutTablesOrigin {
+interface OutTablesOrigin {
   deps: RawDep[];
   calls: RawCall[][];
   dep_secs: number[][];
@@ -168,7 +201,7 @@ export interface OutTablesData {
 }
 
 /** One origin's entry in atlas-v2-in-map.json: inbound map fields. */
-export interface InMapOrigin {
+interface InMapOrigin {
   srcs: RawSrc[];
   in_flows: RawFlow[];
 }
@@ -181,7 +214,7 @@ export interface InMapData {
 
 /** One origin's entry in atlas-v2-in-tables.json (fmt 6): `arr_len` is
     the length of each arr row's prefix of its train's full path. */
-export interface InTablesPackOrigin {
+interface InTablesPackOrigin {
   arrs: RawArr[];
   in_calls: RawInCall[][];
   arr_len: number[];
@@ -196,7 +229,7 @@ export interface InTablesPack {
 }
 
 /** One origin's in tables, expanded to per-row paths. */
-export interface InTablesOrigin {
+interface InTablesOrigin {
   arrs: RawArr[];
   in_calls: RawInCall[][];
   arr_secs: number[][];
@@ -208,7 +241,7 @@ export interface InTablesData {
   origins: InTablesOrigin[];
 }
 
-export interface AtlasData extends SharedData {
+export interface AtlasData extends Omit<SharedData, "about"> {
   about: string;
   origins: RawOrigin[];
 }
@@ -482,6 +515,7 @@ export interface DayTimelineVM {
   numSteps: number; // total steps across all days
   totalMins: number; // total duration until all trains arrive (e.g. 1440, 2880, 4320)
   totalDays: number; // number of 24h cycles needed for all trains to complete
+  firstDepMins: number; // the earliest departure (where the animation starts), 0 with no trains
   secFlowSteps: Map<number, Uint16Array>; // sectionId -> Uint16Array(numSteps) of cumulative train count
   maxFlowSteps: Uint16Array; // length numSteps: max flow count across all sections at each step
   getActiveTrains: (tMins: number) => ActiveTrainVM[];
@@ -536,6 +570,13 @@ export interface OriginVM {
 
 export type DistUnit = "km" | "mi";
 export type Direction = "out" | "in";
+/** Which national layers are drawn: the day's flows and city circles (B), the
+    trains (A), both (A+B) or neither. The Flows and Animation toggles set it; the
+    `?natLayer=none` URL param only restores the Flows toggle (`useUrlState.ts`). */
+export interface NatLayers {
+  flows: boolean;
+  trains: boolean;
+}
 
 /** What the pointer is over on the map. */
 export type Hit =
@@ -543,7 +584,8 @@ export type Hit =
   | { kind: "station"; station: CityPointVM }
   | { kind: "seg"; s: number; n: number; subN?: number }
   | { kind: "chord"; chord: ChordVM }
-  | { kind: "train"; train: ActiveTrainVM };
+  | { kind: "train"; train: ActiveTrainVM }
+  | { kind: "natCity"; idx: number; dep: number; arr: number };
 
 export type RampStop = [number, [number, number, number]];
 
@@ -573,4 +615,95 @@ export interface Palette {
   outline: string;
   dashLine: string;
   landFill: string;
+}
+
+/** Every train's full run as references into the shared section geometry
+    (no per-train vertices). Train q's path entries are
+    [pOff[q], pOff[q+1]): signed ids as in the path tables (< 0 = reversed;
+    ids >= the section count are station throats) and the route distance at
+    which each entry's own track starts. Minutes are on the boarding day's
+    frame, so `end` may pass 1440. */
+export interface NationalTimeline {
+  n: number;
+  tIdx: Int32Array; // train_table index
+  cls: Uint8Array; // 0 high-speed (G/D/C), 1 conventional (Z/T/K/S), 2 other
+  start: Float32Array; // minute of boarding
+  end: Float32Array; // minute of arrival
+  total: Float64Array; // route length (km)
+  pOff: Int32Array; // n + 1
+  pId: Int32Array; // signed path entry ids
+  pStart: Float64Array; // route distance where each entry's track starts
+  sOff: Int32Array; // n + 1
+  sDist: Float64Array;
+  sArr: Float32Array;
+  sDep: Float32Array; // -1 = no dwell (terminus)
+  thr: DecodedSet; // the shared throats, then the file's extra pieces (ids n_sec + n_thr + j)
+  skipped: { emptyPath: number; noStops: number; schedMismatch: number; badTime: number };
+}
+
+/** atlas-v2-national.json (P3.1), as shipped: national per-section flow
+    counts, every train counted once. Section-parallel in the shared file's
+    `sections` order (so it carries the shared file's `fmt`): `total[s]` is
+    the distinct trains/day on section `s`; `by_class[c][s]` splits it into
+    the 8 flow-row class buckets (FLOW_CLASSES order) and sums to `total`. */
+export interface NationalFlowsPack {
+  fmt: number;
+  /** Distinct trains on at least one section. */
+  trains: number;
+  total: number[];
+  by_class: number[][];
+  /** Trains starting / ending at each city (optional: older packs lack it). */
+  cities?: NationalCities;
+}
+
+/** Per-city departures and arrivals of the national flows file: `idx[i]` is a
+    `city_table` index; `dep[i]` / `arr[i]` the day's totals and
+    `dep_by_class[c][i]` / `arr_by_class[c][i]` their split over the 8 class
+    buckets (FLOW_CLASSES order, as `by_class`). */
+interface NationalCities {
+  idx: number[];
+  dep: number[];
+  arr: number[];
+  dep_by_class: number[][];
+  arr_by_class: number[][];
+}
+
+/** atlas-v2-national-index.json (optional): per-train facts the national
+    view filters and sums over, every array one row per `shared.train_table`
+    train. `hour` (0-23), `dist_km` / `dist_mi` / `dur` are the origin
+    filters' bin indices over the train's whole run (-1 = unknown). `secs`,
+    `dep`, `arr` = the train's distinct section ids / departure city ids /
+    arrival city ids, each ascending and delta-coded (first id, then gaps).
+    Summing the selected trains' rows gives flows and city counts; all trains
+    selected = `total` / `cities.dep` / `cities.arr`. */
+export interface NationalIndexPack {
+  fmt: number;
+  n_sec: number;
+  n_train: number;
+  hour: number[];
+  dist_km: number[];
+  dist_mi: number[];
+  dur: number[];
+  secs: number[][];
+  dep: number[][];
+  arr: number[][];
+  /** Optional (newer packs): per train, aligned with `dep` / `arr` (so not
+      delta-coded), the minute of day 0..1439 of its departure from / arrival
+      at that city. */
+  dep_min?: number[][];
+  arr_min?: number[][];
+}
+
+/** atlas-v2-national-entries.json (P3.3), as shipped: when each national
+    train's dot first reaches each section it counts on (the set
+    atlas-v2-national counts). `by_class[c][s]` is the sorted list of entry
+    ticks (1 / ticks_per_min min of the day, rounded up, in [0, 1440 x
+    ticks_per_min)) of class bucket c (FLOW_CLASSES order) on section s, so
+    the trains entered by a minute are an upper bound per class, summed. */
+export interface NationalEntriesPack {
+  fmt: number;
+  n_sec: number;
+  trains: number;
+  ticks_per_min: number;
+  by_class: number[][][];
 }

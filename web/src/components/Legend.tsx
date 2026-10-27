@@ -1,11 +1,12 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from "react";
 import type { Palette } from "../types";
-import { WIDTH_K, flowColor, rampColor, stationR, stationZoomK } from "../lib";
+import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, flowUnits, rampColor, natCityR, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
     the stepped width bar's heights depend on the live zoom ratio. The
@@ -42,6 +43,10 @@ interface LegendProps {
   // "Fastest time to <City>" inbound. The scales themselves are driven
   // through the imperative handle.
   title: string;
+  // National mode: no travel-time bands (there is no origin), widths on the
+  // national factor in steps of 10 / 100 / 300 / 500 trains/day, and circles
+  // sized by a city's departures + arrivals.
+  national?: boolean;
 }
 
 const W = 196; // card content width in CSS px (matches the old canvas)
@@ -60,6 +65,8 @@ const BAND_LABELS: { label: string; mid: number; ink: string }[] = [
 const BAR_H = 15;
 const TIMESEC_H = 8 + BAR_H + 6; // vertical room the band section takes
 const SAMPLES = [10, 50, 200];
+const NAT_STEPS = [10, 100, 300, 500];
+const NAT_SAMPLES = [10, 100, 1000];
 const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif';
 
 const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
@@ -80,12 +87,31 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const infraHsrLineRef = useRef<SVGLineElement | null>(null);
   const infraConvLineRef = useRef<SVGLineElement | null>(null);
   const animGroupRef = useRef<SVGGElement | null>(null);
+  // What the draw handle lays out: the origin legend's scales or the national ones.
+  const national = !!props.national;
+  const STEPS_NOW = national ? NAT_STEPS : STEPS;
+  const SAMPLES_NOW = national ? NAT_SAMPLES : SAMPLES;
+  const scaleRef = useRef({ steps: STEPS_NOW, samples: SAMPLES_NOW, k: WIDTH_K, nat: national });
+  scaleRef.current = { steps: STEPS_NOW, samples: SAMPLES_NOW, k: national ? WIDTH_K * NAT_WIDTH_FACTOR : WIDTH_K, nat: national };
+  const rOf = (n: number) => (scaleRef.current.nat ? natCityR(n) : stationR(n));
   const [collapsed, setCollapsed] = useState<boolean>(
     () =>
       typeof window !== "undefined" &&
       !!window.matchMedia &&
       window.matchMedia("(max-width: 640px)").matches,
   );
+
+  // Phones start with the legend hidden; also when the window narrows to phone
+  // width after load (e.g. a desktop browser switched to a mobile viewport).
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setCollapsed(true);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useImperativeHandle(
     ref,
@@ -112,10 +138,12 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         // Same width mapping as the map; the zoom factor is capped for
         // the legend alone so a deep zoom cannot grow the panel without
         // bound. Step i spans [4 + i*stepW, ...] on a shared baseline.
-        const ratio = Math.min(zoomRatio, 8);
+        const capped = Math.min(zoomRatio, 8);
+        const ratio = capped;
+        const { steps, samples, k } = scaleRef.current;
         let maxH = 0.5;
-        for (let i = 0; i < STEPS.length; i++) {
-          const h = Math.max(0.5, STEPS[i] * WIDTH_K * ratio);
+        for (let i = 0; i < steps.length; i++) {
+          const h = Math.max(0.5, flowUnits(steps[i]) * k * ratio);
           if (h > maxH) maxH = h;
           const rect = stepRefs.current[i];
           if (rect) {
@@ -125,7 +153,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
             // legend's own widest step — salmon for the thinnest,
             // deep crimson for the widest. In the dark scheme
             // flowColor is the flat flow colour, as before.
-            rect.style.fill = flowColor(STEPS[i], STEPS[STEPS.length - 1], pal);
+            rect.style.fill = flowColor(steps[i], steps[steps.length - 1], pal);
           }
         }
         const barH = maxH;
@@ -143,8 +171,8 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         // Sample dots wear the map's zoom factor, laid out left to right
         // with the same spacing; the largest sets the row height.
         let cxp = 6;
-        for (let i = 0; i < SAMPLES.length; i++) {
-          const r0 = stationR(SAMPLES[i]);
+        for (let i = 0; i < samples.length; i++) {
+          const r0 = rOf(samples[i]);
           const rr = r0 * stationZoomK(r0, stationT);
           const ccx = cxp + rr;
           circleRefs.current[i]?.setAttribute("cx", String(ccx));
@@ -153,7 +181,8 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           circleLabelRefs.current[i]?.setAttribute("x", String(ccx));
           cxp = ccx + rr + 18;
         }
-        const circD = stationR(200) * stationZoomK(stationR(200), stationT) * 2;
+        const big = samples[samples.length - 1];
+        const circD = rOf(big) * stationZoomK(rOf(big), stationT) * 2;
         const cbase = base + 24 + 8 + circD;
         circleHeadRef.current?.setAttribute("y", String(-(8 + circD)));
         if (circleGroupRef.current)
@@ -197,24 +226,35 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const circles: { cx: number; r: number; label: string }[] = [];
   {
     let cxp = 4 + 2;
-    for (let i = 0; i < SAMPLES.length; i++) {
-      const rr = stationR(SAMPLES[i]);
+    for (let i = 0; i < SAMPLES_NOW.length; i++) {
+      const rr = rOf(SAMPLES_NOW[i]);
       const ccx = cxp + rr;
-      circles.push({ cx: ccx, r: rr, label: String(SAMPLES[i]) });
+      circles.push({ cx: ccx, r: rr, label: String(SAMPLES_NOW[i]) });
       cxp = ccx + rr + 18;
     }
   }
-  const circD = stationR(200) * 2;
+  const circD = rOf(SAMPLES_NOW[SAMPLES_NOW.length - 1]) * 2;
   // Initial geometry at zoom ratio 1 with the band bar shown; the first
   // map draw corrects it (palette + live zoom) before anything is read.
-  const initMaxH = Math.max(0.5, 100 * WIDTH_K * 1);
+  const initMaxH = Math.max(0.5, flowUnits(STEPS_NOW[STEPS_NOW.length - 1]) * scaleRef.current.k * 1);
   const initBase = TIMESEC_H + 15 + initMaxH;
   const initCbase = initBase + 24 + 8 + circD;
   const initH = Math.round(TIMESEC_H + 15 + initMaxH + 14 + 24 + 8 + circD + 14);
 
   return (
     <div id="legend">
-      <h2 id="legendTitle">{props.title}</h2>
+      <div className="lg-head">
+        <h2 id="legendTitle">{props.title}</h2>
+        <button
+          id="legendToggle"
+          type="button"
+          aria-expanded={collapsed ? "false" : "true"}
+          aria-label={collapsed ? "Show legend" : "Hide legend"}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          {collapsed ? "Key" : "Hide"}
+        </button>
+      </div>
       <div id="legendBody" className={collapsed ? "collapsed" : undefined}>
         <svg
           id="legendSvg"
@@ -223,7 +263,11 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           height={initH}
           viewBox={"0 0 " + W + " " + initH}
           role="img"
-          aria-label="Legend: fastest-time bands 0 to 4 hours, 4 to 12 hours and 12 to 24 hours, line width in trains per day, circle size in direct trains per day"
+          aria-label={
+            national
+              ? "Legend: line width in trains per day, circle size in a city's departures plus arrivals per day"
+              : "Legend: fastest-time bands 0 to 4 hours, 4 to 12 hours and 12 to 24 hours, line width in trains per day, circle size in direct trains per day"
+          }
         >
           <defs>
             <linearGradient id="legendRamp" x1="0" y1="0" x2="1" y2="0">
@@ -285,13 +329,13 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           <g ref={widthGroupRef} transform={"translate(0 " + initBase + ")"}>
             {/* The samples, baseline and value labels, as one group. */}
             <g>
-              {STEPS.map((s, i) => (
+              {STEPS_NOW.map((s, i) => (
                 <rect
                   key={s}
-                  x={4 + i * ((W - 8) / STEPS.length)}
-                  y={-Math.max(0.5, s * WIDTH_K * 1)}
-                  width={(W - 8) / STEPS.length}
-                  height={Math.max(0.5, s * WIDTH_K * 1)}
+                  x={4 + i * ((W - 8) / STEPS_NOW.length)}
+                  y={-Math.max(0.5, flowUnits(s) * scaleRef.current.k * 1)}
+                  width={(W - 8) / STEPS_NOW.length}
+                  height={Math.max(0.5, flowUnits(s) * scaleRef.current.k * 1)}
                   className="lg-steps"
                   ref={(el) => {
                     stepRefs.current[i] = el;
@@ -299,10 +343,10 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
                 />
               ))}
               <rect x={4} y={0} width={W - 8} height={1} fill="currentColor" />
-              {STEPS.map((s, i) => (
+              {STEPS_NOW.map((s, i) => (
                 <text
                   key={s}
-                  x={4 + (i + 0.5) * ((W - 8) / STEPS.length)}
+                  x={4 + (i + 0.5) * ((W - 8) / STEPS_NOW.length)}
                   y={8}
                   fontSize={10.5}
                   fontFamily={FONT}
@@ -328,7 +372,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               fill="currentColor"
               dominantBaseline="middle"
             >
-              Circle size = direct trains/day
+              {national ? "Circle size = departures + arrivals/day" : "Circle size = direct trains/day"}
             </text>
             <rect x={4} y={0} width={W - 8} height={1} fill="currentColor" />
             {circles.map((c, i) => (
@@ -454,14 +498,6 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           </g>
         </svg>
       </div>
-      <button
-        id="legendToggle"
-        type="button"
-        aria-expanded={collapsed ? "false" : "true"}
-        onClick={() => setCollapsed((c) => !c)}
-      >
-        {collapsed ? "Show legend" : "Hide legend"}
-      </button>
     </div>
   );
 });

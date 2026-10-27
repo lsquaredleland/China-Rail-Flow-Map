@@ -44,6 +44,11 @@ impl Stations {
         self.points.is_empty()
     }
 
+    /// Every candidate point of every station (any order).
+    pub fn all_points(&self) -> impl Iterator<Item = &[f64; 2]> {
+        self.points.values().flatten()
+    }
+
     /// The point of `name` best placed between `pa` and `pb`.
     pub fn stop_point(&self, name: &str, pa: [f64; 2], pb: [f64; 2]) -> Option<[f64; 2]> {
         self.points.get(name).and_then(|v| {

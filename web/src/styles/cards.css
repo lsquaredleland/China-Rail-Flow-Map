@@ -1,0 +1,186 @@
+/* ---------- collapsed map cards: city card and train card ----------
+   Black rule on top, 2px frame, no radius. One solid action (the focus
+   button), one outlined square close. Frame/focus come from --ink and
+   --btn-on, so night is the same structure on #1A1B1E with a paper-white
+   button. Compact: about 44px tall. */
+.map-card {
+  --mc-h: 44px;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  min-height: var(--mc-h);
+  background: var(--card-frame);
+  border: 2px solid var(--card-frame);
+  border-top-width: 4px;
+  color: var(--ink);
+  box-shadow: var(--shadow-panel);
+  font-family: inherit;
+}
+.map-card > * { min-width: 0; }
+.mc-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 3px 10px;
+  background: var(--panel);
+}
+.mc-click { cursor: pointer; }
+.mc-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.train-card .mc-title { display: block; font-size: 13px; letter-spacing: 0; }
+.mc-pin { flex: none; width: 14px; height: 14px; }
+.mc-sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.2;
+}
+.mc-sub b { color: var(--ink); font-weight: 800; }
+.mc-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-title > .mc-ell { min-width: 0; }
+.mc-btn,
+.mc-close {
+  flex: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.mc-btn {
+  padding: 0 12px;
+  background: var(--btn-on);
+  color: var(--btn-on-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mc-btn:hover { filter: brightness(1.15); }
+.mc-close {
+  width: 38px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+.mc-close:hover { background: var(--paper-deep); }
+.mc-btn:focus-visible { outline: 2px solid var(--btn-on-ink); outline-offset: -4px; }
+.mc-close:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
+
+/* train card: band + class box + number */
+.mc-id {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 0 9px;
+  background: var(--panel);
+  border-right: 2px solid var(--card-frame);
+}
+.mc-band { width: 5px; height: 20px; background: var(--card-time); }
+.mc-class {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  padding: 0 2px;
+  border: 1.5px solid var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+.mc-num { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.mc-state {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.mc-state.is-en-route { color: var(--card-live); }
+.mc-leg { margin-left: 4px; }
+.train-card.is-isolated { border-color: var(--card-time); background: var(--card-time); }
+.train-card.is-isolated .mc-id { border-right-color: var(--card-time); }
+
+/* placement: one reserved column in the map's top-right corner (#mapCards).
+   Collapsed cards come first, then the filter bar, and the expanded city
+   panel flows below them, so nothing covers anything. The legend, scale bar,
+   expand button and timeline sit elsewhere. */
+.map-cards {
+  position: absolute;
+  top: 14px; right: 14px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(360px, calc(100% - 28px));
+  max-height: calc(100% - 28px);
+  pointer-events: none;
+}
+.map-cards > * { pointer-events: auto; }
+.map-cards .map-card { position: static; width: auto; order: 0; flex: none; }
+.map-cards .active-filter-bar { position: static; max-width: none; align-self: flex-end; order: 1; flex: none; }
+.map-cards #destPanel {
+  position: relative;
+  top: auto; right: auto; left: auto; bottom: auto;
+  width: auto;
+  order: 2;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .map-cards { top: 10px; right: 10px; width: calc(100% - 20px); max-height: calc(100% - 20px); }
+  .mc-btn-t { display: none; }
+  .mc-btn { padding: 0 14px; font-size: 16px; }
+  .mc-close { width: 44px; }
+  .map-cards #destPanel { box-shadow: var(--shadow-pop); }
+}
+@media (pointer: coarse) {
+  .map-card { --mc-h: 44px; }
+  .mc-btn, .mc-close { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-card,
+  .map-cards,
+  #destPanel {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---------- the filter card ----------
+   Same frame as the city and train cards: "FILTERED", each active filter
+   as an outlined chip you tap to remove (the class boxed as on the train
+   card), and the solid Reset as the card's one action. */
+.filter-main { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 5px 10px; }
+.filter-pill-label {
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--ink-soft); user-select: none;
+}
+.filter-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 2px solid var(--ink); border-radius: 0;
+  padding: 2px 4px 2px 6px;
+  font-size: 12.5px; font-weight: 700; line-height: 1.2; color: var(--ink);
+}
+.filter-pill button {
+  background: transparent; border: 0; color: inherit;
+  width: 18px; height: 18px; min-width: 0; min-height: 0; border-radius: 0;
+  padding: 0; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.filter-pill button:hover { background: var(--paper-deep); }
+.filter-clear-all { min-height: 0; }

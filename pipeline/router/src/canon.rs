@@ -310,6 +310,7 @@ mod tests {
             head_start: 0.0,
             head_end: 0.0,
             lines: Vec::new(),
+            reversals: 0,
         }
     }
 

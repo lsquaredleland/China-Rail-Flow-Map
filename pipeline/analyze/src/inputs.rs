@@ -4,9 +4,12 @@
 //!
 //! Environment: `CRFM_DATA_DIR`, `CRFM_OUTPUT_DIR`, `CRFM_OSM_PATH`,
 //! `ATLAS_OVERRIDES`, `ATLAS_PAIR_PATHS`, `ATLAS_LEG_PATHS` (the last one is
-//! read by `legs::load_leg_paths`).
+//! read by `legs::load_leg_paths`), and the timetable source:
+//! `CRFM_SCHEDULE` (a train export, `export.rs`) with
+//! `CRFM_SCHEDULE_SUPPLEMENTS`; unset, the deliverables in `CRFM_OUTPUT_DIR`.
 
 use crate::cn::files::{GTFS_STOPS, OSM_EXTRACT, TIMETABLE_FILES};
+use crate::export::{self, Calendar};
 use crate::geo::median;
 use crate::legs::*;
 use crate::names::clean;
@@ -86,8 +89,12 @@ pub struct Inputs {
     pub paths: Paths,
     pub override_map: OverrideMap,
     pub trains: Vec<Train>,
-    /// Number of trains from the first timetable file.
+    /// Number of trains from the first timetable file (all of them for an
+    /// export).
     pub d1_len: usize,
+    /// `CRFM_SCHEDULE` only: per-train calendars (parallel to `trains`) and
+    /// the export's date window. Its stop lists are also the schedules.
+    pub calendar: Option<(Vec<Calendar>, Vec<String>)>,
     pub city_en: HashMap<String, String>,
     pub stations: StationPoints,
     pub path_map: PathMap,
@@ -137,11 +144,28 @@ pub fn load() -> Inputs {
     let load_deliverable = |p: &PathBuf| -> Deliverable {
         serde_json::from_str(&fs::read_to_string(p).unwrap()).unwrap()
     };
-    let d1 = load_deliverable(&paths.files.join(TIMETABLE_FILES[0]));
-    let d2 = load_deliverable(&paths.files.join(TIMETABLE_FILES[1]));
-    let d1_len = d1.trains.len();
-    let mut trains = d1.trains.clone();
-    trains.extend(d2.trains.iter().cloned());
+    let (trains, d1_len, calendar) = match env::var("CRFM_SCHEDULE") {
+        Ok(p) => {
+            let sups: Vec<PathBuf> = env::var("CRFM_SCHEDULE_SUPPLEMENTS")
+                .map(|v| v.split(',').map(PathBuf::from).collect())
+                .unwrap_or_default();
+            let e = export::load(&PathBuf::from(&p), &sups);
+            println!(
+                "schedule export {p}: listed {}, kept {}, filled from a supplement {}, no stops {}, no run date {}",
+                e.counts[0], e.counts[1], e.counts[2], e.counts[3], e.counts[4]
+            );
+            let n = e.trains.len();
+            (e.trains, n, Some((e.calendars, e.window)))
+        }
+        Err(_) => {
+            let d1 = load_deliverable(&paths.files.join(TIMETABLE_FILES[0]));
+            let d2 = load_deliverable(&paths.files.join(TIMETABLE_FILES[1]));
+            let d1_len = d1.trains.len();
+            let mut trains = d1.trains.clone();
+            trains.extend(d2.trains.iter().cloned());
+            (trains, d1_len, None)
+        }
+    };
     println!("trains: {}", trains.len());
 
     let city_en: HashMap<String, String> =
@@ -195,6 +219,7 @@ pub fn load() -> Inputs {
         override_map,
         trains,
         d1_len,
+        calendar,
         city_en,
         stations: StationPoints {
             gtfs,

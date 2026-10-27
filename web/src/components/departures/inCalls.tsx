@@ -1,8 +1,10 @@
 /* Inbound with a source: every train arriving from that city. */
 import type { OriginVM, SrcVM } from "../../types";
-import { fmtTime } from "../../lib";
+import { fmtTime, runRank } from "../../lib";
 import HeadCount, { OfTotal } from "./HeadCount";
+import WindowedTable, { ORIGIN_ROW_H } from "./WindowedTable";
 import TrainCell from "./TrainCell";
+import RunsCell from "./RunsCell";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
 import { inCallStations } from "../../stationBreakdown";
@@ -19,6 +21,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
     handleClearChip,
     inCallSort,
     setInCallSort,
+    atlas,
   } = ctx;
   const calls = srcFilter.inCalls;
   const stations = inCallStations(calls, ctx.selectedClasses);
@@ -46,6 +49,10 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
   });
   const { key: ik, dir: idir } = inCallSort;
   list.sort((a, b) => {
+    if (ik === "runs") {
+      const dd = runRank(atlas?.data.train_table[a.arr.t], atlas?.data.calendar) - runRank(atlas?.data.train_table[b.arr.t], atlas?.data.calendar);
+      if (dd) return dd * idir;
+    }
     if (ik === "dur") {
       const va = a.dur;
       const vb = b.dur;
@@ -133,7 +140,9 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
     </span>
   );
   const tableNode = (
-    <table id="depTable" className="calls">
+    <WindowedTable n={list.length} rowH={ORIGIN_ROW_H} cols={7} className="calls">
+      {(w) => (
+      <>
       <thead>
         <tr>
           <th scope="col">Train</th>
@@ -144,7 +153,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
             aria-sort={iAriaSort("board")}
             onClick={() => onInCallSort("board")}
           >
-            Departs {srcFilter.en}{" "}
+            Departs{" "}
             <span className="arrow">{iArrow("board")}</span>
           </th>
           <th
@@ -154,7 +163,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
             aria-sort={iAriaSort("arr")}
             onClick={() => onInCallSort("arr")}
           >
-            Arrives {cur.en}{" "}
+            Arrives{" "}
             <span className="arrow">{iArrow("arr")}</span>
           </th>
           <th
@@ -168,23 +177,33 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
           </th>
           <th scope="col">Origin</th>
           <th scope="col">Status</th>
+          <th
+            scope="col"
+            className="sortable"
+            data-sort="runs"
+            aria-sort={iAriaSort("runs")}
+            onClick={() => onInCallSort("runs")}
+          >
+            Runs <span className="arrow">{iArrow("runs")}</span>
+          </th>
         </tr>
       </thead>
       <tbody id="depBody">
         {list.length === 0 ? (
           <tr>
-            <td colSpan={6} className="dep-empty">
+            <td colSpan={7} className="dep-empty">
               No trains match that filter.
             </td>
           </tr>
         ) : (
-          list.map((c, i) => {
+          <>{w.top}{list.map((c, i) => {
+          if (i < w.first || i >= w.last) return null;
             const a = c.arr;
             const isSelected = selectedTrainCodes.includes(a.code);
             return (
               <tr
                 key={i}
-                className={isSelected ? "dep-row-selected" : undefined}
+                {...w.tr(i, isSelected ? "dep-row-selected" : undefined)}
                 onClick={(e) =>
                   handleRowClick(
                     a.code,
@@ -235,12 +254,15 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
                     {c.started ? "Originates here" : "Through train"}
                   </span>
                 </td>
+                <RunsCell atlas={atlas} t={a.t} />
               </tr>
             );
-          })
+          })}{w.bottom}</>
         )}
       </tbody>
-    </table>
+      </>
+      )}
+    </WindowedTable>
   );
   return { heading, depNote, stations, chipNode, count, total: calls.length, showingNote, tableNode };
 }

@@ -1,4 +1,4 @@
-import type { InMapData, OutMapData } from "./types";
+import type { InMapData, OutMapData, SharedData } from "./types";
 import { decodeFlows, requireFmt } from "./lib";
 import { maybeReloadForStale } from "./staleReload";
 
@@ -19,7 +19,7 @@ import { maybeReloadForStale } from "./staleReload";
 // Every file is fetched at most once and cached for the session; each
 // merge goes into the origins in place, by index.
 export const SHARED_URL = "assets/atlas-v2-shared.json";
-export const OUT_MAP_URL = "assets/atlas-v2-out-map.json";
+const OUT_MAP_URL = "assets/atlas-v2-out-map.json";
 export const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
 export const IN_MAP_URL = "assets/atlas-v2-in-map.json";
 export const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
@@ -42,29 +42,72 @@ export async function fetchInMap(): Promise<InMapData> {
 }
 
 export const SCHEDULES_URL = "assets/atlas-v2-schedules.json";
+// National per-section flows (P3.1/P3.2): fetched only when national flows
+// are requested, never for the origin view.
+export const NATIONAL_FLOWS_URL = "assets/atlas-v2-national.json";
+// National flow entry ticks (P3.3): fetched only for national Trains + flows.
+export const NATIONAL_ENTRIES_URL = "assets/atlas-v2-national-entries.json";
+// National per-train index (optional): the hour / distance / duration / code
+// filters and their histograms; fetched only when national mode asks for it.
+export const NATIONAL_INDEX_URL = "assets/atlas-v2-national-index.json";
+// National trains (P2.2): every national train's whole run, fetched only on
+// entering national mode, never for the origin view.
+export const NATIONAL_TRAINS_URL = "assets/atlas-v2-national-trains.json";
 
-// The v2 files carry no `about` blurb (v1 embedded one in the data);
-// the text is unchanged apart from the geometry-precision sentence,
-// which now states the v2 encoding.
-export const ABOUT =
+// The footer's ABOUT text: fixed prose plus the timetable source sentence.
+// The source sentence and the schedule window are pack facts: the pipeline
+// writes them into `shared.about` (train-export packs); a pack without it
+// derives the window from `shared.calendar`, and a pack with neither (a
+// 12306 build) names the source only.
+const ABOUT_PROSE =
   "Minard-style passenger rail flow maps for China's top rail cities. " +
   "Flow line width reflects daily train frequency along each railway corridor. " +
   "In the outbound view, trains are traced from the origin city outward to their destinations; " +
-  "in the inbound view, trains are traced from their starting stations through all intermediate calls into the selected city. " +
-  "Timetable data is sourced from China Railway (12306), covering 5,043 trunk services and 2,210 intercity C/S services across sample dates in October 2026.";
+  "in the inbound view, trains are traced from their starting stations through all intermediate calls into the selected city. ";
+
+const MONTHS_LONG = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function longDate(iso: string, year: boolean): string | undefined {
+  const [y, m, d] = iso.split("-").map(Number);
+  const month = MONTHS_LONG[m - 1];
+  if (!month || !d || !y) return undefined;
+  return year ? `${d} ${month} ${y}` : `${d} ${month}`;
+}
+
+/** The timetable source sentence for a calendar (ISO dates in order); the
+    same wording the pipeline writes (`provenance::about_block`). */
+function sourceSentence(calendar: readonly string[] | undefined): string {
+  const base = "Timetable data is sourced from China Railway (12306)";
+  if (!calendar || calendar.length === 0) return `${base}.`;
+  const from = calendar[0];
+  const to = calendar[calendar.length - 1];
+  const sameYear = from.slice(0, 4) === to.slice(0, 4);
+  const a = longDate(from, from === to || !sameYear);
+  const b = longDate(to, true);
+  if (!a || !b) return `${base}.`;
+  const window = from === to ? `on ${a}` : `from ${a} to ${b}`;
+  return `${base}, covering the passenger trains listed as running on at least one date ${window}.`;
+}
+
+export function aboutText(shared: Pick<SharedData, "about" | "calendar">): string {
+  return ABOUT_PROSE + (shared.about?.source ?? sourceSentence(shared.calendar));
+}
 
 /* Fetch one dataset file, preferring its Brotli twin (the .br asset).
    The host (vercel.json) sends the .br with Content-Encoding: br +
    Content-Type: application/json, so the browser has already decompressed
    it and the bytes are JSON ("{"). Anything else (header missing, SPA
    fallback HTML) falls back to the plain .json split. */
-declare const __ASSET_MANIFEST__: Record<string, string> | undefined;
+declare const __ASSET_MANIFEST__: string | undefined; // JSON text (a string define keeps esbuild from hoisting it into a shared chunk)
 /* The build content-hashes the .br packs (web/bundle.mjs) and bakes the
    name -> hashed-path map into the bundle; unhashed names (dev, or a
    missing entry) resolve to the plain twin path. */
 function brUrl(jsonUrl: string): string {
-  const m =
-    typeof __ASSET_MANIFEST__ === "undefined" ? undefined : __ASSET_MANIFEST__;
+  const m: Record<string, string> | undefined =
+    typeof __ASSET_MANIFEST__ === "undefined" ? undefined : JSON.parse(__ASSET_MANIFEST__);
   return (m && m[jsonUrl]) || jsonUrl + ".br";
 }
 export async function fetchData<T>(jsonUrl: string): Promise<T> {

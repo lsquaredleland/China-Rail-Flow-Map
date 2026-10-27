@@ -14,7 +14,7 @@ import { classIndex } from "./origin";
 
 /** Return a derived OriginVM filtered to the selected train classes,
     departure/arrival hour, journey distance bin, or journey duration bin.
-    Preserves `o` reference identity so MapCanvas redraws in place without
+    Preserves `o` reference identity so MapHost redraws in place without
     resetting camera zoom/pan. */
 export function filterOrigin(
   cur: OriginVM,

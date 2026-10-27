@@ -23,7 +23,7 @@ export function enName(en: string): string {
 
 /** Train-table index of a raw dep/arr row. The one place that knows the
     row layout, so a row-format change only touches this. */
-export function rowTrainIdx(row: readonly unknown[]): number {
+function rowTrainIdx(row: readonly unknown[]): number {
   return row[0] as number;
 }
 
@@ -64,6 +64,21 @@ export function esc(s: string): string {
 }
 
 
+/** How a station's two names read: "zh-en" 重庆北 Chongqing North, "en-zh"
+    Chongqing North 重庆北, "zh-paren" 重庆北 (Chongqing North). One name when
+    the English is missing or identical. */
+type NameOrder = "zh-en" | "en-zh" | "zh-paren";
+export function stationName(zh: string, en: string | undefined, order: NameOrder): string {
+  if (!en || en === zh) return zh;
+  return order === "zh-en" ? `${zh} ${en}` : order === "en-zh" ? `${en} ${zh}` : `${zh} (${en})`;
+}
+
+/** Minutes as words: "45 min", "1 h", "1 h 5 min". */
+export function fmtDurationWords(m: number): string {
+  const r = Math.max(0, Math.round(m));
+  return r >= 60 ? `${Math.floor(r / 60)} h ${r % 60 ? (r % 60) + " min" : ""}`.trim() : `${r} min`;
+}
+
 export function fmtTime(m: number | null | undefined): string {
   if (m === null || m === undefined || m < 0 || isNaN(m)) return "—";
   const h = Math.floor(m / 60);
@@ -99,6 +114,21 @@ export function fmtClock(m: number | null | undefined): string {
   const h = Math.floor(m / 60);
   const mm = m % 60;
   return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** The schedule window of a pack's calendar (`shared.calendar`, ISO dates in
+    order) as "23 Oct – 6 Nov"; undefined without a calendar (12306 packs). */
+export function fmtCalendarSpan(calendar: readonly string[] | undefined): string | undefined {
+  if (!calendar || calendar.length === 0) return undefined;
+  const day = (iso: string) => {
+    const [, m, d] = iso.split("-").map(Number);
+    return `${d} ${MONTHS[m - 1]}`;
+  };
+  const a = day(calendar[0]);
+  const b = day(calendar[calendar.length - 1]);
+  return a === b ? a : `${a} – ${b}`;
 }
 
 // One value, in the unit picked on the toolbar switcher; unknown

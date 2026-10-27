@@ -1,8 +1,7 @@
 /* Pointer input: drag-pan, pinch-zoom, hover picking and tap selection. */
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { MapCtx, Pt } from "./context";
-import { scheduleDraw, draw } from "./render";
-import { zoomAt } from "./camera";
+import { scheduleDraw, zoomAt } from "./camera";
 import { hideTooltip, pick, sameHit, showTooltip } from "./interaction";
 
 function localPos(M: MapCtx, e: ReactPointerEvent): Pt {
@@ -65,7 +64,7 @@ export function onPointerMove(M: MapCtx, e: ReactPointerEvent) {
     const hit = pick(M, p.x, p.y);
     if (!sameHit(hit, st.hover)) {
       st.hover = hit;
-      draw(M);
+      M.render();
     }
     if (hit) showTooltip(M, hit, p.x, p.y);
     else if (!st.pinned) hideTooltip(M);
@@ -94,14 +93,18 @@ export function endPointer(M: MapCtx, e: ReactPointerEvent) {
       } else if (hit && hit.kind === "train") {
         P.current.onSelectTrain?.(hit.train.code);
         hideTooltip(M);
+      } else if (hit && hit.kind === "natCity" && P.current.onSelectNatCity) {
+        P.current.onSelectNatCity({ idx: hit.idx, dep: hit.dep, arr: hit.arr });
+        hideTooltip(M);
       } else if (hit) {
         st.pinned = true;
         showTooltip(M, hit, p.x, p.y);
       } else {
         hideTooltip(M);
         P.current.onSelectDest(null);
+        P.current.onSelectNatCity?.(null);
       }
-      draw(M);
+      M.render();
     }
     st.dragStart = null;
     st.moved = 0;
@@ -114,6 +117,6 @@ export function onPointerLeave(M: MapCtx) {
   if (!st.pinned) {
     st.hover = null;
     hideTooltip(M);
-    draw(M);
+    M.render();
   }
 }
