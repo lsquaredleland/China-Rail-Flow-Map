@@ -20,7 +20,7 @@
                   rankMemo    WeakMap by the counts object
                   labelMemo   WeakMap by the drawn circle set */
 import type { Layer } from "@deck.gl/core";
-import { isoFlowAlpha, stationT } from "../../../../../lib";
+import { isolatedCityIdxs, isoFlowAlpha, natTrainEnds, stationT } from "../../../../../lib";
 import type { NatFilter } from "../../../../../lib";
 import type { MapCtx } from "../../../context";
 import type { DeckStats } from "../../DeckHost";
@@ -53,7 +53,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   st.natCities = null;
   st.natCounts = null;
   st.natLoop = null;
-  // An isolated train: its run and its dot over the faded flows, as in the origin view (circles step aside).
+  // An isolated train: its run and its dot over the faded flows, with only its two end cities, as in the origin view.
   const isoCode = P.current.isolatedTrainCode;
   const tlAll = isoCode ? nationalTimeline(atlas, P.current.nationalTrains) : null;
   const iso = isoCode && tlAll ? nationalIsolated(atlas, tlAll.tl, isoCode) : null;
@@ -88,14 +88,17 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   // The infrastructure overlay over the flows (as in the origin view), under the circles.
   if (withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark, flowAlpha));
   if (iso && tlAll) layers.push(...nationalCorridor(tlAll.tl, atlas, iso.q));
-  if (!iso && withFlows && nf) {
+  if (withFlows && nf) {
     // The city circles ride with the flows (day totals, whatever the clock).
     // With the clock running (flows + trains) the circles grow as the trains stop there.
     const ev = withTrains ? natViewEvents(view, nf, P.current.nationalIndex ?? null) : null;
     const growth = ev ? { ev, t: Math.min(1440, Math.max(0, st.animTime)) } : null;
-    st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale), st.view.scale / st.fitScale, growth);
+    const ix = P.current.nationalIndex;
+    const t = iso && tlAll ? tlAll.tl.tIdx[iso.q] : -1;
+    const only = iso ? isolatedCityIdxs(ix ? natTrainEnds(ix, t) : []) : null;
+    st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale), st.view.scale / st.fitScale, growth, only);
     const hv = st.hover;
-    if (hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, P.current.dark));
+    if (!iso && hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, P.current.dark));
     if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark, hv && hv.kind === "natCity" ? hv.idx : -1));
   }
   const built = withTrains ? nationalTimeline(atlas, P.current.nationalTrains) : null;

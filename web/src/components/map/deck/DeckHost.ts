@@ -11,7 +11,7 @@
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import { getSelCache, isTrainShown, palette, stationStates, stationT, viewToViewState } from "../../../lib";
+import { getSelCache, isTrainShown, originIsolatedCities, palette, stationStates, stationT, viewToViewState } from "../../../lib";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
@@ -178,8 +178,10 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     const dark = P.current.dark;
     const pd = P.current.panelDest ?? null;
     const hover = st.hover;
+    const shown = originIsolatedCities(cur, P.current.direction, P.current.isolatedTrainCode);
     const states = stationStates(
       {
+        shown,
         points: M.points(),
         panelDest: pd,
         hoverIdx: hover && hover.kind === "station" ? hover.station.idx : -1,
@@ -192,7 +194,9 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       getSelCache(P.current, st),
     );
     // Picking and labels skip the cities not yet lit by the animation.
-    st.unlitCities = st.animEnabled ? new Set(states.filter((s) => !s.lit).map((s) => s.idx)) : null;
+    // (an isolated train also hides every city but its far end)
+    const litIdx = new Set(states.filter((s) => s.lit).map((s) => s.idx));
+    st.unlitCities = st.animEnabled || shown ? new Set(M.points().filter((c) => !litIdx.has(c.idx)).map((c) => c.idx)) : null;
     layers.push(
       ...stationLayers({
         states,

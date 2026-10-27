@@ -78,6 +78,7 @@ export {
   natHistogram,
   natIndexActive,
   natSelect,
+  natTrainEnds,
   requireNationalIndex,
 } from "./nationalIndex";
 export type { NatFilter, NatCityEvents } from "./nationalIndex";
@@ -146,6 +147,8 @@ export type {
 export {
   getSelCache,
   isTrainShown,
+  isolatedCityIdxs,
+  originIsolatedCities,
   stationStates,
 } from "./mapModel";
 export type { SelCache, SelInput, StationInput, StationState } from "./mapModel";

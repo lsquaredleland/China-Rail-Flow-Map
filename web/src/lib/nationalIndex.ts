@@ -84,6 +84,12 @@ function decoded(ix: NationalIndexPack): Decoded {
   return d;
 }
 
+/** The departure and arrival city ids (`city_table`) of train row `t`. */
+export function natTrainEnds(ix: NationalIndexPack, t: number): number[] {
+  const d = decoded(ix);
+  return [...(d.dep[t] ?? []), ...(d.arr[t] ?? [])];
+}
+
 /** Which of the filters to skip when selecting (a histogram shows its own
     dimension under all the others). */
 type NatSkip = "hour" | "dist" | "dur" | null;

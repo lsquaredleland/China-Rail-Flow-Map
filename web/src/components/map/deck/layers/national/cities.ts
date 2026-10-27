@@ -74,14 +74,17 @@ export function nationalCityDots(
   stationT: number,
   zoom: number,
   growth: NatGrowth | null = null,
+  only: ReadonlySet<number> | null = null,
 ): NationalCityDots | null {
   if (!nf.cities) return null;
   const order = ranked(c);
-  const k = natCityTier(order.length, zoom);
+  // An isolated train draws just its two ends (the shared rule, lib isolatedCityIdxs), whatever the tier.
+  const pick = only ? order.filter((i) => only.has(c.idx[i])) : null;
+  const k = pick ? pick.length : natCityTier(order.length, zoom);
   const out: NationalCityDots = { idx: [], pos: [], dep: new Uint32Array(k), arr: new Uint32Array(k), r: [], ripple: [] };
   let n = 0;
   for (let j = 0; j < k; j++) {
-    const i = order[j];
+    const i = pick ? pick[j] : order[j];
     let size = c.dep[i] + c.arr[i];
     let ripple = -1;
     if (growth) {
