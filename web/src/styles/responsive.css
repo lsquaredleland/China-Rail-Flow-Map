@@ -105,7 +105,9 @@
   }
   #scalebar .sb-label { text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper); }
   .stats:empty { display: none; }
-  .tl-expand-wrap { bottom: 10px; }
+  /* The pill sits right after KEY (not centred): the scale bar at the right grows
+     to ~130px at the phone default zoom and a centred pill ran into it. */
+  .tl-expand-wrap { bottom: 10px; left: 58px; right: auto; transform: none; width: auto; justify-content: flex-start; }
   .tl-expand-btn.is-over-map { min-height: 36px; padding: 4px 12px; font-size: 11.5px; white-space: nowrap; }
   .tl-expand-btn span[data-short] { font-size: 0; }
   .tl-expand-btn span[data-short]::after { content: attr(data-short); font-size: 11.5px; }

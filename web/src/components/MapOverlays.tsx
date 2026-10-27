@@ -43,7 +43,7 @@ export function TimelineExpandButton({ onExpand }: { onExpand: () => void }) {
         title="Expand 24h train flow animation controls"
       >
         <span className="tl-expand-dot" />
-        <span data-short="24h Flow Animation ▴">24h Flow Animation · Expand ▴</span>
+        <span data-short="24h Animation ▴">24h Flow Animation · Expand ▴</span>
       </button>
     </div>
   );
