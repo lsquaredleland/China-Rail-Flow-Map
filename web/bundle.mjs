@@ -26,7 +26,16 @@ for (const f of readdirSync("public/assets")) {
   assetManifest[`assets/${f.slice(0, -3)}`] = `assets/${hashed}`;
   hashedAssets.push([f, hashed, bytes]);
 }
-const manifestDefine = { __ASSET_MANIFEST__: JSON.stringify(JSON.stringify(assetManifest)) };
+// GA4 Measurement ID (src/lib/analytics.ts), set in the Vercel production env only.
+const gaId = process.env.GA_MEASUREMENT_ID ?? "";
+if (gaId && !/^G-[A-Z0-9]+$/.test(gaId)) {
+  console.error(`GA_MEASUREMENT_ID "${gaId}" is not a G-XXXXXXXXXX id`);
+  process.exit(1);
+}
+const manifestDefine = {
+  __ASSET_MANIFEST__: JSON.stringify(JSON.stringify(assetManifest)),
+  __GA_ID__: JSON.stringify(gaId),
+};
 
 // Two esbuild passes so the inlined entry never statically imports a shared
 // chunk (esbuild would hoist runtime helpers used by both into one, and every
