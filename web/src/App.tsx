@@ -290,6 +290,21 @@ export default function App() {
     <>
       <div className="stage">
         <AppHeader
+          compact={compactStats({
+            cur: national ? null : cur,
+            viewCur: national ? null : viewCur,
+            direction,
+            filtered: selectedClasses.length > 0 || filters.hasHistFilter,
+            outTablesReady,
+            inTablesReady,
+            trainCount: atlas ? atlas.data.train_table.length : 0,
+            national: national
+              ? {
+                  cities: nationalFlows?.cities ? nationalFlows.cities.idx.length : null,
+                  maxFlow: nationalFlows ? nationalFlows.total.reduce((m, v) => (v > m ? v : m), 0) : null,
+                }
+              : null,
+          })}
           cur={national ? null : cur}
           viewCur={national ? null : viewCur}
           direction={direction}
@@ -313,21 +328,6 @@ export default function App() {
         />
 
         <Toolbar
-          compactStats={compactStats({
-            cur: national ? null : cur,
-            viewCur: national ? null : viewCur,
-            direction,
-            filtered: selectedClasses.length > 0 || filters.hasHistFilter,
-            outTablesReady,
-            inTablesReady,
-            trainCount: atlas ? atlas.data.train_table.length : 0,
-            national: national
-              ? {
-                  cities: nationalFlows?.cities ? nationalFlows.cities.idx.length : null,
-                  maxFlow: nationalFlows ? nationalFlows.total.reduce((m, v) => (v > m ? v : m), 0) : null,
-                }
-              : null,
-          })}
           origins={origins}
           originIdx={originIdx}
           onSelectOrigin={selectOrigin}

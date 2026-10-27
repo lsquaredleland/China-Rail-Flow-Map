@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Direction, DistUnit, OriginVM } from "../types";
 
 /** The phone toolbar's one-line stats ("1,498 trains daily · 653 direct cities ·
@@ -49,6 +50,7 @@ export default function AppHeader({
   national,
   isNational,
   onSetNational,
+  compact,
 }: {
   cur: OriginVM | null;
   viewCur: OriginVM | null;
@@ -67,7 +69,11 @@ export default function AppHeader({
   /** National mode is on; `onSetNational` switches between it and the origin view. */
   isNational: boolean;
   onSetNational: (on: boolean) => void;
+  /** Phones: the three stats as one line under the description (compactStats). */
+  compact?: [string, string][] | null;
 }) {
+  // Phones clamp the description to two lines; a tap shows the rest.
+  const [subOpen, setSubOpen] = useState(false);
   return (
     <header>
       <div className="head-row">
@@ -108,7 +114,7 @@ export default function AppHeader({
         </button>
       </div>
       </div>
-      <p className="subtitle">
+      <p className={"subtitle" + (subOpen ? " open" : "")} onClick={() => setSubOpen((v) => !v)}>
         Flow diagram of trains departing and arriving across China&rsquo;s
         top rail cities. The width of each line refers to the number of
         daily trains along that particular piece of track &mdash; spanning{" "}
@@ -118,6 +124,16 @@ export default function AppHeader({
         rail network ({distUnit === "mi" ? "100,000 mi" : "162,000 km"} of
         total track).
       </p>
+      {compact && (
+        <p className="mob-stats" aria-hidden="true">
+          {compact.map(([v, l], i) => (
+            <span key={l}>
+              {i > 0 && " · "}
+              <b>{v}</b> {l}
+            </span>
+          ))}
+        </p>
+      )}
       <div className="stats" id="stats">
         {national && (
           <>

@@ -5,18 +5,19 @@
   .toolbar .city-picker { flex: 1 1 0; min-width: 0; }
   .toolbar .city-picker label { display: none; }
   .toolbar .units[aria-label="Direction"] { display: none; }
-  .toolbar .tb-mob-btn { flex: 0 0 46px; width: 46px; height: 46px; }
+  .toolbar .tb-mob-btn { flex: 0 0 36px; width: 36px; height: 36px; }
   .toolbar .tb-dir-btn {
     flex-direction: column; gap: 2px;
     background: var(--ink); color: var(--paper); border-color: var(--ink);
   }
   .tb-dir-lbl { font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-  .tb-mob-stats {
-    display: block; flex: 1 1 100%; margin: 2px 0 0;
-    font-size: 13px; color: var(--ink-soft);
-  }
-  .tb-mob-stats b { color: var(--ink); font-weight: 800; font-size: 15px; }
-  .tb-mob-stats span:first-child b { color: var(--rust); }
+  .mob-stats { display: block; margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .mob-stats b { color: var(--ink); font-weight: 800; font-size: 15px; }
+  .mob-stats span:first-child b { color: var(--rust); }
+  /* The description: two lines, tap for the rest. */
+  .subtitle { cursor: pointer; }
+  .subtitle.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  /* One control height on phones: the Origin City | National Beta switch's 36 px. */
   /* The Chinese title on its own line. */
   h1 .zh { display: block; }
   h1 .zh-sep { display: none; }
@@ -34,7 +35,7 @@
   .dep-tools #depFilter { flex: 1 1 0; width: auto; min-width: 0; }
   .dep-tools .dep-showing { flex: 1 1 100%; }
   .dep-tools .dep-cls-btn {
-    flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px;
+    flex: 0 0 36px; width: 36px; height: 36px; min-height: 36px;
     border: 1.5px solid var(--panel-edge); border-radius: 3px; background: var(--field);
   }
   .dep-tools.cls-open .cls-filter { display: inline-flex; }
@@ -139,7 +140,7 @@
     color: var(--ink); text-decoration: none;
     font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   }
-  .cls-btn { min-height: 40px; min-width: 40px; }
+  .cls-btn { min-height: 36px; min-width: 36px; }
   /* The origin picker is one framed row: FROM, the city in bold, a chevron. */
   .city-picker {
     flex: 1 1 100%; position: relative;
@@ -158,8 +159,8 @@
   .lb-short { display: inline; }
   #originSearch {
     width: 100%;
-    min-height: 44px;
-    font-size: 17px;
+    min-height: 34px;
+    font-size: 16px;
     font-weight: 800;
     border: 0; background: transparent;
     padding: 0 24px 0 0;
@@ -168,9 +169,9 @@
   #originSearch:focus-visible { outline-offset: 6px; }
   #originList { left: 0; right: 0; width: auto; max-height: 46vh; }
   #originList .opt { padding: 13px 12px; }
-  .toolbar button { min-height: 40px; padding: 5px 10px; font-size: 13px; }
-  .toolbar .tb-mob-btn { min-height: 40px; padding: 0; }
-  #depFilter { min-height: 44px; font-size: 16px; }
+  .toolbar button { min-height: 36px; padding: 4px 10px; font-size: 13px; }
+  .toolbar .tb-mob-btn { min-height: 36px; padding: 0; }
+  #depFilter { min-height: 36px; height: 36px; font-size: 16px; padding: 4px 10px; }
   footer { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
   #destPanel {
     top: auto; left: 10px; right: 10px;

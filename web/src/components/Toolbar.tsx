@@ -34,7 +34,6 @@ export default function Toolbar({
   showFlows,
   onToggleFlows,
   activeFilterCount,
-  compactStats,
 }: {
   origins: RawOrigin[];
   originIdx: number;
@@ -67,8 +66,6 @@ export default function Toolbar({
   onToggleFlows: () => void;
   /** Filters in force (class + histogram + train-code filters), for the narrow-screen badge. */
   activeFilterCount: number;
-  /** Phones: the header's three stats as one line under the controls. */
-  compactStats?: [string, string][] | null;
 }) {
   // Narrow screens (CSS, <= 640px): the filters and the map / display
   // controls fold into two dropdown panels; wider screens show them inline
@@ -178,16 +175,6 @@ export default function Toolbar({
         {layersChanged && <span className="tb-dot" title="Some map options are changed" />}
         <span className="tb-mob-lbl" aria-hidden="true"> ▾</span>
       </button>
-      {compactStats && (
-        <p className="tb-mob-stats" aria-hidden="true">
-          {compactStats.map(([v, l], i) => (
-            <span key={l}>
-              {i > 0 && " · "}
-              <b>{v}</b> {l}
-            </span>
-          ))}
-        </p>
-      )}
       <div id="tbMore" className={"tb-panel tb-pop" + (panel === "more" ? " open" : "")} role="group" aria-label="Map options">
       <span className="tb-pop-h">View</span>
       <div className="group">
