@@ -93,10 +93,10 @@ export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: numb
 
 /** Tails under dots under dwell rings (ids `nat-tails | nat-trains | nat-dwell`); new `data`
     objects every frame, so deck re-uploads the pooled buffers. Only the dots are pickable, and
-    only while the clock is paused (P2.3 picks them). The isolated train's dot keeps its size
-    (only its tail widens). */
+    only while the clock is paused (P2.3 picks them). The isolated train's dot and tail are
+    enlarged as in the origin view. */
 export function nationalLayers(f: NationalFrame, pickable: boolean, isolated = false): Layer[] {
-  return dotLayers("nat-", f, { pickable, isolated, bigDot: false, trigger: f.count });
+  return dotLayers("nat-", f, { pickable, isolated, trigger: f.count });
 }
 
 /** The origin view's emphasis rings on the hovered / selected / isolated

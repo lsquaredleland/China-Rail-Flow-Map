@@ -207,22 +207,26 @@ export function buildPassData(
   return pd;
 }
 
-/** `pd` (an alpha-1 pass) with new per-section counts (national A+B, P3.3):
+/** `pd` (an alpha-1 pass; `alpha` fades the recount like buildPassData) with new per-section counts (national A+B, P3.3):
     the same geometry object and path order, so deck only refills the width
     and colour attributes (no re-tessellation); n and colours from
     `counts[section]`, a section at 0 fully transparent; the colour ramp
     stays normalised to `maxN`; ferry dashes of the sections with n > 0. */
-export function recountPassData(pd: PassData, counts: ArrayLike<number>, pal: Palette, maxN: number): PassData {
+export function recountPassData(pd: PassData, counts: ArrayLike<number>, pal: Palette, maxN: number, alpha = 1): PassData {
   const len = pd.data.length;
   const n = new Float32Array(len);
   const col = new Uint8Array(len * 4);
   const colours = new Map<number, RGBA>();
+  const paper = rgba(pal.paper);
   for (let p = 0; p < len; p++) {
     const v = counts[pd.idxToSec[p]];
     n[p] = v;
     if (v <= 0) continue; // rgba 0: transparent
     let c = colours.get(v);
-    if (!c) colours.set(v, (c = rgba(flowColor(v, maxN, pal))));
+    if (!c) {
+      c = rgba(flowColor(v, maxN, pal));
+      colours.set(v, (c = alpha < 1 ? blendOver(c, paper, alpha) : c));
+    }
     col.set(c, p * 4);
   }
   const ferry: DashPiece[] = [];

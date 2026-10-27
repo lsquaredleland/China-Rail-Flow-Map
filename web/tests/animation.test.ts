@@ -2,7 +2,7 @@
 // dwell positions, final-step flows == static flows (with and without
 // filters), animated trains subset of the filter, no teleporting dots.
 import { describe, expect, test } from "bun:test";
-import { filterOrigin, getSelCache, trainDistAt } from "../src/lib";
+import { filterOrigin, getSelCache, trainDistAt, trainSpeedFrac } from "../src/lib";
 import { animLoop, getAnimState, setAnimEnabled, setPlaying, setTime } from "../src/components/map/anim";
 import { createMapCtx } from "../src/components/map/context";
 import type { MapCtx, Props } from "../src/components/map/context";
@@ -178,6 +178,95 @@ describe("filtered views", () => {
       });
     }
   }
+});
+
+describe("tail taper (presentation only)", () => {
+  test("trainSpeedFrac: 0 at a halt, ramps up, 1 at cruise, ramps down, symmetric", () => {
+    expect([trainSpeedFrac(0, 60), trainSpeedFrac(1, 60)]).toEqual([0, 0]);
+    expect(trainSpeedFrac(0.5, 60)).toBe(1);
+    expect(trainSpeedFrac(0.01, 60)).toBeGreaterThan(0);
+    expect(trainSpeedFrac(0.01, 60)).toBeLessThan(trainSpeedFrac(0.03, 60));
+    expect(trainSpeedFrac(0.03, 60)).toBeCloseTo(trainSpeedFrac(0.97, 60), 9);
+    // a 1-minute leg ramps over a quarter of it
+    expect(trainSpeedFrac(0.125, 1)).toBeCloseTo(0.5, 9);
+  });
+  test("origin trains: tails shorten near stations while positions stay linear", () => {
+    const o = origin("广州");
+    const tl = o.timeline;
+    const long = (c: string) => (tl.getPrepTrain(c)?.arrMins ?? 0) - (tl.getPrepTrain(c)?.depMins ?? 0) > 60;
+    const pt = tl.getPrepTrain(o.deps.find((d) => long(d.code))!.code)!;
+    const at = (t: number) => tl.getActiveTrains(t).find((x) => x.code === pt.code)!;
+    const mid = at((pt.depMins + pt.arrMins) / 2);
+    const early = at(pt.depMins + 0.5);
+    expect(mid.speedFrac).toBe(1);
+    expect(early.speedFrac!).toBeLessThan(1);
+    expect(early.speedFrac!).toBeGreaterThan(0);
+  });
+});
+
+describe("isolated train loops the clock", () => {
+  const g = globalThis as unknown as Record<string, unknown>;
+  g.requestAnimationFrame ??= () => 0;
+  g.cancelAnimationFrame ??= () => {};
+  const ref = <T,>() => ({ current: null as T | null });
+  const ctx = (national: boolean, iso: string | null): MapCtx =>
+    createMapCtx(
+      { current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national, isolatedTrainCode: iso } as unknown as Props },
+      { wrapRef: ref(), canvasRef: ref(), tooltipRef: ref(), scaleWrapRef: ref(), scaleLabelRef: ref(), scaleBarRef: ref(), viewReportTimerRef: { current: null } },
+    );
+  const step = (M: MapCtx, mins: number) => {
+    const st = M.S.current;
+    st.lastRafTimestamp = 1000;
+    animLoop(M, 1000 + (mins / 1440) * st.animSpeed * 1000);
+  };
+
+  test("origin view: past the train's arrival the clock returns to its departure", () => {
+    const o = origin("广州");
+    const tl = o.timeline;
+    const code = o.deps.find((d) => (tl.getPrepTrain(d.code)?.arrMins ?? 0) > (tl.getPrepTrain(d.code)?.depMins ?? 0) + 30)!.code;
+    const pt = tl.getPrepTrain(code)!;
+    const M = ctx(false, code);
+    const st = M.S.current;
+    setPlaying(M, true);
+    st.animTime = pt.arrMins - 1;
+    step(M, 0.5);
+    expect(st.animTime).toBeCloseTo(pt.arrMins - 0.5, 6);
+    step(M, 1);
+    expect(st.animTime).toBe(pt.depMins);
+    setPlaying(M, false);
+    // not isolated: the clock runs on past the arrival
+    const N = ctx(false, null);
+    setPlaying(N, true);
+    N.S.current.animTime = pt.arrMins - 1;
+    step(N, 2);
+    expect(N.S.current.animTime).toBeCloseTo(pt.arrMins + 1, 6);
+    setPlaying(N, false);
+  });
+
+  test("national: after the last stop the clock returns to the first stop, across midnight too", () => {
+    const M = ctx(true, "G1");
+    const st = M.S.current;
+    st.natLoop = { start: 480, dur: 120 };
+    setPlaying(M, true);
+    st.animTime = 590;
+    step(M, 5);
+    expect(st.animTime).toBeCloseTo(595, 6);
+    step(M, 10);
+    expect(st.animTime).toBe(480);
+    // a run from 23:00 for 120 min: past 24:00 the clock wraps and keeps playing until 01:00
+    st.natLoop = { start: 1380, dur: 120 };
+    st.animTime = 1439;
+    step(M, 2);
+    expect(st.animTime).toBe(0);
+    st.animTime = 59;
+    step(M, 2);
+    expect(st.animTime).toBe(1380);
+    // outside the run it plays on normally
+    st.animTime = 600;
+    step(M, 10);
+    expect(st.animTime).toBeCloseTo(610, 6);
+    setPlaying(M, false);
+  });
 });
 
 describe("national clock (P2.2)", () => {

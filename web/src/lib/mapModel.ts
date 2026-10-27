@@ -219,6 +219,9 @@ export interface FlowPass {
   pickable: boolean;
 }
 
+/** Alpha of the flows an isolated train fades to (origin and national views). */
+export const isoFlowAlpha = (dark: boolean) => (dark ? 0.06 : 0.08);
+
 /** The flow passes for the current state, in paint order:
     - isolated train: one faded context pass (the corridor is separate,
       see isolatedCorridor);
@@ -275,7 +278,7 @@ export function flowPasses(s: ModelState, caches: ModelCaches): FlowPass[] {
       {
         role: "context",
         items: activeFlows,
-        alpha: s.dark ? 0.06 : 0.08,
+        alpha: isoFlowAlpha(s.dark),
         maxN: effectiveMaxN,
         pickable: false,
       },

@@ -16,7 +16,7 @@ interface NationalFlowsInput {
   nf: NationalFlowsPack;
   /** The entry ticks; with `minute` the flows are the trains entered by then (A+B). */
   ne: NationalEntriesPack | null;
-  /** Whole minute of the day, 0..1440 (A+B), or null for the day's totals (B). */
+  /** Minute of the day on the entry-tick grid, 0..1440 (A+B), or null for the day's totals (B). */
   minute: number | null;
   /** The class filter (the entry ticks are per class) and the resolved filter view. */
   classes: readonly string[];
@@ -26,6 +26,8 @@ interface NationalFlowsInput {
   fitScale: number;
   /** Zoom clarity (P.current.zoomClarity). */
   damped: boolean;
+  /** 1 = full; an isolated train fades the flows (isoFlowAlpha), as in the origin view. */
+  alpha?: number;
 }
 
 interface NationalFlows {
@@ -40,22 +42,22 @@ interface NationalFlows {
 
 /* B's pass per (file, class filter, theme). Its paint order (widest first by
    the day's counts) is also A+B's, so A+B keeps the geometry and recounts. */
-let dayMemo: { nf: NationalFlowsPack; cls: string; dark: boolean; pd: PassData; maxN: number; sections: number } | null = null;
+let dayMemo: { nf: NationalFlowsPack; cls: string; dark: boolean; alpha: number; pd: PassData; maxN: number; sections: number } | null = null;
 let atMemo: { day: PassData; ne: NationalEntriesPack; minute: number; pd: PassData; sections: number; counts: Uint32Array } | null = null;
 
 /** The national flow layers (under the dots): B draws the day's totals; A+B
     the same paths with each section's trains entered by `minute`, recounted
     only when the minute, class filter, theme or file changes. */
 export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
-  const { atlas, nf, ne, minute, classes, view, dark, scale, fitScale, damped } = inp;
+  const { atlas, nf, ne, minute, classes, view, dark, scale, fitScale, damped, alpha = 1 } = inp;
   const pal = palette(dark);
   const cls = view.key;
   let updateMs = 0;
-  if (!dayMemo || dayMemo.nf !== nf || dayMemo.cls !== cls || dayMemo.dark !== dark) {
+  if (!dayMemo || dayMemo.nf !== nf || dayMemo.cls !== cls || dayMemo.dark !== dark || dayMemo.alpha !== alpha) {
     const t0 = performance.now();
     const pass = nationalFlowPasses(view.counts)[0];
-    const pd = buildPassData(atlas.sec, pass.items, pal, 1, pass.maxN);
-    dayMemo = { nf, cls, dark, pd, maxN: pass.maxN, sections: pass.items.length };
+    const pd = buildPassData(atlas.sec, pass.items, pal, alpha, pass.maxN);
+    dayMemo = { nf, cls, dark, alpha, pd, maxN: pass.maxN, sections: pass.items.length };
     updateMs = performance.now() - t0;
   }
   const day = dayMemo;
@@ -68,7 +70,7 @@ export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
       const counts = nationalCountsAt(ne, classes, minute);
       let drawn = 0;
       for (let s = 0; s < counts.length; s++) if (counts[s] > 0) drawn++;
-      atMemo = { day: day.pd, ne, minute, pd: recountPassData(day.pd, counts, pal, day.maxN), sections: drawn, counts };
+      atMemo = { day: day.pd, ne, minute, pd: recountPassData(day.pd, counts, pal, day.maxN, alpha), sections: drawn, counts };
       updateMs = performance.now() - t0;
     }
     pd = atMemo.pd;
@@ -76,7 +78,7 @@ export function nationalFlowLayers(inp: NationalFlowsInput): NationalFlows {
     drawnCounts = atMemo.counts;
   }
   // Width = flowUnits(n) * WIDTH_K / fitScale, so the national factor rides on fitScale.
-  return { layers: passDataLayers("national", pd, 1, true, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR, damped), sections, counts: drawnCounts, updateMs };
+  return { layers: passDataLayers("national", pd, alpha, alpha >= 1, pal, dark, scale, fitScale / NAT_WIDTH_FACTOR, damped), sections, counts: drawnCounts, updateMs };
 }
 
 /** The hovered section's highlight, as the origin view draws it: the whole
@@ -100,15 +102,17 @@ export function nationalHighlight(atlas: DecodedAtlas, s: number, n: number, sca
 }
 
 /** The infrastructure overlay for the sections the national flows draw
-    (those with trains under the filters), memoised per counts array. */
-const infraMemo = new WeakMap<object, InfraPass[]>();
-export function nationalInfraLayers(atlas: DecodedAtlas, counts: ArrayLike<number>, dark: boolean): Layer[] {
-  let passes = infraMemo.get(counts);
+    (those with trains under the filters), memoised per counts array and alpha. */
+const infraMemo = new WeakMap<object, Map<number, InfraPass[]>>();
+export function nationalInfraLayers(atlas: DecodedAtlas, counts: ArrayLike<number>, dark: boolean, alpha = 1): Layer[] {
+  let byAlpha = infraMemo.get(counts);
+  if (!byAlpha) infraMemo.set(counts, (byAlpha = new Map()));
+  let passes = byAlpha.get(alpha);
   if (!passes) {
     const sections: { s: number }[] = [];
     for (let s = 0; s < counts.length; s++) if (counts[s] > 0) sections.push({ s });
-    passes = [{ alpha: 1, sections: sections as InfraPass["sections"] }];
-    infraMemo.set(counts, passes);
+    passes = [{ alpha, sections: sections as InfraPass["sections"] }];
+    byAlpha.set(alpha, passes);
   }
   return infraLayers(atlas.sec, passes, palette(dark), dark);
 }

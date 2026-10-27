@@ -208,14 +208,13 @@ export function ringLayer(id: string, discs: Disc[], trigger: string | number): 
 }
 
 /** Tails under dots under dwell rings, ids `${prefix}tails | trains | dwell`. `isolated` widens the
-    tails; `bigDot` (default `isolated`) also enlarges the dot. The origin view's dots are never
+    tails and enlarges the dot (both views alike). The origin view's dots are never
     pickable; the national ones are while the clock is paused. */
 export function dotLayers(
   prefix: "" | "nat-",
   b: DotBuffers,
-  o: { pickable: boolean; isolated: boolean; bigDot?: boolean; trigger: string | number },
+  o: { pickable: boolean; isolated: boolean; trigger: string | number },
 ): Layer[] {
-  const big = o.bigDot ?? o.isolated;
   return [
     new TailLayer({
       id: prefix + "tails",
@@ -245,8 +244,8 @@ export function dotLayers(
       lineWidthUnits: "pixels",
       stroked: true,
       filled: true,
-      getRadius: big ? 4.15 : 3,
-      getLineWidth: big ? 2.7 : 2,
+      getRadius: o.isolated ? 4.15 : 3,
+      getLineWidth: o.isolated ? 2.7 : 2,
       ...(b.fill ? {} : { getFillColor: [255, 255, 255, 255] as RGBA }),
       pickable: o.pickable,
       parameters: { depthCompare: "always" },

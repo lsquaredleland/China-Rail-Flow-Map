@@ -55,6 +55,18 @@ export function getSecGeometry(secSet: DecodedSet): SecGeometryCache {
   return result;
 }
 
+/** Tail taper: the speed fraction in [0, 1] a train's tail length follows, 0 at a station halt
+ *  and 1 at cruise (sin^2 ramp over the first and last quarter of a leg, at most 3 min).
+ *  Presentation only: positions stay linear in time. */
+export function trainSpeedFrac(tau: number, durMins: number): number {
+  if (tau <= 0 || tau >= 1) return 0;
+  const accelMins = Math.min(3, durMins * 0.25);
+  const a = Math.max(0.01, Math.min(0.35, accelMins / durMins));
+  if (tau <= a) return Math.sin((Math.PI * tau) / (2 * a)) ** 2;
+  if (tau >= 1 - a) return Math.sin((Math.PI * (1 - tau)) / (2 * a)) ** 2;
+  return 1;
+}
+
 // Scratch result of trainState (single-threaded; avoids per-call allocation).
 const trainScratch = {
   dist: 0,
@@ -109,6 +121,7 @@ function trainState(pt: PrepTrain, t: number) {
   }
   const legDur = Math.max(1, legEndTime - legStartTime);
   const tau = Math.max(0, Math.min(1, (t - legStartTime) / legDur));
+  r.speedFrac = trainSpeedFrac(tau, legDur);
   r.dist = legStartDist + tau * (legEndDist - legStartDist);
 }
 
