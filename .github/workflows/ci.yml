@@ -97,6 +97,11 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Two parallel halves: the card cases and the phone map-bottom/timeline cases.
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [cards, bottom]
     defaults:
       run:
         working-directory: web
@@ -116,7 +121,7 @@ jobs:
       - name: Check cards layout in headless Chrome
         env:
           CHROME_PATH: /usr/bin/google-chrome
-        run: node tools/cards-layout.mjs
+        run: node tools/cards-layout.mjs --part ${{ matrix.part }}
 
   # O12: audit the committed pack. CI cannot rebuild it (needs the OSM
   # extract), but --pack-only needs only the pack files and goldens.json.

@@ -1,10 +1,13 @@
 // Layout check for the collapsed map cards: with the city card and the
 // train card both open, no card's bounding box may intersect the legend,
 // scale bar, 24h expand button, timeline, toolbar, header or another card.
-// usage: node tools/cards-layout.mjs [base=dist]   (env CHROME_PATH)
+// usage: node tools/cards-layout.mjs [base=dist] [--part cards|bottom]   (env CHROME_PATH)
+//   --part cards   the card cases only; --part bottom   the phone map-bottom and
+//   timeline cases only (CI runs the two as parallel jobs); default both.
 import { launch, resolveBase, parseArgs, sleep } from "./common.mjs";
 
-const { pos } = parseArgs(process.argv.slice(2));
+const { pos, opt } = parseArgs(process.argv.slice(2), ["part"]);
+const part = opt.part || "all";
 const { url, close } = await resolveBase(pos[0] || "dist");
 // A fresh browser per case: pages after the first in one software-GL browser
 // load 5x slower. rAF is throttled to 4 fps (layout only; the DOM is what is
@@ -73,7 +76,7 @@ const runCase = async ([w, h, expanded]) => {
   console.log(`${w}x${h}${expanded ? " expanded-panel" : ""}: ${boxes.cards.length} cards, ${boxes.others.length} other boxes checked`);
   await browser.close();
 };
-const queue = [...cases];
+const queue = part === "bottom" ? [] : [...cases];
 await Promise.all([0].map(async () => { for (let c; (c = queue.shift()); ) await runCase(c); }));
 // One page per phone size keeps this fast: origin and national are checked on
 // the same page (the mode switch is a click), legend open and closed by toggling.
@@ -92,7 +95,7 @@ const measure = (pg) => pg.evaluate((src) => {
     scrollW: dock ? dock.scrollWidth : 0, clientW: dock ? dock.clientWidth : 0,
   };
 });
-for (const [w, h] of [[390, 844], [390, 664], [360, 740]]) {
+for (const [w, h] of part === "cards" ? [] : [[390, 844], [390, 664], [360, 740]]) {
   const browser = await newBrowser();
   const pg = await browser.newPage();
   await pg.evaluateOnNewDocument(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
