@@ -173,7 +173,7 @@
   #originList .opt { padding: 13px 12px; }
   .toolbar button { min-height: 36px; padding: 4px 10px; font-size: 13px; }
   .toolbar .tb-mob-btn { min-height: 36px; padding: 0; }
-  #depFilter { min-height: 36px; height: 36px; font-size: 16px; padding: 4px 10px; }
+  #depFilter { min-height: 36px; height: 36px; padding: 4px 10px; }
   footer { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
   #destPanel {
     top: auto; left: 10px; right: 10px;
