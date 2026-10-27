@@ -29,5 +29,9 @@
     "pixelmatch": "8.0.0",
     "puppeteer-core": "25.16.0",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "fflate": "0.7.5",
+    "image-size": "2.0.4"
   }
 }
