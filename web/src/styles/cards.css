@@ -160,3 +160,41 @@
     animation: none;
   }
 }
+
+/* ---------- active map filter bar ----------
+   The "Filtered:" chips over the map use the same chip look as the table's
+   filter chips (.dep-chip: "Calling at", "Isolated"); restored after the
+   map-cards restyle dropped their base styles. */
+.active-filter-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  box-shadow: var(--shadow-pop);
+  padding: 5px 8px;
+  font-family: inherit;
+}
+.filter-pill-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ink-soft); user-select: none;
+}
+.filter-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--btn-on); color: var(--btn-on-ink);
+  border: 1px solid var(--btn-on);
+  border-radius: 2px; padding: 3px 6px 3px 10px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.2;
+}
+.filter-pill button {
+  background: transparent; border: 0; color: inherit;
+  width: 20px; height: 20px; min-width: 0; min-height: 0; border-radius: 2px;
+  padding: 0; font-size: 14px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.filter-pill button:hover { background: rgba(128, 128, 128, 0.25); }
+.filter-clear-all {
+  background: transparent; border: 0; min-height: 0; padding: 2px 4px;
+  font-size: 12px; font-weight: 600; color: var(--rust); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.filter-clear-all:hover { opacity: 0.8; }
