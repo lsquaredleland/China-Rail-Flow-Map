@@ -337,10 +337,13 @@ export default function DeparturesTable({
   const natSel = national?.sel ?? null;
   const natList = useMemo(() => {
     if (!natRows) return [];
-    const picked = selectNatRows(natRows, natSel);
+    // An isolated train narrows the table to that train, as in the origin view.
+    const picked = isolatedTrainCode
+      ? natRows.filter((r) => r.code === isolatedTrainCode)
+      : selectNatRows(natRows, natSel);
     const found = q ? picked.filter((r) => r.hay.indexOf(q) !== -1) : picked;
     return sortNatRows(found, natSort.key, natSort.dir);
-  }, [natRows, natSel, q, natSort]);
+  }, [natRows, natSel, q, natSort, isolatedTrainCode]);
 
   const hasExtraFilters =
     !!q ||
