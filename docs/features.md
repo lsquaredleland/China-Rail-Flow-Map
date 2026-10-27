@@ -4,18 +4,20 @@ This document tracks potential features to explore for the **China Rail Flow Map
 
 ---
 
-## Status Summary
+## Status (2026-10-27)
 
-| # | Feature | Scope | Status |
-|---|---|---|---|
-| 1 | Corridor & Single-Train Route Inspector | Frontend-only | Partly built: a train's run can be isolated on the map (timetable modal, map card); the "click a section → filter the table" half is not |
-| 2 | **Map-Coupled Histograms & Multi-Filter Flow Rendering** | Frontend-only | Completed |
-| 3 | Isochrone / Travel-Time & Speed Shading Mode | Frontend-only | Proposed |
-| 4 | Intra-City Station Terminal Filter | Frontend-only | Proposed |
-| 5 | Two-City Comparison / "Sphere of Influence" View | Frontend-only | Proposed |
-| 6 | 1-Transfer Connection Finder (`Origin → Hub → Destination`) | Frontend-only | Proposed |
-| 7 | Interactive Marey Stringline Diagram (Time × Distance Graph) | Pipeline + Frontend | Proposed |
-| 8 | National All-Trains Backbone Map ("No Origin Selected" Overview) | Pipeline + Frontend | Completed (national mode, `docs/history/DECKGL_MIGRATION.md` Phases 2–3) |
+✅ done · ◐ partial · ❌ not started
+
+| # | Feature | Scope | Status | Notes |
+|---|---|---|---|---|
+| 1 | Corridor & Single-Train Route Inspector | Frontend-only | ◐ | a train's run can be isolated on the map (timetable modal, map card); "click a section → filter the table" is not built |
+| 2 | Map-Coupled Histograms & Multi-Filter Flow Rendering | Frontend-only | ✅ | |
+| 3 | Isochrone / Travel-Time & Speed Shading Mode | Frontend-only | ❌ | |
+| 4 | Intra-City Station Terminal Filter | Frontend-only | ◐ | per-station departure counts show above the table; no station filter yet |
+| 5 | Two-City Comparison / "Sphere of Influence" View | Frontend-only | ❌ | |
+| 6 | 1-Transfer Connection Finder (`Origin → Hub → Destination`) | Frontend-only | ❌ | |
+| 7 | Interactive Marey Stringline Diagram (Time × Distance Graph) | Pipeline + Frontend | ❌ | |
+| 8 | National All-Trains Backbone Map ("No Origin Selected" Overview) | Pipeline + Frontend | ✅ | national mode (`docs/history/DECKGL_MIGRATION.md`, Phases 2–3) |
 
 ---
 
@@ -44,7 +46,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
   - A map color mode toggle that colors destination dots and corridors by **fastest travel time** (`<1h`, `1–2h`, `2–4h`, `4–8h`, `8h+` isochrone rings), **average commercial speed** (`rail / fastest`), or **track circuity** (`rail / crow`, highlighting where terrain forces detours vs. straight HSR viaducts).
 
 ### 4. Intra-City Station Terminal Filter (e.g., Beijing South vs. West vs. Chaoyang)
-- **Status:** Proposed
+- **Status:** Partly built. The departures table shows how many trains leave from each of the city's stations; filtering the map and table by station is not built.
 - **Data Available:** `DepVM` (`fsZh`/`fsEn`) and `ArrVM` (`tsZh`/`tsEn`) preserve the exact boarding/alighting station within the selected city.
 - **Description:**
   - A station chip bar when a multi-station hub is selected (such as Shanghai, Beijing, Guangzhou, Wuhan, or Chengdu), letting users isolate the directional flow footprint of each individual railway terminal on the map.

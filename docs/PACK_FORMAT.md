@@ -1,5 +1,7 @@
 # Pack format: the per-train tables files
 
+**Status:** current. Layout `crfm-tables-1` on pack `fmt` 6; the client has loaded the tables from these files since PR #140.
+
 `atlas-v2-out-tables.safetensors` and `atlas-v2-in-tables.safetensors` are what
 the client loads for the departures / arrivals tables and the train animation.
 They hold exactly the content of `atlas-v2-out-tables.json` /

@@ -1,5 +1,7 @@
 # Data pipeline: rebuilding the pack
 
+**Status:** current: the recipe for the committed pack (`fmt` 6, the 11k train export of 2026-10-25).
+
 How the data pack in `web/public/assets/` is built from OpenStreetMap and a
 timetable, and how to check a rebuild. The maintained parts are **§3 (the
 recipe, especially step 5)** and **§7 (the goldens)**. Binaries:

@@ -1,5 +1,7 @@
 # corridor-v3 — per-train corridor routing (APPLIED TO PRODUCTION)
 
+**Status:** shipped (production since 2026-10-23); the open follow-ups at the end were not revisited.
+
 Built 2026-10-22, promoted to production 2026-10-23. The design and validation
 record of `pipeline/router` as first shipped (on the 12306 pack); the router's
 current modules and config are in `pipeline/router/README.md`, the live recipe in

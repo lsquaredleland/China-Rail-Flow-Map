@@ -1,5 +1,7 @@
 # Chengdu–Chongqing Nonstop Routing — Research Report
 
+**Status:** complete (2026-10-22). The findings are the ground truth for the corridor-routing fix (`docs/PIPELINE.md` §4) and the G2450 adjudication (`docs/MANUAL_OVERRIDES.md`).
+
 Research date: 2026-10-22 (timetable date checked on 12306: 2026-10-23). All sources Chinese-language unless noted. "Verified live" = read in the research browser on the live site; "index" = read via web-index fetch/search extract.
 
 ## Summary

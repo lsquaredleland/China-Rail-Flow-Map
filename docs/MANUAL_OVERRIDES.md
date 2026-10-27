@@ -1,5 +1,7 @@
 # Hand-adjudicated leg overrides (appended to leg_overrides.json)
 
+**Status:** applied. These records are in `data/leg_overrides.json`, which the live pack is built with (`docs/PIPELINE.md` §3 step 5).
+
 ## G2450 重庆东->成都东, 111 min, via [重庆西] (Chengyu + Chongqing West branch tiling, 374.4 km vs drawn 352.3 km)
 
 Not assigned by the generic rule: the [重庆西] corridor family's floor is
