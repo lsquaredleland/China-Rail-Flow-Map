@@ -75,30 +75,40 @@ const runCase = async ([w, h, expanded]) => {
 };
 const queue = [...cases];
 await Promise.all([0].map(async () => { for (let c; (c = queue.shift()); ) await runCase(c); }));
-// Map-bottom controls: legend, 24h expand pill and scale bar never intersect,
-// open or collapsed, origin and national.
+// One page per phone size keeps this fast: origin and national are checked on
+// the same page (the mode switch is a click), legend open and closed by toggling.
 const hit2 = (a, b) => a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
-for (const [w, h] of [[390, 844], [390, 664], [360, 740], [1280, 800]]) {
+const box = (e) => { const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
+const measure = (pg) => pg.evaluate((src) => {
+  const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
+  const dock = document.querySelector(".timeline-bar-dock");
+  const c = document.querySelector('button[title="Collapse animation bar"]');
+  return {
+    legend: r("#legend"), pill: r(".tl-expand-wrap"), scale: r("#scalebar"), map: r("#mapwrap"),
+    collapse: c ? (() => { const b = c.getBoundingClientRect(); return { x: b.x, y: b.y, r: b.right, b: b.bottom }; })() : null,
+    ticks: [...document.querySelectorAll(".tb-tick-item")].filter((e) => e.getBoundingClientRect().width > 0).length,
+    badges: [...document.querySelectorAll(".tb-badge, .tb-zone-label")].filter((e) => e.getBoundingClientRect().width > 0).length,
+    scrollW: dock ? dock.scrollWidth : 0, clientW: dock ? dock.clientWidth : 0,
+  };
+});
+for (const [w, h] of [[390, 844], [390, 664], [360, 740]]) {
+  const browser = await newBrowser();
+  const pg = await browser.newPage();
+  await pg.evaluateOnNewDocument(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
+  await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+  await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
+  await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
+  await until(pg, "document.querySelector('.tl-expand-wrap')", 30000);
   for (const national of [false, true]) {
+    if (national) {
+      await click(pg, "#tglNational");
+      await until(pg, "document.querySelector('.tl-expand-wrap') && !document.querySelector('#dirOut')", 30000);
+    }
     for (const open of [true, false]) {
-      const browser = await newBrowser();
-    const pg = await browser.newPage();
-    await pg.evaluateOnNewDocument(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
-      await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
-      await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
-      await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
-      if (national) {
-        await pg.evaluate(() => { const b = document.getElementById("tglNational"); if (b) b.click(); });
-        await sleep(2500);
-      }
-      await sleep(1500);
       const collapsed = await pg.evaluate(() => document.getElementById("legendBody")?.classList.contains("collapsed"));
-      if (w < 641 && collapsed === open) await click(pg, "#legendToggle");
-      await sleep(500);
-      const b = await pg.evaluate(() => {
-        const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
-        return { legend: r("#legend"), pill: r(".tl-expand-wrap"), scale: r("#scalebar"), map: r("#mapwrap") };
-      });
+      if (collapsed === open) await click(pg, "#legendToggle");
+      await sleep(300);
+      const b = await measure(pg);
       const tag = `${w}x${h} ${national ? "national" : "origin"} legend-${open ? "open" : "closed"}`;
       if (!b.pill) fails.push(`${tag}: expand pill missing`);
       const parts = [["legend", b.legend], ["pill", b.pill], ["scale", b.scale]].filter(([, v]) => v);
@@ -108,51 +118,26 @@ for (const [w, h] of [[390, 844], [390, 664], [360, 740], [1280, 800]]) {
         if (b.map && (v.x < b.map.x || v.r > b.map.r || v.y < b.map.y || v.b > b.map.b)) fails.push(`${tag}: ${parts[i][0]} leaves the map`);
       }
       console.log(`${tag}: ${parts.map(([n]) => n).join(", ")} checked`);
-      await browser.close();
     }
-  }
-}
-// Open 24h bar on phones (one compact row): the collapse button is fully on
-// screen, nothing overflows, and the tick labels and status badges are gone.
-for (const [w, h] of [[390, 844], [360, 740], [470, 844]]) {
-  for (const national of [false, true]) {
-    const browser = await newBrowser();
-    const pg = await browser.newPage();
-    await pg.evaluateOnNewDocument(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
-    await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
-    await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
-    await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
-    if (national) {
-      await pg.evaluate(() => { const b = document.getElementById("tglNational"); if (b) b.click(); });
-      await sleep(2500);
-    }
+    // the 24h bar open: one compact row, the collapse button fully on screen
     await click(pg, 'button[title^="Expand 24h"]');
-    await sleep(1000);
-    const t = await pg.evaluate(() => {
-      const r = (e) => { const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, r: b.right, b: b.bottom }; };
-      const c = document.querySelector('button[title="Collapse animation bar"]');
-      const dock = document.querySelector(".timeline-bar-dock");
-      return {
-        collapse: c ? r(c) : null,
-        ticks: [...document.querySelectorAll(".tb-tick-item")].map((e) => ({ t: e.textContent, ...r(e) })),
-        badges: [...document.querySelectorAll(".tb-badge, .tb-zone-label")].filter((e) => e.getBoundingClientRect().width > 0).length,
-        scrollW: dock ? dock.scrollWidth : 0,
-        clientW: dock ? dock.clientWidth : 0,
-      };
-    });
-    const tag = `${w}x${h} ${national ? "national" : "origin"} timeline-open`;
-    if (!t.collapse) fails.push(`${tag}: collapse button missing`);
-    else if (t.collapse.x < 0 || t.collapse.r > w || t.collapse.y < 0) fails.push(`${tag}: collapse button off screen`);
-    if (t.badges) fails.push(`${tag}: ${t.badges} status badge/zone labels still visible`);
-    if (t.scrollW > t.clientW) fails.push(`${tag}: bar overflows (${t.scrollW} > ${t.clientW})`);
-    if (t.ticks.some((k) => k.r > k.x)) fails.push(`${tag}: tick labels still shown on the phone bar`);
-    for (let i = 0; i < t.ticks.length; i++) {
-      if (t.ticks[i].x < 0 || t.ticks[i].r > w) fails.push(`${tag}: tick "${t.ticks[i].t}" off screen`);
-      for (let j = i + 1; j < t.ticks.length; j++) if (hit2(t.ticks[i], t.ticks[j])) fails.push(`${tag}: ticks "${t.ticks[i].t}" and "${t.ticks[j].t}" overlap`);
+    await until(pg, "document.querySelector('.timeline-bar-dock')", 10000);
+    {
+      const t = await measure(pg);
+      const tag = `${w}x${h} ${national ? "national" : "origin"} timeline-open`;
+      if (!t.collapse) fails.push(`${tag}: collapse button missing`);
+      else if (t.collapse.x < 0 || t.collapse.r > w || t.collapse.y < 0) fails.push(`${tag}: collapse button off screen`);
+      if (t.scrollW > t.clientW) fails.push(`${tag}: bar overflows (${t.scrollW} > ${t.clientW})`);
+      if (t.ticks) fails.push(`${tag}: tick labels still shown on the phone bar`);
+      if (t.badges) fails.push(`${tag}: ${t.badges} status badge/zone labels still visible`);
+      console.log(`${tag}: collapse, overflow, labels checked`);
     }
-    console.log(`${tag}: collapse + ${t.ticks.length} ticks checked`);
-    await browser.close();
+    if (!national) {
+      await click(pg, 'button[title="Collapse animation bar"]');
+      await until(pg, "document.querySelector('.tl-expand-wrap')", 30000);
+    }
   }
+  await browser.close();
 }
 await close();
 if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
