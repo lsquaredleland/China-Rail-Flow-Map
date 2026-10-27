@@ -232,7 +232,18 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
 
   return (
     <div id="legend">
-      <h2 id="legendTitle">{props.title}</h2>
+      <div className="lg-head">
+        <h2 id="legendTitle">{props.title}</h2>
+        <button
+          id="legendToggle"
+          type="button"
+          aria-expanded={collapsed ? "false" : "true"}
+          aria-label={collapsed ? "Show legend" : "Hide legend"}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          {collapsed ? "Key" : "Hide"}
+        </button>
+      </div>
       <div id="legendBody" className={collapsed ? "collapsed" : undefined}>
         <svg
           id="legendSvg"
@@ -476,14 +487,6 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           </g>
         </svg>
       </div>
-      <button
-        id="legendToggle"
-        type="button"
-        aria-expanded={collapsed ? "false" : "true"}
-        onClick={() => setCollapsed((c) => !c)}
-      >
-        {collapsed ? "Show legend" : "Hide legend"}
-      </button>
     </div>
   );
 });

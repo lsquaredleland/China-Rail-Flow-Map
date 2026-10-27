@@ -140,6 +140,7 @@
   font-weight: 700;
   color: var(--ink);
 }
+.lg-head { display: contents; }
 #legendToggle { display: none; }
 
 @media (prefers-reduced-motion: reduce) {

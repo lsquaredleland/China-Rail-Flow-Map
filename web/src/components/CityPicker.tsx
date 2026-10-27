@@ -10,7 +10,9 @@ interface Props {
 
 /* Searchable origin combobox: ranked list of the 100 origins, filterable
    by English or Chinese name, with full keyboard navigation. */
-const display = (o: RawOrigin) => enName(o.en) + " · " + o.zh;
+// Phones show "Guangzhou 广州" (a space, as in the mobile design), wider screens "Guangzhou · 广州".
+const narrow = () => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+const display = (o: RawOrigin) => enName(o.en) + (narrow() ? " " : " · ") + o.zh;
 
 export default function CityPicker({ origins, curIdx, onSelect }: Props) {
   const [value, setValue] = useState("");

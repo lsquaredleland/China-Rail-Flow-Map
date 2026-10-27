@@ -77,7 +77,7 @@ export default function Toolbar({
       {!national && (
       <>
       <div className="group city-picker">
-        <label htmlFor="originSearch">Origin city</label>
+        <label htmlFor="originSearch"><span className="lb-long">Origin city</span><span className="lb-short">From</span></label>
         <CityPicker
           origins={origins}
           curIdx={originIdx}
@@ -107,24 +107,35 @@ export default function Toolbar({
       <button
         id="filtersBtn"
         type="button"
+        aria-label="Filters"
         className="tb-mob-btn"
         aria-expanded={panel === "filters" ? "true" : "false"}
         aria-controls="tbFilters"
         onClick={() => toggle("filters")}
       >
-        Filters
+        <svg className="tb-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+          <circle cx="16" cy="7" r="2.4" fill="none" stroke="currentColor" strokeWidth="2.2" />
+          <circle cx="8" cy="17" r="2.4" fill="none" stroke="currentColor" strokeWidth="2.2" />
+        </svg>
+        <span className="tb-mob-lbl">Filters</span>
         {activeFilterCount > 0 && <span className="tb-badge">{activeFilterCount}</span>}
-        <span aria-hidden="true"> ▾</span>
+        <span className="tb-mob-lbl" aria-hidden="true"> ▾</span>
       </button>
       <button
         id="moreBtn"
         type="button"
+        aria-label="Map options"
         className="tb-mob-btn"
         aria-expanded={panel === "more" ? "true" : "false"}
         aria-controls="tbMore"
         onClick={() => toggle("more")}
       >
-        Map options<span aria-hidden="true"> ▾</span>
+        <svg className="tb-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M12 3 3 8l9 5 9-5zM3 12.5l9 5 9-5M3 16.5l9 5 9-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
+        </svg>
+        <span className="tb-mob-lbl">Map options</span>
+        <span className="tb-mob-lbl" aria-hidden="true"> ▾</span>
       </button>
       <div id="tbFilters" className={"tb-panel" + (panel === "filters" ? " open" : "")}>
       <div
