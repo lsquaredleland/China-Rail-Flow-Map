@@ -105,3 +105,29 @@ describe("review fixes", () => {
     expect(target.calls).toBe(first);
   });
 });
+
+// Memory budgets (bun, forced GC; JS heap + ArrayBuffer stores). Measured
+// 2026-10-27: both directions' TA1 tables retain 23.8 MB at load (the eager
+// JSON expansion this replaced: 129.5 MB); one origin expanded adds ~4 MB.
+describe("memory budget", () => {
+  const mem = () => {
+    Bun.gc(true);
+    const m = process.memoryUsage();
+    return m.heapUsed + m.arrayBuffers;
+  };
+  const raw = ["out", "in"].map((d) => brotliDecompressSync(readFileSync(join(ASSETS, `atlas-v2-${d}-tables.ta1.br`))));
+
+  test("loading both directions' tables retains under 35 MB", () => {
+    const base = mem();
+    const out = expandOutTa1(readTa1(new Uint8Array(raw[0])));
+    const inn = expandInTa1(readTa1(new Uint8Array(raw[1])));
+    const loaded = mem() - base;
+    expect(loaded).toBeLessThan(35e6);
+    // The busiest origin (both directions) stays a few MB.
+    const before = mem();
+    for (const o of [out.origins[0]]) void [o.deps, o.calls, o.dep_secs, o.dep_chord_legs, o.dep_stop_pos];
+    for (const o of [inn.origins[0]]) void [o.arrs, o.in_calls, o.arr_secs, o.arr_chord_legs];
+    expect(mem() - before).toBeLessThan(8e6);
+    void [out, inn];
+  });
+});
