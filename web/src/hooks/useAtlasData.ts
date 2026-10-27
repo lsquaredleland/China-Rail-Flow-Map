@@ -19,8 +19,8 @@ import type {
 } from "../types";
 import {
   copyFields,
-  expandInTa1,
-  expandOutTa1,
+  expandInColumns,
+  expandOutColumns,
   prepAtlas,
   prepOutline,
   requireFmt,
@@ -43,7 +43,7 @@ import {
   SHARED_URL,
   fetchData,
   fetchInMap,
-  fetchTa1,
+  fetchColumns,
   fetchOutMap,
 } from "../data";
 import { initialDirection, matchesCity } from "./useUrlState";
@@ -164,12 +164,12 @@ export function useAtlasData({
       }
       if (flights.outTables) return;
       flights.outTables = true;
-      Promise.all([fetchTa1(OUT_TABLES_URL), loadSchedules()])
+      Promise.all([fetchColumns(OUT_TABLES_URL), loadSchedules()])
         .then(([d, sched]) => {
           requireFmt(d.fmt, OUT_TABLES_URL);
           schedData = sched;
           if (sched) setSchedulesData(sched);
-          outTablesRef.current = expandOutTa1(d);
+          outTablesRef.current = expandOutColumns(d);
           flights.outTables = false;
           setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
           applyOutTables();
@@ -188,10 +188,10 @@ export function useAtlasData({
       }
       if (flights.inTables) return;
       flights.inTables = true;
-      fetchTa1(IN_TABLES_URL)
+      fetchColumns(IN_TABLES_URL)
         .then((d) => {
           requireFmt(d.fmt, IN_TABLES_URL);
-          inTablesRef.current = expandInTa1(d);
+          inTablesRef.current = expandInColumns(d);
           flights.inTables = false;
           setLoadError((e) => (e && e.startsWith(IN_TABLES_URL) ? null : e));
           applyInTables();

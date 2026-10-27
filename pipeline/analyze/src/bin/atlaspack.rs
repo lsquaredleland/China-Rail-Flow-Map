@@ -119,8 +119,8 @@
 //!   atlas-v2-out-tables.json, atlas-v2-in-map.json, atlas-v2-in-tables.json
 //!   (shared is shared). The four origin files partition the combined
 //!   origins exactly; the packer asserts the partition before writing.
-//! - atlas-v2-out-tables.ta1 / atlas-v2-in-tables.ta1: the two tables files
-//!   as typed-array columns (`analyze_rs::ta1`), asserted to decode back to
+//! - atlas-v2-out-tables.safetensors / atlas-v2-in-tables.safetensors: the
+//!   two tables files as integer columns (`analyze_rs::columns`, docs/PACK_FORMAT.md), asserted to decode back to
 //!   the JSON exactly. The client loads these; the JSON stays for the tools.
 //! - atlas-v2-schedules.json
 //! - atlas-v2-national.json (P3.1; only when the v1 input has `national`)
@@ -210,9 +210,9 @@
 //! plus a geometry check (same point counts, coordinates within half a
 //! 1e4 step). Any mismatch aborts with a nonzero exit.
 
+use analyze_rs::columns;
 use analyze_rs::entries;
 use analyze_rs::provenance;
-use analyze_rs::ta1;
 use serde_json::{json, Map, Value};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -1249,24 +1249,24 @@ fn main() {
         by_name.push(("atlas-v2-national-entries.json", packed));
     }
 
-    // TA1 twins of the two tables files: what the client loads (ta1.rs).
+    // safetensors twins of the two tables files: what the client loads (columns.rs).
     let mut items: Vec<(&str, Vec<u8>)> = Vec::new();
     for (name, val) in &by_name {
         let twin = match *name {
-            "atlas-v2-out-tables.json" => Some(("atlas-v2-out-tables.ta1", "out-tables")),
-            "atlas-v2-in-tables.json" => Some(("atlas-v2-in-tables.ta1", "in-tables")),
+            "atlas-v2-out-tables.json" => Some(("atlas-v2-out-tables.safetensors", "out-tables")),
+            "atlas-v2-in-tables.json" => Some(("atlas-v2-in-tables.safetensors", "in-tables")),
             _ => None,
         };
         if let Some((tn, pack)) = twin {
-            let b = ta1::encode_tables(val, pack);
+            let b = columns::encode_tables(val, pack);
             assert!(
-                ta1::decode_tables(&b).as_ref() == Ok(val),
+                columns::decode_tables(&b).as_ref() == Ok(val),
                 "{tn}: does not decode back to {name}"
             );
             items.push((tn, b));
         }
     }
-    println!("ta1 tables: PASS (both decode back to their JSON exactly)");
+    println!("safetensors tables: PASS (both decode back to their JSON exactly)");
     items.extend(
         by_name
             .into_iter()

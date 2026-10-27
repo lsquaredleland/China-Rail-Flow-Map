@@ -41,18 +41,18 @@ export {
   decodeSecs,
   decodeSet,
   copyFields,
-  expandInTa1,
+  expandInColumns,
   expandInTables,
-  expandOutTa1,
+  expandOutColumns,
   expandOutTables,
-  isTa1,
-  readTa1,
+  isSafetensors,
+  readSafetensors,
   flatBB,
   prepAtlas,
   prepOutline,
   requireFmt,
 } from "./decode";
-export type { Ta1 } from "./decode";
+export type { Columns } from "./decode";
 export {
   haversineKm,
   stationLabel,

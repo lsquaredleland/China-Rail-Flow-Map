@@ -70,7 +70,7 @@
       ]
     },
     {
-      "source": "/assets/(.*)\\.ta1\\.br",
+      "source": "/assets/(.*)\\.safetensors\\.br",
       "headers": [
         {
           "key": "Content-Encoding",

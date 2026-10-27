@@ -190,7 +190,7 @@ export function decodeFlows(rows: RawFlow[] | undefined): void {
 // Copy an expanded origin with copyFields, not Object.assign or spread
 // (those read every getter and so expand every origin).
 
-/** What the per-row expansion reads from a tables pack, JSON or TA1. */
+/** What the per-row expansion reads from a tables pack, JSON or safetensors. */
 interface TableSource<Row, Call> {
   n: number;
   rows(o: number): Row[];
@@ -341,64 +341,67 @@ export function expandInTables(d: InTablesPack): InTablesData {
   };
 }
 
-/* ---------- TA1: the tables as typed-array columns ---------- */
-// Layout and columns: pipeline/analyze/src/ta1.rs. The columns are views
-// into the fetched buffer (no parse, no per-row objects); only an origin's
-// rows that are read get materialised, by the expansion above.
+/* ---------- the tables as safetensors integer columns ---------- */
+// Container: safetensors (u64 header length, JSON header, tensors back to
+// back); the tensors and what they mean: docs/PACK_FORMAT.md; the writer:
+// pipeline/analyze/src/columns.rs. The columns are views into the fetched
+// buffer (no parse, no per-row objects); only an origin's rows that are
+// read get materialised, by the expansion above.
 
-type Ta1Array = Int16Array | Int32Array | Uint32Array;
+/** `__metadata__.format` of the files this reader understands. */
+const COLUMNS_FORMAT = "crfm-tables-1";
 
-interface Ta1Column {
-  name: string;
-  type: "i16" | "i32" | "u32";
-  width: number;
-  length: number;
-  offset: number;
-}
+type ColumnArray = Int16Array | Int32Array | Uint32Array;
 
-export interface Ta1 {
+const DTYPES = { I16: Int16Array, I32: Int32Array, U32: Uint32Array } as const;
+
+export interface Columns {
   fmt: number;
   pack: string;
-  meta: { chords: [number, ChordLeg[]][] };
-  cols: Record<string, { width: number; v: Ta1Array }>;
+  cols: Record<string, { width: number; v: ColumnArray }>;
 }
 
-/** Does `u8` start with the TA1 magic? */
-export function isTa1(u8: Uint8Array): boolean {
-  return u8.length >= 8 && u8[0] === 0x54 && u8[1] === 0x41 && u8[2] === 0x31 && u8[3] === 0;
+/** Does `u8` look like a safetensors file (and not, say, an HTML fallback)? */
+export function isSafetensors(u8: Uint8Array): boolean {
+  if (u8.length < 10 || u8[8] !== 0x7b) return false;
+  const dv = new DataView(u8.buffer, u8.byteOffset, 8);
+  return dv.getUint32(4, true) === 0 && dv.getUint32(0, true) < u8.length;
 }
 
-/** Read a TA1 file into column views. Throws on anything else. */
-export function readTa1(bytes: Uint8Array): Ta1 {
-  if (!isTa1(bytes)) throw new Error("not a TA1 file");
-  // Typed views need aligned offsets; a fetched buffer starts at 0, a
-  // pooled Node buffer may not.
-  const u8 = bytes.byteOffset % 8 === 0 ? bytes : bytes.slice();
-  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
-  const hl = dv.getUint32(4, true);
+/** Read a tables safetensors file into column views. Throws on anything else. */
+export function readSafetensors(u8: Uint8Array): Columns {
+  if (!isSafetensors(u8)) throw new Error("not a safetensors file");
+  const hl = new DataView(u8.buffer, u8.byteOffset, 8).getUint32(0, true);
   const h = JSON.parse(new TextDecoder().decode(u8.subarray(8, 8 + hl)));
-  const body = u8.byteOffset + Math.ceil((8 + hl) / 8) * 8;
-  const cols: Ta1["cols"] = {};
-  for (const c of h.columns as Ta1Column[]) {
-    const at = body + c.offset;
+  const md = h.__metadata__ || {};
+  if (md.format !== COLUMNS_FORMAT) throw new Error(`not a ${COLUMNS_FORMAT} file`);
+  const body = u8.byteOffset + 8 + hl;
+  const cols: Columns["cols"] = {};
+  for (const [name, t] of Object.entries(h) as [string, { dtype: keyof typeof DTYPES; shape: number[]; data_offsets: [number, number] }][]) {
+    if (name === "__metadata__") continue;
+    const Arr = DTYPES[t.dtype];
+    if (!Arr) throw new Error(`${name}: unsupported dtype ${t.dtype}`);
+    const [b0, b1] = t.data_offsets;
+    const n = (b1 - b0) / Arr.BYTES_PER_ELEMENT;
+    const at = body + b0;
+    // Our writer keeps every tensor aligned; copy one that is not (another
+    // writer, or a pooled Node buffer).
     const v =
-      c.type === "i16"
-        ? new Int16Array(u8.buffer, at, c.length)
-        : c.type === "i32"
-          ? new Int32Array(u8.buffer, at, c.length)
-          : new Uint32Array(u8.buffer, at, c.length);
-    cols[c.name] = { width: c.width, v };
+      at % Arr.BYTES_PER_ELEMENT === 0
+        ? new Arr(u8.buffer as ArrayBuffer, at, n)
+        : new Arr(u8.slice(8 + hl + b0, 8 + hl + b1).buffer);
+    cols[name] = { width: t.shape[1] ?? 1, v };
   }
-  return { fmt: h.fmt, pack: h.pack, meta: h.meta, cols };
+  return { fmt: Number(md.fmt), pack: md.pack, cols };
 }
 
-function ta1Source<Row, Call>(t: Ta1, rowsKey: string, markKey: string, listsKey: string): TableSource<Row, Call> {
+function columnsSource<Row, Call>(t: Columns, rowsKey: string, markKey: string, listsKey: string): TableSource<Row, Call> {
   const col = (name: string) => {
     const c = t.cols[name];
-    if (!c) throw new Error(`TA1 ${t.pack}: no column ${name}`);
+    if (!c) throw new Error(`${t.pack}: no column ${name}`);
     return c;
   };
-  const rowsOf = (v: Ta1Array, w: number, r0: number, r1: number) => {
+  const rowsOf = (v: ColumnArray, w: number, r0: number, r1: number) => {
     const out = new Array(r1 - r0);
     for (let r = r0; r < r1; r++) out[r - r0] = slice(v, r * w, r * w + w);
     return out;
@@ -412,6 +415,13 @@ function ta1Source<Row, Call>(t: Ta1, rowsKey: string, markKey: string, listsKey
   const callOff = col("call_off").v;
   const calls = col(listsKey);
   const stop = t.cols.stop_off && { off: t.cols.stop_off.v, v: col("stop_pos").v };
+  const chordTrain = col("chord_train").v;
+  const chordOff = col("chord_off").v;
+  const chordLegs = col("chord_legs").v;
+  const chords: [number, ChordLeg[]][] = Array.from(chordTrain, (tr, i) => [
+    tr,
+    rowsOf(chordLegs, 3, chordOff[i], chordOff[i + 1]) as ChordLeg[],
+  ]);
   return {
     n: rowOff.length - 1,
     rows: (o) => rowsOf(rows.v, rows.width, rowOff[o], rowOff[o + 1]),
@@ -424,20 +434,20 @@ function ta1Source<Row, Call>(t: Ta1, rowsKey: string, markKey: string, listsKey
     mark: (o) => mark.subarray(rowOff[o], rowOff[o + 1]),
     path: (t) => paths.subarray(pathOff[t], pathOff[t + 1]),
     stopPos: (t) => (stop ? stop.v.subarray(stop.off[t], stop.off[t + 1]) : []),
-    chords: t.meta.chords,
+    chords,
   };
 }
 
-/** The out tables from atlas-v2-out-tables.ta1 (lazy per origin). */
-export function expandOutTa1(t: Ta1): OutTablesData {
-  if (t.pack !== "out-tables") throw new Error(`TA1: expected out-tables, got ${t.pack}`);
-  return { origins: outOrigins(ta1Source<RawDep, RawCall>(t, "deps", "dep_off", "calls")) };
+/** The out tables from atlas-v2-out-tables.safetensors (lazy per origin). */
+export function expandOutColumns(t: Columns): OutTablesData {
+  if (t.pack !== "out-tables") throw new Error(`expected out-tables, got ${t.pack}`);
+  return { origins: outOrigins(columnsSource<RawDep, RawCall>(t, "deps", "dep_off", "calls")) };
 }
 
-/** The in tables from atlas-v2-in-tables.ta1 (lazy per origin). */
-export function expandInTa1(t: Ta1): InTablesData {
-  if (t.pack !== "in-tables") throw new Error(`TA1: expected in-tables, got ${t.pack}`);
-  return { origins: inOrigins(ta1Source<RawArr, RawInCall>(t, "arrs", "arr_len", "in_calls")) };
+/** The in tables from atlas-v2-in-tables.safetensors (lazy per origin). */
+export function expandInColumns(t: Columns): InTablesData {
+  if (t.pack !== "in-tables") throw new Error(`expected in-tables, got ${t.pack}`);
+  return { origins: inOrigins(columnsSource<RawArr, RawInCall>(t, "arrs", "arr_len", "in_calls")) };
 }
 
 /** Decode a travel-ordered path into its flow sections: `~s` marks a

@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use analyze_rs::chains;
 use analyze_rs::cn::*;
+use analyze_rs::columns;
 use analyze_rs::entries;
 use analyze_rs::geo::*;
 use analyze_rs::inputs;
@@ -15,7 +16,6 @@ use analyze_rs::names::*;
 use analyze_rs::pack;
 use analyze_rs::polyline::*;
 use analyze_rs::provenance;
-use analyze_rs::ta1;
 use analyze_rs::timetable::*;
 
 #[derive(Default, Clone)]
@@ -189,7 +189,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         None => println!("AUDIT pack build: none (pack predates the provenance block)"),
     }
     let mut ok = check_formats(&shared, &out_map, &in_map, &out_t, &in_t);
-    ok &= check_ta1(dir, &out_t, &in_t);
+    ok &= check_columns(dir, &out_t, &in_t);
     ok &= check_city_points(&shared);
     if ok {
         expand_tables(&mut out_t, true);
@@ -268,16 +268,16 @@ fn check_about(shared: &Value) -> i64 {
     i64::from(bad)
 }
 
-/// The TA1 tables (what the client loads) decode to exactly the JSON tables
-/// every other check reads (ta1.rs).
-fn check_ta1(dir: &Path, out_t: &Value, in_t: &Value) -> bool {
+/// The safetensors tables (what the client loads) decode to exactly the JSON
+/// tables every other check reads (columns.rs).
+fn check_columns(dir: &Path, out_t: &Value, in_t: &Value) -> bool {
     let mut ok = true;
     for (name, t) in [
-        ("atlas-v2-out-tables.ta1", out_t),
-        ("atlas-v2-in-tables.ta1", in_t),
+        ("atlas-v2-out-tables.safetensors", out_t),
+        ("atlas-v2-in-tables.safetensors", in_t),
     ] {
         let same = pack::exists(dir, name)
-            && ta1::decode_tables(&pack::read_bytes(dir, name)).as_ref() == Ok(t);
+            && columns::decode_tables(&pack::read_bytes(dir, name)).as_ref() == Ok(t);
         println!(
             "AUDIT pack {name}: {}",
             if same {

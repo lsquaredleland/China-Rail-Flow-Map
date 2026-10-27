@@ -1,6 +1,6 @@
 import type { InMapData, OutMapData, SharedData } from "./types";
-import { decodeFlows, isTa1, readTa1, requireFmt } from "./lib";
-import type { Ta1 } from "./lib";
+import { decodeFlows, isSafetensors, readSafetensors, requireFmt } from "./lib";
+import type { Columns } from "./lib";
 import { maybeReloadForStale } from "./staleReload";
 
 // The v2 atlas dataset ships in five split files (same origin order
@@ -21,11 +21,11 @@ import { maybeReloadForStale } from "./staleReload";
 // merge goes into the origins in place, by index.
 export const SHARED_URL = "assets/atlas-v2-shared.json";
 const OUT_MAP_URL = "assets/atlas-v2-out-map.json";
-// The tables files ship as TA1 typed-array columns (decode.ts readTa1):
+// The tables files ship as safetensors integer columns (docs/PACK_FORMAT.md):
 // the same content as the JSON tables, without the parse or the heap.
-export const OUT_TABLES_URL = "assets/atlas-v2-out-tables.ta1";
+export const OUT_TABLES_URL = "assets/atlas-v2-out-tables.safetensors";
 export const IN_MAP_URL = "assets/atlas-v2-in-map.json";
-export const IN_TABLES_URL = "assets/atlas-v2-in-tables.ta1";
+export const IN_TABLES_URL = "assets/atlas-v2-in-tables.safetensors";
 export const OUTLINE_URL = "assets/china-outline.json";
 // Every data file carries the pack format (fmt 6: renumbered sections,
 // delta-coded map flows, per-train paths with station throats); older packs would draw wrong,
@@ -99,25 +99,26 @@ export function aboutText(shared: Pick<SharedData, "about" | "calendar">): strin
   return ABOUT_PROSE + (shared.about?.source ?? sourceSentence(shared.calendar));
 }
 
-/* Fetch one TA1 file, as fetchData: the Brotli twin (vercel.json sends it
-   with Content-Encoding: br, so the bytes start with the TA1 magic), else
-   the plain file. A TA1 file that fails to read throws (not a fallback). */
-export async function fetchTa1(url: string): Promise<Ta1> {
+/* Fetch one safetensors tables file, as fetchData: the Brotli twin
+   (vercel.json sends it with Content-Encoding: br, so the bytes are the
+   file itself), else the plain file. A file that fails to read throws (not
+   a fallback). */
+export async function fetchColumns(url: string): Promise<Columns> {
   let u8: Uint8Array | null = null;
   try {
     const u = brUrl(url);
     const res = await fetch(u);
     if (!res.ok && maybeReloadForStale(res.status, u)) {
-      return new Promise<Ta1>(() => {}); // the page is about to reload
+      return new Promise<Columns>(() => {}); // the page is about to reload
     }
     if (res.ok) u8 = new Uint8Array(await res.arrayBuffer());
   } catch {
     /* fall through to the plain file */
   }
-  if (u8 && isTa1(u8)) return readTa1(u8);
+  if (u8 && isSafetensors(u8)) return readSafetensors(u8);
   const r = await fetch(url);
   if (!r.ok) throw new Error("HTTP " + r.status);
-  return readTa1(new Uint8Array(await r.arrayBuffer()));
+  return readSafetensors(new Uint8Array(await r.arrayBuffer()));
 }
 
 /* Fetch one dataset file, preferring its Brotli twin (the .br asset).

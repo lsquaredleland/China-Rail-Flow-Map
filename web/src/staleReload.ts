@@ -8,8 +8,8 @@ const RELOAD_KEY = "staleReloadAt";
 export const RELOAD_COOLDOWN_MS = 60_000;
 export const RELOAD_NOTICE = "A newer version of the map is available — reloading…";
 
-/* Hashed pack, e.g. assets/out-tables.1a2b3c4d.json.br (or .ta1.br) */
-const HASHED_PACK = /(^|\/)assets\/[^/?#]+\.[0-9a-f]{8}\.(json|ta1)\.br(\?|#|$)/;
+/* Hashed pack, e.g. assets/out-tables.1a2b3c4d.json.br (or .safetensors.br) */
+const HASHED_PACK = /(^|\/)assets\/[^/?#]+\.[0-9a-f]{8}\.(json|safetensors)\.br(\?|#|$)/;
 
 /* Pure decision: reload only for an HTTP 404 on a hashed pack, and not if a
    reload already happened within the cooldown (guards a reload loop when the

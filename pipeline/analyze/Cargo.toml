@@ -10,3 +10,7 @@ quick-xml = "0.38"
 brotli = "9"
 rayon = "1.12"
 sha2 = "0.10"
+
+[dev-dependencies]
+# Reference reader: tests check our hand-written files against it.
+safetensors = "0.8"
