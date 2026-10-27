@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -100,6 +101,18 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
       !!window.matchMedia &&
       window.matchMedia("(max-width: 640px)").matches,
   );
+
+  // Phones start with the legend hidden; also when the window narrows to phone
+  // width after load (e.g. a desktop browser switched to a mobile viewport).
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setCollapsed(true);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useImperativeHandle(
     ref,

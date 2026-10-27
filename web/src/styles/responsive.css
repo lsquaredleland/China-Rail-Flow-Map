@@ -11,6 +11,14 @@
   }
   /* Class filter behind its own button, like the top Filters. */
   .dep-tools .cls-filter { display: none; flex: 1 1 100%; }
+  /* The class button sits right of the search box and matches it. */
+  .dep-tools { column-gap: 8px; }
+  .dep-tools #depFilter { flex: 1 1 0; width: auto; min-width: 0; }
+  .dep-tools .dep-showing { flex: 1 1 100%; }
+  .dep-tools .dep-cls-btn {
+    flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px;
+    border: 1.5px solid var(--panel-edge); border-radius: 3px; background: var(--field);
+  }
   .dep-tools.cls-open .cls-filter { display: inline-flex; }
   #mapwrap { height: 68vh; height: 68dvh; min-height: 400px; }
   header { padding: 12px 16px 10px; }
@@ -107,11 +115,11 @@
   #legend:has(#legendBody.collapsed) h2 { display: none; }
   #legend:has(#legendBody.collapsed) #legendToggle {
     align-self: flex-start;
-    padding: 12px 11px;
+    padding: 6px 8px;
     border: 1.5px solid var(--ink); border-radius: 0;
     background: var(--panel);
     color: var(--ink); text-decoration: none;
-    font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   }
   .cls-btn { min-height: 40px; min-width: 40px; }
   /* The origin picker is one framed row: FROM, the city in bold, a chevron. */
