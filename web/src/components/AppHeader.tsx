@@ -50,7 +50,7 @@ export default function AppHeader({
           </svg>
         </span>
         <span>
-          China Rail Flow Map <span className="zh">· 铁路客流图</span>
+          China Rail Flow Map <span className="zh"><span className="zh-sep">· </span>铁路客流图</span>
         </span>
       </h1>
       <div className="group units mode-switch" role="group" aria-label="View">

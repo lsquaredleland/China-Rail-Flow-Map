@@ -31,6 +31,7 @@
   color: var(--ink-soft);
 }
 .dep-st { display: inline-block; }
+.dep-st-more { display: none; }
 .dep-st b { color: var(--ink); font-weight: 700; }
 .dep-st-en { opacity: 0.8; }
 .dep-of { color: var(--ink-soft); font-weight: 500; font-size: 0.7em; }

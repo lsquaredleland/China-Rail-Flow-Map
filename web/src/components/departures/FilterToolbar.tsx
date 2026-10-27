@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type {
   CityPointVM,
@@ -68,8 +69,9 @@ export default function FilterToolbar({
     );
   };
 
+  const [clsOpen, setClsOpen] = useState(false);
   return (
-<div className="dep-tools">
+<div className={"dep-tools" + (clsOpen ? " cls-open" : "")}>
   <input
     id="depFilter"
     type="search"
@@ -78,6 +80,20 @@ export default function FilterToolbar({
     value={query}
     onChange={(e) => onQueryChange(e.target.value)}
   />
+  <button
+    type="button"
+    className="tb-mob-btn dep-cls-btn"
+    aria-label="Train class filter"
+    aria-expanded={clsOpen}
+    onClick={() => setClsOpen((v) => !v)}
+  >
+    <svg className="tb-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="16" cy="7" r="2.4" fill="none" stroke="currentColor" strokeWidth="2.2" />
+      <circle cx="8" cy="17" r="2.4" fill="none" stroke="currentColor" strokeWidth="2.2" />
+    </svg>
+    {selectedClasses.length > 0 && <span className="tb-badge">{selectedClasses.length}</span>}
+  </button>
   <div
     className="cls-filter"
     role="group"

@@ -1,4 +1,17 @@
 @media (max-width: 640px) {
+  /* The Chinese title on its own line. */
+  h1 .zh { display: block; }
+  h1 .zh-sep { display: none; }
+  /* Station breakdown: the first two, the rest behind "+N more". */
+  .dep-stations:not(.open) .dep-st:nth-of-type(n+3) { display: none; }
+  .dep-stations .dep-st-more {
+    display: inline;
+    margin-left: 6px; padding: 0; border: 0; background: none;
+    font: inherit; color: var(--ink); text-decoration: underline; cursor: pointer;
+  }
+  /* Class filter behind its own button, like the top Filters. */
+  .dep-tools .cls-filter { display: none; flex: 1 1 100%; }
+  .dep-tools.cls-open .cls-filter { display: inline-flex; }
   #mapwrap { height: 68vh; height: 68dvh; min-height: 400px; }
   header { padding: 12px 16px 10px; }
   /* Compact on phones: the header switcher and dropdown buttons are ~36 px
