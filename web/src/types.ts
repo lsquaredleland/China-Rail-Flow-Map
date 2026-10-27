@@ -47,7 +47,7 @@ export type RawFlow = number[];
      1 if the train terminates in this city else 0,
      optional sec_cnt (number of section indices from origin to this stop)].
     Clock times are integer minutes since midnight. */
-type RawCall = [number, number, number, number, number, number?];
+export type RawCall = [number, number, number, number, number, number?];
 
 /** [city index, trains, fast, terminating, fastest min, median min, crow km, rail km]
     rail km is -1 when unknown (e.g. Hong Kong's unrouted tunnel leg). */
@@ -62,7 +62,7 @@ type RawSrc = RawDest;
      arrival minutes in the origin city, arrival day offset from boarding day,
      1 if the train originates in the source city else 0, boarding-station index,
      optional sec_cnt (number of section indices from boarding stop to origin)]. */
-type RawInCall = [number, number, number, number, number, number, number?];
+export type RawInCall = [number, number, number, number, number, number, number?];
 
 /** One train arriving in the origin city, positional:
     [train-table index, origin-station index (where the train truly starts),
@@ -70,7 +70,7 @@ type RawInCall = [number, number, number, number, number, number, number?];
      arrival-station index in this city, arrival minutes in this city,
      duration minutes origin to this city, stops before this city,
      rail journey km from the origin; -1 when unknown]. */
-type RawArr = [
+export type RawArr = [
   number, number, number, number, number, number, number, number, number,
 ];
 
@@ -79,7 +79,7 @@ type RawArr = [
      to-station index, to-city index, arrival minutes,
      duration minutes, stops,
      exact journey distance by rail to the final stop; -1 when any leg is unrouted]. */
-type RawDep = [
+export type RawDep = [
   number, number, number, number, number, number, number, number, number,
 ];
 

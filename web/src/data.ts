@@ -1,5 +1,6 @@
 import type { InMapData, OutMapData, SharedData } from "./types";
-import { decodeFlows, requireFmt } from "./lib";
+import { decodeFlows, isTa1, readTa1, requireFmt } from "./lib";
+import type { Ta1 } from "./lib";
 import { maybeReloadForStale } from "./staleReload";
 
 // The v2 atlas dataset ships in five split files (same origin order
@@ -20,9 +21,11 @@ import { maybeReloadForStale } from "./staleReload";
 // merge goes into the origins in place, by index.
 export const SHARED_URL = "assets/atlas-v2-shared.json";
 const OUT_MAP_URL = "assets/atlas-v2-out-map.json";
-export const OUT_TABLES_URL = "assets/atlas-v2-out-tables.json";
+// The tables files ship as TA1 typed-array columns (decode.ts readTa1):
+// the same content as the JSON tables, without the parse or the heap.
+export const OUT_TABLES_URL = "assets/atlas-v2-out-tables.ta1";
 export const IN_MAP_URL = "assets/atlas-v2-in-map.json";
-export const IN_TABLES_URL = "assets/atlas-v2-in-tables.json";
+export const IN_TABLES_URL = "assets/atlas-v2-in-tables.ta1";
 export const OUTLINE_URL = "assets/china-outline.json";
 // Every data file carries the pack format (fmt 6: renumbered sections,
 // delta-coded map flows, per-train paths with station throats); older packs would draw wrong,
@@ -94,6 +97,28 @@ function sourceSentence(calendar: readonly string[] | undefined): string {
 
 export function aboutText(shared: Pick<SharedData, "about" | "calendar">): string {
   return ABOUT_PROSE + (shared.about?.source ?? sourceSentence(shared.calendar));
+}
+
+/* Fetch one TA1 file, as fetchData: the Brotli twin (vercel.json sends it
+   with Content-Encoding: br, so the bytes start with the TA1 magic), else
+   the plain file. */
+export async function fetchTa1(url: string): Promise<Ta1> {
+  try {
+    const u = brUrl(url);
+    const res = await fetch(u);
+    if (!res.ok && maybeReloadForStale(res.status, u)) {
+      return new Promise<Ta1>(() => {}); // the page is about to reload
+    }
+    if (res.ok) {
+      const u8 = new Uint8Array(await res.arrayBuffer());
+      if (isTa1(u8)) return readTa1(u8);
+    }
+  } catch {
+    /* fall through to the plain file */
+  }
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return readTa1(new Uint8Array(await r.arrayBuffer()));
 }
 
 /* Fetch one dataset file, preferring its Brotli twin (the .br asset).

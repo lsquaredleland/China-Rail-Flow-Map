@@ -40,13 +40,19 @@ export {
   decodeFlows,
   decodeSecs,
   decodeSet,
+  copyFields,
+  expandInTa1,
   expandInTables,
+  expandOutTa1,
   expandOutTables,
+  isTa1,
+  readTa1,
   flatBB,
   prepAtlas,
   prepOutline,
   requireFmt,
 } from "./decode";
+export type { Ta1 } from "./decode";
 export {
   haversineKm,
   stationLabel,

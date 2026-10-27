@@ -29,6 +29,18 @@ pub fn read_text(dir: &Path, name: &str) -> String {
     }
 }
 
+/// The bytes of pack file `name` in `dir`, brotli-decoded when it is
+/// `<name>.br` (as [`read_text`]).
+pub fn read_bytes(dir: &Path, name: &str) -> Vec<u8> {
+    let br = dir.join(format!("{name}.br"));
+    if br.exists() {
+        brotli_decode(&fs::read(&br).unwrap_or_else(|e| panic!("read {}: {e}", br.display())))
+    } else {
+        let p = dir.join(name);
+        fs::read(&p).unwrap_or_else(|e| panic!("read {}: {e}", p.display()))
+    }
+}
+
 /// Is pack file `name` in `dir`, as `<name>.br` or `<name>`?
 pub fn exists(dir: &Path, name: &str) -> bool {
     dir.join(format!("{name}.br")).exists() || dir.join(name).exists()

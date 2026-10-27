@@ -15,6 +15,7 @@ use analyze_rs::names::*;
 use analyze_rs::pack;
 use analyze_rs::polyline::*;
 use analyze_rs::provenance;
+use analyze_rs::ta1;
 use analyze_rs::timetable::*;
 
 #[derive(Default, Clone)]
@@ -188,6 +189,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         None => println!("AUDIT pack build: none (pack predates the provenance block)"),
     }
     let mut ok = check_formats(&shared, &out_map, &in_map, &out_t, &in_t);
+    ok &= check_ta1(dir, &out_t, &in_t);
     ok &= check_city_points(&shared);
     if ok {
         expand_tables(&mut out_t, true);
@@ -267,6 +269,29 @@ fn check_about(shared: &Value) -> i64 {
 }
 
 /// Every table and map file carries `fmt: 6`.
+/// The TA1 tables (what the client loads) decode to exactly the JSON tables
+/// every other check reads (ta1.rs).
+fn check_ta1(dir: &Path, out_t: &Value, in_t: &Value) -> bool {
+    let mut ok = true;
+    for (name, t) in [
+        ("atlas-v2-out-tables.ta1", out_t),
+        ("atlas-v2-in-tables.ta1", in_t),
+    ] {
+        let same = pack::exists(dir, name)
+            && ta1::decode_tables(&pack::read_bytes(dir, name)).as_ref() == Ok(t);
+        println!(
+            "AUDIT pack {name}: {}",
+            if same {
+                "PASS (equals its JSON)"
+            } else {
+                "FAIL (missing or differs from its JSON)"
+            }
+        );
+        ok &= same;
+    }
+    ok
+}
+
 fn check_formats(
     shared: &Value,
     out_map: &Value,

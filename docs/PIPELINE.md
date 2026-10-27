@@ -163,6 +163,7 @@ Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
 ./target/release/atlas        # → china-flow-atlas-data.json (v1 combined)
 ./target/release/atlaspack    # → the v2 pack + combined v2:
 #   atlas-v2-{shared,out-map,out-tables,in-map,in-tables,schedules}.json(.br)
+#   atlas-v2-{out-tables,in-tables}.ta1(.br)  (the tables as TA1 columns)
 #   atlas-v2-{national,national-trains,national-entries,national-index}.json(.br)
 #   china-flow-atlas-data-v2.json(.br)  (original section numbering)
 ./target/release/audit        # the audit gate — must report:
@@ -173,7 +174,11 @@ Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
 the `.json.br` files the web app fetches: `atlas-v2-{shared,out-map,out-tables,in-map,in-tables,schedules}.json.br`,
 the national files `atlas-v2-{national,national-trains,national-entries}.json.br`
 (fetched only in national mode; shipped since 2026-10-25) and
-`china-outline.json.br`. Copy just those. The combined `atlas-v2-{out,in}.json.br`
+`china-outline.json.br`, plus `atlas-v2-{out-tables,in-tables}.ta1.br`. Copy just those.
+The client loads the tables from the `.ta1.br` twins (typed-array columns,
+`pipeline/analyze/src/ta1.rs`); the two `*-tables.json.br` stay in the
+directory for `audit`, the tests and the tools, and `bundle.mjs` leaves them
+out of `dist/`. `audit` fails a pack whose `.ta1` does not decode to its JSON. The combined `atlas-v2-{out,in}.json.br`
 and the plain `.json` copies (`atlas-v2-schedules.json`, `china-outline.json`)
 are not fetched by the app (it loads `<url>.br`, with a plain `.json` fallback
 that is not deployed) and only add to the deploy size.

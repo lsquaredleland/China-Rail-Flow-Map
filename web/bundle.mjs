@@ -7,18 +7,22 @@ import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:z
 import { relative, resolve, sep } from "node:path";
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 
-// Content-hash the Brotli data packs: public/assets/<name>.json.br is
-// served as dist/assets/<name>.<hash8>.json.br so the files can be
+// Content-hash the Brotli data packs: public/assets/<name>.json.br (and
+// <name>.ta1.br) is served as dist/assets/<name>.<hash8>.json.br so the files can be
 // `immutable`, and the name -> hashed-path map is baked into the bundle
 // (index.html is the revalidated entry point that carries it). Source
 // names stay unchanged for the pipeline scripts.
+// The JSON tables stay in public/assets for the tests and pipeline tools;
+// the client loads their .ta1 twins, so they are not deployed.
+const TOOLS_ONLY = new Set(["atlas-v2-out-tables.json.br", "atlas-v2-in-tables.json.br"]);
 const assetManifest = {};
 const hashedAssets = [];
 for (const f of readdirSync("public/assets")) {
-  if (!f.endsWith(".json.br")) continue;
+  const ext = /\.(json|ta1)\.br$/.exec(f);
+  if (!ext || TOOLS_ONLY.has(f)) continue;
   const bytes = readFileSync(`public/assets/${f}`);
   const h = createHash("sha256").update(bytes).digest("hex").slice(0, 8);
-  const hashed = f.replace(/\.json\.br$/, `.${h}.json.br`);
+  const hashed = f.replace(ext[0], `.${h}.${ext[1]}.br`);
   assetManifest[`assets/${f.slice(0, -3)}`] = `assets/${hashed}`;
   hashedAssets.push([f, hashed, bytes]);
 }
@@ -166,6 +170,7 @@ for (const [f, hashed, bytes] of hashedAssets) {
   rmSync(`dist/assets/${f}`);
   writeFileSync(`dist/assets/${hashed}`, bytes);
 }
+for (const f of TOOLS_ONLY) rmSync(`dist/assets/${f}`, { force: true });
 // Hashed lazy chunks (deck.gl etc.).
 mkdirSync("dist/assets", { recursive: true });
 for (const o of chunkOuts) writeFileSync(`dist/${o.rel}`, o.contents);

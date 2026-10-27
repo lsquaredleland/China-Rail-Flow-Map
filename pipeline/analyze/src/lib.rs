@@ -34,5 +34,6 @@ pub mod pack;
 pub mod packdiff;
 pub mod polyline;
 pub mod provenance;
+pub mod ta1;
 pub mod timetable;
 pub mod trainpath;

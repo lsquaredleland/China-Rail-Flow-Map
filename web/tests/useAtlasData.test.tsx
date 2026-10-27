@@ -100,7 +100,15 @@ describe("useAtlasData failure flags", () => {
       Promise.resolve({
         ok: true,
         status: 200,
-        arrayBuffer: () => Promise.resolve(new TextEncoder().encode(JSON.stringify({ fmt: 999 })).buffer),
+        // The tables files are TA1: magic, header length, JSON header.
+        arrayBuffer: () => {
+          const h = new TextEncoder().encode(JSON.stringify({ fmt: 999, pack: "out-tables", meta: { chords: [] }, columns: [] }));
+          const b = new Uint8Array(8 + h.length);
+          b.set([0x54, 0x41, 0x31, 0]);
+          new DataView(b.buffer).setUint32(4, h.length, true);
+          b.set(h, 8);
+          return Promise.resolve(b.buffer);
+        },
         json: () => Promise.resolve({ fmt: 999 }),
       })) as any;
 
