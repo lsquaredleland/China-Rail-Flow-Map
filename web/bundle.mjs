@@ -174,8 +174,35 @@ for (const f of TOOLS_ONLY) rmSync(`dist/assets/${f}`, { force: true });
 // Hashed lazy chunks (deck.gl etc.).
 mkdirSync("dist/assets", { recursive: true });
 for (const o of chunkOuts) writeFileSync(`dist/${o.rel}`, o.contents);
-writeFileSync(
-  "dist/index.html",
-  tpl.replace("/*__CSS__*/", () => css).replace("/*__BUNDLE__*/", () => js),
-);
+// Content Security Policy as a <meta> tag: the two inline scripts (theme
+// bootstrap, the entry bundle) are allowed by their SHA-256 hashes, so no other
+// inline script can run. deck.gl's loaders start workers from blob: URLs. The
+// Google hosts are the ones GA4 documents. frame-ancestors only works as a
+// header, so it is in vercel.json.
+let html = tpl.replace("/*__CSS__*/", () => css).replace("/*__BUNDLE__*/", () => js);
+const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+if (inlineScripts.length !== 2) {
+  console.error(`expected 2 inline scripts for the CSP hashes, found ${inlineScripts.length}`);
+  process.exit(1);
+}
+const hashes = inlineScripts.map((s) => `'sha256-${createHash("sha256").update(s).digest("base64")}'`);
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' ${hashes.join(" ")} https://www.googletagmanager.com`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com",
+  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join("; ");
+const charset = '<meta charset="utf-8" />';
+if (!html.includes(charset)) {
+  console.error("template is missing the charset meta the CSP is placed after");
+  process.exit(1);
+}
+html = html.replace(charset, () => `${charset}\n    <meta http-equiv="Content-Security-Policy" content="${csp}" />`);
+writeFileSync("dist/index.html", html);
 console.log("dist/index.html written, bundle bytes:", js.length);
