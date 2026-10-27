@@ -53,8 +53,28 @@ export const inCallStations = (calls: InCallVM[], classes: string[] = []) =>
 /** The station a call stops at in the destination city. The pack keeps no
     station on a call row, so it is read from the train's schedule: the stops
     after boarding are the last `stopPos.length` entries, and the call is the
-    one whose arrival minute matches. Null until the schedules have loaded.
-    A call that cannot be placed counts as 其他 / other, keeping the sum. */
+    one whose arrival minute matches. Null when the call cannot be placed
+    (or the schedules have not loaded). */
+export function callStation(
+  c: CallVM,
+  stationTable: { zh: string; en: string }[],
+  schedules: SchedulesData["schedules"] | undefined,
+): { zh: string; en: string } | null {
+  const sched = schedules?.[c.dep.t];
+  const n = c.dep.stopPos.length;
+  if (!sched || c.arrMins === undefined || c.arrMins < 0) return null;
+  const b = sched.length - 1 - n;
+  const want = c.arrMins % 1440;
+  for (let i = 0; i < n && b >= 0; i++) {
+    const r = sched[b + 1 + i];
+    if (r[1] === want) return stationTable[r[0]] || null;
+  }
+  return null;
+}
+
+/** Trains calling at a destination, by the station they stop at. Null until
+    the schedules have loaded. A call that cannot be placed counts as
+    其他 / other, keeping the sum. */
 export function callStations(
   calls: CallVM[],
   stationTable: { zh: string; en: string }[],
@@ -64,17 +84,8 @@ export function callStations(
   if (!schedules) return null;
   const OTHER = { zh: "其他", en: "other" };
   return tallyStations(
-    byClass(calls, classes, (c) => c.dep.cls).map((c) => {
-      const sched = schedules[c.dep.t];
-      const n = c.dep.stopPos.length;
-      if (!sched || c.arrMins === undefined || c.arrMins < 0) return OTHER;
-      const b = sched.length - 1 - n;
-      const want = c.arrMins % 1440;
-      for (let i = 0; i < n && b >= 0; i++) {
-        const r = sched[b + 1 + i];
-        if (r[1] === want) return stationTable[r[0]] || OTHER;
-      }
-      return OTHER;
-    }),
+    byClass(calls, classes, (c) => c.dep.cls).map(
+      (c) => callStation(c, stationTable, schedules) || OTHER,
+    ),
   );
 }

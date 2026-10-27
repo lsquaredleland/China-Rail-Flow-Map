@@ -113,8 +113,8 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
             Departs <span className="arrow">{arrow("dep")}</span>
           </th>
           <th scope="col">From</th>
-          <th scope="col">To</th>
           <th scope="col">Arrives</th>
+          <th scope="col">To</th>
           <th
             scope="col"
             className="sortable"
@@ -174,6 +174,12 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
                 {d.fsZh}
                 {d.fsEn ? <span className="to-stn">{d.fsEn}</span> : null}
               </td>
+              <td className="c-time">
+                {d.arr}
+                {depDayOffset(d) > 0 ? (
+                  <span className="plus"> +{depDayOffset(d)}d</span>
+                ) : null}
+              </td>
               <td>
                 <span className="to-city">
                   {d.tcEn} &middot; {d.tcZh}
@@ -182,12 +188,6 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
                   {d.tsZh}
                   {d.tsEn ? " · " + d.tsEn : ""}
                 </span>
-              </td>
-              <td className="c-time">
-                {d.arr}
-                {depDayOffset(d) > 0 ? (
-                  <span className="plus"> +{depDayOffset(d)}d</span>
-                ) : null}
               </td>
               <td className="c-time">{fmtTime(d.dur)}</td>
               <td className="num c-time">{fmtDist(d.km, unit)}</td>
