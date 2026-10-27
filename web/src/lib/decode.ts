@@ -204,6 +204,7 @@ interface TableSource<Row, Call> {
 }
 
 function slice(a: ArrayLike<number>, from: number, to = a.length): number[] {
+  from = Math.max(0, from);
   const out = new Array<number>(Math.max(0, to - from));
   for (let i = from; i < to; i++) out[i - from] = a[i];
   return out;
@@ -253,6 +254,7 @@ function outOrigins<Row extends RawDep, Call>(s: TableSource<Row, Call>) {
   const chords = once(() => new Map(s.chords));
   return Array.from({ length: s.n }, (_, o) => {
     const rows = once(() => s.rows(o));
+    const lists = once(() => s.lists(o));
     const expand = once(() => {
       const deps = rows();
       const off = s.mark(o);
@@ -275,7 +277,7 @@ function outOrigins<Row extends RawDep, Call>(s: TableSource<Row, Call>) {
     });
     return lazyFields<OutTablesData["origins"][number]>({
       deps: rows,
-      calls: () => s.lists(o) as RawCall[][],
+      calls: () => lists() as RawCall[][],
       dep_secs: () => expand().dep_secs,
       dep_chord_legs: () => expand().dep_chord_legs,
       dep_stop_pos: () => expand().dep_stop_pos,
@@ -287,6 +289,7 @@ function inOrigins<Row extends RawArr, Call>(s: TableSource<Row, Call>) {
   const chords = once(() => new Map(s.chords));
   return Array.from({ length: s.n }, (_, o) => {
     const rows = once(() => s.rows(o));
+    const lists = once(() => s.lists(o));
     const expand = once(() => {
       const arrs = rows();
       const len = s.mark(o);
@@ -301,7 +304,7 @@ function inOrigins<Row extends RawArr, Call>(s: TableSource<Row, Call>) {
     });
     return lazyFields<InTablesData["origins"][number]>({
       arrs: rows,
-      in_calls: () => s.lists(o) as RawInCall[][],
+      in_calls: () => lists() as RawInCall[][],
       arr_secs: () => expand().arr_secs,
       arr_chord_legs: () => expand().arr_chord_legs,
     });

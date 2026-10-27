@@ -94,3 +94,14 @@ describe("lazy per-origin expansion", () => {
     expect(o.arr_secs).toEqual([]);
   });
 });
+
+describe("review fixes", () => {
+  test("re-merging an origin keeps its calls (no rebuild on a direction flip)", () => {
+    const d = expandOutTa1(ta1("atlas-v2-out-tables.ta1"));
+    const target: Record<string, unknown> = {};
+    copyFields(target, d.origins[2]);
+    const first = target.calls;
+    copyFields(target, d.origins[2]);
+    expect(target.calls).toBe(first);
+  });
+});

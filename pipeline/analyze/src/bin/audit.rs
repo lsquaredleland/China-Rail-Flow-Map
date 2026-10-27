@@ -268,7 +268,6 @@ fn check_about(shared: &Value) -> i64 {
     i64::from(bad)
 }
 
-/// Every table and map file carries `fmt: 6`.
 /// The TA1 tables (what the client loads) decode to exactly the JSON tables
 /// every other check reads (ta1.rs).
 fn check_ta1(dir: &Path, out_t: &Value, in_t: &Value) -> bool {
@@ -292,6 +291,7 @@ fn check_ta1(dir: &Path, out_t: &Value, in_t: &Value) -> bool {
     ok
 }
 
+/// Every table and map file carries `fmt: 6`.
 fn check_formats(
     shared: &Value,
     out_map: &Value,

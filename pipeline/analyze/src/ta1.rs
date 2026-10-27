@@ -123,7 +123,7 @@ fn flatten<'a>(
 
 /// The row width of the first row anywhere in `lists` (rows of lists).
 fn width_of<'a>(mut rows: impl Iterator<Item = &'a Value>) -> usize {
-    rows.next().map_or(0, |r| arr(r).len())
+    rows.next().map_or(1, |r| arr(r).len().max(1))
 }
 
 /// Encode a tables JSON value (`pack` = "out-tables" | "in-tables").

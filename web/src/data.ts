@@ -101,21 +101,20 @@ export function aboutText(shared: Pick<SharedData, "about" | "calendar">): strin
 
 /* Fetch one TA1 file, as fetchData: the Brotli twin (vercel.json sends it
    with Content-Encoding: br, so the bytes start with the TA1 magic), else
-   the plain file. */
+   the plain file. A TA1 file that fails to read throws (not a fallback). */
 export async function fetchTa1(url: string): Promise<Ta1> {
+  let u8: Uint8Array | null = null;
   try {
     const u = brUrl(url);
     const res = await fetch(u);
     if (!res.ok && maybeReloadForStale(res.status, u)) {
       return new Promise<Ta1>(() => {}); // the page is about to reload
     }
-    if (res.ok) {
-      const u8 = new Uint8Array(await res.arrayBuffer());
-      if (isTa1(u8)) return readTa1(u8);
-    }
+    if (res.ok) u8 = new Uint8Array(await res.arrayBuffer());
   } catch {
     /* fall through to the plain file */
   }
+  if (u8 && isTa1(u8)) return readTa1(u8);
   const r = await fetch(url);
   if (!r.ok) throw new Error("HTTP " + r.status);
   return readTa1(new Uint8Array(await r.arrayBuffer()));
