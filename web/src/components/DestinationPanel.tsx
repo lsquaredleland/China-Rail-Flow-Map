@@ -16,6 +16,8 @@ interface Props {
   /** Minimised card line before the count; national mode has no origin
       ("120 departures · 98 arrivals"). Default: "from <city>". */
   sub?: string;
+  /** Replaces the "See all N trains" link (national: jump to that city's origin view). */
+  link?: { label: string; onClick: () => void } | null;
   onClose: () => void;
 }
 
@@ -32,6 +34,7 @@ export default function DestinationPanel({
   cityZh,
   unit,
   sub,
+  link,
   onClose,
 }: Props) {
   // Minimized keeps the selection (map highlight, flows, table filter);
@@ -134,7 +137,20 @@ export default function DestinationPanel({
             })}
           </tbody>
         </table>
-        {point.trains > 0 && (
+        {link ? (
+          <div className="dp-link-row">
+            <a
+              href="#"
+              className="dp-link"
+              onClick={(e) => {
+                e.preventDefault();
+                link.onClick();
+              }}
+            >
+              {link.label}
+            </a>
+          </div>
+        ) : point.trains > 0 && (
           <div className="dp-link-row">
             <a
               href="#departures"

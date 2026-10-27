@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
-import { buildOrigin, stationName } from "./lib";
+import { buildOrigin, natCityCounts, natFlowCounts, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
@@ -167,12 +167,38 @@ export default function App() {
     ensureNationalIndex,
     ensureSchedules,
   });
+  // National numbers under every active filter: per-city departures / arrivals,
+  // trains per section, and the header's three stats.
+  const natSel = natData?.sel ?? null;
+  const natCityLive = useMemo(
+    () => (national && nationalFlows ? natCityCounts(nationalFlows, nationalIndex, natFilter, natSel) : null),
+    [national, nationalFlows, nationalIndex, natFilter, natSel],
+  );
+  const natStats = useMemo(() => {
+    if (!national || !nationalFlows) return null;
+    let trains = atlas ? atlas.data.train_table.length : 0;
+    if (natSel) {
+      trains = 0;
+      for (let t = 0; t < natSel.length; t++) trains += natSel[t];
+    }
+    let cities = 0;
+    if (natCityLive) for (let i = 0; i < natCityLive.dep.length; i++) if (natCityLive.dep[i] + natCityLive.arr[i] > 0) cities++;
+    const flows = natFlowCounts(nationalFlows, nationalIndex, natFilter, natSel);
+    let maxFlow = 0;
+    for (let i = 0; i < flows.length; i++) if (flows[i] > maxFlow) maxFlow = flows[i];
+    return { trains, cities: nationalFlows.cities ? cities : null, maxFlow };
+  }, [national, nationalFlows, nationalIndex, natFilter, natSel, natCityLive, atlas]);
   // The national city card: the same panel as the origin view's, with its own rows.
-  const natPoint = natCity && natCityRow ? { idx: natCity.idx, zh: natCityRow.zh, en: natCityRow.en, trains: 0 } : null;
-  const natRows: [string, string][] | undefined = natCity
-    ? [["Departures", String(natCity.dep)], ["Arrivals", String(natCity.arr)]]
+  const natCityNow = (() => {
+    if (!natCity || !natCityLive) return natCity;
+    const i = natCityLive.idx.indexOf(natCity.idx);
+    return i < 0 ? { ...natCity, dep: 0, arr: 0 } : { idx: natCity.idx, dep: natCityLive.dep[i], arr: natCityLive.arr[i] };
+  })();
+  const natPoint = natCityNow && natCityRow ? { idx: natCityNow.idx, zh: natCityRow.zh, en: natCityRow.en, trains: 0 } : null;
+  const natRows: [string, string][] | undefined = natCityNow
+    ? [["Departures", String(natCityNow.dep)], ["Arrivals", String(natCityNow.arr)]]
     : undefined;
-  const natSub = natCity ? `${natCity.dep} departures · ${natCity.arr} arrivals` : undefined;
+  const natSub = natCityNow ? `${natCityNow.dep} departures · ${natCityNow.arr} arrivals` : undefined;
   // The isolated train belongs to the outbound animation.
   useEffect(() => {
     if (direction === "in" && !national) setIsolatedTrainCode(null);
@@ -295,12 +321,9 @@ export default function App() {
             filtered: selectedClasses.length > 0 || filters.hasHistFilter,
             outTablesReady,
             inTablesReady,
-            trainCount: atlas ? atlas.data.train_table.length : 0,
+            trainCount: national && natStats ? natStats.trains : atlas ? atlas.data.train_table.length : 0,
             national: national
-              ? {
-                  cities: nationalFlows?.cities ? nationalFlows.cities.idx.length : null,
-                  maxFlow: nationalFlows ? nationalFlows.total.reduce((m, v) => (v > m ? v : m), 0) : null,
-                }
+              ? { cities: natStats?.cities ?? null, maxFlow: natStats?.maxFlow ?? null }
               : null,
           })}
           cur={national ? null : cur}
@@ -312,15 +335,12 @@ export default function App() {
           selectedTrainCodes={filters.selectedTrainCodes}
           outTablesReady={outTablesReady}
           inTablesReady={inTablesReady}
-          trainCount={atlas ? atlas.data.train_table.length : 0}
+          trainCount={national && natStats ? natStats.trains : atlas ? atlas.data.train_table.length : 0}
           isNational={national}
           onSetNational={setNationalMode}
           national={
             national
-              ? {
-                  cities: nationalFlows?.cities ? nationalFlows.cities.idx.length : null,
-                  maxFlow: nationalFlows ? nationalFlows.total.reduce((m, v) => (v > m ? v : m), 0) : null,
-                }
+              ? { cities: natStats?.cities ?? null, maxFlow: natStats?.maxFlow ?? null }
               : null
           }
         />
@@ -429,6 +449,19 @@ export default function App() {
             point={national ? natPoint : panelCity}
             rows={national ? natRows : undefined}
             sub={national ? natSub : undefined}
+            link={(() => {
+              if (!national || !natCityRow || !atlas) return null;
+              const oi = atlas.data.origins.findIndex((o) => o.zh === natCityRow.zh);
+              if (oi < 0) return null;
+              return {
+                label: "See all departures →",
+                onClick: () => {
+                  setNatCity(null);
+                  setNationalMode(false);
+                  selectOrigin(oi);
+                },
+              };
+            })()}
             direction={national ? "out" : direction}
             cityEn={!national && cur ? cur.en : ""}
             cityZh={!national && cur ? cur.o.zh : ""}
