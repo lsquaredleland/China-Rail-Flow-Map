@@ -101,6 +101,23 @@ function parseInitialCamera(): (Camera & { scale: number }) | null {
   return null;
 }
 
+/* Phones opening the default origin with no camera in the URL start on this
+   view (owner): ?city=Guangzhou&lat=27.4849&lon=113.3280&z=5.17. */
+const PHONE_DEFAULT_CAMERA = { lat: 27.4849, lon: 113.328, z: 5.17 };
+function phoneDefaultCamera(): (Camera & { scale: number }) | null {
+  try {
+    if (!window.matchMedia("(max-width: 640px)").matches) return null;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("national") === "1") return null;
+    const city = params.get("city");
+    if (city && city !== "Guangzhou" && city !== "广州") return null;
+    const { lat, lon, z } = PHONE_DEFAULT_CAMERA;
+    return { lon, lat, zoom: z, scale: (256 * Math.pow(2, z)) / 360 };
+  } catch {
+    return null;
+  }
+}
+
 export function matchesCity(o: { zh: string; en: string }, query: string): boolean {
   const q = query.trim().toLowerCase();
   const qClean = q.replace(/[\s\-_'’]+/g, "");
@@ -197,7 +214,7 @@ export function useUrlSync({
   /** Browser back/forward landed on another city. */
   onCityFromUrl: (idx: number) => void;
 }) {
-  const [initialCamera] = useState(parseInitialCamera);
+  const [initialCamera] = useState(() => parseInitialCamera() ?? phoneDefaultCamera());
   const lastCameraRef = useRef<Camera | null>(initialCamera);
 
   const syncUrl = (idx: number, cam?: Camera | null) => {
