@@ -1,5 +1,40 @@
 import type { Direction, DistUnit, OriginVM } from "../types";
 
+/** The phone toolbar's one-line stats ("1,498 trains daily · 653 direct cities ·
+    359 busiest/day"): the same three numbers as the header's stat row. */
+export function compactStats(o: {
+  cur: OriginVM | null;
+  viewCur: OriginVM | null;
+  direction: Direction;
+  filtered: boolean;
+  outTablesReady: boolean;
+  inTablesReady: boolean;
+  trainCount: number;
+  national?: { cities: number | null; maxFlow: number | null } | null;
+}): [string, string][] | null {
+  const n = (v: number | null | undefined) => (v == null ? "…" : v.toLocaleString("en-US"));
+  if (o.national) {
+    return [
+      [n(o.trainCount || null), "trains running"],
+      [n(o.national.cities), "cities"],
+      [n(o.national.maxFlow), "busiest/day"],
+    ];
+  }
+  const { cur, viewCur } = o;
+  if (!cur || !viewCur) return null;
+  return o.direction === "out"
+    ? [
+        [n(o.filtered && o.outTablesReady ? viewCur.deps.length : cur.o.outbound), "trains daily"],
+        [n(viewCur.dests.length), "direct cities"],
+        [n(viewCur.maxFlow), "busiest/day"],
+      ]
+    : [
+        [n(o.filtered && o.inTablesReady ? viewCur.arrs.length : cur.o.inbound), "trains daily"],
+        [n(viewCur.srcs.length), "direct cities"],
+        [n(viewCur.maxInFlow), "busiest/day"],
+      ];
+}
+
 export default function AppHeader({
   cur,
   viewCur,

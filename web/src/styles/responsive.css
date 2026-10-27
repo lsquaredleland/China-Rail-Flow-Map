@@ -1,4 +1,22 @@
 @media (max-width: 640px) {
+  /* Top bar (owner mock): picker, an OUT/IN toggle, Filters, Map options on one
+     row; the header's stats as one line under it. */
+  .stats { display: none; }
+  .toolbar .city-picker { flex: 1 1 0; min-width: 0; }
+  .toolbar .city-picker label { display: none; }
+  .toolbar .units[aria-label="Direction"] { display: none; }
+  .toolbar .tb-mob-btn { flex: 0 0 46px; width: 46px; height: 46px; }
+  .toolbar .tb-dir-btn {
+    flex-direction: column; gap: 2px;
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .tb-dir-lbl { font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+  .tb-mob-stats {
+    display: block; flex: 1 1 100%; margin: 2px 0 0;
+    font-size: 13px; color: var(--ink-soft);
+  }
+  .tb-mob-stats b { color: var(--ink); font-weight: 800; font-size: 15px; }
+  .tb-mob-stats span:first-child b { color: var(--rust); }
   /* The Chinese title on its own line. */
   h1 .zh { display: block; }
   h1 .zh-sep { display: none; }

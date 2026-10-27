@@ -34,6 +34,7 @@ export default function Toolbar({
   showFlows,
   onToggleFlows,
   activeFilterCount,
+  compactStats,
 }: {
   origins: RawOrigin[];
   originIdx: number;
@@ -66,6 +67,8 @@ export default function Toolbar({
   onToggleFlows: () => void;
   /** Filters in force (class + histogram + train-code filters), for the narrow-screen badge. */
   activeFilterCount: number;
+  /** Phones: the header's three stats as one line under the controls. */
+  compactStats?: [string, string][] | null;
 }) {
   // Narrow screens (CSS, <= 640px): the filters and the map / display
   // controls fold into two dropdown panels; wider screens show them inline
@@ -108,6 +111,18 @@ export default function Toolbar({
           onSelect={onSelectOrigin}
         />
       </div>
+      <button
+        id="dirToggle"
+        type="button"
+        className="tb-mob-btn tb-dir-btn"
+        aria-label={direction === "out" ? "Outbound (switch to inbound)" : "Inbound (switch to outbound)"}
+        onClick={() => onSetDirection(direction === "out" ? "in" : "out")}
+      >
+        <svg className="tb-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path d="M5 8h13M14 4l4 4-4 4M19 16H6M10 12l-4 4 4 4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="tb-dir-lbl">{direction === "out" ? "Out" : "In"}</span>
+      </button>
       <div className="group units" role="group" aria-label="Direction">
         <button
           id="dirOut"
@@ -163,6 +178,16 @@ export default function Toolbar({
         {layersChanged && <span className="tb-dot" title="Some map options are changed" />}
         <span className="tb-mob-lbl" aria-hidden="true"> ▾</span>
       </button>
+      {compactStats && (
+        <p className="tb-mob-stats" aria-hidden="true">
+          {compactStats.map(([v, l], i) => (
+            <span key={l}>
+              {i > 0 && " · "}
+              <b>{v}</b> {l}
+            </span>
+          ))}
+        </p>
+      )}
       <div id="tbMore" className={"tb-panel tb-pop" + (panel === "more" ? " open" : "")} role="group" aria-label="Map options">
       <span className="tb-pop-h">View</span>
       <div className="group">

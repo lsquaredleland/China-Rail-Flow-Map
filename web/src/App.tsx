@@ -20,7 +20,7 @@ import Footnote from "./components/Footnote";
 import TimelineScrubber from "./components/TimelineScrubber";
 import TrainScheduleModal from "./components/TrainScheduleModal";
 import AnimAnnouncer from "./components/AnimAnnouncer";
-import AppHeader from "./components/AppHeader";
+import AppHeader, { compactStats } from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
 import { MapCardSlot, cardBand } from "./components/MapCards";
@@ -313,6 +313,21 @@ export default function App() {
         />
 
         <Toolbar
+          compactStats={compactStats({
+            cur: national ? null : cur,
+            viewCur: national ? null : viewCur,
+            direction,
+            filtered: selectedClasses.length > 0 || filters.hasHistFilter,
+            outTablesReady,
+            inTablesReady,
+            trainCount: atlas ? atlas.data.train_table.length : 0,
+            national: national
+              ? {
+                  cities: nationalFlows?.cities ? nationalFlows.cities.idx.length : null,
+                  maxFlow: nationalFlows ? nationalFlows.total.reduce((m, v) => (v > m ? v : m), 0) : null,
+                }
+              : null,
+          })}
           origins={origins}
           originIdx={originIdx}
           onSelectOrigin={selectOrigin}
