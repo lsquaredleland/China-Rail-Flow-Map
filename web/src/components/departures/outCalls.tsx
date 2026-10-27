@@ -118,10 +118,7 @@ export function outCallsMode(ctx: DepCtx, cur: OriginVM, destFilter: DestVM): Mo
     <>
       Every train from {cur.en} that stops at {destFilter.en} &mdash;
       whether it ends its journey there or only calls on the way
-      through. &ldquo;Arrives&rdquo; and &ldquo;Departs&rdquo; are the
-      times at {destFilter.en}&rsquo;s station; &ldquo;Duration&rdquo; is
-      the travel time from {cur.en} to {destFilter.en}; &ldquo;Station&rdquo;
-      is the {destFilter.en} station the train stops at.
+      through.
     </>
   );
   const chipNode = (

@@ -36,9 +36,7 @@ export default function LoadingSection({
       <>
         Every train from {cur.en} that stops at {destFilter.en} &mdash;
         whether it ends its journey there or only calls on the way
-        through. &ldquo;Arrives&rdquo; and &ldquo;Departs&rdquo; are the
-        times at {destFilter.en}&rsquo;s station; &ldquo;Final
-        destination&rdquo; is where the train is ultimately bound.
+        through.
       </>
     );
   } else if (srcFilter) {
@@ -95,8 +93,7 @@ export default function LoadingSection({
     note = (
       <>
         Every train departing the selected city &mdash; from any of its
-        stations &mdash; for every train in the timetable window. &ldquo;Stops&rdquo; counts the stops the train makes after leaving
-        its origin-city station.
+        stations &mdash; for every train in the timetable window.
       </>
     );
   }

@@ -92,8 +92,7 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   const depNote = (
     <>
       Every train departing the selected city &mdash; from any of its
-      stations &mdash; for every train in the timetable window. &ldquo;Stops&rdquo; counts the stops the train makes after leaving
-      its origin-city station.
+      stations &mdash; for every train in the timetable window.
     </>
   );
   const tableNode = (
