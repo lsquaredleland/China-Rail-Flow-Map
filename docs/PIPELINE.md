@@ -439,7 +439,7 @@ geometry — an override can never make a leg worse than shipped.
 
 **Staged results** (regenerate via §3 step 7): 1,564 pairs flagged;
 4,538 flagged legs correctly untouched; **365 legs re-routed** (364 by
-rule + G2450 hand-adjudicated — `corridor-fix/MANUAL_OVERRIDES.md`).
+rule + G2450 hand-adjudicated — `docs/MANUAL_OVERRIDES.md`).
 Largest: 唐山→秦皇岛 28 G + 24 back (Tianjin–Qinhuangdao HSR, 37–42 min,
 drawn on the conventional line, floor 103); 合肥↔芜湖 27; 西宁↔兰州 26.
 Chengdu–Chongqing: D951/D2208/D5128 + five westbound north;
@@ -548,7 +548,7 @@ are enforced only in the full audit, not `--pack-only`. Current key values
   rows have stations without a city call of their own
 - known gaps: inbound-only legs stay unresolved; flows still trim 1.3 km
   around stations (paths bridge them with throats, O1; see
-  `optimization-progress.md`)
+  `docs/history/optimization-progress.md`)
 
 The list below is the **historical** 2026-10-22 origin-environment build. It
 matches neither the live pack nor any build reproducible from disk; kept

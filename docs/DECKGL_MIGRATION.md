@@ -7,7 +7,7 @@ the toolbar, the shared 24h animation bar, map cards, the national table and fil
 growth, Play from origin, the Zoom-clarity trial) is recorded in those PRs, so the national
 "three-way control" and "coverage note" described under P3.2 below are superseded. The
 `deckgl` → `main` merge is the owner's gate (G-MAIN, D16); the pre-merge audit is
-`docs/AUDIT_PRE_MAIN.md`. Everything below is the plan and the as-built record per task.
+`docs/history/AUDIT_PRE_MAIN.md`. Everything below is the plan and the as-built record per task.
 **Gate G0: GO with conditions** (independent gate review 2026-10-25, §11.6; the conditions are
 folded into the P1b tasks as C16–C26 below).
 Each phase is a set of numbered, PR-sized tasks with files, tests, acceptance numbers and a

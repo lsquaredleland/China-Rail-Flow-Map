@@ -1,16 +1,16 @@
-# China Rail 24h Flow Animation — Pipeline-First Optimization Plan (`optimization.md`)
+# China Rail 24h Flow Animation — Pipeline-First Optimization Plan
 
 _Revised 2026-10-23. Supersedes the earlier client-side chainer plan (summarized in Appendix A)._
 
 ## 0. Context
 
-- **Active repository:** `/Users/leland/Downloads/china-rail-animation`, branch `explore/24h-train-flow-animation`
-- **Handoff repository (keep clean):** `/Users/leland/Downloads/china-rail-handoff-v3`
+- **Active repository:** `china-rail-animation` (the pre-migration working copy), branch `explore/24h-train-flow-animation`
+- **Handoff repository (keep clean):** `china-rail-handoff-v3`
 - **Preview server:** `http://localhost:8090/` serving `web/dist`
 - **Client checks:**
   ```bash
-  npm --prefix /Users/leland/Downloads/china-rail-animation/web run typecheck
-  npm --prefix /Users/leland/Downloads/china-rail-animation/web run build
+  npm --prefix web run typecheck
+  npm --prefix web run build
   ```
 - **Pipeline rebuild:** `docs/PIPELINE.md` §3 step 5 (corridor-v3 env vars `ATLAS_OVERRIDES` = empty file, `ATLAS_PAIR_PATHS`, `ATLAS_LEG_PATHS`), then `atlaspack`, then `audit`. Verify against the goldens in `docs/PIPELINE.md` §7.
 - **Owner rule:** pipeline changes go through a **staged** rebuild, are verified, and are swapped live only with the owner's approval. Timetable inputs come from `data/raw/*.jsonl`. No new 12306 pulls.

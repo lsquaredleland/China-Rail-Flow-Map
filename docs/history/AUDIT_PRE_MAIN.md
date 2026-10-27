@@ -774,7 +774,7 @@ this audit (owner rule).
 ## 10. Upstream data issue: placeholder stop lists in the train export
 
 **Confirmed, read-only** (`python3 -I` over
-`/Users/leland/Downloads/china-rail-flow-map/data/raw/train-exports-2026-10-25/trains-all.json`,
+`data/raw/train-exports-2026-10-25/trains-all.json`,
 untracked in git): 11,589 trains; **4,303 trains carry a stop list whose every entry is
 `{"no": "", "name": "", "arrive": "", "depart": ""}`** (the right number of stops, no content),
 all of them `source: discovered` / `phase2-discovery`: by class C 982, D 1,359, G 1,279, K 339,

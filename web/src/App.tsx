@@ -26,6 +26,7 @@ import { MapCardSlot, cardBand } from "./components/MapCards";
 import { IsolationChip, TimelineExpandButton } from "./components/MapOverlays";
 import type { CityPointVM } from "./types";
 import { useNationalTable } from "./hooks/useNationalTable";
+import { track } from "./lib/analytics";
 
 export default function App() {
   const atlasRef = useRef<DecodedAtlas | null>(null);
@@ -46,10 +47,16 @@ export default function App() {
   // Each click on a train opens a fresh timetable (expanded), even the same
   // train or one picked while another's card was minimised: the key remounts it.
   const [trainOpenSeq, setTrainOpenSeq] = useState(0);
-  const toggleIsolate = (c: string) => setIsolatedTrainCode((prev) => (prev === c ? null : c));
+  const toggleIsolate = (c: string) => {
+    if (c !== isolatedTrainCode) track("train_isolate", { mode: national ? "national" : "origin" });
+    setIsolatedTrainCode((prev) => (prev === c ? null : c));
+  };
   const openTrain = (code: string | null) => {
     setSelectedTrainCode(code);
-    if (code) setTrainOpenSeq((n) => n + 1);
+    if (code) {
+      setTrainOpenSeq((n) => n + 1);
+      track("train_open", { mode: national ? "national" : "origin", train_class: code[0] });
+    }
   };
 
   const { initialCamera, syncUrl, handleViewChange } = useUrlSync({
@@ -222,6 +229,7 @@ export default function App() {
     setIsolatedTrainCode(null);
     setNational(v);
     writeNationalParam(v);
+    track("mode_switch", { mode: v ? "national" : "origin" });
   };
 
   /* ---------- actions ---------- */
@@ -230,6 +238,8 @@ export default function App() {
     clearFilters();
     setOriginIdx(idx);
     syncUrl(idx);
+    const o = atlas?.data.origins[idx];
+    if (o) track("origin_select", { city: o.en || o.zh });
   };
 
   // Debug / test handles on window.
@@ -281,6 +291,7 @@ export default function App() {
     setPanelCity(null);
     clearFilters();
     prefs.setDirection(d);
+    track("direction_switch", { direction: d });
   };
 
   const setDistUnit = (u: DistUnit) => {
@@ -353,24 +364,39 @@ export default function App() {
           onSetDirection={setDirection}
           selectedClasses={selectedClasses}
           onClearClasses={() => setSelectedClasses([])}
-          onToggleClass={filters.toggleClass}
+          onToggleClass={(cls) => {
+            if (!selectedClasses.includes(cls)) track("class_filter", { train_class: cls });
+            filters.toggleClass(cls);
+          }}
           availableClasses={availableClasses}
           panelCity={panelCity}
           cur={cur}
           mapRef={mapRef}
           showNetwork={showNetwork}
-          onToggleNetwork={() => setShowNetwork((v) => !v)}
+          onToggleNetwork={() => {
+            track("ui_toggle", { control: "network" });
+            setShowNetwork((v) => !v);
+          }}
           showLabels={showLabels}
-          onToggleLabels={() => setShowLabels((v) => !v)}
+          onToggleLabels={() => {
+            track("ui_toggle", { control: "labels" });
+            setShowLabels((v) => !v);
+          }}
           showInfra={showInfra}
-          onToggleInfra={toggleInfra}
+          onToggleInfra={() => {
+            track("ui_toggle", { control: "infra" });
+            toggleInfra();
+          }}
           distUnit={distUnit}
           onSetDistUnit={setDistUnit}
           dark={dark}
           onSetDark={setDark}
           national={national}
           showFlows={natFlowsOn}
-          onToggleFlows={toggleNatFlows}
+          onToggleFlows={() => {
+            track("ui_toggle", { control: "national_flows" });
+            toggleNatFlows();
+          }}
           activeFilterCount={
             selectedClasses.length +
             [filters.hours, filters.distBins, filters.durBins, filters.selectedTrainCodes].filter((a) => a && a.length > 0).length

@@ -24,8 +24,8 @@ An interactive, Minard-style passenger rail flow atlas across China's top 100 ra
 China-Rail-Flow-Map/
 ├── web/                  # React 19 + TypeScript + deck.gl 9.4 frontend (bundled with esbuild via node bundle.mjs)
 │   ├── src/              # Application, deck.gl renderer (components/map/deck), pure lib/, histograms, timetable views
-│   ├── public/assets/    # 11 Brotli files (7.9 MB): 10 atlas-v2-*.json.br (4 national) + china-outline.json.br
-│   ├── tests/            # bun test (266 tests on the committed pack and samples)
+│   ├── public/assets/    # the pre-built Brotli data pack (atlas-v2-*.json.br / .safetensors.br + china-outline.json.br)
+│   ├── tests/            # bun test (runs on the committed pack and samples)
 │   ├── tools/            # dev tooling: static server, screenshot diff, perf drivers, headless smoke (CI)
 │   └── bundle.mjs        # Produces web/dist/ (index.html with the entry inlined + hashed assets/)
 ├── pipeline/             # Unified Rust Cargo workspace for OSM & timetable processing
@@ -35,8 +35,9 @@ China-Rail-Flow-Map/
 │   ├── tiler/            # MVT / PMTiles vector tile encoder
 │   └── outline/          # National boundary polyline generator
 ├── data/                 # Station gazetteers (ZH/EN), OSM station coordinates & corridor overrides
-└── docs/                 # PIPELINE.md (reproduction), DECKGL_MIGRATION.md (renderer plan and as-built record),
-                          # THIN_CLIENT.md (pack-format design, deferred), AUDIT_PRE_MAIN.md, history/, research/
+└── docs/                 # PIPELINE.md (reproduction), PACK_FORMAT.md (tables container), DECKGL_MIGRATION.md
+                          # (renderer as-built record), THIN_CLIENT.md (pipeline/client split, partly built),
+                          # research/ (routing evidence), history/ (finished plans, audits and reviews)
 ```
 
 ---
@@ -62,7 +63,11 @@ and the map reports that the data could not be loaded.
 Checks: `bun run typecheck`, `bun test`, and `node tools/smoke.mjs dist` (headless WebGL boot,
 the CI `web-smoke` job). Screenshot and perf drivers: `web/tools/shots/`, `web/tools/perf/`.
 
+The data pack is committed, so the web app needs nothing beyond the repo.
+
 ### 2. Build & Test the Rust Data Pipeline
+
+Requires a stable Rust toolchain.
 
 ```bash
 cd pipeline
@@ -70,7 +75,18 @@ cargo test --workspace --release
 cargo build --workspace --release
 ```
 
+Tests, `audit --pack-only` (the CI pack check) and `secdiff --packs` run from a clone. A full
+rebuild of the pack also needs inputs that are not in git: an OpenStreetMap China extract
+(`data/osm/china-latest.osm.pbf`, from Geofabrik) and the timetable export under `data/raw/`.
+
 See [`docs/PIPELINE.md`](docs/PIPELINE.md) for the complete end-to-end data pipeline documentation (OSM PBF extraction, `corridor-v3` routing, `atlas` section assembly, and `atlaspack` v2 compression).
+
+### 3. Analytics (optional)
+
+The build reads `GA_MEASUREMENT_ID` (a GA4 `G-…` id). With it set, the page loads gtag.js and
+sends a few interaction events (`mode_switch`, `origin_select`, `direction_switch`,
+`animation_play`, `class_filter`, `train_open`, `train_isolate`, `ui_toggle`; see
+`web/src/lib/analytics.ts`). Without it, nothing is loaded or sent.
 
 ---
 

@@ -100,7 +100,7 @@
     "peak_rss_mb": 5315.3,
     "data_scope": "Top 100 cities, 5.4k sections, 78k pts",
     "desc": "Shared track-section flow assembly & index builder",
-    "stdout_head": "leg overrides loaded: 364 from /Users/leland/Downloads/china-rail-handoff-v3/data/leg_overrides.json",
+    "stdout_head": "leg overrides loaded: 364 from data/leg_overrides.json",
     "stdout_tail": "wrote /tmp/rust_benchmarks/bench_atlas.json (38.30 MB)"
   },
   {
