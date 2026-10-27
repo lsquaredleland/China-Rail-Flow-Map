@@ -10,9 +10,11 @@ This document tracks potential features to explore for the **China Rail Flow Map
 
 | # | Feature | Scope | Status | Notes |
 |---|---|---|---|---|
-| 1 | Corridor & Single-Train Route Inspector | Frontend-only | ◐ | a train's run can be isolated on the map (timetable modal, map card); "click a section → filter the table" is not built |
+| 1a | Single-train route inspector | Frontend-only | ✅ | click a train (table row or map dot): its whole run isolated on the map, timetable with calling stations, "Play from origin", map card; hovering a section shows its trains/day |
+| 1b | Section → trains filter ("which trains cross this bridge?") | Frontend-only | ❌ | click a section to filter the table to the trains on it |
 | 2 | Map-Coupled Histograms & Multi-Filter Flow Rendering | Frontend-only | ✅ | |
-| 3 | Isochrone / Travel-Time & Speed Shading Mode | Frontend-only | ❌ | |
+| 3a | Travel-time shading of destinations | Frontend-only | ✅ | destination dots coloured by fastest time (under 4 h / 4–12 h / over 12 h), with the legend's time bar |
+| 3b | Corridor shading, speed & circuity modes, isochrone rings | Frontend-only | ❌ | |
 | 4 | Intra-City Station Terminal Filter | Frontend-only | ◐ | per-station departure counts show above the table; no station filter yet |
 | 5 | Two-City Comparison / "Sphere of Influence" View | Frontend-only | ❌ | |
 | 6 | 1-Transfer Connection Finder (`Origin → Hub → Destination`) | Frontend-only | ❌ | |
@@ -24,7 +26,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
 ## 1. Frontend-Only Features (Data Already Loaded in Browser)
 
 ### 1. Corridor & Single-Train Route Inspector
-- **Status:** Partly built. Clicking a train (table row, map dot) opens its timetable with "Isolate on map" (its whole run as a corridor, every other train hidden) and "Play from origin"; a minimised map card keeps the state. The section-click → table filter half is not built.
+- **Status:** The single-train half is built (1a): clicking a train in the table or on the map isolates its whole run, opens its timetable with "Play from origin", and a minimised map card keeps the state; hovering any section shows its trains per day. The section-click → table filter (1b) is not built.
 - **Data Available:** Every departure (`DepVM.secs`) and arrival (`ArrVM.secs`) already carries the exact array of track section indices it traverses, and the map already hit-tests individual track sections (`{ kind: "seg", s, n }` in `Hit`).
 - **Description:**
   - **Hover/click a train in `DeparturesTable`** to trace that single train's exact path on the map, highlighting all its calling cities and showing its commercial speed (`km / duration`).
@@ -40,7 +42,7 @@ This document tracks potential features to explore for the **China Rail Flow Map
   - **Mobile UX consideration:** On mobile viewports, the histograms sit below the map above the departures table, so scrolling back and forth between the histogram bars and the map canvas can feel clunky. When implementing, consider a compact floating filter pill/summary bar on the map (or sticky mini-controls) so mobile users can see and clear active histogram filters without losing sight of the map.
 
 ### 3. Isochrone / Travel-Time & Speed Shading Mode
-- **Status:** Proposed
+- **Status:** Partly built (3a): destination dots are coloured by fastest travel time in three bands (under 4 h, 4–12 h, over 12 h; `TIME_BANDS` in `web/src/lib/palette.ts`) with a matching time bar in the legend. Corridor colouring, the speed and circuity modes and isochrone rings (3b) are not built.
 - **Data Available:** Every destination/source city (`CityPointVM`) carries `fastest` (minutes), `median` (minutes), `crow` (straight-line km), and `rail` (routed track km).
 - **Description:**
   - A map color mode toggle that colors destination dots and corridors by **fastest travel time** (`<1h`, `1–2h`, `2–4h`, `4–8h`, `8h+` isochrone rings), **average commercial speed** (`rail / fastest`), or **track circuity** (`rail / crow`, highlighting where terrain forces detours vs. straight HSR viaducts).
