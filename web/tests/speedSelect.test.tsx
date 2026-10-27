@@ -3,9 +3,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import SpeedSelect, { SPEED_MULTIPLIERS, nextSpeed } from "../src/components/SpeedSelect";
 
-describe("SpeedSelect (phone speed button)", () => {
-  test("1x, 2x, 3x map to 60, 30, 15 seconds per day", () => {
-    expect(SPEED_MULTIPLIERS.map((o) => [o.label, o.secs])).toEqual([["1×", 60], ["2×", 30], ["3×", 15]]);
+describe("SpeedSelect (the speed button, phone and desktop)", () => {
+  test("0.5x, 1x, 2x, 4x map to 120, 60, 30, 15 seconds per day", () => {
+    expect(SPEED_MULTIPLIERS.map((o) => [o.label, o.secs])).toEqual([["0.5×", 120], ["1×", 60], ["2×", 30], ["4×", 15]]);
   });
 
   test("shows the current multiplier (2x on the default 30 s)", () => {
@@ -14,18 +14,18 @@ describe("SpeedSelect (phone speed button)", () => {
     expect(h).toContain("SPEED");
   });
 
-  test("tapping cycles 1x -> 2x -> 3x -> 1x via setSpeed", () => {
+  test("tapping cycles 1x -> 2x -> 4x -> 0.5x -> 1x via setSpeed", () => {
     const calls: number[] = [];
     let speed = 60;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const el = SpeedSelect({ speed, onSetSpeed: (s) => calls.push(s) }) as React.ReactElement<any>;
       el.props.onClick();
       speed = calls[calls.length - 1];
     }
-    expect(calls).toEqual([30, 15, 60, 30]);
+    expect(calls).toEqual([30, 15, 120, 60, 30]);
   });
 
-  test("an unknown speed restarts the cycle at 1x", () => {
-    expect(nextSpeed(15)).toBe(60);
+  test("an unknown speed restarts the cycle at 0.5x", () => {
+    expect(nextSpeed(45)).toBe(120);
   });
 });
