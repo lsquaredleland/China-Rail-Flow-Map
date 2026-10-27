@@ -9,6 +9,31 @@
 > and a CI smoke job. #2 (canonical geometry) became the `[canon] mode = "hybrid"` rule (PR #23).
 > File:line references below are to `f199472` and no longer match the tree.
 
+## Status of the findings (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped
+
+| Finding | Status | How |
+|---|---|---|
+| R1 canonical geometry ≠ production | ✅ | `[canon] mode = "hybrid"` (PR #23) |
+| R2 router non-determinism | ✅ | O17 (PR #15) |
+| R3 atlas section non-determinism | ✅ | O18 (PR #13) |
+| R4 class breakdown from the first edge | ✅ | junction rule in `chains.rs`; `audit` checks classes sum to the total |
+| R5 deploy cache contract | ✅ | content-hashed packs (`web/bundle.mjs`) |
+| R6 repo cannot rebuild from a clone | ◐ | `.gitignore` lists subdirs; the OSM extract and `data/raw/` timetables are still not in git |
+| R7 live recipe depends on a splice | ✅ | splice retired with O17 |
+| R8 duplicated atlas/audit code, no tests | ✅ | shared `analyze/src` modules with tests |
+| R9 three OSM parsers | ◐ | one module (`analyze/src/osm.rs`) plus the router's; the node byte scan stays for speed |
+| R10 marginal argmax, not MAP path | ❌ | (recommendation 13, Viterbi) |
+| R11 hard thresholds, no margin column | ❌ | |
+| R12 `audit_pack` reads only `.json` | ✅ | reads `.json.br` (CI `pack-audit`) |
+| R13 linear `nearest_station` scan | ❌ | not revisited |
+| R14 `as any`, unguarded `localStorage` | ✅ | 0 `as any`; `web/src/storage.ts` never throws |
+| R15 per-frame allocations (Canvas) | — | superseded: the Canvas renderer was replaced by deck.gl |
+| R16 contradictory recipe in `PIPELINE.md` | ✅ | one recipe (§3 step 5) |
+| R17 bundle inlined into `index.html` | — | kept by design; deck.gl is a separate lazy chunk |
+| Recs 14–15 topology-cut sections, station identity by OSM id | ❌ | |
+
 Scope: read-only review of `china-rail-animation` (the pre-migration working copy) (pipeline + web), with one glance at the `feat/o1-throat-stubs` worktree. Claims are tied to `file:line` on this commit. Two small read-only scripts were run against the shipped `candidates.json` from the handoff (`china-rail-handoff-v3/data/derived/corridor-v3/`); no rebuilds, no 12306 queries. Anything I could not verify from code or on-disk artifacts is marked **(uncertain)**.
 
 ---

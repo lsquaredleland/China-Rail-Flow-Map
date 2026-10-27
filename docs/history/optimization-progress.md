@@ -2,6 +2,20 @@
 
 Historical record (moved from the repo root 2026-10-27; phases 0–5 are done, open backlog: O2, O3, O7, O19). Companion to `optimization-plan.md` (the plan; phase and bug IDs refer to it). Update this file at the end of every work session.
 
+## Status at a glance (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped
+
+| Item | Status |
+|---|---|
+| Phases 0–5 | ✅ |
+| O1, O4, O5, O6, O8, O9, O10, O12, O13, O14, O15, O16, O17, O18, O20 | ✅ |
+| O11 U-turn overlap fix | — won't do (owner decision) |
+| O2 continuity gaps over 6 km | ❌ |
+| O3 chord legs at a path end | ❌ |
+| O7 inbound loop trains with non-monotone `sec_cnt` | ❌ documented quirk, gated as a `max` golden |
+| O19 the 0.1–1 km joins at stops | ❌ |
+
 ## How to resume
 1. `git status --short --branch` (primary checkout since the 2026-10-24 migration; branch from `main`).
 2. Read the **Status** table and the newest **Session** entry below.

@@ -8,7 +8,7 @@ The findings below (§0–§12) are the historical record and are not edited. �
 | Item | Status |
 |---|---|
 | **§0 top actions** | |
-| 1. Merge with `--no-ff` (Vercel ignore rule) | ⏳ at merge time (owner) |
+| 1. Merge with `--no-ff` (Vercel ignore rule) | ✅ merge commit, PR #139 (2026-10-27) |
 | 2. Route-change review (8 rows) | ✅ owner accepted the shipped pack as is (2026-10-26) |
 | 3. Surface a failed national index load | ✅ #127 |
 | 4. ABOUT window from the pack | ✅ #109, pack swap #116 |

@@ -1,5 +1,14 @@
 # deck.gl migration plan: from the Canvas 2D renderer to deck.gl
 
+| Phase | Status |
+|---|---|
+| 0 spike, G0 gate | ✅ |
+| 1 origin view on deck.gl (Canvas deleted in P1c.2) | ✅ |
+| 2 national trains (A) | ✅ |
+| 3 national flows (B), A+B | ✅ |
+| G-MAIN `deckgl` → `main` | ✅ PR #139 (merge commit, 2026-10-27) |
+
+
 Status (2026-10-26): **built.** Phases 0–3 are merged on `deckgl` (origin view on deck.gl,
 Canvas deleted in P1c.2, national mode with trains A, flows B and A+B, the 11k train-export
 pack swapped in on 2026-10-25). Later UI work on `deckgl` (PR #80 onward: the Flows toggle in

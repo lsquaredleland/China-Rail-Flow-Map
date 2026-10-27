@@ -2,6 +2,20 @@
 
 _Revised 2026-10-23. Supersedes the earlier client-side chainer plan (summarized in Appendix A)._
 
+## Status (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped. Detail per item: `optimization-progress.md`.
+
+| Phase | Status |
+|---|---|
+| 0. Client fixes on current data | ✅ |
+| 1. Ordered, oriented paths | ✅ |
+| 2. Generated schedules | ✅ |
+| 3. Station-throat stubs | ✅ O1, PR #8 (fmt 6) |
+| 4. Client cleanup on new data | ✅ |
+| 5. Per-train path dedupe | ✅ O6, PR #6 (fmt 5) |
+| Bug ledger B1–B21 (§3) | ✅ addressed by the phases above (per the progress log); chord legs at a path end remain as O3 |
+
 ## 0. Context
 
 - **Active repository:** `china-rail-animation` (the pre-migration working copy), branch `explore/24h-train-flow-animation`

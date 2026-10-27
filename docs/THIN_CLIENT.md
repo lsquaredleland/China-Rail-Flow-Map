@@ -1,10 +1,21 @@
 # Thin client: where the pipeline / client line should sit
 
-Status (2026-10-27): **partly built.** Done: T0 (bench, `web/tools/bench`), the national
-trains file (#16, PR #43), the 11k ingest (T5, on fmt 6) and the tables half of T4 (safetensors
-columns, `docs/PACK_FORMAT.md`). Not started: T1 manifest, T2/T3 (the pipeline-owned facts:
-ferry flag, class table, romanised names, section lengths, `boardAbs`, `firstVisit`) and the
-geometry half of T4. The text below is the original audit. It reviews the
+## Status (2026-10-27)
+
+✅ done · ◐ partial · ❌ open · — dropped
+
+| Task | Status | Where |
+|---|---|---|
+| T0 Bench in repo | ✅ | `web/tools/bench/`, `bun run bench` (PR #45) |
+| T1 Manifest + pack id | ❌ | |
+| T2 Facts out of the client (ferry flag, class table, romanised names, section lengths, `pStart`, `boardAbs`, `firstVisit`) | ◐ | only the national trains file (#16, PR #43); the rest is still derived in `web/src/lib` |
+| T3 Client consumes T2 | ❌ | waits on T2 |
+| T4 Binary columnar container | ◐ | tables as safetensors columns (PR #140, `docs/PACK_FORMAT.md`); geometry still JSON |
+| T5 New timetable ingest | ✅ | the 11k train export, on fmt 6 (2026-10-25) |
+| T6 Optional later | ❌ | |
+
+Of the 16 inventory rows marked **move** or **shape** (§3), 2 are done (#3 tables, #16 national
+trains). The text below is the original audit. It reviews the
 owner's "make the client as dumb as possible" premise (2026-10-25), sets out the target data
 contract between the Rust pipeline and the web client, audits every client-side derivation on
 `deckgl` @ `58426d1` against it, and sequences the moves against the deck.gl plan
