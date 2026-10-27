@@ -208,7 +208,7 @@ pub fn encode_tables(v: &Value, pack: &str) -> Vec<u8> {
         );
     }
     let mut h = serde_json::to_vec(&Value::Object(header)).unwrap();
-    while (8 + h.len()) % 8 != 0 {
+    while !(8 + h.len()).is_multiple_of(8) {
         h.push(b' ');
     }
     let mut out = Vec::with_capacity(8 + h.len() + body.len());
@@ -378,7 +378,7 @@ mod tests {
         assert_eq!((8 + hl) % 8, 0);
         for (name, view) in st.tensors() {
             let (_, vals) = ours.col(&name);
-            let sz = view.dtype().size();
+            let sz = view.dtype().bitsize() / 8;
             assert_eq!(view.data().len(), vals.len() * sz, "{name}");
             assert_eq!(
                 (view.data().as_ptr() as usize - b.as_ptr() as usize) % sz,
