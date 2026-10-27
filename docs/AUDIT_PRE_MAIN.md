@@ -215,7 +215,7 @@ boolean, `writeNatLayerParam` writes `none`/`flows` only). The four-state `NatLa
   Behaviour change only for old links carrying `natLayer=both|trains` (they would open with the
   flows on and the bar collapsed, like any other link).
 
-**"Zoom clarity".** A toolbar toggle (`Toolbar.tsx:226-234`), state in `App.tsx:51-52` and
+**"Zoom clarity".** *Resolved: dropped (owner decision) -- the button, state, `zoomWidthScale` / `ZOOM_WIDTH_KNEE`, the `damped` parameters and `zoomWidth.test.ts` are gone; widths are the pre-trial widths.* Historical description: a toolbar toggle (`Toolbar.tsx:226-234`), state in `App.tsx:51-52` and
 `MapCanvas.tsx:251-255`, the maths in `palette.ts:108-127`, consumed by `flows.ts:296,348,516`
 and `Legend.tsx:129`, tested by `zoomWidth.test.ts`. The switch is a `globalThis` flag because
 the lazy chunk carries its own copy of `palette.ts` (the comment at `palette.ts:111-112` says
@@ -272,7 +272,7 @@ fed origin or national data). Inventory of every national-specific branch:
 | R6 | Legend scales: `national` prop switches steps/samples/caption | `Legend.tsx:46-48,89-95,351` | justified | One component; the data differs (trains/day vs departures+arrivals). |
 | R7 | Timeline bar: `isNational` relabels Running/Trains, hides Arrived and Finish | `TimelineScrubber.tsx:90-92,184-188,393-410,563-572` | justified | One component driven by `AnimState.national`. |
 | R8 | Timetable modal: `national` synthesises a `trainVM` from the stops, folds the clock, hides isolate/jump in inbound only | `TrainScheduleModal.tsx:30-35,113-141,238-243` | justified | One component. S4 asks for the stop unrolling to happen once. |
-| R9 | Screen-reader live region: national only; origin silent by decision (P2.4) | `AnimAnnouncer.tsx:5-6,34` | justified (decision) | Nice-to-have: announce the origin's departed/arrived too (§7.4). |
+| R9 | (Removed by owner decision: `AnimAnnouncer` and its live region are deleted.) Screen-reader live region: national only; origin silent by decision (P2.4) | `AnimAnnouncer.tsx:5-6,34` | justified (decision) | Nice-to-have: announce the origin's departed/arrived too (§7.4). |
 | R10 | Deck layers: `nationalLayers` / `nationalRings` vs `trainLayers` | `layers/national.ts:263-365`, `layers/trains.ts:183-245` | **should-merge** | `interface DotBuffers {count, pos: Float32Array, posStride, line: Uint8Array, fill?: Uint8Array, tailCount, tailSrc, tailTgt, tailCol, dwell: Disc[], rings: Disc[]}`; `dotLayers(prefix: "" \| "nat-", b: DotBuffers, o: {pickable: boolean; isolated: boolean}): Layer[]`. `TrainBuffers` and `NationalFrame` both satisfy it (the national frame's interleaved `buf` becomes `pos` with `posStride: 24`, `fill` undefined = white). Removes ~90 lines and keeps the two marks identical by construction (the plan's §2.2 intent). |
 | R11 | Flows: national B / A+B reuse `buildPassData`, `passDataLayers`, `recountPassData`, `infraLayers`, `wholePath`, `rippleRing` | `layers/national.ts:456-487,491-507,642-651,679` | reused | Good: one geometry path for both modes. |
 | R12 | Label candidates: national fabricates `CityPointVM`s with zeroed fields | `layers/national.ts:614-637`, `labelsOverlay.ts:38-44` | **should-merge** | Narrow `placeLabels`' input to `LabelPoint = Pick<CityPointVM, "idx" \| "zh" \| "en" \| "pt" \| "trains">` (`lib/labels.ts`); the national builder then passes `{idx, zh, en, pt, trains}` honestly. Type-only change. |

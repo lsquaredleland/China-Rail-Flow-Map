@@ -66,7 +66,7 @@ describe("toolbar panels", () => {
   test("the layers popover groups the controls under headings and keeps their ids", () => {
     const h = renderToStaticMarkup(<Toolbar {...props(0)} />);
     for (const t of ["View", "Map layers", "Units &amp; theme"]) expect(h).toContain(t);
-    for (const id of ["btnCountry", "btnHome", "btnOut", "btnIn", "tglNetwork", "tglLabels", "tglInfra", "tglZoomClarity", "unitKm", "unitMi", "themeDay", "themeNight"])
+    for (const id of ["btnCountry", "btnHome", "btnOut", "btnIn", "tglNetwork", "tglLabels", "tglInfra", "unitKm", "unitMi", "themeDay", "themeNight"])
       expect(h).toContain(`id="${id}"`);
     // the class filter stays inline, outside the popover (it follows the popover's closing tag)
     expect(h).toContain("cls-filter");

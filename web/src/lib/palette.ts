@@ -101,19 +101,8 @@ const SQRT_KNEE = Math.sqrt(WIDTH_KNEE);
 export function flowUnits(n: number): number {
   return n <= WIDTH_KNEE ? n : WIDTH_KNEE + 2 * SQRT_KNEE * (Math.sqrt(n) - SQRT_KNEE);
 }
-export function flowWidth(n: number, scale: number, fitScale: number, damped = false): number {
-  return Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale) * zoomWidthScale(scale / fitScale, damped));
-}
-
-// "Zoom clarity" (owner trial): when `damped`, flow widths grow with the zoom only
-// up to ZOOM_WIDTH_KNEE x the national fit, then with its square root, so busy hubs
-// don't balloon when zoomed in. Off by default; the Toolbar button turns it on and
-// the flag travels as a parameter (P.current.zoomClarity).
-export const ZOOM_WIDTH_KNEE = 3;
-/** Multiplier on a zoom-proportional width at zoom ratio `r` (scale / fitScale): 1 when off or up to the knee. */
-export function zoomWidthScale(r: number, damped = false): number {
-  if (!damped || r <= ZOOM_WIDTH_KNEE) return 1;
-  return Math.sqrt(ZOOM_WIDTH_KNEE / r);
+export function flowWidth(n: number, scale: number, fitScale: number): number {
+  return Math.max(0.5, flowUnits(n) * WIDTH_K * (scale / fitScale));
 }
 
 function rgbStr(c: [number, number, number]): string {

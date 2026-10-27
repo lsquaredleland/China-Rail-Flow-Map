@@ -24,8 +24,6 @@ export default function Toolbar({
   onToggleLabels,
   showInfra,
   onToggleInfra,
-  zoomClarity,
-  onToggleZoomClarity,
   distUnit,
   onSetDistUnit,
   dark,
@@ -53,8 +51,6 @@ export default function Toolbar({
   onToggleLabels: () => void;
   showInfra: boolean;
   onToggleInfra: () => void;
-  zoomClarity: boolean;
-  onToggleZoomClarity: () => void;
   distUnit: DistUnit;
   onSetDistUnit: (u: DistUnit) => void;
   dark: boolean;
@@ -95,7 +91,7 @@ export default function Toolbar({
     };
   }, [panel]);
   // A dot on the layers button while any option differs from its default.
-  const layersChanged = !showNetwork || showLabels || showInfra || zoomClarity || (national && !showFlows) || distUnit !== "km";
+  const layersChanged = !showNetwork || showLabels || showInfra || (national && !showFlows) || distUnit !== "km";
   return (
     <div className="toolbar" ref={rootRef}>
       {!national && (
@@ -247,15 +243,6 @@ export default function Toolbar({
           onClick={onToggleInfra}
         >
           Infrastructure
-        </button>
-        <button
-          id="tglZoomClarity"
-          type="button"
-          aria-pressed={zoomClarity ? "true" : "false"}
-          title="When zoomed in past ×3, lines widen more slowly so busy hubs stay readable"
-          onClick={onToggleZoomClarity}
-        >
-          Zoom clarity
         </button>
       </div>
       <span className="tb-pop-h">Units &amp; theme</span>

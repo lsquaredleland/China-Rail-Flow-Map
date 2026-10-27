@@ -56,6 +56,7 @@ export interface DepCtx {
     currentList: { code: string }[],
   ) => void;
   onSelectTrain?: (code: string) => void;
+  onToggleIsolate?: (code: string) => void;
   handleClearChip: () => void;
   emptyProps: EmptyProps;
   natSort: SortState<NatSortKey>;

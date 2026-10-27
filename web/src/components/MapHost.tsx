@@ -253,7 +253,6 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
     notifyAnimListeners(M);
   }, [
     M,
-    props.zoomClarity,
     props.showNetwork,
     props.showLabels,
     props.showInfra,

@@ -19,7 +19,6 @@ import DeparturesTable from "./components/DeparturesTable";
 import Footnote from "./components/Footnote";
 import TimelineScrubber from "./components/TimelineScrubber";
 import TrainScheduleModal from "./components/TrainScheduleModal";
-import AnimAnnouncer from "./components/AnimAnnouncer";
 import AppHeader, { compactStats } from "./components/AppHeader";
 import Toolbar from "./components/Toolbar";
 import ActiveFilterBar from "./components/ActiveFilterBar";
@@ -41,14 +40,13 @@ export default function App() {
   const [national, setNational] = useState<boolean>(initialNational);
 
   const prefs = usePrefs();
-  // "Zoom clarity" trial (removable, lib/palette.ts): always starts off.
-  const [zoomClarity, setZoomClarity] = useState<boolean>(false);
   const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
   const { selectedTrainCode, setSelectedTrainCode, isolatedTrainCode, setIsolatedTrainCode } =
     useTrainSelection();
   // Each click on a train opens a fresh timetable (expanded), even the same
   // train or one picked while another's card was minimised: the key remounts it.
   const [trainOpenSeq, setTrainOpenSeq] = useState(0);
+  const toggleIsolate = (c: string) => setIsolatedTrainCode((prev) => (prev === c ? null : c));
   const openTrain = (code: string | null) => {
     setSelectedTrainCode(code);
     if (code) setTrainOpenSeq((n) => n + 1);
@@ -346,8 +344,6 @@ export default function App() {
           onToggleLabels={() => setShowLabels((v) => !v)}
           showInfra={showInfra}
           onToggleInfra={toggleInfra}
-          zoomClarity={zoomClarity}
-          onToggleZoomClarity={() => setZoomClarity((v) => !v)}
           distUnit={distUnit}
           onSetDistUnit={setDistUnit}
           dark={dark}
@@ -373,7 +369,6 @@ export default function App() {
           showNetwork={showNetwork}
           showLabels={showLabels}
           showInfra={showInfra}
-          zoomClarity={zoomClarity}
           distUnit={distUnit}
           panelDest={panelCity}
           loadError={loadError ?? natLoadError}
@@ -493,6 +488,7 @@ export default function App() {
           filters.setSelectedTrainCodes([]);
         }}
         onSelectTrain={openTrain}
+        onToggleIsolate={toggleIsolate}
         isolatedTrainCode={isolatedTrainCode}
         onClearTrainIsolation={() => setIsolatedTrainCode(null)}
         onSelectCity={(c) => handleSelectDest(c)}
@@ -511,8 +507,6 @@ export default function App() {
         selectedTrainCodes={filters.selectedTrainCodes}
         onSelectTrainCodes={filters.setSelectedTrainCodes}
       />
-
-      <AnimAnnouncer mapRef={mapRef} national={national} />
 
       <footer id="pageFooter">
         {atlas ? atlas.data.about : ""}
@@ -538,9 +532,7 @@ export default function App() {
         trainVM={selectedTrainVM}
         national={national}
         isIsolated={isolatedTrainCode === selectedTrainCode}
-        onToggleIsolate={(c) => {
-          setIsolatedTrainCode((prev) => (prev === c ? null : c));
-        }}
+        onToggleIsolate={toggleIsolate}
         onPlayFrom={(mins) => playFrom(national ? ((mins % 1440) + 1440) % 1440 : mins)}
         onJumpToTime={(mins) => {
           // The national clock is one day.
