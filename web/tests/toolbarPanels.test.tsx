@@ -63,4 +63,18 @@ describe("toolbar panels", () => {
     expect(nat.indexOf('id="tbMore"')).toBeLessThan(nat.indexOf('id="tglFlows"'));
     expect(renderToStaticMarkup(<Toolbar {...props(0, false)} />)).not.toContain("tglFlows");
   });
+  test("the layers popover groups the controls under headings and keeps their ids", () => {
+    const h = renderToStaticMarkup(<Toolbar {...props(0)} />);
+    for (const t of ["View", "Map layers", "Units &amp; theme"]) expect(h).toContain(t);
+    for (const id of ["btnCountry", "btnHome", "btnOut", "btnIn", "tglNetwork", "tglLabels", "tglInfra", "tglZoomClarity", "unitKm", "unitMi", "themeDay", "themeNight"])
+      expect(h).toContain(`id="${id}"`);
+    // the class filter stays inline, outside the popover (it follows the popover's closing tag)
+    expect(h).toContain("cls-filter");
+    expect(h.indexOf('id="tbMore"')).toBeLessThan(h.indexOf('id="tbFilters"'));
+  });
+  test("a dot shows on the layers button only while a layer option is off its default", () => {
+    expect(renderToStaticMarkup(<Toolbar {...props(0)} />)).not.toContain("tb-dot");
+    const changed = { ...(props(0) as object), showInfra: true } as never;
+    expect(renderToStaticMarkup(<Toolbar {...changed} />)).toContain("tb-dot");
+  });
 });
