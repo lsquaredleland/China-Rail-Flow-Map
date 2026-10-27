@@ -167,7 +167,9 @@
     text-overflow: ellipsis;
   }
   #originSearch:focus-visible { outline-offset: 6px; }
-  #originList { left: 0; right: 0; width: auto; max-height: 46vh; }
+  /* The city list spans the full toolbar width (not just the picker), so the
+     "#N City 城市 — n trains" rows fit. The picker starts 14px from the edge. */
+  #originList { left: 0; right: auto; width: calc(100vw - 28px); max-height: 46vh; }
   #originList .opt { padding: 13px 12px; }
   .toolbar button { min-height: 36px; padding: 4px 10px; font-size: 13px; }
   .toolbar .tb-mob-btn { min-height: 36px; padding: 0; }
