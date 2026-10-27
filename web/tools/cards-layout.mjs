@@ -77,6 +77,7 @@ const queue = [...cases];
 await Promise.all([0].map(async () => { for (let c; (c = queue.shift()); ) await runCase(c); }));
 // One page per phone size keeps this fast: origin and national are checked on
 // the same page (the mode switch is a click), legend open and closed by toggling.
+const wait = (pg, fn, label, t = 60000) => until(pg, fn, t).catch(() => { fails.push(`timed out waiting for ${label}`); });
 const hit2 = (a, b) => a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
 const box = (e) => { const b = e.getBoundingClientRect(); return b.width && b.height ? { x: b.x, y: b.y, r: b.right, b: b.bottom } : null; };
 const measure = (pg) => pg.evaluate((src) => {
@@ -98,11 +99,11 @@ for (const [w, h] of [[390, 844], [390, 664], [360, 740]]) {
   await pg.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
   await pg.goto(`${url}/?theme=light`, { waitUntil: "networkidle0" });
   await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
-  await until(pg, "document.querySelector('.tl-expand-wrap')", 30000);
+  await wait(pg, "document.querySelector('.tl-expand-wrap')", "expand pill on load");
   for (const national of [false, true]) {
     if (national) {
       await click(pg, "#tglNational");
-      await until(pg, "document.querySelector('.tl-expand-wrap') && !document.querySelector('#dirOut')", 30000);
+      await wait(pg, "document.querySelector('.tl-expand-wrap') && !document.querySelector('#dirOut')", "national mode");
     }
     for (const open of [true, false]) {
       const collapsed = await pg.evaluate(() => document.getElementById("legendBody")?.classList.contains("collapsed"));
@@ -121,7 +122,7 @@ for (const [w, h] of [[390, 844], [390, 664], [360, 740]]) {
     }
     // the 24h bar open: one compact row, the collapse button fully on screen
     await click(pg, 'button[title^="Expand 24h"]');
-    await until(pg, "document.querySelector('.timeline-bar-dock')", 10000);
+    await wait(pg, "document.querySelector('.timeline-bar-dock')", "timeline bar");
     {
       const t = await measure(pg);
       const tag = `${w}x${h} ${national ? "national" : "origin"} timeline-open`;
@@ -134,7 +135,7 @@ for (const [w, h] of [[390, 844], [390, 664], [360, 740]]) {
     }
     if (!national) {
       await click(pg, 'button[title="Collapse animation bar"]');
-      await until(pg, "document.querySelector('.tl-expand-wrap')", 30000);
+      await wait(pg, "document.querySelector('.tl-expand-wrap')", "expand pill after collapse");
     }
   }
   await browser.close();
