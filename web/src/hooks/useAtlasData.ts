@@ -6,13 +6,11 @@ import type {
   DecodedOutline,
   InMapData,
   InTablesData,
-  InTablesPack,
   NationalEntriesPack,
   NationalFlowsPack,
   NationalIndexPack,
   OutMapData,
   OutTablesData,
-  OutTablesPack,
   NationalTrainsData,
   NationalTrainsPack,
   OutlineData,
@@ -20,8 +18,9 @@ import type {
   SharedData,
 } from "../types";
 import {
-  expandInTables,
-  expandOutTables,
+  copyFields,
+  expandInColumns,
+  expandOutColumns,
   prepAtlas,
   prepOutline,
   requireFmt,
@@ -44,6 +43,7 @@ import {
   SHARED_URL,
   fetchData,
   fetchInMap,
+  fetchColumns,
   fetchOutMap,
 } from "../data";
 import { initialDirection, matchesCity } from "./useUrlState";
@@ -132,8 +132,9 @@ export function useAtlasData({
       const at = atlasRef.current;
       if (!d || !at) return;
       if (schedData) at.schedules = schedData.schedules;
+      // copyFields keeps the tables' per-origin fields lazy (decode.ts).
       for (let i = 0; i < d.origins.length; i++)
-        Object.assign(at.data.origins[i], d.origins[i]);
+        copyFields(at.data.origins[i], d.origins[i]);
       setOutTablesReady(true);
     };
     const applyInMap = () => {
@@ -152,7 +153,7 @@ export function useAtlasData({
       const at = atlasRef.current;
       if (!d || !at) return;
       for (let i = 0; i < d.origins.length; i++)
-        Object.assign(at.data.origins[i], d.origins[i]);
+        copyFields(at.data.origins[i], d.origins[i]);
       setInTablesReady(true);
     };
 
@@ -163,12 +164,12 @@ export function useAtlasData({
       }
       if (flights.outTables) return;
       flights.outTables = true;
-      Promise.all([fetchData<OutTablesPack>(OUT_TABLES_URL), loadSchedules()])
+      Promise.all([fetchColumns(OUT_TABLES_URL), loadSchedules()])
         .then(([d, sched]) => {
           requireFmt(d.fmt, OUT_TABLES_URL);
           schedData = sched;
           if (sched) setSchedulesData(sched);
-          outTablesRef.current = expandOutTables(d);
+          outTablesRef.current = expandOutColumns(d);
           flights.outTables = false;
           setLoadError((e) => (e && e.startsWith(OUT_TABLES_URL) ? null : e));
           applyOutTables();
@@ -187,10 +188,10 @@ export function useAtlasData({
       }
       if (flights.inTables) return;
       flights.inTables = true;
-      fetchData<InTablesPack>(IN_TABLES_URL)
+      fetchColumns(IN_TABLES_URL)
         .then((d) => {
           requireFmt(d.fmt, IN_TABLES_URL);
-          inTablesRef.current = expandInTables(d);
+          inTablesRef.current = expandInColumns(d);
           flights.inTables = false;
           setLoadError((e) => (e && e.startsWith(IN_TABLES_URL) ? null : e));
           applyInTables();

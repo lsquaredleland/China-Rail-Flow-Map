@@ -1,5 +1,6 @@
 // Static server for dist/ that mimics the Vercel headers in vercel.json:
 //   assets/*.json.br   immutable cache, Content-Encoding: br, application/json
+//   assets/*.safetensors.br  the same, application/octet-stream
 //   index.html         Cache-Control: public, max-age=0, must-revalidate
 //   every file         nosniff, Referrer-Policy, Permissions-Policy//   every file         ETag (If-None-Match -> 304); .js/.html/.css/.svg are
 //                      brotli-compressed on the fly when accepted, as the host does
@@ -44,10 +45,10 @@ export function serve(dir, port, { quiet = true, notFound = [] } = {}) {
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     };
-    if (/^\/assets\/.*\.json\.br$/.test(p)) {
+    if (/^\/assets\/.*\.(json|safetensors)\.br$/.test(p)) {
       h["Cache-Control"] = "public, max-age=31536000, immutable";
       h["Content-Encoding"] = "br";
-      h["Content-Type"] = "application/json";
+      h["Content-Type"] = p.endsWith(".safetensors.br") ? "application/octet-stream" : "application/json";
     } else {
       h["Content-Type"] = TYPES[path.extname(f)] || "application/octet-stream";
       if (p === "/index.html") h["Cache-Control"] = "public, max-age=0, must-revalidate";

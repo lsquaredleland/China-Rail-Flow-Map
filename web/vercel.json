@@ -68,6 +68,19 @@
           "value": "application/json"
         }
       ]
+    },
+    {
+      "source": "/assets/(.*)\\.safetensors\\.br",
+      "headers": [
+        {
+          "key": "Content-Encoding",
+          "value": "br"
+        },
+        {
+          "key": "Content-Type",
+          "value": "application/octet-stream"
+        }
+      ]
     }
   ]
 }

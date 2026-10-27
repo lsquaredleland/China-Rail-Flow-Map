@@ -21,6 +21,7 @@
 
 pub mod chains;
 pub mod cn;
+pub mod columns;
 pub mod entries;
 pub mod export;
 pub mod flows;

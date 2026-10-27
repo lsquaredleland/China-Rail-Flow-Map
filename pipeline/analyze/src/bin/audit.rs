@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use analyze_rs::chains;
 use analyze_rs::cn::*;
+use analyze_rs::columns;
 use analyze_rs::entries;
 use analyze_rs::geo::*;
 use analyze_rs::inputs;
@@ -188,6 +189,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
         None => println!("AUDIT pack build: none (pack predates the provenance block)"),
     }
     let mut ok = check_formats(&shared, &out_map, &in_map, &out_t, &in_t);
+    ok &= check_columns(dir, &out_t, &in_t);
     ok &= check_city_points(&shared);
     if ok {
         expand_tables(&mut out_t, true);
@@ -264,6 +266,29 @@ fn check_about(shared: &Value) -> i64 {
         calendar.len()
     );
     i64::from(bad)
+}
+
+/// The safetensors tables (what the client loads) decode to exactly the JSON
+/// tables every other check reads (columns.rs).
+fn check_columns(dir: &Path, out_t: &Value, in_t: &Value) -> bool {
+    let mut ok = true;
+    for (name, t) in [
+        ("atlas-v2-out-tables.safetensors", out_t),
+        ("atlas-v2-in-tables.safetensors", in_t),
+    ] {
+        let same = pack::exists(dir, name)
+            && columns::decode_tables(&pack::read_bytes(dir, name)).as_ref() == Ok(t);
+        println!(
+            "AUDIT pack {name}: {}",
+            if same {
+                "PASS (equals its JSON)"
+            } else {
+                "FAIL (missing or differs from its JSON)"
+            }
+        );
+        ok &= same;
+    }
+    ok
 }
 
 /// Every table and map file carries `fmt: 6`.

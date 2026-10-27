@@ -119,6 +119,9 @@
 //!   atlas-v2-out-tables.json, atlas-v2-in-map.json, atlas-v2-in-tables.json
 //!   (shared is shared). The four origin files partition the combined
 //!   origins exactly; the packer asserts the partition before writing.
+//! - atlas-v2-out-tables.safetensors / atlas-v2-in-tables.safetensors: the
+//!   two tables files as integer columns (`analyze_rs::columns`, docs/PACK_FORMAT.md), asserted to decode back to
+//!   the JSON exactly. The client loads these; the JSON stays for the tools.
 //! - atlas-v2-schedules.json
 //! - atlas-v2-national.json (P3.1; only when the v1 input has `national`)
 //! - atlas-v2-national-trains.json (P2.2 data source; only when the v1 input
@@ -207,6 +210,7 @@
 //! plus a geometry check (same point counts, coordinates within half a
 //! 1e4 step). Any mismatch aborts with a nonzero exit.
 
+use analyze_rs::columns;
 use analyze_rs::entries;
 use analyze_rs::provenance;
 use serde_json::{json, Map, Value};
@@ -396,7 +400,9 @@ fn pack_sections(secs: &Value) -> Value {
 
 fn write_with_br(path: &Path, bytes: &[u8], quality: u32) -> (usize, usize) {
     std::fs::write(path, bytes).expect("write json");
-    let br_path = path.with_extension("json.br");
+    let mut br_path = path.as_os_str().to_owned();
+    br_path.push(".br");
+    let br_path = PathBuf::from(br_path);
     let f = std::fs::File::create(&br_path).expect("create br");
     let mut w = brotli::CompressorWriter::new(std::io::BufWriter::new(f), 8192, quality, 22);
     w.write_all(bytes).expect("brotli write");
@@ -1243,10 +1249,29 @@ fn main() {
         by_name.push(("atlas-v2-national-entries.json", packed));
     }
 
-    let items: Vec<(&str, Vec<u8>)> = by_name
-        .into_iter()
-        .map(|(name, val)| (name, serde_json::to_string(&val).unwrap().into_bytes()))
-        .collect();
+    // safetensors twins of the two tables files: what the client loads (columns.rs).
+    let mut items: Vec<(&str, Vec<u8>)> = Vec::new();
+    for (name, val) in &by_name {
+        let twin = match *name {
+            "atlas-v2-out-tables.json" => Some(("atlas-v2-out-tables.safetensors", "out-tables")),
+            "atlas-v2-in-tables.json" => Some(("atlas-v2-in-tables.safetensors", "in-tables")),
+            _ => None,
+        };
+        if let Some((tn, pack)) = twin {
+            let b = columns::encode_tables(val, pack);
+            assert!(
+                columns::decode_tables(&b).as_ref() == Ok(val),
+                "{tn}: does not decode back to {name}"
+            );
+            items.push((tn, b));
+        }
+    }
+    println!("safetensors tables: PASS (both decode back to their JSON exactly)");
+    items.extend(
+        by_name
+            .into_iter()
+            .map(|(name, val)| (name, serde_json::to_string(&val).unwrap().into_bytes())),
+    );
 
     let results: Vec<(&str, usize, usize)> = items
         .par_iter()
