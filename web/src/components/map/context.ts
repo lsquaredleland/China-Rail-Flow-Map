@@ -74,8 +74,6 @@ export interface Props {
       and every flow section's track geometry is stroked again on top
       as one uniform thin line in the theme's ink tone. */
   showInfra: boolean;
-  /** "Zoom clarity" trial: damp flow widths past x3 zoom (lib/palette.ts). */
-  zoomClarity?: boolean;
   distUnit: DistUnit;
   panelDest: CityPointVM | null;
   loadError: string | null;
@@ -262,7 +260,7 @@ export function createMapCtx(P: MapCtx["P"], refs: MapRefs): MapCtx {
     Y: (lat) => -lat * S.current.view.scale + S.current.view.ty,
     toLon: (px) => (px - S.current.view.tx) / S.current.view.scale,
     toLat: (py) => (S.current.view.ty - py) / S.current.view.scale,
-    widthOf: (n) => flowWidth(n, S.current.view.scale, S.current.fitScale, !!P.current.zoomClarity),
+    widthOf: (n) => flowWidth(n, S.current.view.scale, S.current.fitScale),
 
     /* ---------- direction-aware views of the current origin ---------- */
     points: () => {

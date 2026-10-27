@@ -95,9 +95,9 @@ export const NAT_WIDTH_FACTOR = 0.5;
 
 /** Stroke width (CSS px) per section: the origin flows' scale times NAT_WIDTH_FACTOR
     (the 0.5 px hairline floor stays). */
-export function nationalWidths(counts: Uint32Array, scale: number, fitScale: number, damped = false): Float32Array {
+export function nationalWidths(counts: Uint32Array, scale: number, fitScale: number): Float32Array {
   const w = new Float32Array(counts.length);
-  for (let s = 0; s < counts.length; s++) w[s] = Math.max(0.5, flowWidth(counts[s], scale, fitScale, damped) * NAT_WIDTH_FACTOR);
+  for (let s = 0; s < counts.length; s++) w[s] = Math.max(0.5, flowWidth(counts[s], scale, fitScale) * NAT_WIDTH_FACTOR);
   return w;
 }
 

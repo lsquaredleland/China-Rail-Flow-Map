@@ -24,8 +24,6 @@ export {
   flowColor,
   flowUnits,
   flowWidth,
-  zoomWidthScale,
-  ZOOM_WIDTH_KNEE,
   palette,
   paletteRGBA,
   rampColor,

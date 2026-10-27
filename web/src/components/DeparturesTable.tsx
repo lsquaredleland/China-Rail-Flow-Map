@@ -56,6 +56,8 @@ interface Props {
   atlas?: DecodedAtlas | null;
   onSelectOrigin?: (idx: number) => void;
   onSelectTrain?: (code: string) => void;
+  /** Toggle single-train isolation (the timetable's "Isolate on map"); a plain row click calls it. */
+  onToggleIsolate?: (code: string) => void;
   isolatedTrainCode?: string | null;
   onClearTrainIsolation?: () => void;
   onSelectCity?: (city: CityPointVM | null) => void;
@@ -100,6 +102,7 @@ export default function DeparturesTable({
   atlas,
   onSelectOrigin,
   onSelectTrain,
+  onToggleIsolate,
   isolatedTrainCode,
   onClearTrainIsolation,
   onSelectCity,
@@ -163,6 +166,12 @@ export default function DeparturesTable({
     e: MouseEvent,
     currentList: { code: string }[],
   ) => {
+    const plain = !e.shiftKey && !e.metaKey && !e.ctrlKey;
+    // Isolation belongs to the outbound animation and national mode.
+    if (plain && onToggleIsolate && (national || direction === "out")) {
+      onToggleIsolate(code);
+      return;
+    }
     if (!onSelectTrainCodes) return;
     if (e.shiftKey && lastClickedRowIdxRef.current !== null) {
       const start = Math.min(lastClickedRowIdxRef.current, idx);
@@ -425,6 +434,7 @@ export default function DeparturesTable({
     selectedTrainCodes,
     handleRowClick,
     onSelectTrain,
+    onToggleIsolate,
     handleClearChip,
     emptyProps: {
       atlas,

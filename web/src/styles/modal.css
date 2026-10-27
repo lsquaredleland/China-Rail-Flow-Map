@@ -247,7 +247,10 @@
 
 @media (max-width: 640px) {
   .tsm-backdrop { padding: 8px; }
-  .tsm-dialog { max-height: 94dvh; }
+  .tsm-dialog { max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain; }
+  /* One scroll for the whole modal: the stops table grows to its full height. */
+  .tsm-dialog > * { flex-shrink: 0; }
+  .sg-scroll { flex: none; min-height: 0; overflow: visible; }
   .sg-head { padding: 14px 12px 12px; gap: 8px; flex-wrap: wrap; }
   .sg-num { font-size: 28px; }
   .sg-title-block { flex-basis: 100%; order: 3; }
@@ -262,5 +265,5 @@
   .sg-c-n.is-dep { font-size: 14px; }
   .sg-zh { font-size: 16px; }
   .sg-table .sg-c-idx { width: 32px; }
-  .sg-foot { padding: 10px 12px; font-size: 12px; }
+  .sg-foot { padding: 10px 12px; font-size: 12px; position: sticky; bottom: 0; background: var(--panel); }
 }

@@ -20,6 +20,7 @@ export default function NatTable({
   calendar,
   loaded,
   onSelectTrain,
+  onToggleIsolate,
 }: {
   list: NatRow[];
   sort: SortState<NatSortKey>;
@@ -30,6 +31,8 @@ export default function NatTable({
   /** The schedules the rows are read from have loaded. */
   loaded: boolean;
   onSelectTrain?: (code: string) => void;
+  /** A row click isolates the train on the map; the train link opens its timetable. */
+  onToggleIsolate?: (code: string) => void;
 }) {
   const th = (k: NatSortKey, label: string, cls?: string) => (
     <th
@@ -78,7 +81,7 @@ export default function NatTable({
               {list.slice(w.first, w.last).map((r, k) => {
                 const tr = trainTable[r.t];
                 return (
-                  <tr key={r.t} {...w.tr(w.first + k)} onClick={onSelectTrain ? () => onSelectTrain(r.code) : undefined}>
+                  <tr key={r.t} {...w.tr(w.first + k)} onClick={onToggleIsolate ? () => onToggleIsolate(r.code) : undefined}>
                     <td className="c-train">
                       <TrainCell d={{ code: r.code, cls: r.cls }} onClick={onSelectTrain ? () => onSelectTrain(r.code) : undefined} />
                     </td>

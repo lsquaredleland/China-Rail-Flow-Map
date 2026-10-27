@@ -7,7 +7,7 @@ import { nextSort } from "./sorting";
 import type { DepCtx, ModeView, NatData } from "./types";
 
 export function natTrainsMode(ctx: DepCtx, nat: NatData, list: NatRow[]): ModeView {
-  const { hasExtraFilters, natSort, setNatSort, onSelectTrain, unit } = ctx;
+  const { hasExtraFilters, natSort, setNatSort, onSelectTrain, onToggleIsolate, unit } = ctx;
   const total = nat.rows ? nat.rows.length : 0;
   const { key, dir } = natSort;
   const order: Record<NatSortKey, [string, string]> = {
@@ -49,6 +49,7 @@ export function natTrainsMode(ctx: DepCtx, nat: NatData, list: NatRow[]): ModeVi
       calendar={nat.calendar}
       loaded={!!nat.rows}
       onSelectTrain={onSelectTrain}
+      onToggleIsolate={onToggleIsolate}
     />
   );
   return { heading, depNote, stations: null, count: total, total, showingNote, tableNode };
