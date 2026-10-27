@@ -38,13 +38,15 @@ export default function ActiveFilterBar({
   return (
     <InSlot>
     <div
-      className="active-filter-bar"
+      className="map-card active-filter-bar"
       role="status"
       aria-label="Active map and table filters"
     >
-      <span className="filter-pill-label">Filtered:</span>
+      <div className="mc-main filter-main">
+      <span className="filter-pill-label">Filtered</span>
       {classes.map((cls) => (
         <span key={cls} className="filter-pill">
+          <span className="mc-class">{cls === "plain" ? "普" : cls}</span>
           Class: {cls === "plain" ? "普" : cls}
           <button
             type="button"
@@ -105,9 +107,10 @@ export default function ActiveFilterBar({
           </button>
         </span>
       )}
+      </div>
       <button
         type="button"
-        className="filter-clear-all"
+        className="mc-btn filter-clear-all"
         onClick={onClearAll}
         title="Reset all filters"
       >
