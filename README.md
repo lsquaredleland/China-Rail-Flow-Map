@@ -81,12 +81,13 @@ rebuild of the pack also needs inputs that are not in git: an OpenStreetMap Chin
 
 See [`docs/PIPELINE.md`](docs/PIPELINE.md) for the complete end-to-end data pipeline documentation (OSM PBF extraction, `corridor-v3` routing, `atlas` section assembly, and `atlaspack` v2 compression).
 
-### 3. Analytics (optional)
+### 3. Analytics
 
-The build reads `GA_MEASUREMENT_ID` (a GA4 `G-…` id). With it set, the page loads gtag.js and
-sends a few interaction events (`mode_switch`, `origin_select`, `direction_switch`,
-`animation_play`, `class_filter`, `train_open`, `train_isolate`, `ui_toggle`; see
-`web/src/lib/analytics.ts`). Without it, nothing is loaded or sent.
+The live site loads Google Analytics 4 and sends a few interaction events (`mode_switch`,
+`origin_select`, `direction_switch`, `animation_play`, `class_filter`, `train_open`,
+`train_isolate`, `ui_toggle`). It does so only on the production hostname, so local builds,
+tests and preview deployments load and send nothing; the ID and the host are at the top of
+`web/src/lib/analytics.ts`.
 
 ---
 
