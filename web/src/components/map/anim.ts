@@ -24,6 +24,28 @@ function animStartMins(M: MapCtx): number {
   return Math.floor(tl.firstDepMins);
 }
 
+/** The isolated train's run on the clock, or null when no train is isolated: from its departure
+    (origin view) or first stop (national) for `dur` minutes. The national clock is one wrapping day. */
+function isoRun(M: MapCtx): { start: number; dur: number; wrap: boolean } | null {
+  const code = M.P.current.isolatedTrainCode;
+  if (!code) return null;
+  if (M.P.current.national) {
+    const r = M.S.current.natLoop;
+    return r && r.dur > 0 ? { start: ((r.start % 1440) + 1440) % 1440, dur: r.dur, wrap: true } : null;
+  }
+  const pt = M.activeTimeline()?.getPrepTrain(code);
+  return pt && pt.arrMins > pt.depMins ? { start: pt.depMins, dur: pt.arrMins - pt.depMins, wrap: false } : null;
+}
+
+/** Where the clock goes `deltaMins` after `t` when an isolated train passes its final stop: back
+    to its start. Null when no train is isolated or the train is not mid-run. */
+export function isoLoopTime(M: MapCtx, t: number, deltaMins: number): number | null {
+  const run = isoRun(M);
+  if (!run) return null;
+  const e = run.wrap ? (((t - run.start) % 1440) + 1440) % 1440 : t - run.start;
+  return e >= 0 && e < run.dur && e + deltaMins >= run.dur ? run.start : null;
+}
+
 export function getAnimState(M: MapCtx): AnimState {
   const { S, P, activeTimeline } = M;
   const st = S.current;
@@ -116,8 +138,9 @@ export function animLoop(M: MapCtx, timestamp: number) {
       // Accelerate tail playback (Day 2-3) by 2.5x so watching terminal arrivals stays dynamic
       const tailMult = st.animTime > 1440 ? 2.5 : 1.0;
       const deltaMins = (dt / Math.max(1, st.animSpeed)) * 1440 * tailMult;
-      st.animTime = st.animTime + deltaMins;
-      if (st.animTime >= totalMins) {
+      const looped = isoLoopTime(M, st.animTime, deltaMins);
+      st.animTime = looped ?? st.animTime + deltaMins;
+      if (looped === null && st.animTime >= totalMins) {
         st.animTime = animStartMins(M);
       }
       M.render();

@@ -5,7 +5,7 @@
    train, so no per-train vertices are kept. */
 import type { DecodedAtlas, NationalTimeline, NationalTrainsPack, SchedulesData } from "../types";
 import { decodeSet, requireFmt } from "./decode";
-import { getSecGeometry, prepTrainPath } from "./timeline";
+import { getSecGeometry, prepTrainPath, trainSpeedFrac } from "./timeline";
 
 /** Throw a FmtError unless `d` is a national trains file for a shared pack
     with `nSec` sections, `nThr` throats and `nTrains` train_table rows: same
@@ -144,7 +144,7 @@ export function natState(tl: NationalTimeline, q: number, a: number): void {
   }
   const legDur = Math.max(1, legEndTime - legStartTime);
   const tau = Math.max(0, Math.min(1, (a - legStartTime) / legDur));
-  nat.speed = 1;
+  nat.speed = trainSpeedFrac(tau, legDur);
   nat.dwell = false;
   nat.dist = legStartDist + tau * (legEndDist - legStartDist);
 }

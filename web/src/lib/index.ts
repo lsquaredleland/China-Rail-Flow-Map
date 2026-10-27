@@ -62,6 +62,7 @@ export {
   buildDayTimeline,
   prepTrainPath,
   trainDistAt,
+  trainSpeedFrac,
 } from "./timeline";
 export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
 export { natTrainVM } from "./natTrain";
@@ -131,6 +132,7 @@ export {
   highlightSegN,
   infraPasses,
   isFilteredView,
+  isoFlowAlpha,
   isolatedCorridor,
   newModelCaches,
   pickableChords,

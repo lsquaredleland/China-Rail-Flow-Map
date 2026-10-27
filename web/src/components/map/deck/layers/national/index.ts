@@ -14,13 +14,13 @@
      trains.ts    pool        timeline identity (buffers regrow with it)
                   corridorMemo  WeakMap timeline -> train row -> sampled path
      flows.ts     dayMemo     (flows pack, view key, theme)
-                  atMemo      (day pass, entries pack, whole minute)
+                  atMemo      (day pass, entries pack, entry tick)
                   infraMemo   WeakMap by the drawn counts array
      cities.ts    eventsMemo  WeakMap by the view
                   rankMemo    WeakMap by the counts object
                   labelMemo   WeakMap by the drawn circle set */
 import type { Layer } from "@deck.gl/core";
-import { stationT } from "../../../../../lib";
+import { isoFlowAlpha, stationT } from "../../../../../lib";
 import type { NatFilter } from "../../../../../lib";
 import type { MapCtx } from "../../../context";
 import type { DeckStats } from "../../DeckHost";
@@ -52,22 +52,19 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   stats.natFlows = 0;
   st.natCities = null;
   st.natCounts = null;
-  // An isolated train: only its run and its dot (flows and circles step aside).
+  st.natLoop = null;
+  // An isolated train: its run and its dot over the faded flows, as in the origin view (circles step aside).
   const isoCode = P.current.isolatedTrainCode;
   const tlAll = isoCode ? nationalTimeline(atlas, P.current.nationalTrains) : null;
   const iso = isoCode && tlAll ? nationalIsolated(atlas, tlAll.tl, isoCode) : null;
-  if (iso && tlAll) {
-    layers.push(...nationalCorridor(tlAll.tl, atlas, iso.q));
-    if (!withTrains) {
-      st.natN = st.natRunning = stats.natDots = 0;
-      st.natPick = null;
-      return layers;
-    }
-  }
-  if (!iso && withFlows && nf && (!withTrains || P.current.nationalEntries)) {
-    // A+B: cumulative since 00:00 (D7), by whole minute; 24:00 is the day's totals.
-    // The entry ticks know only the class, so an index filter draws the day's totals.
-    const minute = withTrains && !view.indexed ? Math.min(1440, Math.floor(Math.max(0, st.animTime))) : null;
+  if (iso && tlAll) st.natLoop = { start: tlAll.tl.start[iso.q], dur: tlAll.tl.end[iso.q] - tlAll.tl.start[iso.q] };
+  const flowAlpha = iso ? isoFlowAlpha(P.current.dark) : 1;
+  if (withFlows && nf && (!withTrains || P.current.nationalEntries)) {
+    // A+B: cumulative since 00:00 (D7), by entry tick (the file's sub-minute step, so sections
+    // light up smoothly with the clock); 24:00 is the day's totals. The entry ticks know only
+    // the class, so an index filter draws the day's totals.
+    const tpm = P.current.nationalEntries?.ticks_per_min ?? 1;
+    const minute = withTrains && !view.indexed ? Math.min(1440, Math.floor(Math.max(0, st.animTime) * tpm) / tpm) : null;
     const fl = nationalFlowLayers({
       atlas,
       nf,
@@ -79,6 +76,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       scale: st.view.scale,
       fitScale: st.fitScale,
       damped: !!P.current.zoomClarity,
+      alpha: flowAlpha,
     });
     layers.push(...fl.layers);
     stats.natFlows = fl.sections;
@@ -89,7 +87,8 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     }
   }
   // The infrastructure overlay over the flows (as in the origin view), under the circles.
-  if (!iso && withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark));
+  if (withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark, flowAlpha));
+  if (iso && tlAll) layers.push(...nationalCorridor(tlAll.tl, atlas, iso.q));
   if (!iso && withFlows && nf) {
     // The city circles ride with the flows (day totals, whatever the clock).
     // With the clock running (flows + trains) the circles grow as the trains stop there.

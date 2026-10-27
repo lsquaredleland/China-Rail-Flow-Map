@@ -9,6 +9,7 @@ import type { NatFilter } from "../src/lib";
 const NOF: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
 import type { NationalTrainsData } from "../src/types";
 import { LABEL_TRAINS_PER_UNIT, maxDots, natView, nationalCityDots, nationalInfraLayers, nationalLabelPoints, nationalFlowLayers, nationalFrame, nationalHighlight, nationalKeep, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
+import { isoFlowAlpha } from "../src/lib";
 import { glowOf } from "../src/components/map/deck/layers/trains";
 import { nationalTrains, pack } from "./fixture";
 
@@ -53,6 +54,15 @@ describe("national layers", () => {
     expect(dots.props.pickable).toBe(false);
     expect(nationalLayers(f, true)[1].props.pickable).toBe(true);
     expect(tails.props.pickable).toBe(false);
+  });
+
+  test("an isolated train's dot and tail match the origin view's isolated marks", () => {
+    const f = nationalFrame(tl, atlas, 1095, 100);
+    const [tails, dots] = nationalLayers(f, false, true);
+    expect([dots.props.getRadius, dots.props.getLineWidth]).toEqual([4.15, 2.7]);
+    expect(tails.props.getWidth).toBe(3.5);
+    const [, plain] = nationalLayers(f, false);
+    expect([plain.props.getRadius, plain.props.getLineWidth]).toEqual([3, 2]);
   });
 
   test("natSynth: copies shifted by 37 min, positions of the originals unchanged", () => {
@@ -176,6 +186,20 @@ describe("national flow picking and circle size", () => {
     for (let i = 0; i < idxToSec.length; i++) expect(out.counts[idxToSec[i]]).toBeGreaterThan(0);
     // widest first: the first path belongs to the busiest section
     expect(out.counts[idxToSec[0]]).toBe(Math.max(...Array.from(out.counts)));
+  });
+  test("an isolated train fades the flows (isoFlowAlpha) instead of hiding them", () => {
+    const faded = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, dark: false, scale: 100, fitScale: 100, alpha: isoFlowAlpha(false) });
+    expect(isoFlowAlpha(false)).toBe(0.08);
+    expect(isoFlowAlpha(true)).toBe(0.06);
+    expect(faded.sections).toBe(out.sections);
+    expect(faded.layers.some((l) => l.id.startsWith("pick-"))).toBe(false);
+    const col = (ls: typeof out.layers) => {
+      const l = ls.find((x) => x.id === "flows-national")!;
+      return (l.props.getColor as (d: unknown, i: { index: number }) => number[])(null, { index: 0 });
+    };
+    // faded towards the paper (white): lighter than the full-strength colour
+    const full = col(out.layers), fade = col(faded.layers);
+    expect(fade[0] + fade[1] + fade[2]).toBeGreaterThan(full[0] + full[1] + full[2]);
   });
   test("the hover highlight is one wider path on the hovered section", () => {
     const n = 40;
