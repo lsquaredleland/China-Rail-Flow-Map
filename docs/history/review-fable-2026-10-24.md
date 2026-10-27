@@ -1,6 +1,6 @@
 # Review: China Rail Flow Map — `main` @ `f199472` (Fable, 2026-10-24)
 
-> **Historical record (moved here 2026-10-26 by the pre-main audit, `docs/AUDIT_PRE_MAIN.md`).**
+> **Historical record (moved here 2026-10-26 by the pre-main audit, `docs/history/AUDIT_PRE_MAIN.md`).**
 > Written against the Canvas client before the deck.gl migration. Of its top recommendations:
 > #1 router determinism (O17) and #3 atlas determinism (O18) are done (`optimization-progress.md`, now in this folder);
 > #4 the deploy cache contract is fixed (content-hashed packs, `Content-Encoding: br`, `web/bundle.mjs`);
@@ -131,7 +131,7 @@ Severity: **H** = wrong output or data loss risk; **M** = fragility that will bi
 
 **Architecture.** React 19 shell (`App.tsx`, 1,594 lines, 10 effects) around one imperative canvas component (`MapCanvas.tsx`, 2,959 lines) that holds props in `P.current` and mutable draw state in `S.current`. The atlas is a shared mutable object: staged table loads `Object.assign` into `at.data.origins[i]` (`App.tsx:357-384`) and flip ready flags that re-run `useMemo`s. It works, and it is fast, but it is the kind of design where the invariants live in the authors' heads (the B14/B21 class of bugs came from exactly this). A small typed store (`AtlasStore` with `applyOutTables` etc. as the only writers) would make the phases explicit without a framework change.
 
-**Rendering/perf.** Every frame redraws outline, graticule, the full network backdrop (bbox-culled but not cached), flows, infra, trains, stations and labels (`MapCanvas.tsx:1940-2000`). On a phone at 60 fps that is the dominant cost; `PIPELINE.md` §6.2 already names backdrop caching as the first perf item. Concretely: render outline+graticule+network to an offscreen canvas keyed by `(view, size, DPR, palette)` and `drawImage` it; render static flows to a second layer when not animating. Per-frame allocations (R15) are easy wins: one shared gradient per class (translate the context instead), a reused `Map` for active counts. The 5-min `secFlowSteps` tables (`lib.ts:1360-1392`) are `Map<sec, Uint16Array(numSteps)>` — ~7.5k × ~800 steps × 2 B ≈ 12 MB for a long-span origin; fine on desktop, worth checking on the Oppo (**uncertain**).
+**Rendering/perf.** Every frame redraws outline, graticule, the full network backdrop (bbox-culled but not cached), flows, infra, trains, stations and labels (`MapCanvas.tsx:1940-2000`). On a phone at 60 fps that is the dominant cost; `PIPELINE.md` §6.2 already names backdrop caching as the first perf item. Concretely: render outline+graticule+network to an offscreen canvas keyed by `(view, size, DPR, palette)` and `drawImage` it; render static flows to a second layer when not animating. Per-frame allocations (R15) are easy wins: one shared gradient per class (translate the context instead), a reused `Map` for active counts. The 5-min `secFlowSteps` tables (`lib.ts:1360-1392`) are `Map<sec, Uint16Array(numSteps)>` — ~7.5k × ~800 steps × 2 B ≈ 12 MB for a long-span origin; fine on desktop, worth checking on a phone (**uncertain**).
 
 **State/URL.** `?city=&lat=&lon=&z=` sync with debounce (`App.tsx:321-349`, `MapCanvas.tsx:2017-2023`), persisted dark/direction/unit in `localStorage`. Good; guard `localStorage` with try/catch (R14).
 

@@ -1,105 +1,50 @@
-# China Rail — barebones handoff (v3, 2026-10-22)
+# Data pipeline: rebuilding the pack
 
-> **Status (read first).** The live, maintained parts of this document are
-> **§3 (recipe, especially step 5 and the O9 router inputs)** and **§7 (goldens)**.
-> §1 (project description), §5 (what was removed from the v3 handoff zip) and
-> §8 (provenance) are **handoff-era history**, kept for context only; their
-> paths (`project/`, `deliverable/`) and package contents no longer match this
-> repo. Binaries that exist today: `pipeline/analyze/src/bin/{atlas,atlaspack,audit,chainfill,legclass,osm_export,paths,secdiff}.rs`
-> plus `analyze-rs` (main), `pipeline/filter` (main, `probe`), `pipeline/router`
-> (main, `cordcheck`, `splitcheck`) and `pipeline/outline` (main).
+How the data pack in `web/public/assets/` is built from OpenStreetMap and a
+timetable, and how to check a rebuild. The maintained parts are **§3 (the
+recipe, especially step 5)** and **§7 (the goldens)**. Binaries:
+`pipeline/analyze/src/bin/{atlas,atlaspack,audit,chainfill,legclass,osm_export,paths,secdiff}.rs`
+plus `analyze-rs` (main), `pipeline/filter` (main, `probe`), `pipeline/router`
+(main, `cordcheck`, `splitcheck`) and `pipeline/outline` (main).
 
+Engineering rules:
 
-The minimal continuation package for the China rail project: **all source
-code, the irreplaceable raw timetable datasets, and complete instructions
-to recreate every derived artifact.** Everything bulky was a build output
-and has been removed; §3 is the recipe book that regenerates it.
-
-Owner: Leland. Origin environment: Muse VM (Linux, 2 vCPU / 7 GB).
-Standing engineering rules from the owner — carry them over:
-
-- **All data-processing code is Rust**, state-of-the-art standard:
-  `rustfmt`-formatted, `cargo clippy --all-targets` at **zero warnings**
-  (fix properly or annotate with a justified `#[allow]`). Python only
-  if essential.
-- Cargo is not on PATH in fresh shells: `export PATH=$HOME/.cargo/bin:$PATH`.
-- The flow atlas uses a **free basemap only** (no CARTO/API keys) and
-  **MapLibre is permanently off the table** (owner decision) — its
-  renderer is custom canvas/WebGL.
-- **Staging discipline (owner requirement):** no version control exists,
-  so algorithm changes build into a staging area first, live data is
-  snapshotted before any swap, and nothing swaps without the owner's
-  go-ahead. Judge rebuilds by **flow-identity** (per-origin summaries +
-  atomic edge counts), never byte-identity — the pipeline has
-  pre-existing run-to-run byte churn in section chaining.
+- **All data-processing code is Rust**: `rustfmt`-formatted, `cargo clippy
+  --all-targets` at **zero warnings** (fix properly or annotate with a
+  justified `#[allow]`). Python only if essential.
+- **Staged rebuilds.** Algorithm changes build into a scratch directory
+  first, never over `web/public/assets/`; a new pack lands in its own PR
+  after `audit` passes against the goldens (§7) and `secdiff` explains every
+  changed flow. Judge rebuilds by **flow identity** (per-origin summaries and
+  atomic edge counts); since O17/O18 the build is also byte-reproducible.
 
 ---
 
-## 1. What this project is (history: handoff-era)
+## 1. What the pipeline produces
 
-Two products from one pipeline:
+The atlas behind the flow map: for each of the 102 origin cities, the
+distinct trains/day on every shared track section, outbound and inbound, plus
+per-train paths, stops and schedules for the tables and the animation, and the
+national files for national mode. A train that re-covers the same track (e.g.
+土溪→平昌→达州) counts once in the static flows while the animation shows each
+pass, so static < animated there by design (成都 out, 达州 side: static 1,
+animated 2). What the web app does with it is in `README.md`.
 
-1. **China Rail Flow Map** (web artifact `china-rail-flow-atlas`) —
-   Minard-style flow map of China's top 100 rail cities by outbound and
-   inbound trains/day; line width = exact count of distinct trains/day per
-   shared track section (per-train dedupe, strictly proportional).
-   A train that re-covers the same track (e.g. 土溪→平昌→达州) counts once in the
-   static flows while the animation shows each pass, so static < animated there
-   by design (成都 out, 达州 side: static 1, animated 2).
-   Features Outbound + Inbound modes, exact per-train city-pair routing
-   (clicking any station dot fades non-connecting trunks to ~18% opacity and
-   draws the exact city-pair train volume at 100% opacity on top of the
-   ghosted trunk width), 2-color HSR vs. conventional infrastructure overlay
-   (`sections`: 4,274 HSR / 3,257 conv; `in_sections`: 4,146 HSR / 3,116 conv;
-   `#0066cc`/`#4da3ff` HSR vs `#40231a`/`#ecdfc2` conv; 2-color legend key),
-   8-class per-section flow breakdown (`G, D, C, S, Z, T, K, plain/普`) packing
-   `[sec_idx, total, g, d, c, s, z, t, k, plain]` with interactive class
-   filtering dynamically updating map flows, destination dots, and header
-   stats, three interactive click-to-filter histograms (Hour, Distance, and
-   1-hour Duration bins `0–1h` … `24h+` in `#1b9e77`), China Railway branding
-   with network statistics subtitle (7,253 mapped daily services of >12,000
-   nationwide across 48,000 km / 30,000 mi HSR network), sortable Duration &
-   Distance columns, `—` for terminating stops, and automatic reachable
-   city-pair search chips. Built into `china-rail-flow-map/`; data recreated
-   by §3 step 5.
-2. **Chengdu→Chongqing rail map** (artifact
-   `chengdu-to-chongqing-rail-map`) — 126 trains, Tue 2026-10-20,
-   corridor-classified; ground truth in
-   `project/derived/chengdu-chongqing-trains.json` (included).
+## 2. Inputs
 
-### 1.1 The 2026-10-22 v2+ enhancements to China Rail Flow Map
-
-- **2-Color HSR vs. Conventional Infrastructure Overlay**: `sections` (4,519 HSR / 4,587 conv, current pack; 12306-era: 4,274 / 3,257) and `in_sections` (4,495 HSR / 4,560 conv; 12306-era: 4,146 / 3,116) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h, rendered in `#0066cc` (light) / `#4da3ff` (dark) for HSR vs `#40231a` / `#ecdfc2` for conventional rail, with an interactive 2-color Infrastructure key in the legend card.
-- **8-Class Per-Section Flow Breakdown (`G, D, C, S, Z, T, K, plain/普`)**: `flows` and `in_flows` rows pack `[sec_idx, total, g, d, c, s, z, t, k, plain]` (trailing zero counts stripped). Selecting any combination of classes in the map toolbar or table filter bar dynamically redraws the map's flow widths/colors, destination/source city dots, and header stats, while highlighting the selected classes as an overlay on top of the fixed background histograms.
-- **Exact Per-Train Section Index (`dep_secs`, `arr_secs`, and per-call `sec_cnt`)**: `atlas-v2-out-tables.json` and `atlas-v2-in-tables.json` include each train's ordered section index list (`dep_secs` / `arr_secs`) and each call's stop-cutoff section count (`sec_cnt`). Clicking any station dot fades non-connecting trunks to ~18% opacity and draws the exact city-pair train count per section at 100% opacity on top of the ghosted full trunk width.
-- **Three Interactive Histograms (Hour, Distance, Duration)**: Added the 3rd **Trains by journey time** histogram (1-hour bins `0–1h` … `24h+` in `#1b9e77`), hover count labels directly above every hovered bar, and click-to-filter on all three histograms.
-- **Departures / Arrivals Table & Header Enhancements**: Added China Railway vector logo and concise subtitle (7,253 mapped daily services of >12,000 nationwide; 48,000 km / 30,000 mi HSR network), sortable **Duration** column on city-pair call tables, sortable **Distance** (`km`/`mi`) column on vanilla outbound/inbound tables, `—` for departure time on terminating stops, removed double-click camera reset, and added automatic city-pair matching ("Calling at" / "Arriving from" chip) when typing a reachable city name in `#depFilter`.
-
-## 2. What IS in this package (34 MB unpacked, ~6 MB zipped — the raw
-timetable text compresses ~7×; everything else is code and docs)
-
-```
-README.md            top-level overview and data format specification
-web/                 web front-end for China Rail Flow Map (React + Bun + Brotli)
-  src/               full UI source, build scripts, components, and assets
-  public/assets/     pre-computed compressed atlas datasets
-pipeline/            Rust Cargo workspace for OSM & timetable processing
-  analyze/           analyze-rs: timetable resolution, audit, atlas assembly & packing
-  router/            corridor-v3 routing & speed scoring
-  filter/            fast OSM PBF -> railway XML extractor
-  outline/           national border polyline generator
-data/                stations, gazetteers, overrides, and raw inputs
-  raw/               point-in-time timetable JSONL files (stops.jsonl, trains.jsonl, etc.)
-  leg_overrides.json the corridor fix's override data (§4)
-  city_en.json       gazetteer English names (gazetteer v2.2 in code)
-docs/                pipeline guides, benchmarks, and research reports
-```
+Tracked in git: the curated `data/*.json` files (stations, gazetteers, English
+names, `leg_overrides.json`, `pair_path_fixes.json`, `station_fixes.json`) and
+`pipeline/router/recipe.toml`. **Not** tracked: the OpenStreetMap China extract
+(`data/osm/`, from Geofabrik, §3 step 1), the timetables (`data/raw/`: the
+12306 `stops*.jsonl` / `trains*.jsonl` snapshots and the train export
+`train-exports-2026-10-25/`) and everything derived (`data/derived/`, build
+directories). Their formats are in `README.md`.
 
 ## 3. Recreate everything
 
-Prerequisites: Rust toolchain, Node 20+ (for web build), `brotli` CLI for packing.
-All commands run from the package root unless stated. Timings are the origin VM's
-benchmarks (logs in `docs/benchmarks/`).
+Prerequisites: Rust toolchain, Node 22+ (for the web build), `brotli` CLI for packing.
+All commands run from the repo root unless stated. Timings are rough, from a
+2-vCPU Linux VM.
 
 ### Step 1 — rail geometry (the base layer)
 ```bash
@@ -143,7 +88,7 @@ Service layer: 5,043 PTv2 `route=train` relations on real OSM ids
 honest `note`). GTFS: 5,043 trips, 64,117 stop_times, 1,955 stops,
 single-day `calendar_dates`. Gotchas (self-closing `<node/>` coords;
 station points from the streamed elements, not `osm_stations.json`;
-strip 12306's space-typeset names) are documented in origin project notes.
+strip 12306's space-typeset names) are handled in `osm_export.rs`.
 
 ### Step 5 — the flow-atlas dataset (what the live artifact serves)
 **Since 2026-10-22 the live atlas is the corridor-v3 build** (owner's
@@ -154,7 +99,6 @@ live in `data/derived/corridor-v3/` (or regenerate with `pipeline/router`,
 schedule or OSM network: `pipeline/router/README.md`). The live pack is built WITH `data/leg_overrides.json` (see "Actual
 live recipe" below); an empty-overrides build does not reproduce it. A bare
 `atlas` run loads `leg_overrides.json` (§4) by default.
-Pre-v3 data: `snapshots/pre-corridor-v3-2026-10-22/` (checksummed).
 ```bash
 ./target/release/atlas        # → china-flow-atlas-data.json (v1 combined)
 ./target/release/atlaspack    # → the v2 pack + combined v2:
@@ -199,9 +143,10 @@ pass `CRFM_PIPELINE_TREE=$(git rev-parse HEAD:pipeline)`. Make every
 `pipeline/` commit (goldens included) before the build that ships, because
 any of them changes the tree hash. Rebuild staged:
 ```bash
-source ../staging/env.sh   # CRFM_DATA_DIR/CRFM_OUTPUT_DIR -> staging/inputs (cp -c clones of
-                           # handoff-v3 inputs), ATLAS_PAIR_PATHS, ATLAS_LEG_PATHS,
-                           # ATLAS_OVERRIDES=staging/inputs/data/leg_overrides.json
+# staging/ is a local, git-ignored scratch area. env.sh exports CRFM_DATA_DIR and
+# CRFM_OUTPUT_DIR (a copy of data/ and of the GTFS output, staging/inputs/{data,output}),
+# ATLAS_OVERRIDES=staging/inputs/data/leg_overrides.json, ATLAS_PAIR_PATHS, ATLAS_LEG_PATHS
+source ../staging/env.sh
 X=$PWD/../data/raw/train-exports-2026-10-25
 export CRFM_SCHEDULE=$X/trains-all.json
 export CRFM_SCHEDULE_SUPPLEMENTS=$X/train-operating-days.json
@@ -312,7 +257,7 @@ paths, O1). The *decoded* per-row meaning is fmt 4's plus the throats:
   `sec_cnt`, no flow counting. Removing them from a path gives the fmt 5 path
   exactly (`scripts/check_pack_roundtrip.mjs` proves it on a whole pack).
 
-Decoded per-row fields (what `lib.ts` `expandOutTables` / `expandInTables`
+Decoded per-row fields (what `web/src/lib/decode.ts` `expandOutColumns` / `expandInColumns`
 rebuild, and what `audit` expands to):
 - `dep_secs` / `arr_secs` are in **travel order**; an entry `~s` (= `-(s+1)`)
   means section `s` is travelled against its stored point order. A train
@@ -408,7 +353,11 @@ ATLAS_OVERRIDES=../../data/leg_overrides.json ATLAS_OUT=<staging-dir>/atlas-fixe
                               # changes ONLY on overridden corridors
 ```
 
-## 4. The corridor-routing fix — a verified PROPOSAL, not applied
+## 4. The corridor-routing fix (leg overrides)
+
+**Status: applied.** The live pack is built with `data/leg_overrides.json`
+(§3 step 5). The 2026-10-22 decision recorded at the end of this section was
+reversed once the geometry gaps it names were filled (O5/O9, PR #7).
 
 **Problem.** Nonstop legs were drawn on unconstrained shortest-path
 geometry; on parallel corridors that misroutes trains (Chengdu–Chongqing
@@ -443,8 +392,8 @@ G2445/G2446/G2447/G2450 via Chongqing West; D846/D862 (+D848/D864 back)
 south loop. Control run (empty overrides) is **flow-identical** to
 shipped — zero changed atomic edges, all 100 origins, both directions.
 
-**Owner's decision (2026-10-22): DO NOT APPLY. Live v1 stays.** From the
-before/after previews (`docs/previews/`), v2 looked less viable: the
+**Decision of 2026-10-22 (since reversed): do not apply yet.** From the
+before/after previews, v2 looked less viable: the
 network data has real **geometry gaps** — pairs with no track geometry
 at all, existing only as chords: （平昌→达州）, （南京→扬州）. Two
 overrides could not take effect even staged (fallback, no regression):
@@ -457,57 +406,22 @@ the segment-floor sum; fits neither Chengyu's ~86 floor nor the north
 the audit + small map kept it on Chengyu. Decide with fresh evidence
 (a live stop-list pull) before any swap.
 
-## 5. What is NOT in v3, and where its recipe lives (history: handoff-era)
+## 5. Open work
 
-| Removed artifact | Recreate |
-|---|---|
-| `china-rail.osm`, Geofabrik PBF | §3 step 1 |
-| Atlas datasets (five-file v2 pack, combined v1/v2, per-direction) | §3 step 5 |
-| Staged corridor-fix pack + staged atlas + pre-swap backup | §3 step 7 |
-| OSM service layer `.osm.gz` (19 MB) | §3 step 4 |
-| GTFS zip | §3 step 4 |
-| `pair_paths.json`, `pair_distances.json`, `cs_out/`, `c_out/` | §3 steps 3–4 |
-| Spreadsheets (city pairs ×2, Chengdu workbook) | §3 step 6 |
-| `chengdu-flow-data.json`, `china-flow-stations-data.json`, `china-outline.json`, `china-rail-timetables-*.json`, `china-rail-intercity-*.json`, `beijing-shanghai-raw-trains.json` | §3 steps 3, 5 |
-| `legclass-report.json`, secdiff dumps, build logs | §3 step 7 (conclusions in §4) |
-| Pre-gapfix snapshots | Not recreatable — regression role spent; results in §4 + session notes |
-| Operating-days crawl state (221 MB) | Belongs to the separate workstream (§6), still in the origin workspace |
-| `project/smt/` (57 MB) | A third-party timetable app — not project work; left in the origin workspace |
+- Pipeline backlog: O2 (triage the continuity gaps over 6 km), O3 (chord legs
+  at a path end), O7 (inbound loop trains with non-monotone `sec_cnt`) and
+  O19 (the 0.1–1 km joins at stops), in `docs/history/optimization-progress.md`.
+- Moving the remaining data facts out of the client (pack manifest, ferry
+  flag, class table, section lengths, boarding days): `docs/THIN_CLIENT.md`
+  §4, tasks T1–T4.
+- Done since the first version of this list: the inbound leg-resolution
+  defect (O5, PR #7), the performance pass (the deck.gl renderer,
+  `docs/history/DECKGL_MIGRATION.md`) and per-train operating days (the
+  train export's calendar, §3 step 5).
 
-Kept despite being derivable, deliberately: the `data/raw/stops*.jsonl` timetable datasets
-(point-in-time; §2) and `data/leg_overrides.json` (365 records — the auditable
-input of §4, 125 KB).
+## 6. Reference numbers
 
-## 6. Other open work (deferred; none started)
-
-1. **Inbound leg-resolution defect** (audit finding; owner deferred it —
-   outbound first). `resolve_leg` is called at one site in `atlas.rs`
-   (outbound); the inbound pass reads only the cache and skips misses.
-   Chengdu measured: **70 legs dropped (89/3,822 occurrences), 66/558
-   trains affected, ~10,100 train-km ≈ 2.9% of inbound geography**;
-   undercounts e.g. 成都西 17 true vs 9 shipped. Totals/widest (111)
-   unaffected. Fix: resolve on demand in the inbound pass — and in
-   `audit.rs`, which copies the same behaviour and checks outbound only.
-2. **Performance pass**: baselines first (first paint, per-file
-   fetch+parse, origin-switch, frame cost; desktop + throttled), then
-   staged parse, backdrop caching + viewport culling; goldens re-checked
-   per change. Geometry coarsening ~500 m proposed, never approved.
-   Sandbox timings ≠ the owner's phone (Oppo Find N6).
-3. **Operating-days** (separate thread): per-train operating patterns
-   for ~7,250 trains. Pilot passed (witness agreement 100% on 1,134
-   train-days; 220/234 daily). Atlas integration deferred until
-   the dataset lands.
-4. **Delivered (2026-10-22 v2+)**: class filters (8 classes: G, D, C, S,
-   Z, T, K, plain) with reactive flow/dot updates, 3 interactive click-to-filter
-   histograms (Hour, Distance, Duration) with overlay highlights, 2-color
-   HSR/conventional infrastructure overlay, and exact per-train city-pair
-   section highlighting.
-   **Parked**: filter optimisation (benchmarks were test-only); hour-of-day
-   animation; same-corridor section merging (identified, never authorised).
-   Small-map caveat: its reverse direction was verified structurally, never
-   live-driven.
-
-Reference numbers: renumbering is endemic — 31.1% of trunk services
+Renumbering is endemic — 31.1% of trunk services
 carry >1 public code (parity flips at reversals; count physical services
 by internal train_no, never by public code). Stopping patterns are
 mostly unique (89.3% unique intermediate patterns in multi-train OD
@@ -545,29 +459,9 @@ are enforced only in the full audit, not `--pack-only`. Current key values
   around stations (paths bridge them with throats, O1; see
   `docs/history/optimization-progress.md`)
 
-The list below is the **historical** 2026-10-22 origin-environment build. It
-matches neither the live pack nor any build reproducible from disk; kept
-for provenance only.
+## 8. Data sources
 
-- Chengdu outbound: **564 trains / 610 cities / widest 145 / 561 of 564
-  fully tracked / 4 chord legs** (corridor-v3, live since 2026-10-22;
-  pre-v3: widest 133 / 544 / 8 — double track was split, chords
-  unrouted)
-- Chengdu inbound: **558 arrivals / 627 sources / widest 108** (pre-v3
-  111; five westbound D trains now on the northern route)
-- Chengdu↔Chongqing: 136 out (53 terminating), 136 in (54 originating),
-  fastest 62 min both ways
-- Trunk pair census (§3 step 3); audit gate: dropped chains 0, flow
-  lost 0; staged-vs-shipped secdiff touches only overridden corridors
-- Chengdu direct: 重庆 136, 广州 21 (6:54), 上海 17 (10:06), 北京 13
-  (7:30), 香港 1 (8:18), 拉萨 1 (34:38); 819 trains/day stop in Chengdu
-
-## 8. Provenance (history: handoff-era)
-
-Built 2026-10-13 → 2026-10-22 (origin main chat + "China rail project"
-side chat). Day logs: `docs/session-notes/`. This v3 supersedes the v1
-(10.5 MB, 2026-10-21) and v2 (111 → 74.6 MB, 2026-10-22) handoff zips;
-packing script: `~/workspace/your_files/build-handoff-v3.sh` (origin
-environment). Data sources: OpenStreetMap contributors (ODbL) via
-Geofabrik; timetables from live 12306 queries. Distances are computed
-from OSM geometry — engineering estimates, not official CR kilometrage.
+Track geometry: OpenStreetMap contributors (ODbL), via Geofabrik. Timetables:
+point-in-time 12306 snapshots and the 2026-10-25 train export (`README.md`).
+Distances are computed from OSM geometry: engineering estimates, not official
+China Railway kilometrage.

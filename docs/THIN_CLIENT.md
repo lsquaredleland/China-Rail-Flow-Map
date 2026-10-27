@@ -10,9 +10,8 @@ contract between the Rust pipeline and the web client, audits every client-side 
 `deckgl` @ `58426d1` against it, and sequences the moves against the deck.gl plan
 (`docs/history/DECKGL_MIGRATION.md`, Phases 2–3, G-MAIN) and the incoming ≈ 12,000-train data.
 
-Every number is tagged **[measured]** (this audit, bun 1.4.4 / node 22 on an M4 Max, scripts in
-the session scratch directory `scratchpad/thinclient/bench/{measure,columnar}.ts`, not
-committed) or **[estimate]** (with the arithmetic shown). Pack = the committed fmt 6 pack in
+Every number is tagged **[measured]** (this audit, bun 1.4.4 / node 22 on an M4 Max, scripts
+since committed as `web/tools/bench/` by T0, `bun run bench`) or **[estimate]** (with the arithmetic shown). Pack = the committed fmt 6 pack in
 `web/public/assets` (7,157 trains, 102 origins, 7,922 sections).
 
 ---
@@ -421,7 +420,7 @@ both directions loaded ≤ 60 MB** and **M16 first-paint transfer ≤ 1.1 MB bro
    client* runs unchanged on another network's pack (then every China literal must go, §1.3 (k)),
    or only that the *pipeline* does? The audit assumes the former.
 9. **Heap budget.** Is ≈ 60 MB JS heap after both directions (M15) the right number for your
-   phone (Oppo Find N6), or do you want a measured target from a device run first?
+   target phone, or do you want a measured target from a device run first?
 
 ---
 
@@ -449,8 +448,7 @@ Client build costs: `prepAtlas` 10.8 ms; `expandOutTables` 9.1 ms / 29.0 MB; `ex
 `buildNational` 17.8 ms, 9.0 MB retained (6,972 trains, 670,796 refs); `natPositions(1095)`
 2.9 ms → 2,668 dots.
 
-Columnar prototype: §1.3 (d). Scripts: `scratchpad/thinclient/bench/measure.ts`,
-`columnar.ts` (session scratch; T0 commits them).
+Columnar prototype: §1.3 (d). Scripts: `web/tools/bench/` (T0).
 
 ## Appendix B. Sources
 

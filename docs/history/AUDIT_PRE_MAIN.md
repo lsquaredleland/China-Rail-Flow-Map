@@ -582,7 +582,7 @@ ignored props.
 | `docs/THIN_CLIENT.md` | design doc, "nothing built", owner defers | **Keep**; still the record of the pack-format decision. Not acted on (owner instruction). |
 | `docs/review-fable.md` | review of `main` @ `f199472` (Canvas era); top items done | **Archived** → `docs/history/review-fable-2026-10-24.md` with a status note (#90). |
 | `docs/deckgl-spike/*.png` (4 side-by-sides) and `p1b1/`, `p1b2/`, `p1b3/`, `p1b5/` diff masks (46 PNGs, 6.9 MB) | G0 spike and G1 parity evidence; each directory referenced once from the migration doc | **Keep `p1b5/`** (the final G1 masks) and the 4 spike PNGs; `p1b1–p1b3` (3.5 MB) are interim masks superseded by `p1b5` and can be deleted once the doc's three references are reworded. Borderline; not removed. |
-| `docs/history/PROJECT_NOTES.md`, `docs/research/*`, `docs/corridor-v3-report.md`, `docs/corridor-v3-summary.json`, `docs/MANUAL_OVERRIDES.md`, `docs/benchmarks/*` | handoff-era records, referenced from `PIPELINE.md` | Keep. `docs/benchmarks/bench.sh` hard-codes `~/workspace/...` paths from the origin VM; keep as provenance of `benchmark_results.json`. |
+| `docs/history/PROJECT_NOTES.md`, `docs/research/*`, `docs/corridor-v3-report.md`, `docs/corridor-v3-summary.json`, `docs/MANUAL_OVERRIDES.md`, `docs/benchmarks/*` | handoff-era records, referenced from `PIPELINE.md` | Keep. (`docs/benchmarks/` was later removed.) |
 | `optimization.md`, `optimization-progress.md` (repo root) | the pipeline work log, "update at the end of every session" | Keep; nice-to-have: move under `docs/` (the progress log's "How to resume" paths would need updating). |
 | `docs/features.md` | roadmap; #8 and #1 statuses were stale (fixed in #90) | Keep. |
 | `pipeline/goldens-12306fix.proposed.json` | goldens for the 12306 recipe, referenced by `PIPELINE.md:214-218` | Keep. |
@@ -763,7 +763,7 @@ local-only branch at `539daf2`), `agent-ac31e363…`, `agent-adef11fa…`, `agen
 (detached), `agent-ad099b62…` (`fix/city-point-fallback`, merged), `agent-ad5da65a…`
 (`feat/national-city-counts`, merged, locked), `agent-ae7f76dc…` (`data/swap-11k-national`,
 remote deleted), `agent-a2f82fa3…` (this audit). Plus 4 scratch worktrees under
-`/private/tmp/…/scratchpad/` (`benchwt`, `noease/base`, `p1c2fu/base`, `ripplewt`) and the
+a temporary scratch directory (`benchwt`, `noease/base`, `p1c2fu/base`, `ripplewt`) and the
 audit's own `main-wt`, `pr-wt`. Recommendation: for each, `git -C <path> status --short` to
 confirm nothing uncommitted, then `git worktree remove <path>` (`--force` for the locked
 ones) and `git worktree prune`; delete the local branches whose remotes are gone. Not done by

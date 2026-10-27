@@ -328,5 +328,5 @@ Read-only; scripts and decoded live pack in `staging/spotcheck/` (`g1.py`, `g2.p
 - Primary checkout is now this repo (fresh clone). `data/derived`, `data/raw`, `output/` (real dir) and `staging/` were copied in with `cp -c`; `data/osm` is a symlink to the old handoff folder's `data/osm`, which is all that remains of the old folder.
 - Verified from the new home: the staged rebuild (O9 rerun + splice byte-identical to `staging/inputs/.../corridor-v3-o9`), full audit + goldens PASS, `secdiff --edges` 0 vs `staging/o1-build/o1v2`, roundtrip OK, `audit --pack-only` PASS on the committed assets, typecheck + build OK.
 - All worktrees removed; branches pushed. The handoff's unpushed local `main` commit is preserved as `backup/handoff-local-main-3484031`; its old stash 686f72a is saved as `staging/handoff-stash-686f72a.patch`.
-- `~/workspace/your_files` and `~/workspace/goals/china-rail-network-map/files` now point at the new `output/`.
+- The old workspace folders now point at the new `output/`.
 - Follow-up from O1: about 97k joins of 0.1-1 km remain, where the arriving and departing legs end on different station nodes (backlog O19).

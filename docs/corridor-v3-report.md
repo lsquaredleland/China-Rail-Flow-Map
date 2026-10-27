@@ -1,7 +1,9 @@
 # corridor-v3 — per-train corridor routing (APPLIED TO PRODUCTION)
 
-Built 2026-10-22, Promoted to Production 2026-10-23 per owner go-ahead.
-Applied to production assets in `output/` and `web/public/assets/` via `pair_paths_canonical.json` and `leg_paths.json`.
+Built 2026-10-22, promoted to production 2026-10-23. The design and validation
+record of `pipeline/router` as first shipped (on the 12306 pack); the router's
+current modules and config are in `pipeline/router/README.md`, the live recipe in
+`docs/PIPELINE.md` §3 step 5. "Production" below means the pre-router geometry.
 
 > [!NOTE]
 > **Footnote on 12306 Ground-Truth Verification:**
@@ -122,39 +124,12 @@ Whole router: **~20 s** wall (incl. 5 s canonical redraw) on 14 cores (graph 4.9
 7.6 s, everything else < 2 s), 1.9 GB peak. Parameter sweeps via env
 vars (`CV3_*`, documented in `router/src/model.rs`) and `./sweep.sh`.
 
-## Files
-
-- `router/` — the crate (`cargo build --release`); also `splitcheck`
-  (parallel-split detector) and `cordcheck` (explains nested cords at a
-  point: sections, separation, track nodes, which pairs use which track).
-  rustfmt clean, clippy 0 warnings, unit tests pass.
-- `out/` — `leg_routes.jsonl` (every leg's decision), `leg_paths.json`
-  (ATLAS_LEG_PATHS input), `candidates.json`, `bridges.json`,
-  `summary.json`, `validation_wrong_switches.jsonl`.
-- `atlas-control/`, `atlas-v3/` (+ `pack/`) — staged atlas builds, logs,
-  secdiff/edge diffs.
-- `web-v3/`, `web-v3.html` — the flow map on v3 data (merge + router);
-  `web-canon/`, `web-canon.html` — double-track merge only;
-  `web-baseline/`, `web-baseline.html` — same app on the live rebuild.
-- `spot_check.mjs`, `spot_D2208_2026-10-28.json` — the one-train
-  12306 check. `live_check.log` — log of an aborted bulk pull (stopped
-  at the owner's request; no data kept).
-
 ## Rebuild
 
-```bash
-cd project/staging/corridor-v3
-(cd router && cargo build --release)
-./router/target/release/corridor-router --out out
-R=../../pipeline/analyze/target/release
-ATLAS_OVERRIDES=$PWD/../../data/no_overrides.json \
-ATLAS_PAIR_PATHS=$PWD/out/pair_paths_canonical.json \
-ATLAS_LEG_PATHS=$PWD/out/leg_paths.json \
-ATLAS_OUT=$PWD/atlas-v3/china-flow-atlas-data.json $R/atlas
-$R/audit            # same env
-$R/atlaspack --in atlas-v3/china-flow-atlas-data.json --out-dir atlas-v3/pack
-python3 -I make_web.py atlas-v3/pack web-v3 "corridor-v3 staging"
-```
+The router is `pipeline/router`; its outputs (`leg_paths.json`,
+`pair_paths_canonical.json`, plus `leg_routes.jsonl`, `candidates.json`,
+`bridges.json`, `summary.json`, `validation_wrong_switches.jsonl`) feed `atlas`
+through `ATLAS_LEG_PATHS` / `ATLAS_PAIR_PATHS`, as in `docs/PIPELINE.md` §3 step 5.
 
 ## Open follow-ups
 

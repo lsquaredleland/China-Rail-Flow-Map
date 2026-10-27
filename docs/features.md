@@ -51,15 +51,15 @@ This document tracks potential features to explore for the **China Rail Flow Map
 
 ### 5. Two-City Comparison / "Sphere of Influence" View
 - **Status:** Proposed
-- **Data Available:** All 100 origins are loaded into memory in Phase 1 (`OutMapData`).
+- **Data Available:** All 102 origins are loaded into memory in Phase 1 (`OutMapData`).
 - **Description:**
   - A "Compare with…" picker that overlays two origins in contrasting colors (e.g., Chengdu vs. Chongqing, or Beijing vs. Shanghai) to visualize overlapping corridors and compare which third cities are faster or more frequently served from City A vs. City B.
 
 ### 6. 1-Transfer Connection Finder (`Origin → Hub → Destination`)
 - **Status:** Proposed
-- **Data Available:** Once tables load, all 100 cities' departure/arrival tables and intermediate calls (`CallVM`) are in memory, allowing outbound calls from City A to be joined with inbound calls to City B.
+- **Data Available:** Once tables load, all 102 cities' departure/arrival tables and intermediate calls (`CallVM`) are in memory, allowing outbound calls from City A to be joined with inbound calls to City B.
 - **Description:**
-  - When clicking an unreached city (or a city with few direct trains), calculate and display the best 1-transfer itineraries across the top 100 hubs, including same-station vs. cross-city station transfers (`tsZh === bsZh`) and layover times.
+  - When clicking an unreached city (or a city with few direct trains), calculate and display the best 1-transfer itineraries across the 102 origin hubs, including same-station vs. cross-city station transfers (`tsZh === bsZh`) and layover times.
 
 ---
 
@@ -75,4 +75,4 @@ This document tracks potential features to explore for the **China Rail Flow Map
 - **Status:** **Completed** as national mode ("National Beta" in the header): the pipeline emits `atlas-v2-national` (per-section totals, every train once), `-national-trains` (whole runs), `-national-entries` (section entry minutes) and `-national-index` (per-train filter facts); the client draws the flows, the growing city circles and every train on one 24h clock, with the origin view's components (`docs/history/DECKGL_MIGRATION.md`, Phases 2–3).
 - **Data Available:** Shared `train_table` and `sections` in `SharedData` (`pipeline/analyze/src/bin/atlaspack.rs`).
 - **Description:**
-  - Deduplicate every train across all 100 origins or emit a pre-aggregated national section flow array from `atlaspack` so users can view the **entire national rail volume** at once before clicking into a specific origin city.
+  - Deduplicate every train across all 102 origins or emit a pre-aggregated national section flow array from `atlaspack` so users can view the **entire national rail volume** at once before clicking into a specific origin city.
