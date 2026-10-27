@@ -412,37 +412,9 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           </div>
         </div>
 
-        {/* Right: A DAY IN / 15s 30s 60s / Finish / Collapse */}
+        {/* Right: speed / Finish / Collapse */}
         <div className="tb-right">
-          <span className="tb-speed-caption">A DAY IN</span>
-
           <SpeedSelect speed={speed} onSetSpeed={handleSetSpeed} />
-          <div className="tb-speed-group">
-            <button
-              type="button"
-              className={`tb-speed-btn ${speed === 15 ? "active" : ""}`}
-              onClick={() => handleSetSpeed(15)}
-              title="Simulate 24 hours in 15 seconds"
-            >
-              15s
-            </button>
-            <button
-              type="button"
-              className={`tb-speed-btn ${speed === 30 ? "active" : ""}`}
-              onClick={() => handleSetSpeed(30)}
-              title="Simulate 24 hours in 30 seconds"
-            >
-              30s
-            </button>
-            <button
-              type="button"
-              className={`tb-speed-btn ${speed === 60 ? "active" : ""}`}
-              onClick={() => handleSetSpeed(60)}
-              title="Simulate 24 hours in 60 seconds"
-            >
-              60s
-            </button>
-          </div>
 
           <button
             type="button"
