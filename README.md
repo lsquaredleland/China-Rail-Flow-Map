@@ -2,7 +2,7 @@
 
 An interactive, Minard-style animated flow map of trains departing and arriving across China's 102 busiest rail hubs — **11,248 scheduled passenger services** (running 23 Oct – 6 Nov 2026) over more than **50,000 km** of high-speed rail and even more conventional track, drawn with deck.gl (WebGL2); no map tile libraries and no API keys.
 
-**Live Demo:** [minard.lsquared.cc](https://minard.lsquared.cc/)
+**Live Demo:** [minard.lsquared.cc](https://minard.lsquared.cc/) · hosting (DNS, Cloudflare, Vercel): [`docs/HOSTING.md`](docs/HOSTING.md)
 
 ---
 
@@ -34,7 +34,7 @@ China-Rail-Flow-Map/
 │   ├── filter/           # Fast PBF -> railway-only OSM XML extractor
 │   └── outline/          # National boundary polyline generator
 ├── data/                 # Station gazetteers (ZH/EN), OSM station coordinates & corridor overrides
-└── docs/                 # PIPELINE.md (reproduction), PACK_FORMAT.md (tables container),
+└── docs/                 # PIPELINE.md (reproduction), PACK_FORMAT.md (tables container), HOSTING.md,
                           # THIN_CLIENT.md (pipeline/client split, partly built), research/ (routing evidence),
                           # history/ (finished plans, audits, reviews; DECKGL_MIGRATION.md holds the renderer
                           # decisions that code comments cite as C19, C23, D3, ...)
