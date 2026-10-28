@@ -387,12 +387,14 @@ fn pack_sections(secs: &Value) -> Value {
         arr(secs)
             .iter()
             .map(|s| {
-                let g = requant(get(s, "g").as_str().unwrap());
+                let mut o = json!({ "g": requant(get(s, "g").as_str().unwrap()) });
                 if is_hsr(s) {
-                    json!({ "g": g, "h": 1 })
-                } else {
-                    json!({ "g": g })
+                    o["h"] = json!(1);
                 }
+                if let Some(l) = s.get("l") {
+                    o["l"] = l.clone();
+                }
+                o
             })
             .collect(),
     )
@@ -469,6 +471,9 @@ fn verify(v1: &Value, v2: &Value) -> Result<(), String> {
             )?;
             if is_hsr(s1) != is_hsr(s2) {
                 return Err(format!("{key} hsr flag mismatch"));
+            }
+            if s1.get("l") != s2.get("l") {
+                return Err(format!("{key} line names mismatch"));
             }
         }
     }
@@ -1013,6 +1018,7 @@ fn main() {
         "train_table": get(&v1, "train_table"),
         "sections": pack_sections(get(&v1, "sections")),
         "in_sections": pack_sections(get(&v1, "in_sections")),
+        "lines": v1.get("lines").cloned().unwrap_or_else(|| json!([])),
         "network": arr(get(&v1, "network")).iter()
             .map(|s| json!(requant(s.as_str().unwrap()))).collect::<Vec<_>>(),
         "throats": arr(get(&v1, "throats")).iter()

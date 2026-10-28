@@ -124,7 +124,7 @@ export {
 export type { Extent, View } from "./camera";
 export { isFerrySection, splitFerry } from "./ferry";
 
-export { tooltipHtml } from "./tooltip";
+export { sectionLines, tooltipHtml } from "./tooltip";
 
 export {
   activeTimeline,

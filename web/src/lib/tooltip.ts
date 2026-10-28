@@ -25,6 +25,21 @@ interface TooltipInput {
   dark: boolean;
   /** The hovered section is the Qiongzhou Strait ferry corridor. */
   ferry: boolean;
+  /** The hovered section's OSM line names `[name, name:en]`. */
+  lines?: [string, string][];
+}
+
+/** The OSM line names of flow section `s`: national flows and the outbound
+    view index `sections`, the inbound view `in_sections`. */
+export function sectionLines(
+  data: AtlasData,
+  view: { national?: boolean; direction: Direction },
+  s: number,
+): [string, string][] {
+  const secs = view.national || view.direction === "out" ? data.sections : data.in_sections;
+  const names = data.lines;
+  if (!names) return [];
+  return (secs[s]?.l ?? []).map((i) => names[i]).filter((n) => n !== undefined);
 }
 
 export function tooltipHtml(hit: Hit, t: TooltipInput): string {
@@ -110,6 +125,10 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
         hit.n +
         (hit.n === 1 ? " train" : " trains") +
         " per day on this section</div>";
+    }
+    for (const [zh, en] of t.lines ?? []) {
+      html +=
+        "<div class='t-sub'>" + esc(zh) + (en ? " &middot; " + esc(en) : "") + "</div>";
     }
     if (t.ferry) {
       const blueCol = t.dark ? "#38BDF8" : "#0284C7";

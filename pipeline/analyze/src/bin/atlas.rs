@@ -72,6 +72,10 @@ struct AtlasSection {
     g: String,
     #[serde(skip_serializing_if = "is_zero")]
     h: u8,
+    /// The OSM line names the section runs on: indices into `lines`, by
+    /// share of the section's named length, largest first.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    l: Vec<u32>,
 }
 #[derive(serde::Serialize)]
 struct AtlasChord {
@@ -153,6 +157,9 @@ struct AtlasOut {
     origins: Vec<AtlasOrigin>,
     sections: Vec<AtlasSection>,
     in_sections: Vec<AtlasSection>,
+    /// OSM line names `[name, name:en]` ("" when OSM has no English name)
+    /// that `sections` / `in_sections` `l` index, in order of first use.
+    lines: Vec<[String; 2]>,
     /// O1 station-throat pieces (polylines): path entries `base + j` (base =
     /// sections.len() in dep_secs, in_sections.len() in arr_secs).
     throats: Vec<String>,
@@ -830,6 +837,7 @@ impl<'a> Ctx<'a> {
             hsr_edges,
             conv_edges,
             hsr_nodes,
+            ..
         } = &self.ways;
 
         let total = chain.len().saturating_sub(1);
@@ -848,6 +856,30 @@ impl<'a> Ctx<'a> {
             })
             .count();
         u8::from(total > 0 && hsr_n * 2 >= total)
+    }
+
+    /// The OSM lines (`WayClasses::lines` indices) a chain runs on, each
+    /// with at least `LINE_MIN_SHARE` of its named length, largest share
+    /// first. Unnamed edges count for no line.
+    fn chain_lines(&self, chain: &[i64]) -> Vec<u32> {
+        const LINE_MIN_SHARE: f64 = 0.2;
+        let coords = &self.inp.coords;
+        let mut km: HashMap<u32, f64> = HashMap::new();
+        for w in chain.windows(2) {
+            let Some(&li) = self.ways.edge_line.get(&osm::edge_key(w[0], w[1])) else {
+                continue;
+            };
+            if let (Some(&p), Some(&q)) = (coords.get(&w[0]), coords.get(&w[1])) {
+                *km.entry(li).or_insert(0.0) += hav_km_ll(p, q);
+            }
+        }
+        let total: f64 = km.values().sum();
+        let mut ls: Vec<(u32, f64)> = km
+            .into_iter()
+            .filter(|&(_, k)| total > 0.0 && k >= LINE_MIN_SHARE * total)
+            .collect();
+        ls.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        ls.into_iter().map(|(li, _)| li).collect()
     }
 }
 
@@ -1041,9 +1073,22 @@ struct Interner {
     /// train_table t -> index into `trains` (train_ti[t]), and back
     train_ti: Vec<usize>,
     train_idx: HashMap<usize, usize>,
+    line_table: Vec<[String; 2]>,
+    /// OSM line index (`WayClasses::lines`) -> line_table index
+    line_idx: HashMap<u32, u32>,
 }
 
 impl Interner {
+    fn line(&mut self, li: u32, lines: &[(String, String)]) -> u32 {
+        if let Some(&i) = self.line_idx.get(&li) {
+            return i;
+        }
+        let i = self.line_table.len() as u32;
+        let (zh, en) = &lines[li as usize];
+        self.line_table.push([zh.clone(), en.clone()]);
+        self.line_idx.insert(li, i);
+        i
+    }
     fn city(
         &mut self,
         zh: &str,
@@ -1830,6 +1875,11 @@ fn build_sections(
             b: b_i,
             g: polyline_encode(&simp),
             h: cx.chain_hsr(chain),
+            l: cx
+                .chain_lines(chain)
+                .into_iter()
+                .map(|li| it.line(li, &cx.ways.lines))
+                .collect(),
         });
         for (ci, n, cls_counts) in sig_list[*sid as usize].iter() {
             flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
@@ -3327,12 +3377,14 @@ fn main() {
     stats.insert("train_table".into(), it.train_table.len() as i64);
     stats.insert("network_polylines".into(), network.len() as i64);
     stats.insert("throats".into(), throat_geo.len() as i64);
+    stats.insert("lines".into(), it.line_table.len() as i64);
     let out = AtlasOut {
         build: provenance::build_block(&inp),
         about,
         origins: asm.origins,
         sections: os.sections,
         in_sections: is_.sections,
+        lines: it.line_table,
         throats: throat_geo,
         city_table: it.city_table,
         station_table: it.station_table,

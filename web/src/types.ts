@@ -8,6 +8,7 @@
 interface RawSection {
   g: string; // Google-polyline-encoded track geometry, precision 1e4
   h?: number; // 1 for high-speed rail (HSR), omitted/0 for conventional rail
+  l?: number[]; // OSM line names it runs on: indices into `lines`, largest share first
 }
 
 export interface RawCity {
@@ -126,6 +127,9 @@ export interface SharedData {
   train_table: RawTrain[];
   sections: RawSection[];
   in_sections: RawSection[];
+  /** OSM line names `[name, name:en]` (en "" when OSM has none) that a
+      section's `l` indexes. Absent in packs from before it existed. */
+  lines?: [string, string][];
   network: string[]; // encoded backdrop polylines
   /** fmt 6 (O1): station-throat pieces, geometry only. Path entry `n + j`
       (n = that direction's section count) is throat j; never a flow. */
