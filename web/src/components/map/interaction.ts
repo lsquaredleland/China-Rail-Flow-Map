@@ -267,8 +267,8 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
 
 // The section card's caret: CARD_CARET_X px in from the card's left edge,
 // CARD_CARET_H px tall (map.css #tooltip.card::after).
-const CARD_CARET_X = 34;
-const CARD_CARET_H = 9;
+const CARD_CARET_X = 24;
+const CARD_CARET_H = 7;
 
 /* The section card sits above the pointer with its caret tip on it; below
    (caret on top) when there is no room above. The caret follows the pointer
@@ -279,7 +279,7 @@ function placeCard(el: HTMLElement, px: number, py: number, tw: number, th: numb
   el.classList.toggle("below", !above);
   el.style.left = x + "px";
   el.style.top = (above ? py - th - CARD_CARET_H : py + CARD_CARET_H) + "px";
-  el.style.setProperty("--caret-x", Math.max(12, Math.min(tw - 12, px - x)) + "px");
+  el.style.setProperty("--caret-x", Math.max(10, Math.min(tw - 10, px - x)) + "px");
 }
 
 export function hideTooltip(M: MapCtx) {

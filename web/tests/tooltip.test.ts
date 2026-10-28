@@ -36,11 +36,11 @@ test("seg tooltips list the section's OSM line names", () => {
   const c = cases().find((x) => x.name === "seg 1")!;
   const base = { data: pack().atlas.data, cur: c.cur, direction: c.P.direction, distUnit: c.P.distUnit, panelDest: null, dark: false, ferry: false };
   const html = tooltipHtml(c.hit, { ...base, lines: [["京广高速线", "Beijing–Guangzhou HSR"], ["京广线", ""]] });
-  expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广高速线</div><div class='sc-en'>Beijing–Guangzhou HSR</div></div>");
+  expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广高速线</div><div class='mc-sub'>Beijing–Guangzhou HSR</div></div>");
   expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广线</div></div>");
   expect(html).not.toContain("sc-foot");
   const fast = tooltipHtml(c.hit, { ...base, speed: 350 });
-  expect(fast).toContain("<span class='sc-kicker'>Line speed limit</span><span class='sc-speed'><b>350</b> km/h</span>");
+  expect(fast).toContain("<span class='mc-state'>Line speed limit</span><span class='sc-speed'><b>350</b> km/h</span>");
   expect(tooltipHtml(c.hit, { ...base, speed: 350, distUnit: "mi" })).toContain("<b>217</b> mph");
   expect(tooltipHtml(c.hit, base)).toBe(gold["seg 1"]);
 });
