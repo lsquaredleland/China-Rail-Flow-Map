@@ -49,8 +49,7 @@ export function sectionInfo(
 }
 
 /** The section card (Signal · Section tooltip): the count, the OSM line
-    names (and the ferry crossing), then the signed speed limit. Type comes
-    from the map cards' classes (mc-num, mc-state, mc-sub; cards.css). */
+    names (and the ferry crossing), then the signed speed limit. */
 function sectionCardHtml(hit: Extract<Hit, { kind: "seg" }>, t: TooltipInput): string {
   const sub = hit.subN !== undefined && hit.subN > 0 && t.panelDest;
   const n = sub ? hit.subN! : hit.n;
@@ -59,37 +58,37 @@ function sectionCardHtml(hit: Extract<Hit, { kind: "seg" }>, t: TooltipInput): s
     (sub ? (t.direction === "out" ? " to " : " from ") + esc(t.panelDest!.en) : " per day");
   const kicker = sub ? "of " + hit.n + " on this section" : "on this section";
   let html =
-    "<div class='sc-head'><div class='sc-n mc-num'>" + n + "</div>" +
+    "<div class='sc-head'><div class='sc-n'>" + n + "</div>" +
     "<div class='sc-what'><div class='sc-label'>" + what + "</div>" +
-    "<div class='mc-state'>" + kicker + "</div></div>" +
+    "<div class='tc-kicker'>" + kicker + "</div></div>" +
     "<div class='sc-swatch'></div></div>";
   const lines = (t.lines ?? []).map(
     ([zh, en]) =>
       "<div class='sc-line'><div class='sc-zh'>" + esc(zh) + "</div>" +
-      (en ? "<div class='mc-sub'>" + esc(en) + "</div>" : "") + "</div>",
+      (en ? "<div class='sc-en'>" + esc(en) + "</div>" : "") + "</div>",
   );
   if (t.ferry) {
     lines.push(
       "<div class='sc-line sc-ferry'><div class='sc-zh'>粤海铁路轮渡</div>" +
-        "<div class='mc-sub'>Guangdong–Hainan Train Ferry &middot; Qiongzhou Strait crossing</div></div>",
+        "<div class='sc-en'>Guangdong–Hainan Train Ferry &middot; Qiongzhou Strait crossing</div></div>",
     );
   }
   if (lines.length) html += "<div class='sc-body'>" + lines.join("") + "</div>";
   if (t.speed) {
     const [v, unit] = fmtSpeed(t.speed, t.distUnit).split(" ");
     html +=
-      "<div class='sc-foot'><span class='mc-state'>Line speed limit</span>" +
+      "<div class='sc-foot'><span class='tc-kicker'>Line speed limit</span>" +
       "<span class='sc-speed'><b>" + v + "</b> " + unit + "</span></div>";
   }
   return html;
 }
 
 const PIN =
-  "<svg class='mc-pin' viewBox='0 0 16 16' aria-hidden='true'>" +
+  "<svg class='cc-pin' viewBox='0 0 16 16' aria-hidden='true'>" +
   "<circle cx='8' cy='8' r='6' fill='none' stroke='currentColor' stroke-width='1.8'/>" +
   "<circle cx='8' cy='8' r='2' fill='currentColor'/></svg>";
 
-/** The city card: the map card's pinned title, the direct-train count, then
+/** The city card: the pinned city title, the direct-train count, then
     stationRows / sourceRows (the pinned panel's rows) in three groups: train
     mix, journey times (the fastest with its time-band swatch, the colour of
     the city's dot) and distances. */
@@ -98,21 +97,22 @@ function cityCardHtml(c: CityPointVM, t: TooltipInput): string {
   const rows = out
     ? stationRows(c as DestVM, t.cur.en, t.distUnit)
     : sourceRows(c as SrcVM, t.cur.en, t.distUnit);
-  const row = ([k, v]: [string, string], swatch = "") =>
-    "<div class='cc-row'><span>" + esc(k) + "</span><b>" + swatch + esc(v) + "</b></div>";
+  const row = ([k, v]: [string, string], swatch = "", accent = false) =>
+    "<div class='cc-row'><span>" + esc(k) + "</span><b" + (accent ? " class='cc-accent'" : "") + ">" +
+    swatch + esc(v) + "</b></div>";
   const fastest = (c as DestVM | SrcVM).fastest;
   const swatch =
     fastest > 0
       ? "<i class='cc-swatch' style='background:" + rampColor(fastest, palette(t.dark)) + "'></i>"
       : "";
   return (
-    "<div class='cc-title mc-title'>" + PIN + "<span>" + esc(c.zh) + " " + esc(c.en) + "</span></div>" +
-    "<div class='sc-head'><div class='sc-n mc-num'>" + rows[0][1] + "</div>" +
+    "<div class='cc-title'>" + PIN + "<span>" + esc(c.zh) + " " + esc(c.en) + "</span></div>" +
+    "<div class='sc-head'><div class='sc-n'>" + rows[0][1] + "</div>" +
     "<div class='sc-what'><div class='sc-label'>direct trains / day</div>" +
-    "<div class='mc-state'>" + (out ? "from " : "to ") + esc(t.cur.en) + "</div></div>" +
+    "<div class='tc-kicker'>" + (out ? "from " : "to ") + esc(t.cur.en) + "</div></div>" +
     "<div class='sc-swatch'></div></div>" +
     "<div class='cc-rows'>" + row(rows[1]) + row(rows[2]) + "</div>" +
-    "<div class='cc-rows'>" + row(rows[3], swatch) + row(rows[4]) + "</div>" +
+    "<div class='cc-rows'>" + row(rows[3], swatch, true) + row(rows[4]) + "</div>" +
     "<div class='cc-rows sc-foot'>" + row(rows[5]) + row(rows[6]) + "</div>"
   );
 }

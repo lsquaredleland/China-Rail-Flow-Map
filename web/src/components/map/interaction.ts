@@ -268,7 +268,7 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
 
 // The section card's caret: CARD_CARET_X px in from the card's left edge,
 // CARD_CARET_H px tall (map.css #tooltip.card::after).
-const CARD_CARET_X = 24;
+const CARD_CARET_X = 22;
 const CARD_CARET_H = 7;
 
 /* The section card sits above the pointer with its caret tip on it; below

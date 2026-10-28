@@ -36,11 +36,11 @@ test("seg tooltips list the section's OSM line names", () => {
   const c = cases().find((x) => x.name === "seg 1")!;
   const base = { data: pack().atlas.data, cur: c.cur, direction: c.P.direction, distUnit: c.P.distUnit, panelDest: null, dark: false, ferry: false };
   const html = tooltipHtml(c.hit, { ...base, lines: [["京广高速线", "Beijing–Guangzhou HSR"], ["京广线", ""]] });
-  expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广高速线</div><div class='mc-sub'>Beijing–Guangzhou HSR</div></div>");
+  expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广高速线</div><div class='sc-en'>Beijing–Guangzhou HSR</div></div>");
   expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广线</div></div>");
   expect(html).not.toContain("sc-foot");
   const fast = tooltipHtml(c.hit, { ...base, speed: 350 });
-  expect(fast).toContain("<span class='mc-state'>Line speed limit</span><span class='sc-speed'><b>350</b> km/h</span>");
+  expect(fast).toContain("<span class='tc-kicker'>Line speed limit</span><span class='sc-speed'><b>350</b> km/h</span>");
   expect(tooltipHtml(c.hit, { ...base, speed: 350, distUnit: "mi" })).toContain("<b>217</b> mph");
   expect(tooltipHtml(c.hit, base)).toBe(gold["seg 1"]);
 });
@@ -67,4 +67,11 @@ test("train tooltips show the leg average and the track limit when known", () =>
   expect(bare).not.toContain("leg avg");
   expect(bare).not.toContain("Track limit");
   expect(tooltipHtml({ kind: "train", train: { ...train, legKmh: 295 } }, { ...base, distUnit: "mi" })).toContain("~183 mph");
+});
+
+test("the city card's fastest time is the rust accent", () => {
+  const c = cases().find((x) => x.name === "station out km")!;
+  const html = tooltipHtml(c.hit, { data: pack().atlas.data, cur: c.cur, direction: "out", distUnit: "km", panelDest: null, dark: false, ferry: false });
+  expect(html).toMatch(/<span>Fastest from Guangzhou<\/span><b class='cc-accent'><i class='cc-swatch'[^>]*><\/i>0:25<\/b>/);
+  expect(html).toContain("<span>By rail</span><b>");
 });

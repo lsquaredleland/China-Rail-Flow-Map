@@ -51,12 +51,11 @@
 #tooltip table { border-collapse: collapse; margin-top: 5px; width: 100%; }
 #tooltip td { padding: 1.5px 8px 1.5px 0; font-size: 12px; font-variant-numeric: tabular-nums; }
 #tooltip td:last-child { padding-right: 0; text-align: right; font-weight: 700; }
-/* Section card (Signal · Section tooltip): the map-card frame (2px, 4px
-   top rule) on the panel, a paper footer, a caret on the pointer. Type is
-   the map cards' (mc-num / mc-state / mc-sub in cards.css); these rules
-   only lay it out, at the old tooltip's width. */
+/* Section and city cards (Signal tooltips): a map-card frame (2px, 4px top
+   rule) at the legend's type scale (#legend: 11px caps heading, 10.5px
+   text), the small overlay they sit among; a caret on the pointer. */
 #tooltip.card {
-  --caret-x: 24px;
+  --caret-x: 22px;
   background: var(--panel);
   color: var(--ink);
   border: 2px solid var(--card-frame);
@@ -64,9 +63,10 @@
   border-radius: 0;
   padding: 0;
   width: max-content;
-  min-width: 190px;
-  max-width: 270px;
+  min-width: 170px;
+  max-width: 250px;
   box-shadow: var(--shadow-panel);
+  font-size: 11px;
   line-height: 1.25;
 }
 #tooltip.card::after {
@@ -88,12 +88,21 @@
   background: var(--panel);
   transform: rotate(225deg);
 }
-#tooltip .sc-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; }
+#tooltip .tc-kicker {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+#tooltip .sc-head { display: flex; align-items: center; gap: 7px; padding: 6px 9px; }
+#tooltip .sc-n { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
 #tooltip .sc-what { flex: 1 1 auto; min-width: 0; }
-#tooltip .sc-label { font-size: 13px; font-weight: 800; }
-#tooltip .sc-swatch { flex: none; align-self: flex-start; margin-top: 5px; width: 24px; height: 4px; background: var(--rust); }
-#tooltip .sc-body { border-top: 1px solid var(--rule); padding: 6px 10px; display: grid; gap: 5px; }
-#tooltip .sc-zh { font-size: 13px; font-weight: 800; }
+#tooltip .sc-label { font-size: 12px; font-weight: 800; }
+#tooltip .sc-swatch { flex: none; align-self: flex-start; margin-top: 4px; width: 20px; height: 3px; background: var(--rust); }
+#tooltip .sc-body { border-top: 1px solid var(--rule); padding: 5px 9px; display: grid; gap: 4px; }
+#tooltip .sc-zh { font-size: 12px; font-weight: 800; }
+#tooltip .sc-en { font-size: 11px; color: var(--ink-soft); }
 #tooltip .sc-ferry .sc-zh { color: var(--indigo); }
 #tooltip .sc-foot {
   display: flex;
@@ -102,19 +111,20 @@
   gap: 12px;
   border-top: 1px solid var(--rule);
   background: var(--paper);
-  padding: 5px 10px 6px;
+  padding: 4px 9px 5px;
 }
-#tooltip .sc-speed { font-size: 11px; font-weight: 600; white-space: nowrap; }
-#tooltip .sc-speed b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
-/* City card: the map card's pinned title over a frame rule, then rows. */
-#tooltip .cc-title { padding: 7px 10px; border-bottom: 2px solid var(--card-frame); }
-#tooltip .cc-title .mc-pin { width: 12px; height: 12px; }
-#tooltip .cc-rows { border-top: 1px solid var(--rule); padding: 5px 10px; display: grid; gap: 3px; }
-#tooltip .cc-rows.sc-foot { display: grid; justify-content: stretch; gap: 3px; padding: 5px 10px 6px; }
+#tooltip .sc-speed { font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+#tooltip .sc-speed b { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* City card: the pinned title over a frame rule, then rows. */
+#tooltip .cc-title { display: flex; align-items: center; gap: 5px; padding: 5px 9px; border-bottom: 2px solid var(--card-frame); font-size: 13px; font-weight: 800; }
+#tooltip .cc-pin { flex: none; width: 11px; height: 11px; }
+#tooltip .cc-rows { border-top: 1px solid var(--rule); padding: 4px 9px; display: grid; gap: 2px; }
+#tooltip .cc-rows.sc-foot { display: grid; justify-content: stretch; gap: 2px; padding: 4px 9px 5px; }
 #tooltip .sc-foot .cc-row > span { color: var(--ink-soft); }
-#tooltip .cc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 12px; }
-#tooltip .cc-row > b { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
-#tooltip .cc-swatch { display: inline-block; width: 8px; height: 8px; }
+#tooltip .cc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; font-size: 11px; }
+#tooltip .cc-row > b { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#tooltip .cc-row > b.cc-accent { color: var(--rust); }
+#tooltip .cc-swatch { display: inline-block; width: 7px; height: 7px; }
 #legendCol {
   position: absolute;
   left: 14px; bottom: 14px;
