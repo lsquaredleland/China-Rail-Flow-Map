@@ -88,6 +88,11 @@ const PIN =
   "<circle cx='8' cy='8' r='6' fill='none' stroke='currentColor' stroke-width='1.8'/>" +
   "<circle cx='8' cy='8' r='2' fill='currentColor'/></svg>";
 
+/** The city cards' header: the pin, then the Chinese and English names. */
+function cityTitleHtml(c: { zh: string; en: string }): string {
+  return "<div class='cc-title'>" + PIN + "<span>" + esc(c.zh) + " " + esc(c.en) + "</span></div>";
+}
+
 /** The city card: the pinned city title, the direct-train count, then
     stationRows / sourceRows (the pinned panel's rows) in three groups: train
     mix, journey times (the fastest with its time-band swatch, the colour of
@@ -106,7 +111,7 @@ function cityCardHtml(c: CityPointVM, t: TooltipInput): string {
       ? "<i class='cc-swatch' style='background:" + rampColor(fastest, palette(t.dark)) + "'></i>"
       : "";
   return (
-    "<div class='cc-title'>" + PIN + "<span>" + esc(c.zh) + " " + esc(c.en) + "</span></div>" +
+    cityTitleHtml(c) +
     "<div class='sc-head'><div class='sc-n'>" + rows[0][1] + "</div>" +
     "<div class='sc-what'><div class='sc-label'>direct trains / day</div>" +
     "<div class='tc-kicker'>" + (out ? "from " : "to ") + esc(t.cur.en) + "</div></div>" +
@@ -114,6 +119,19 @@ function cityCardHtml(c: CityPointVM, t: TooltipInput): string {
     "<div class='cc-rows'>" + row(rows[1]) + row(rows[2]) + "</div>" +
     "<div class='cc-rows'>" + row(rows[3], swatch, true) + row(rows[4]) + "</div>" +
     "<div class='cc-rows sc-foot'>" + row(rows[5]) + row(rows[6]) + "</div>"
+  );
+}
+
+/** The national city card (Signal · City totals): the city card's pinned
+    title over the day's departures and arrivals on a paper strip. */
+function natCityCardHtml(c: { zh: string; en: string }, dep: number, arr: number): string {
+  const cell = (n: number, label: string) =>
+    "<div class='nc-cell'><div class='sc-n'>" + n.toLocaleString("en-US") + "</div>" +
+    "<div class='tc-kicker'>" + label + "</div></div>";
+  return (
+    cityTitleHtml(c) +
+    "<div class='nc-totals'>" + cell(dep, dep === 1 ? "departure" : "departures") +
+    cell(arr, arr === 1 ? "arrival" : "arrivals") + "</div>"
   );
 }
 
@@ -177,19 +195,7 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
   } else if (hit.kind === "seg") {
     html = sectionCardHtml(hit, t);
   } else if (hit.kind === "natCity") {
-    const c = data.city_table[hit.idx];
-    html =
-      "<div class='t-title'>" +
-      esc(c.zh) +
-      " &middot; " +
-      esc(c.en) +
-      "</div><div>" +
-      hit.dep.toLocaleString("en-US") +
-      (hit.dep === 1 ? " departure" : " departures") +
-      " &middot; " +
-      hit.arr.toLocaleString("en-US") +
-      (hit.arr === 1 ? " arrival" : " arrivals") +
-      "</div>";
+    html = natCityCardHtml(data.city_table[hit.idx], hit.dep, hit.arr);
   } else if (hit.kind === "train") {
     const tr = hit.train;
     const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";

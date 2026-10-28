@@ -81,7 +81,7 @@
   border-bottom: 2px solid var(--card-frame);
   transform: rotate(45deg);
 }
-#tooltip.card:not(:has(.sc-foot))::after { background: var(--panel); }
+#tooltip.card:not(:has(.sc-foot, .nc-totals))::after { background: var(--panel); }
 #tooltip.card.below::after {
   bottom: auto;
   top: -9px;
@@ -125,6 +125,11 @@
 #tooltip .cc-row > b { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 #tooltip .cc-row > b.cc-accent { color: var(--rust); }
 #tooltip .cc-swatch { display: inline-block; width: 7px; height: 7px; }
+/* National city card: the day's totals on a paper strip, split by a hairline. */
+#tooltip .nc-totals { display: grid; grid-template-columns: 1fr 1fr; background: var(--paper); }
+#tooltip .nc-cell { padding: 5px 9px 6px; }
+#tooltip .nc-cell + .nc-cell { border-left: 1px solid var(--rule); }
+#tooltip .nc-cell .sc-n { margin-bottom: 2px; }
 #legendCol {
   position: absolute;
   left: 14px; bottom: 14px;

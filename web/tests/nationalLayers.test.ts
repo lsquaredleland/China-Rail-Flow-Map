@@ -166,9 +166,9 @@ describe("national city circles", () => {
   test("tooltip: city name, departures and arrivals", () => {
     const html = tooltipHtml({ kind: "natCity", idx: 0, dep: 1234, arr: 1 }, { data: atlas.data } as never);
     const c = atlas.data.city_table[0];
-    expect(html).toContain(c.zh);
-    expect(html).toContain("1,234 departures");
-    expect(html).toContain("1 arrival");
+    expect(html).toContain("<span>" + c.zh + " " + c.en + "</span>");
+    expect(html).toContain("<div class='nc-cell'><div class='sc-n'>1,234</div><div class='tc-kicker'>departures</div></div>");
+    expect(html).toContain("<div class='nc-cell'><div class='sc-n'>1</div><div class='tc-kicker'>arrival</div></div>");
   });
 });
 
