@@ -51,7 +51,6 @@
 #tooltip table { border-collapse: collapse; margin-top: 5px; width: 100%; }
 #tooltip td { padding: 1.5px 8px 1.5px 0; font-size: 12px; font-variant-numeric: tabular-nums; }
 #tooltip td:last-child { padding-right: 0; text-align: right; font-weight: 700; }
-#tooltip td.accent-val { color: var(--rust); }
 /* Section card (Signal · Section tooltip): the map-card frame (2px, 4px
    top rule) on the panel, a paper footer, a caret on the pointer. Type is
    the map cards' (mc-num / mc-state / mc-sub in cards.css); these rules
@@ -107,6 +106,15 @@
 }
 #tooltip .sc-speed { font-size: 11px; font-weight: 600; white-space: nowrap; }
 #tooltip .sc-speed b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* City card: the map card's pinned title over a frame rule, then rows. */
+#tooltip .cc-title { padding: 7px 10px; border-bottom: 2px solid var(--card-frame); }
+#tooltip .cc-title .mc-pin { width: 12px; height: 12px; }
+#tooltip .cc-rows { border-top: 1px solid var(--rule); padding: 5px 10px; display: grid; gap: 3px; }
+#tooltip .cc-rows.sc-foot { display: grid; justify-content: stretch; gap: 3px; padding: 5px 10px 6px; }
+#tooltip .sc-foot .cc-row > span { color: var(--ink-soft); }
+#tooltip .cc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 12px; }
+#tooltip .cc-row > b { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#tooltip .cc-swatch { display: inline-block; width: 8px; height: 8px; }
 #legendCol {
   position: absolute;
   left: 14px; bottom: 14px;

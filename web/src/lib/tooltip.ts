@@ -12,9 +12,10 @@ import type {
 import {
   esc,
   fmtSpeed,
-  sourceRowsHtml,
-  stationRowsHtml,
+  sourceRows,
+  stationRows,
 } from "./format";
+import { palette, rampColor } from "./palette";
 import { stationLabel } from "./geo";
 
 interface TooltipInput {
@@ -83,6 +84,39 @@ function sectionCardHtml(hit: Extract<Hit, { kind: "seg" }>, t: TooltipInput): s
   return html;
 }
 
+const PIN =
+  "<svg class='mc-pin' viewBox='0 0 16 16' aria-hidden='true'>" +
+  "<circle cx='8' cy='8' r='6' fill='none' stroke='currentColor' stroke-width='1.8'/>" +
+  "<circle cx='8' cy='8' r='2' fill='currentColor'/></svg>";
+
+/** The city card: the map card's pinned title, the direct-train count, then
+    stationRows / sourceRows (the pinned panel's rows) in three groups: train
+    mix, journey times (the fastest with its time-band swatch, the colour of
+    the city's dot) and distances. */
+function cityCardHtml(c: CityPointVM, t: TooltipInput): string {
+  const out = t.direction === "out";
+  const rows = out
+    ? stationRows(c as DestVM, t.cur.en, t.distUnit)
+    : sourceRows(c as SrcVM, t.cur.en, t.distUnit);
+  const row = ([k, v]: [string, string], swatch = "") =>
+    "<div class='cc-row'><span>" + esc(k) + "</span><b>" + swatch + esc(v) + "</b></div>";
+  const fastest = (c as DestVM | SrcVM).fastest;
+  const swatch =
+    fastest > 0
+      ? "<i class='cc-swatch' style='background:" + rampColor(fastest, palette(t.dark)) + "'></i>"
+      : "";
+  return (
+    "<div class='cc-title mc-title'>" + PIN + "<span>" + esc(c.zh) + " " + esc(c.en) + "</span></div>" +
+    "<div class='sc-head'><div class='sc-n mc-num'>" + rows[0][1] + "</div>" +
+    "<div class='sc-what'><div class='sc-label'>direct trains / day</div>" +
+    "<div class='mc-state'>" + (out ? "from " : "to ") + esc(t.cur.en) + "</div></div>" +
+    "<div class='sc-swatch'></div></div>" +
+    "<div class='cc-rows'>" + row(rows[1]) + row(rows[2]) + "</div>" +
+    "<div class='cc-rows'>" + row(rows[3], swatch) + row(rows[4]) + "</div>" +
+    "<div class='cc-rows sc-foot'>" + row(rows[5]) + row(rows[6]) + "</div>"
+  );
+}
+
 export function tooltipHtml(hit: Hit, t: TooltipInput): string {
   const cur = t.cur;
   const data = t.data;
@@ -124,15 +158,7 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
           : "Click again to clear selection") +
         "</div>";
     } else {
-      html =
-        "<div class='t-title'>" +
-        esc(c.zh) +
-        " &middot; " +
-        esc(c.en) +
-        "</div>" +
-        (t.direction === "out"
-          ? stationRowsHtml(c as DestVM, cur.en, t.distUnit)
-          : sourceRowsHtml(c as SrcVM, cur.en, t.distUnit));
+      html = cityCardHtml(c, t);
     }
   } else if (hit.kind === "chord") {
     const ch = hit.chord;

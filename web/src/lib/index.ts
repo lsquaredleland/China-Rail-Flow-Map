@@ -12,10 +12,8 @@ export {
   formatHoursLabel,
   formatScheduleStops,
   sourceRows,
-  sourceRowsHtml,
   stationName,
   stationRows,
-  stationRowsHtml,
   trainOrigins,
 } from "./format";
 export {

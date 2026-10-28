@@ -247,7 +247,8 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
     ...(hit.kind === "seg" ? sectionInfo(atlas.data, P.current, hit.s) : {}),
   });
   tooltip.innerHTML = html;
-  const card = hit.kind === "seg";
+  // the section and city cards (lib/tooltip) open with their count row
+  const card = !!tooltip.querySelector(".sc-head");
   tooltip.classList.toggle("card", card);
   tooltip.classList.add("show");
   const tw = tooltip.offsetWidth,

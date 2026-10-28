@@ -146,7 +146,7 @@ export function fmtSpeed(kmh: number, unit: DistUnit): string {
   return unit === "mi" ? Math.round(kmh * 0.621371) + " mph" : kmh + " km/h";
 }
 
-/** The fact rows shared by the hover tooltip and the pinned detail panel. */
+/** The fact rows shared by the hover city card and the pinned detail panel. */
 export function stationRows(
   c: DestVM,
   originEn: string,
@@ -161,15 +161,6 @@ export function stationRows(
     ["Crow flies", fmtDist(c.crow, unit)],
     ["By rail", fmtDist(c.rail, unit)],
   ];
-}
-
-/** stationRows as the tooltip's HTML table (the tooltip is set via innerHTML). */
-export function stationRowsHtml(
-  c: DestVM,
-  originEn: string,
-  unit: DistUnit,
-): string {
-  return rowsHtml(stationRows(c, originEn, unit));
 }
 
 /** The mirrored fact rows for a source city in inbound mode. */
@@ -188,37 +179,6 @@ export function sourceRows(
     ["By rail", fmtDist(c.rail, unit)],
   ];
 }
-
-/** sourceRows as the tooltip's HTML table. */
-export function sourceRowsHtml(
-  c: SrcVM,
-  destEn: string,
-  unit: DistUnit,
-): string {
-  return rowsHtml(sourceRows(c, destEn, unit));
-}
-
-function rowsHtml(rows: [string, string][]): string {
-  return (
-    "<table>" +
-    rows
-      .map((r) => {
-        const isAccent = r[0].startsWith("Fastest") || r[0] === "By rail";
-        return (
-          "<tr><td>" +
-          esc(r[0]) +
-          "</td><td" +
-          (isAccent ? ' class="accent-val"' : "") +
-          ">" +
-          esc(r[1]) +
-          "</td></tr>"
-        );
-      })
-      .join("") +
-    "</table>"
-  );
-}
-
 
 /** Formats raw schedule integers into human-readable ScheduleStop records */
 export function formatScheduleStops(
