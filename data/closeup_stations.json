@@ -1,0 +1,16 @@
+{
+  "_doc": "City close-ups (atlas closeup_stations): per origin city, stations always shown when the city splits into its stations at close zoom (include) or never (exclude); they win over the rules in atlas.rs. Owner decision 2026-10-27: airport stations are included.",
+  "include": {
+    "北京": ["大兴机场"],
+    "成都": ["天府机场", "双流机场"],
+    "广州": ["白云机场北", "白云机场东"],
+    "深圳": ["深圳机场", "深圳机场北"],
+    "郑州": ["郑州航空港"],
+    "重庆": ["江北机场"],
+    "青岛": ["青岛机场"],
+    "石家庄": ["正定机场"],
+    "南宁": ["吴圩机场"],
+    "珠海": ["珠海机场"]
+  },
+  "exclude": {}
+}

@@ -11,8 +11,9 @@
 import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { CityPointVM, Palette } from "../../../../types";
-import { rampColor, rgba, stationR, stationZoomK } from "../../../../lib";
+import { dotPlaces, rampColor, rgba, splitRadius, stationR, stationZoomK } from "../../../../lib";
 import type { RGBA, StationState } from "../../../../lib";
+import type { Closeup } from "../../closeup";
 
 interface StationDot {
   c: CityPointVM;
@@ -40,28 +41,27 @@ export interface Ripple {
 
 const withAlpha = (c: RGBA, a: number): RGBA => [c[0], c[1], c[2], Math.round(c[3] * a)];
 
+/** Where city `c`'s dot(s) are drawn: one, or one per station while it splits. */
+const placesOf = (c: CityPointVM, cu: Closeup | null | undefined) =>
+  dotPlaces([c.pt[0], c.pt[1]], cu?.byCity.get(c.zh), cu?.k ?? 0);
+
 /** Dots in Canvas paint order (lit cities only): with a destination selected
     the dimmed cities first, then the full-opacity ones on top; otherwise
-    `states` order. */
-export function stationDots(states: StationState[], pal: Palette, dark: boolean, hasDest: boolean): StationDot[] {
+    `states` order. A city that splits into its stations draws one dot per
+    station, sharing the city's area. */
+export function stationDots(states: StationState[], pal: Palette, dark: boolean, hasDest: boolean, cu?: Closeup | null): StationDot[] {
   const edge = rgba(pal.dotEdge);
   const lw = dark ? 3.0 : 1.5;
-  const mk = (s: StationState): StationDot => {
-    const fill = rgba(typeof s.c.fastest === "number" ? rampColor(s.c.fastest, pal) : pal.dot);
-    return {
-      c: s.c,
-      pos: [s.c.pt[0], s.c.pt[1]],
-      r: s.r0 * s.kd,
-      fill: withAlpha(fill, s.alpha),
-      line: withAlpha(edge, s.alpha),
-      lw,
-    };
+  const mk = (s: StationState): StationDot[] => {
+    const fill = withAlpha(rgba(typeof s.c.fastest === "number" ? rampColor(s.c.fastest, pal) : pal.dot), s.alpha);
+    const line = withAlpha(edge, s.alpha);
+    return placesOf(s.c, cu).map((p) => ({ c: s.c, pos: p.pos, r: splitRadius(s.r0 * s.kd, p.f), fill, line, lw }));
   };
   const lit = states.filter((s) => s.lit);
-  if (!hasDest) return lit.map(mk);
+  if (!hasDest) return lit.flatMap(mk);
   const out: StationDot[] = [];
-  for (const s of lit) if (s.alpha < 1) out.push(mk(s));
-  for (const s of lit) if (s.alpha === 1) out.push(mk(s));
+  for (const s of lit) if (s.alpha < 1) out.push(...mk(s));
+  for (const s of lit) if (s.alpha === 1) out.push(...mk(s));
   return out;
 }
 
@@ -73,10 +73,11 @@ const RIPPLE_MIN = 3;
     circle's edge and spreads by RIPPLE_GROW of the current radius (at
     least RIPPLE_MIN px, so the smallest circles still show it), alpha
     `1 − frac`. */
-export function stationRipples(states: StationState[], dark: boolean): Ripple[] {
+export function stationRipples(states: StationState[], dark: boolean, cu?: Closeup | null): Ripple[] {
   const out: Ripple[] = [];
   for (const s of states) {
-    if (s.ripple) out.push(rippleRing([s.c.pt[0], s.c.pt[1]], s.r0 * s.kd, s.ripple.frac, dark));
+    if (!s.ripple) continue;
+    for (const p of placesOf(s.c, cu)) out.push(rippleRing(p.pos, splitRadius(s.r0 * s.kd, p.f), s.ripple.frac, dark));
   }
   return out;
 }
@@ -98,17 +99,23 @@ export function stationRings(opts: {
   hoverStation: CityPointVM | null;
   hoverOrigin: boolean;
   originPt: [number, number];
+  /** The origin's dot(s): `originPt`, or one per station while it splits. */
+  originPlaces?: [number, number][];
   sk: number;
   dark: boolean;
+  closeup?: Closeup | null;
 }): Ring[] {
   const ink = rgba(opts.dark ? "#EDEDEA" : "#111111");
   const rings: Ring[] = [];
   const grown = (c: CityPointVM) => stationR(c.trains) * stationZoomK(stationR(c.trains), opts.sk);
+  const around = (c: CityPointVM, extra: number, w: number) => {
+    for (const p of placesOf(c, opts.closeup)) rings.push({ pos: p.pos, r: splitRadius(grown(c), p.f) + extra, w, col: ink });
+  };
   const pd = opts.panelDest;
-  if (pd) rings.push({ pos: [pd.pt[0], pd.pt[1]], r: grown(pd) + 3.8, w: 3, col: ink });
+  if (pd) around(pd, 3.8, 3);
   const hc = opts.hoverStation;
-  if (hc) rings.push({ pos: [hc.pt[0], hc.pt[1]], r: grown(hc) + 3.5, w: 2, col: ink });
-  else if (opts.hoverOrigin) rings.push({ pos: opts.originPt, r: 14.5, w: 2, col: ink });
+  if (hc) around(hc, 3.5, 2);
+  else if (opts.hoverOrigin) for (const pos of opts.originPlaces ?? [opts.originPt]) rings.push({ pos, r: 14.5, w: 2, col: ink });
   return rings;
 }
 
@@ -118,10 +125,13 @@ interface StationLayerInput {
   dark: boolean;
   hasDest: boolean;
   originPt: [number, number];
+  /** The origin's dot(s): one per station while the origin splits (no sizing: each is the origin disc). */
+  originPlaces: [number, number][];
   panelDest: CityPointVM | null;
   hoverStation: CityPointVM | null;
   hoverOrigin: boolean;
   sk: number;
+  closeup: Closeup | null;
   /** Changes whenever the states can have changed (clock, view zoom, selection, hover, theme). */
   key: string;
   /** Changes with the origin / direction (positions). */
@@ -130,15 +140,17 @@ interface StationLayerInput {
 
 export function stationLayers(inp: StationLayerInput): Layer[] {
   const { dark, key } = inp;
-  const dots = stationDots(inp.states, inp.pal, dark, inp.hasDest);
-  const ripples = stationRipples(inp.states, dark);
+  const dots = stationDots(inp.states, inp.pal, dark, inp.hasDest, inp.closeup);
+  const ripples = stationRipples(inp.states, dark, inp.closeup);
   const rings = stationRings({
     panelDest: inp.panelDest,
     hoverStation: inp.hoverStation,
     hoverOrigin: inp.hoverOrigin,
     originPt: inp.originPt,
+    originPlaces: inp.originPlaces,
     sk: inp.sk,
     dark,
+    closeup: inp.closeup,
   });
   const common = { radiusUnits: "pixels", lineWidthUnits: "pixels", stroked: true } as const;
   return [
@@ -173,18 +185,18 @@ export function stationLayers(inp: StationLayerInput): Layer[] {
       pickable: false,
       updateTriggers: { getPosition: key, getRadius: key, getLineColor: key },
     }),
-    new ScatterplotLayer({
+    new ScatterplotLayer<[number, number]>({
       ...common,
       id: "origin",
-      data: [0],
+      data: inp.originPlaces,
       filled: true,
-      getPosition: () => inp.originPt,
+      getPosition: (d) => d,
       getRadius: 9,
       getLineWidth: 1.5,
       getFillColor: dark ? [237, 237, 234, 255] : [17, 17, 17, 255],
       getLineColor: dark ? [26, 27, 30, 255] : [255, 255, 255, 255],
       pickable: true,
-      updateTriggers: { getPosition: inp.posKey, getFillColor: dark, getLineColor: dark },
+      updateTriggers: { getPosition: inp.posKey + "|" + key, getFillColor: dark, getLineColor: dark },
     }),
     new ScatterplotLayer<Ring>({
       ...common,

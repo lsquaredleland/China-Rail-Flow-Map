@@ -62,6 +62,17 @@ pub struct StationPoints {
 }
 
 impl StationPoints {
+    /// `[lat, lon]` of the name's real OSM candidate nearest `near` (`[lat, lon]`):
+    /// picks between homonyms once the station's city is known.
+    pub fn point_near(&self, name: &str, near: [f64; 2]) -> Option<[f64; 2]> {
+        let d2 = |c: &[f64; 2]| (c[0] - near[0]).powi(2) + (c[1] - near[1]).powi(2);
+        self.osm
+            .get(name)?
+            .iter()
+            .min_by(|x, y| d2(x).partial_cmp(&d2(y)).unwrap())
+            .copied()
+    }
+
     /// `[lat, lon]` of a station name, if known.
     pub fn point(&self, name: &str) -> Option<[f64; 2]> {
         if let Some(p) = self.gtfs.get(name) {

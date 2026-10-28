@@ -49,6 +49,19 @@ interface LabelOptions {
   fitScale: number;
   /** stationT of the current zoom. */
   sk: number;
+  /** City close-ups: the cities (zh) whose own label gives way to their
+      stations' labels, and those labels (`off`: the dot's radius plus gap),
+      placed after the origin's and the selected city's whatever `showDest` says. */
+  closeups?: { skip: Set<string>; stations: CloseupLabel[] };
+}
+
+export interface CloseupLabel {
+  zh: string;
+  en: string;
+  pt: [number, number];
+  off: number;
+  /** The origin's or the selected city's stations: boxed, like their city's label. */
+  boxed: boolean;
 }
 
 /** `measure(text, fs, weight)` is the rendered text width in px. */
@@ -154,15 +167,19 @@ export function placeLabels(
 
   // The origin first, so its label always wins a spot — and it is the
   // only label drawn while destination labels are toggled off.
-  if (origin) place(origin, { fs: 13, weight: "700", pad: 5, off: 13, isBoxed: true });
-  if (panelDest) {
+  const skip = opts.closeups?.skip;
+  if (origin && !skip?.has(origin.zh)) place(origin, { fs: 13, weight: "700", pad: 5, off: 13, isBoxed: true });
+  if (panelDest && !skip?.has(panelDest.zh)) {
     place(panelDest, { fs: 12.5, weight: "700", pad: 5, off: off(panelDest, 5), isBoxed: true });
+  }
+  for (const st of opts.closeups?.stations ?? []) {
+    place(st, st.boxed ? { fs: 12, weight: "700", pad: 4, off: st.off, isBoxed: true } : { fs: 11, weight: "600", pad: 2, off: st.off });
   }
   if (!showDest) return out;
   // Candidate set by zoom (points are already sorted by trains/day).
   // "Termini" here are route ends in the current direction: trains
   // ending at the city outbound, starting there inbound.
-  const all = points;
+  const all = skip ? points.filter((c) => !skip.has(c.zh)) : points;
   const ratio = view.scale / fitScale;
   const cands: LabelPoint[] = [];
   let j: number;

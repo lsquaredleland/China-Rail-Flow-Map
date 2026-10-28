@@ -1074,6 +1074,9 @@ impl Interner {
         self.station_table.push(AtlasStation {
             zh: zh.to_string(),
             en: station_en(zh, city_en),
+            pt: None,
+            city: None,
+            closeup: None,
         });
         self.station_idx.insert(zh.to_string(), i);
         i
@@ -3044,6 +3047,231 @@ fn national_index_phase(
     national_index
 }
 
+/// Each station's point and city, for the client's city close-ups. Runs last,
+/// so it only fills rows: every table index stays as before. A point more
+/// than CLOSEUP_FAR_KM from its city's is a homonym's: the station's OSM
+/// candidate nearest the city replaces it; a station still that far keeps no
+/// city (its own point or its city's is wrong), so it never splits from it.
+fn station_places(cx: &Ctx, city_pt: &HashMap<String, [f64; 2]>, it: &mut Interner) {
+    const CLOSEUP_FAR_KM: f64 = 60.0;
+    let ll = |p: [f64; 2]| [p[1], p[0]];
+    let (mut moved, mut far) = (0usize, 0usize);
+    for i in 0..it.station_table.len() {
+        let zh = it.station_table[i].zh.clone();
+        let city = city_of(&zh);
+        let mut pt = cx.station_pt(&zh);
+        let mut in_city = true;
+        if let (Some(p), Some(c)) = (pt, city_pt.get(&city)) {
+            if hav_km_ll(ll(p), ll(*c)) > CLOSEUP_FAR_KM {
+                if let Some(q) = cx.inp.stations.point_near(&zh, *c) {
+                    if hav_km_ll(ll(q), ll(*c)) < hav_km_ll(ll(p), ll(*c)) {
+                        pt = Some(q);
+                        moved += 1;
+                    }
+                }
+                if pt.is_some_and(|q| hav_km_ll(ll(q), ll(*c)) > CLOSEUP_FAR_KM) {
+                    far += 1;
+                    in_city = false;
+                }
+            }
+        }
+        it.station_table[i].pt = pt.map(ll);
+        it.station_table[i].city = if in_city {
+            it.city_idx.get(&city).copied()
+        } else {
+            None
+        };
+    }
+    println!("station places: {moved} moved to their city's homonym, {far} still over {CLOSEUP_FAR_KM} km from their city (left out of it)");
+}
+
+/// `data/closeup_stations.json` (optional): per origin city, stations always
+/// in its close-up (`include`) or never (`exclude`), whatever the rules say.
+#[derive(Deserialize, Default)]
+struct CloseupOverrides {
+    #[serde(default)]
+    include: std::collections::BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    exclude: std::collections::BTreeMap<String, Vec<String>>,
+}
+
+/// The close-up stations of the origin cities (owner-approved rules,
+/// 2026-10-27). A station of the city (placed, `city` set) at
+/// CLOSEUP_MIN_TRAINS+ trains/day is major when it is named after the city,
+/// or the city plus 东/西/南/北; else, at CLOSEUP_MIN_SHARE+ of the city's
+/// station calls, when CLOSEUP_TERMINUS+ long-distance trains (not C / S)
+/// start or end there, or CLOSEUP_HUB+ stop there from CLOSEUP_HUB_DIRS+
+/// neighbouring stations. At most CLOSEUP_MAX, name / cardinal first, then
+/// busiest; the overrides win over all of it. A city with fewer than two
+/// splits into none.
+fn closeup_stations(cx: &Ctx, origins: &[String], it: &mut Interner) {
+    const CLOSEUP_MIN_TRAINS: u32 = 20;
+    const CLOSEUP_MIN_SHARE: f64 = 0.03;
+    const CLOSEUP_TERMINUS: u32 = 30;
+    const CLOSEUP_HUB: u32 = 100;
+    const CLOSEUP_HUB_DIRS: usize = 3;
+    const CLOSEUP_MAX: usize = 8;
+    let trains = &cx.inp.trains;
+    let file = cx.inp.paths.data_dir.join("closeup_stations.json");
+    let ov: CloseupOverrides = match fs::read_to_string(&file) {
+        Ok(s) => serde_json::from_str(&s).unwrap_or_else(|e| panic!("{}: {e}", file.display())),
+        Err(_) => CloseupOverrides::default(),
+    };
+
+    // Per station, over the pack's trains: all trains, long-distance trains,
+    // long-distance trains starting or ending there, and the stations
+    // long-distance trains come from or go to next.
+    let (mut all, mut long, mut ends) = (
+        HashMap::<&str, u32>::new(),
+        HashMap::<&str, u32>::new(),
+        HashMap::<&str, u32>::new(),
+    );
+    let mut dirs: HashMap<&str, HashSet<&str>> = HashMap::new();
+    for &ti in &it.train_ti {
+        let names = &cx.train_names[ti];
+        let ld = !matches!(trains[ti].train_class.as_str(), "C" | "S");
+        let mut seen = HashSet::new();
+        for nm in names.iter().filter(|n| seen.insert(n.as_str())) {
+            *all.entry(nm).or_default() += 1;
+            if ld {
+                *long.entry(nm).or_default() += 1;
+            }
+        }
+        if !ld {
+            continue;
+        }
+        if let (Some(a), Some(b)) = (names.first(), names.last()) {
+            *ends.entry(a).or_default() += 1;
+            *ends.entry(b).or_default() += 1;
+        }
+        for w in names.windows(2) {
+            dirs.entry(&w[0]).or_default().insert(&w[1]);
+            dirs.entry(&w[1]).or_default().insert(&w[0]);
+        }
+    }
+    let get = |m: &HashMap<&str, u32>, k: &str| m.get(k).copied().unwrap_or(0);
+
+    let mut by_city: HashMap<i64, Vec<usize>> = HashMap::new();
+    for (i, s) in it.station_table.iter().enumerate() {
+        if let (Some(c), Some(_)) = (s.city, s.pt) {
+            by_city.entry(c).or_default().push(i);
+        }
+    }
+    let (mut n_cities, mut n_stations) = (0usize, 0usize);
+    let mut flagged: Vec<usize> = Vec::new();
+    for city in origins {
+        let Some(&ci) = it.city_idx.get(city) else {
+            continue;
+        };
+        let list = by_city.get(&ci).cloned().unwrap_or_default();
+        let total: u32 = list
+            .iter()
+            .map(|&i| get(&all, &it.station_table[i].zh))
+            .sum();
+        let inc = ov.include.get(city).cloned().unwrap_or_default();
+        let exc = ov.exclude.get(city).cloned().unwrap_or_default();
+        for nm in inc.iter().chain(exc.iter()) {
+            assert!(
+                list.iter().any(|&i| &it.station_table[i].zh == nm),
+                "{}: {nm} is not a placed station of {city}",
+                file.display()
+            );
+        }
+        let rule = |zh: &str| -> Option<&'static str> {
+            if inc.iter().any(|n| n == zh) {
+                return Some("include");
+            }
+            if exc.iter().any(|n| n == zh) || get(&all, zh) < CLOSEUP_MIN_TRAINS {
+                return None;
+            }
+            if zh == city {
+                return Some("name");
+            }
+            if zh
+                .strip_prefix(city.as_str())
+                .is_some_and(|r| ["东", "西", "南", "北"].contains(&r))
+            {
+                return Some("cardinal");
+            }
+            if (get(&all, zh) as f64) < CLOSEUP_MIN_SHARE * total as f64 {
+                return None;
+            }
+            if get(&ends, zh) >= CLOSEUP_TERMINUS {
+                return Some("terminus");
+            }
+            if get(&long, zh) >= CLOSEUP_HUB
+                && dirs.get(zh).map_or(0, |d| d.len()) >= CLOSEUP_HUB_DIRS
+            {
+                return Some("hub");
+            }
+            None
+        };
+        let mut keep: Vec<(usize, &str)> = list
+            .iter()
+            .filter_map(|&i| rule(&it.station_table[i].zh).map(|r| (i, r)))
+            .collect();
+        // rank: overrides, then name / cardinal, then busiest (name breaks ties)
+        let rank = |r: &str| match r {
+            "include" => 0,
+            "name" | "cardinal" => 1,
+            _ => 2,
+        };
+        keep.sort_by(|a, b| {
+            let (za, zb) = (&it.station_table[a.0].zh, &it.station_table[b.0].zh);
+            rank(a.1)
+                .cmp(&rank(b.1))
+                .then(get(&all, zb).cmp(&get(&all, za)))
+                .then(za.cmp(zb))
+        });
+        let n_inc = keep.iter().filter(|k| k.1 == "include").count();
+        keep.truncate(CLOSEUP_MAX.max(n_inc));
+        let split = keep.len() >= 2;
+        let line: Vec<String> = keep
+            .iter()
+            .map(|(i, r)| {
+                format!(
+                    "{}({}, {r})",
+                    it.station_table[*i].zh,
+                    get(&all, &it.station_table[*i].zh)
+                )
+            })
+            .collect();
+        let mut dropped: Vec<&usize> = list
+            .iter()
+            .filter(|i| !keep.iter().any(|k| k.0 == **i))
+            .collect();
+        dropped.sort_by_key(|&&i| std::cmp::Reverse(get(&all, &it.station_table[i].zh)));
+        let dl: Vec<String> = dropped
+            .iter()
+            .map(|&&i| {
+                format!(
+                    "{} {}",
+                    it.station_table[i].zh,
+                    get(&all, &it.station_table[i].zh)
+                )
+            })
+            .collect();
+        println!(
+            "closeup {} {city}: {} | dropped: {}",
+            if split { "SPLIT" } else { "one  " },
+            line.join(" "),
+            dl.join(" ")
+        );
+        if split {
+            n_cities += 1;
+            n_stations += keep.len();
+            flagged.extend(keep.iter().map(|k| k.0));
+        }
+    }
+    for i in flagged {
+        it.station_table[i].closeup = Some(true);
+    }
+    println!(
+        "closeups: {n_cities} of {} origin cities split, into {n_stations} stations",
+        origins.len()
+    );
+}
+
 fn main() {
     let inp = inputs::load();
     let out_path = env::var("ATLAS_OUT")
@@ -3087,6 +3315,8 @@ fn main() {
     let (about, calendar) = about_and_calendar(&cx);
     national_cities(&m, &asm, &mut national, &mut it);
     let national_index = national_index_phase(&m, &national, &it);
+    station_places(&cx, &m.city_pt, &mut it);
+    closeup_stations(&cx, &m.selected, &mut it);
     let mut stats: std::collections::BTreeMap<String, i64> = Default::default();
     stats.insert("origins".into(), asm.origins.len() as i64);
     stats.insert("sections".into(), os.sections.len() as i64);

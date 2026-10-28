@@ -20,7 +20,7 @@ import type {
   PrepTrain,
 } from "../../types";
 import { flowWidth, isFilteredView as isFilteredViewOf } from "../../lib";
-import type { DestWindow, NatFilter } from "../../lib";
+import type { DestWindow, NatFilter, SplitAnim } from "../../lib";
 import type { LegendHandle } from "../Legend";
 import type { DeckHandle } from "./deck/DeckHost";
 import type { NationalCityDots } from "./deck/layers/national";
@@ -185,6 +185,11 @@ function createMapState() {
     natCities: null as NationalCityDots | null,
     /** Origin-view cities not yet lit by the animation (null when not animating). */
     unlitCities: null as Set<number> | null,
+    /** City close-ups (origin view): the split animation, its progress in the
+        last frame (0 merged .. 1 split) and the frame it has requested. */
+    closeup: { from: 0, to: 0, at: 0 } as SplitAnim,
+    closeupK: 0,
+    closeupRaf: 0,
     animPlaying: false,
     animSpeed: 30,
     animEnabled: false,

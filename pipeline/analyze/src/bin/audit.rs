@@ -220,6 +220,15 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     g.insert("sections".into(), n(&shared["sections"]));
     g.insert("in_sections".into(), n(&shared["in_sections"]));
     g.insert("schedules_trains".into(), n(&sch["schedules"]));
+    // City close-ups (atlas `closeup_stations`): flagged stations and the cities they split.
+    let close: Vec<Value> = arr(&shared["station_table"])
+        .into_iter()
+        .filter(|s| s["closeup"].as_bool() == Some(true))
+        .collect();
+    let close_cities: std::collections::BTreeSet<i64> =
+        close.iter().map(|s| int(&s["city"])).collect();
+    g.insert("closeup_stations".into(), close.len() as i64);
+    g.insert("closeup_cities".into(), close_cities.len() as i64);
     let about_bad = check_about(shared);
     ok &= about_bad == 0;
     g.insert("about_mismatch".into(), about_bad);
