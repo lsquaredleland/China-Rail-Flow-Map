@@ -131,6 +131,7 @@ national files above, array rows, integer-minute times, geometry at 1e4. The out
 file are 宜昌 174, 香港 110 and 拉萨 12. (The earlier 12306-era pack was a strict top-100 cut,
 #1 广州 1,201/day … #100 麻城 137/day.)
 - **Infrastructure (`atlas-v2-shared.json`)**: `sections` (4,519 HSR / 4,587 conv, current pack; 12306-era: 4,274 / 3,257) and `in_sections` (4,495 HSR / 4,560 conv; 12306-era: 4,146 / 3,116) carry `h: 1` when OSM ways have `highspeed=yes` or `maxspeed >= 200` km/h.
+- **Line names and speed limits (shared, since 2026-10-28)**: `lines` is a table of OSM line names `[name, name:en]` (`""` when OSM has no English name), in order of first use. A section's `l` lists the indices of the lines holding at least 20% of its named length, largest share first; its `v` is the OSM `maxspeed` (km/h) over most of its tagged length, omitted when under half of it is tagged. Both come from non-`service` rail ways (`osm::scan_ways`; `atlas.rs` `chain_lines` / `chain_speed`). Current pack: 814 lines, 96% of sections named, 88% with a `v`. The client shows them on the section card, and the limit of the section under a moving train.
 - **8-Class Flow Breakdown (`out-map` / `in-map`)**: `flows` and `in_flows` rows pack `[sec_idx, total, g, d, c, s, z, t, k, plain]` (trailing zero counts stripped).
 - **National table (`atlas-v2-national.json`, P3.1; shipped since 2026-10-25)**: `{fmt, trains, total, by_class}`, arrays parallel to `sections`: distinct trains/day per section, every train counted once nationally, split into the same 8 classes. Format and rule: `atlaspack.rs` header and `docs/history/DECKGL_MIGRATION.md` (P3.1 as built).
 - **City close-ups (`station_table` `pt` / `city` / `closeup`)**: each station's `[lon, lat]` and `city_table` index (a point over 60 km from its city takes the name's OSM candidate nearest the city; one still that far keeps no `city`), and `closeup: true` on the major stations of the origin cities, which the client splits a city's dot into from z9. The rules (owner-approved 2026-10-27) are in `atlas.rs` `closeup_stations`: 20+ trains/day, and named after the city or the city + 东/西/南/北, or (at 3%+ of the city's station calls) 30+ long-distance (not C / S) trains starting or ending there, or 100+ stopping from 3+ neighbouring stations; at most 8 per city, a city with fewer than two splits into none. `data/closeup_stations.json` `include` / `exclude` win over the rules (the airport stations are included). `atlas` prints a `closeup` line per origin city (kept with their rule, dropped with trains/day); goldens gate `closeup_cities` / `closeup_stations`.
@@ -296,7 +297,9 @@ rebuild, and what `audit` expands to):
   The stops are `schedules[t][len - stops ..]`, which give stations and
   times; the client builds its dwells from these (O14).
 - `atlas-v2-schedules.json` is generated from `data/raw/stops*.jsonl`,
-  indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm]`
+  indexed by train `t`, with rows `[stIdx, arrMins, depMins, dayOff, legKm, legKmh]`
+  (`legKmh`: the arriving leg's timetable average speed, 0 when unknown or over
+  400 km/h; `atlas.rs` `leg_kmh`)
   and station names normalized.
 
 **Provenance (`shared.build`).** `atlas` records, and `atlaspack` copies into
