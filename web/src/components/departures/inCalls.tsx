@@ -7,7 +7,7 @@ import TrainCell from "./TrainCell";
 import RunsCell from "./RunsCell";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
-import { inCallStations } from "../../stationBreakdown";
+import { inCallStations, majorStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, InCallSortKey } from "./types";
 
 export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeView {
@@ -24,7 +24,7 @@ export function inCallsMode(ctx: DepCtx, cur: OriginVM, srcFilter: SrcVM): ModeV
     atlas,
   } = ctx;
   const calls = srcFilter.inCalls;
-  const stations = inCallStations(calls, ctx.selectedClasses);
+  const stations = majorStations(inCallStations(calls, ctx.selectedClasses), atlas?.data.station_table);
   const classCalls = byClass(calls, ctx.selectedClasses, (c) => c.arr.cls);
   const count = classCalls.length;
   const originating = classCalls.filter((c) => c.started).length;

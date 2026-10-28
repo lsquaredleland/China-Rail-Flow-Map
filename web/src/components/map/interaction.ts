@@ -247,15 +247,39 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
     ...(hit.kind === "seg" ? sectionInfo(atlas.data, P.current, hit.s) : {}),
   });
   tooltip.innerHTML = html;
+  const card = hit.kind === "seg";
+  tooltip.classList.toggle("card", card);
   tooltip.classList.add("show");
   const tw = tooltip.offsetWidth,
     th = tooltip.offsetHeight;
+  if (card) {
+    placeCard(tooltip, px, py, tw, th, st.W);
+    return;
+  }
+  tooltip.classList.remove("below");
   let x = px + 14,
     y = py + 14;
   if (x + tw > st.W - 6) x = px - tw - 10;
   if (y + th > st.H - 6) y = py - th - 10;
   tooltip.style.left = Math.max(4, x) + "px";
   tooltip.style.top = Math.max(4, y) + "px";
+}
+
+// The section card's caret: CARD_CARET_X px in from the card's left edge,
+// CARD_CARET_H px tall (map.css #tooltip.card::after).
+const CARD_CARET_X = 34;
+const CARD_CARET_H = 9;
+
+/* The section card sits above the pointer with its caret tip on it; below
+   (caret on top) when there is no room above. The caret follows the pointer
+   when the card is pushed in from a map edge. */
+function placeCard(el: HTMLElement, px: number, py: number, tw: number, th: number, W: number) {
+  const x = Math.max(4, Math.min(W - tw - 4, px - CARD_CARET_X));
+  const above = py - th - CARD_CARET_H >= 4;
+  el.classList.toggle("below", !above);
+  el.style.left = x + "px";
+  el.style.top = (above ? py - th - CARD_CARET_H : py + CARD_CARET_H) + "px";
+  el.style.setProperty("--caret-x", Math.max(12, Math.min(tw - 12, px - x)) + "px");
 }
 
 export function hideTooltip(M: MapCtx) {

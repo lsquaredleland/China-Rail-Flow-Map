@@ -47,6 +47,41 @@ export function sectionInfo(
   };
 }
 
+/** The section card (Signal · Section tooltip): the count, the OSM line
+    names (and the ferry crossing), then the signed speed limit. */
+function sectionCardHtml(hit: Extract<Hit, { kind: "seg" }>, t: TooltipInput): string {
+  const sub = hit.subN !== undefined && hit.subN > 0 && t.panelDest;
+  const n = sub ? hit.subN! : hit.n;
+  const what =
+    (n === 1 ? "train" : "trains") +
+    (sub ? (t.direction === "out" ? " to " : " from ") + esc(t.panelDest!.en) : " per day");
+  const kicker = sub ? "of " + hit.n + " on this section" : "on this section";
+  let html =
+    "<div class='sc-head'><div class='sc-n'>" + n + "</div>" +
+    "<div class='sc-what'><div class='sc-label'>" + what + "</div>" +
+    "<div class='sc-kicker'>" + kicker + "</div></div>" +
+    "<div class='sc-swatch'></div></div>";
+  const lines = (t.lines ?? []).map(
+    ([zh, en]) =>
+      "<div class='sc-line'><div class='sc-zh'>" + esc(zh) + "</div>" +
+      (en ? "<div class='sc-en'>" + esc(en) + "</div>" : "") + "</div>",
+  );
+  if (t.ferry) {
+    lines.push(
+      "<div class='sc-line sc-ferry'><div class='sc-zh'>粤海铁路轮渡</div>" +
+        "<div class='sc-en'>Guangdong–Hainan Train Ferry &middot; Qiongzhou Strait crossing</div></div>",
+    );
+  }
+  if (lines.length) html += "<div class='sc-body'>" + lines.join("") + "</div>";
+  if (t.speed) {
+    const [v, unit] = fmtSpeed(t.speed, t.distUnit).split(" ");
+    html +=
+      "<div class='sc-foot'><span class='sc-kicker'>Line speed limit</span>" +
+      "<span class='sc-speed'><b>" + v + "</b> " + unit + "</span></div>";
+  }
+  return html;
+}
+
 export function tooltipHtml(hit: Hit, t: TooltipInput): string {
   const cur = t.cur;
   const data = t.data;
@@ -113,37 +148,7 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
       "</table>" +
       "<div class='t-sub'>No track routing &mdash; drawn straight</div>";
   } else if (hit.kind === "seg") {
-    if (hit.subN !== undefined && hit.subN > 0 && t.panelDest) {
-      const destName = t.panelDest.en;
-      html =
-        "<div class='t-title'>" +
-        hit.subN +
-        (hit.subN === 1 ? " train" : " trains") +
-        (t.direction === "out" ? " to " : " from ") +
-        esc(destName) +
-        " <span style='opacity:0.75;font-size:0.9em'>(of " +
-        hit.n +
-        " total)</span></div>";
-    } else {
-      html =
-        "<div class='t-title'>" +
-        hit.n +
-        (hit.n === 1 ? " train" : " trains") +
-        " per day on this section</div>";
-    }
-    for (const [zh, en] of t.lines ?? []) {
-      html +=
-        "<div class='t-sub'>" + esc(zh) + (en ? " &middot; " + esc(en) : "") + "</div>";
-    }
-    if (t.speed) {
-      html += "<div class='t-sub'>Line speed limit " + fmtSpeed(t.speed, t.distUnit) + "</div>";
-    }
-    if (t.ferry) {
-      const blueCol = t.dark ? "#38BDF8" : "#0284C7";
-      html +=
-        `<div class='t-sub' style='color:${blueCol};font-weight:600'>` +
-        "粤海铁路轮渡 (Guangdong–Hainan Train Ferry) &middot; Qiongzhou Strait crossing</div>";
-    }
+    html = sectionCardHtml(hit, t);
   } else if (hit.kind === "natCity") {
     const c = data.city_table[hit.idx];
     html =

@@ -6,6 +6,7 @@ import {
   callStations,
   depStations,
   inCallStations,
+  majorStations,
   tallyStations,
 } from "../src/stationBreakdown";
 import { origin, pack } from "./fixture";
@@ -38,6 +39,31 @@ describe("departures from a city", () => {
       const o = origin(zh);
       expect(sum(depStations(o.deps))).toBe(o.deps.length);
     }
+  });
+});
+
+describe("major stations only", () => {
+  test("广州: only closeup stations, the rest in a last 其他, sum kept", () => {
+    const o = origin("广州");
+    const st = pack().atlas.data.station_table;
+    const major = new Set(st.filter((x) => x.closeup).map((x) => x.zh));
+    const all = depStations(o.deps);
+    const s = majorStations(all, st);
+    expect(sum(s)).toBe(o.deps.length);
+    expect(s.length).toBeLessThan(all.length);
+    expect(s[s.length - 1].zh).toBe("其他");
+    for (const x of s.slice(0, -1)) expect(major.has(x.zh)).toBe(true);
+    expect(s.map((x) => x.zh)).toContain("广州南");
+  });
+  test("a city with no major station keeps all of them; no rest means no 其他", () => {
+    const counts = [{ zh: "甲", en: "A", n: 3 }, { zh: "乙", en: "B", n: 1 }];
+    expect(majorStations(counts, [{ zh: "丙", closeup: true }])).toEqual(counts);
+    expect(majorStations(counts, undefined)).toEqual(counts);
+    expect(majorStations(counts, [{ zh: "甲", closeup: true }, { zh: "乙", closeup: true }])).toEqual(counts);
+    expect(majorStations(counts, [{ zh: "甲", closeup: true }])).toEqual([
+      { zh: "甲", en: "A", n: 3 },
+      { zh: "其他", en: "other", n: 1 },
+    ]);
   });
 });
 

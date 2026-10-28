@@ -8,7 +8,7 @@ import RunsCell from "./RunsCell";
 import HeadCount from "./HeadCount";
 import { byClass, classTag } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
-import { arrStations } from "../../stationBreakdown";
+import { arrStations, majorStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, ArrSortKey } from "./types";
 
 export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
@@ -27,7 +27,7 @@ export function inArrivalsMode(ctx: DepCtx, cur: OriginVM): ModeView {
   } = ctx;
   let showingNote: string;
   const arrs = cur.arrs;
-  const stations = arrStations(arrs, ctx.selectedClasses);
+  const stations = majorStations(arrStations(arrs, ctx.selectedClasses), atlas?.data.station_table);
   const count = byClass(arrs, ctx.selectedClasses, (a) => a.cls).length;
   const tag = classTag(ctx.selectedClasses);
   const list: ArrVM[] = arrs.filter(

@@ -29,6 +29,23 @@ export function tallyStations(
   );
 }
 
+const OTHER = { zh: "其他", en: "other" };
+
+/** Only a city's major stations (`station_table` `closeup`, the pipeline's
+    rule): when any counted station is major, every other one folds into a
+    last 其他 / other entry, so the counts still sum to the heading's number.
+    A city with no major station keeps all its stations. */
+export function majorStations(
+  counts: StationCount[],
+  stationTable: { zh: string; closeup?: boolean }[] | undefined,
+): StationCount[] {
+  const major = new Set((stationTable ?? []).filter((s) => s.closeup).map((s) => s.zh));
+  if (!counts.some((c) => major.has(c.zh))) return counts;
+  const kept = counts.filter((c) => major.has(c.zh));
+  const rest = counts.reduce((n, c) => (major.has(c.zh) ? n : n + c.n), 0);
+  return rest ? [...kept, { ...OTHER, n: rest }] : kept;
+}
+
 /** Keep rows whose train class is selected (no selection keeps all). Only the
     train-type filter narrows the station counts; search and histogram
     selections do not. */
@@ -82,7 +99,6 @@ export function callStations(
   classes: string[] = [],
 ): StationCount[] | null {
   if (!schedules) return null;
-  const OTHER = { zh: "其他", en: "other" };
   return tallyStations(
     byClass(calls, classes, (c) => c.dep.cls).map(
       (c) => callStation(c, stationTable, schedules) || OTHER,

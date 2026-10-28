@@ -7,7 +7,7 @@ import RunsCell from "./RunsCell";
 import HeadCount from "./HeadCount";
 import { byClass, classTag, depDayOffset } from "./helpers";
 import { ariaSort, nextSort, sortArrow } from "./sorting";
-import { depStations } from "../../stationBreakdown";
+import { depStations, majorStations } from "../../stationBreakdown";
 import type { DepCtx, ModeView, SortKey } from "./types";
 
 export function outDeparturesMode(ctx: DepCtx): ModeView {
@@ -27,7 +27,7 @@ export function outDeparturesMode(ctx: DepCtx): ModeView {
   } = ctx;
   let showingNote: string;
   const deps = cur ? cur.deps : [];
-  const stations = depStations(deps, ctx.selectedClasses);
+  const stations = majorStations(depStations(deps, ctx.selectedClasses), atlas?.data.station_table);
   const count = byClass(deps, ctx.selectedClasses, (d) => d.cls).length;
   const tag = classTag(ctx.selectedClasses);
   const list = deps.filter(
