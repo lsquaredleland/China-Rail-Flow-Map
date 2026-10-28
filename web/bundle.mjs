@@ -135,7 +135,8 @@ for (const ph of ["/*__BUNDLE__*/", "/*__CSS__*/"]) {
 }
 
 // The stylesheet is src/styles/*.css, inlined into the template's <style>
-// in this order (later files win ties, so the mobile overrides come last).
+// in this order (later files win ties, so the mobile overrides come last),
+// minified like the JS so the source comments stay out of the served page.
 const CSS_ORDER = [
   "theme.css",
   "base.css",
@@ -155,9 +156,12 @@ if (unlisted.length) {
   console.error("src/styles has files missing from CSS_ORDER in bundle.mjs:", unlisted.join(", "));
   process.exit(1);
 }
-const css = CSS_ORDER.map((f) => readFileSync(`src/styles/${f}`, "utf8").trimEnd())
-  .join("\n")
-  .replace(/\n/g, "\n      ");
+const css = (
+  await esbuild.transform(
+    CSS_ORDER.map((f) => readFileSync(`src/styles/${f}`, "utf8")).join("\n"),
+    { loader: "css", minify: true },
+  )
+).code.trimEnd();
 
 // Start from an empty dist/ so stale hashed files never accumulate.
 rmSync("dist", { recursive: true, force: true });
