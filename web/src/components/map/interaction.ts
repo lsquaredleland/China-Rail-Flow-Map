@@ -1,6 +1,7 @@
 /* Hit-testing and the floating tooltip. */
 import type { ChordVM, FlowVM, Hit } from "../../types";
 import {
+  dotPlaces,
   isFerrySection,
   isTrainShown as modelIsTrainShown,
   natTrainVM,
@@ -10,11 +11,13 @@ import {
   pickableChords,
   pickableFlows,
   pickPriority,
+  splitRadius,
   TRAIN_RADIUS,
 } from "../../lib";
 import type { PickCandidate } from "../../lib";
 import type { MapCtx } from "./context";
 import { stationT } from "./camera";
+import { closeupOf } from "./closeup";
 import { getDestSectionCounts, modelState } from "./flows";
 
 
@@ -44,22 +47,28 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
   // With a destination selected (the two-city focus), only that city and the
   // origin answer the pointer until the focus is closed.
   const pd = P.current.panelDest;
+  // A split city answers at each of its station dots (lib/closeups), still as the city.
+  const cu = closeupOf(M);
   for (let i = 0; i < pts.length; i++) {
     const c = pts[i];
     if (pd && c.idx !== pd.idx) continue;
     if (S.current.unlitCities?.has(c.idx)) continue;
-    const x = X(c.pt[0]),
-      y = Y(c.pt[1]);
-    if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
-    const radius = 14 * stationZoomK(stationR(c.trains), sk);
-    const dx = px - x,
-      dy = py - y;
-    if (dx * dx + dy * dy > radius * radius) continue;
-    cands.push({ kind: "station", index: i, pos: [c.pt[0], c.pt[1]], radius });
-    hits.push({ kind: "station", station: c });
+    for (const p of dotPlaces([c.pt[0], c.pt[1]], cu?.byCity.get(c.zh), cu?.k ?? 0)) {
+      const x = X(p.pos[0]),
+        y = Y(p.pos[1]);
+      if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+      const radius = p.f >= 1 ? 14 * stationZoomK(stationR(c.trains), sk) : Math.max(8, splitRadius(14 * stationZoomK(stationR(c.trains), sk), p.f));
+      const dx = px - x,
+        dy = py - y;
+      if (dx * dx + dy * dy > radius * radius) continue;
+      cands.push({ kind: "station", index: i, pos: p.pos, radius });
+      hits.push({ kind: "station", station: c });
+    }
   }
-  cands.push({ kind: "origin", index: 0, pos: [cur.o.pt[0], cur.o.pt[1]] });
-  hits.push({ kind: "origin" });
+  for (const p of dotPlaces([cur.o.pt[0], cur.o.pt[1]], cu?.byCity.get(cur.o.zh), cu?.k ?? 0)) {
+    cands.push({ kind: "origin", index: 0, pos: p.pos });
+    hits.push({ kind: "origin" });
+  }
 }
 
 /* Paused only: the active trains, filtered by isTrainShown (no isolation filter). */

@@ -158,8 +158,10 @@ export {
   stationStates,
 } from "./mapModel";
 export type { SelCache, SelInput, StationInput, StationState } from "./mapModel";
+export { CLOSEUP_Z, cityStations, dotPlaces, retarget, scaleOfZoom, splitK, splitRadius } from "./closeups";
+export type { CloseupStation, DotPlace, SplitAnim } from "./closeups";
 export { placeLabels } from "./labels";
-export type { LabelPoint } from "./labels";
+export type { CloseupLabel, LabelPoint } from "./labels";
 export { TRAIN_RADIUS, distToLine, distToSeg, pickPriority } from "./pick";
 export type { PickCandidate } from "./pick";
 export { tripStatus, unrollStops } from "./tripStatus";

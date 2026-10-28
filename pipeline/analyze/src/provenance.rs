@@ -81,6 +81,10 @@ pub fn build_block(inp: &Inputs) -> Value {
         "pair_paths_sha256": sha256_files(&pair),
         "overrides_sha256": sha256_files(std::slice::from_ref(&inp.paths.overrides_path)),
     });
+    let closeups = inp.paths.data_dir.join("closeup_stations.json");
+    if closeups.exists() {
+        b["closeups_sha256"] = json!(sha256_files(&[closeups]));
+    }
     if let Ok(p) = std::env::var("CRFM_SCHEDULE") {
         let mut files = vec![PathBuf::from(p)];
         if let Ok(v) = std::env::var("CRFM_SCHEDULE_SUPPLEMENTS") {

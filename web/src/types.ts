@@ -10,7 +10,7 @@ interface RawSection {
   h?: number; // 1 for high-speed rail (HSR), omitted/0 for conventional rail
 }
 
-interface RawCity {
+export interface RawCity {
   zh: string;
   en: string;
   pt: [number, number]; // [lon, lat] of the city's principal station point
@@ -19,6 +19,12 @@ interface RawCity {
 export interface RawStation {
   zh: string;
   en: string;
+  /** [lon, lat]; absent when the station has no point (and in older packs). */
+  pt?: [number, number];
+  /** `city_table` index of the station's city; absent when that city is not in the table. */
+  city?: number;
+  /** A major station of an origin city that splits into its stations from z9 (the pipeline's rules). */
+  closeup?: boolean;
 }
 
 export interface RawTrain {

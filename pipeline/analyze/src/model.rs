@@ -12,6 +12,17 @@ pub struct AtlasCity {
 pub struct AtlasStation {
     pub zh: String,
     pub en: String,
+    /// [lon, lat]; absent when the station has no point.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pt: Option<[f64; 2]>,
+    /// city_table index of the station's city; absent when that city is not
+    /// in city_table (it is never drawn).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<i64>,
+    /// True for a major station of an origin city that splits into its
+    /// stations at close zoom (atlas `closeup_stations`); absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closeup: Option<bool>,
 }
 
 #[derive(serde::Serialize)]

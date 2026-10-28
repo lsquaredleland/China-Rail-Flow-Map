@@ -11,7 +11,8 @@
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import { getSelCache, isTrainShown, originIsolatedCities, palette, stationStates, stationT, viewToViewState } from "../../../lib";
+import { dotPlaces, getSelCache, isTrainShown, originIsolatedCities, palette, stationStates, stationT, viewToViewState } from "../../../lib";
+import { closeupOf, stepCloseup } from "../closeup";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
 import { backdropLayers } from "./layers/backdrop";
@@ -197,18 +198,23 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     // (an isolated train also hides every city but its far end)
     const litIdx = new Set(states.filter((s) => s.lit).map((s) => s.idx));
     st.unlitCities = st.animEnabled || shown ? new Set(M.points().filter((c) => !litIdx.has(c.idx)).map((c) => c.idx)) : null;
+    stepCloseup(M);
+    const closeup = closeupOf(M);
+    const originPt: [number, number] = [cur.o.pt[0], cur.o.pt[1]];
     layers.push(
       ...stationLayers({
         states,
         pal: palette(dark),
         dark,
         hasDest: !!pd,
-        originPt: [cur.o.pt[0], cur.o.pt[1]],
+        originPt,
+        originPlaces: dotPlaces(originPt, closeup?.byCity.get(cur.o.zh), closeup?.k ?? 0).map((p) => p.pos),
         panelDest: pd,
         hoverStation: hover && hover.kind === "station" ? hover.station : null,
         hoverOrigin: !!hover && hover.kind === "origin",
         sk,
-        key: [dark, Math.round(sk * 1000), st.animEnabled ? st.animTime : -1, pd?.idx, hover?.kind, hover && hover.kind === "station" ? hover.station.idx : -1, P.current.cur?.o.zh, P.current.direction].join("|"),
+        closeup,
+        key: [dark, Math.round(sk * 1000), st.closeupK, st.animEnabled ? st.animTime : -1, pd?.idx, hover?.kind, hover && hover.kind === "station" ? hover.station.idx : -1, P.current.cur?.o.zh, P.current.direction].join("|"),
         posKey: (cur.o.zh ?? "") + "|" + P.current.direction,
       }),
     );
@@ -394,6 +400,8 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement, onFatal?: () => void)
     destroy() {
       destroyed = true;
       cancelAnimationFrame(settleRaf);
+      cancelAnimationFrame(M.S.current.closeupRaf);
+      M.S.current.closeupRaf = 0;
       try {
         deck.finalize();
       } catch {

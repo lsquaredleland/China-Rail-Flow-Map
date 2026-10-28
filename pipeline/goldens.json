@@ -39,7 +39,9 @@
     "national_index_trains": 11248,
     "national_index_events": 170657,
     "national_entries_eq_national": 9106,
-    "national_entries_recompute_eq": 9106
+    "national_entries_recompute_eq": 9106,
+    "closeup_cities": 88,
+    "closeup_stations": 237
   },
   "max": {
     "chord_leg_rows": 46,

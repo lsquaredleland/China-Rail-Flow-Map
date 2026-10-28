@@ -3,7 +3,10 @@
    the former Canvas renderer, so placement is unchanged;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
-import { isTrainShown, nat, natCityR, natState, palette, placeLabels, stationT } from "../../../lib";
+import { dotPlaces, isTrainShown, nat, natCityR, natState, palette, placeLabels, splitRadius, stationR, stationT, stationZoomK } from "../../../lib";
+import type { CloseupLabel, LabelPoint } from "../../../lib";
+import { closeupOf } from "../closeup";
+import type { Closeup } from "../closeup";
 import type { MapCtx } from "../context";
 import { nationalLabelPoints, LABEL_TRAINS_PER_UNIT } from "./layers/national";
 import { glowOf, shownTrains } from "./layers/trains";
@@ -35,12 +38,11 @@ export function drawLabelsOverlay(M: MapCtx) {
   const national = P.current.national;
   ctx.textBaseline = "middle";
   const nothingToName = national && (!P.current.showLabels || !st.natCities);
+  const sk = stationT(st.view, st.fitScale);
+  const lit = national ? [] : st.unlitCities ? points().filter((c) => !st.unlitCities!.has(c.idx)) : points();
+  const cu = national ? null : closeupOf(M);
   const labels = nothingToName ? [] : placeLabels(
-    national
-      ? nationalLabelPoints(P.current.atlas, st.natCities!)
-      : st.unlitCities
-        ? points().filter((c) => !st.unlitCities!.has(c.idx))
-        : points(),
+    national ? nationalLabelPoints(P.current.atlas, st.natCities!) : lit,
     st.view,
     st.W,
     st.H,
@@ -60,7 +62,8 @@ export function drawLabelsOverlay(M: MapCtx) {
       panelDest: P.current.panelDest ?? null,
       showDest: P.current.showLabels,
       fitScale: st.fitScale,
-      sk: stationT(st.view, st.fitScale),
+      sk,
+      closeups: cu ? closeupLabels(cu, cur.o.zh, P.current.panelDest ?? null, lit, sk) : undefined,
     },
   );
   for (const { box, style, text, x, y, align } of labels) {
@@ -85,15 +88,37 @@ export function drawLabelsOverlay(M: MapCtx) {
     return;
   }
   drawTrainTags(M, ctx);
-  // The origin's diamond; its disc is a deck layer (P1b.3).
-  const cx = M.X(cur.o.pt[0]);
-  const cy = M.Y(cur.o.pt[1]);
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = dark ? "#1A1B1E" : "#ffffff";
-  ctx.fillRect(-2.2, -2.2, 4.4, 4.4);
-  ctx.restore();
+  // The origin's diamond, on each of its stations while it splits; its disc is a deck layer (P1b.3).
+  for (const p of dotPlaces([cur.o.pt[0], cur.o.pt[1]], cu?.byCity.get(cur.o.zh), cu?.k ?? 0)) {
+    ctx.save();
+    ctx.translate(M.X(p.pos[0]), M.Y(p.pos[1]));
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = dark ? "#1A1B1E" : "#ffffff";
+    ctx.fillRect(-2.2, -2.2, 4.4, 4.4);
+    ctx.restore();
+  }
+}
+
+/* The close-ups' labels: every split city (the origin, the selected city, the
+   lit cities) drops its own label; once fully split its stations are named,
+   the origin's and the selected city's boxed. Mid-split none are, so no
+   label rides a moving dot. */
+function closeupLabels(cu: Closeup, originZh: string, pd: LabelPoint | null, lit: LabelPoint[], sk: number) {
+  const skip = new Set<string>();
+  const stations: CloseupLabel[] = [];
+  const add = (zh: string, off: (f: number) => number, boxed: boolean) => {
+    const list = cu.byCity.get(zh);
+    if (!list || skip.has(zh)) return;
+    skip.add(zh);
+    if (cu.k < 1) return;
+    const f = 1 / Math.sqrt(list.length);
+    for (const s of list) stations.push({ zh: s.zh, en: s.en, pt: s.pt, off: off(f), boxed });
+  };
+  const grown = (c: LabelPoint) => stationR(c.trains) * stationZoomK(stationR(c.trains), sk);
+  add(originZh, () => 13, true);
+  if (pd) add(pd.zh, (f) => splitRadius(grown(pd), f) + 5, true);
+  for (const c of lit) add(c.zh, (f) => splitRadius(grown(c), f) + 2, false);
+  return { skip, stations };
 }
 
 /* The hovered / selected / isolated train's code tag (map/trains.ts), above
