@@ -11,7 +11,7 @@ import {
   pickableChords,
   pickableFlows,
   pickPriority,
-  sectionLines,
+  sectionInfo,
   splitRadius,
   TRAIN_RADIUS,
 } from "../../lib";
@@ -244,7 +244,7 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
     panelDest: P.current.panelDest,
     dark: P.current.dark,
     ferry: hit.kind === "seg" && !!set && isFerrySection(set.bb, hit.s),
-    lines: hit.kind === "seg" ? sectionLines(atlas.data, P.current, hit.s) : [],
+    ...(hit.kind === "seg" ? sectionInfo(atlas.data, P.current, hit.s) : {}),
   });
   tooltip.innerHTML = html;
   tooltip.classList.add("show");

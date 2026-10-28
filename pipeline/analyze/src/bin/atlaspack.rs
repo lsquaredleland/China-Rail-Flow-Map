@@ -94,8 +94,9 @@
 //!
 //! Schedules (`atlas-v2-schedules.json`, generated, not hand-committed):
 //! `schedules[t]` (t = train_table index) is the train's full stop list,
-//! rows `[station_table idx, arr mins, dep mins, day offset, leg km]`
-//! (-1 = no time / unknown km). `extra_stations` stays empty (kept for
+//! rows `[station_table idx, arr mins, dep mins, day offset, leg km, leg km/h]`
+//! (-1 = no time / unknown km; km/h = the arriving leg's timetable average,
+//! 0 when unknown). `extra_stations` stays empty (kept for
 //! the client's type); every stop resolves into station_table.
 //!
 //! Train calendar (train-export builds only, `CRFM_SCHEDULE`; absent
@@ -394,6 +395,9 @@ fn pack_sections(secs: &Value) -> Value {
                 if let Some(l) = s.get("l") {
                     o["l"] = l.clone();
                 }
+                if let Some(v) = s.get("v") {
+                    o["v"] = v.clone();
+                }
                 o
             })
             .collect(),
@@ -472,8 +476,8 @@ fn verify(v1: &Value, v2: &Value) -> Result<(), String> {
             if is_hsr(s1) != is_hsr(s2) {
                 return Err(format!("{key} hsr flag mismatch"));
             }
-            if s1.get("l") != s2.get("l") {
-                return Err(format!("{key} line names mismatch"));
+            if s1.get("l") != s2.get("l") || s1.get("v") != s2.get("v") {
+                return Err(format!("{key} line names / speeds mismatch"));
             }
         }
     }

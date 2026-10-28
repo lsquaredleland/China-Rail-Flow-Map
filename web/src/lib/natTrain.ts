@@ -57,6 +57,28 @@ export function natTrainVM(
         break;
       }
     }
+  } else {
+    // the leg ahead: the first stop not yet reached
+    for (let i = 0; i < nStops; i++) {
+      if (a < tl.sArr[s0 + i]) {
+        vm.legKmh = sd[b + 1 + i][5] || undefined;
+        break;
+      }
+    }
+    vm.trackKmh = sectionAt(tl, data, q, nat.dist);
   }
   return vm;
+}
+
+/** The signed speed limit of the flow section at route distance d of train
+    q (natXY's entry search); undefined on a throat or an untagged section. */
+function sectionAt(tl: NationalTimeline, data: AtlasData, q: number, d: number): number | undefined {
+  let lo = tl.pOff[q], hi = tl.pOff[q + 1] - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (tl.pStart[mid] <= d) lo = mid; else hi = mid - 1;
+  }
+  const v = tl.pId[lo];
+  const id = v < 0 ? ~v : v;
+  return id < data.sections.length ? data.sections[id].v : undefined;
 }

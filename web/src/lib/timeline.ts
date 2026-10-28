@@ -71,6 +71,7 @@ export function trainSpeedFrac(tau: number, durMins: number): number {
 const trainScratch = {
   dist: 0,
   speedFrac: 1,
+  legKmh: 0, // the current leg's timetable average (0 unknown / not moving)
   dwell: 0 as 0 | 1 | 2 | 3, // 0 moving, 1 origin, 2 intermediate stop, 3 final
   stop: null as PrepTrainStop | null,
 };
@@ -80,6 +81,7 @@ function trainState(pt: PrepTrain, t: number) {
   r.stop = null;
   r.dwell = 0;
   r.speedFrac = 1;
+  r.legKmh = 0;
   if (t < pt.depMins) {
     r.dist = 0;
     r.dwell = 1;
@@ -113,6 +115,7 @@ function trainState(pt: PrepTrain, t: number) {
       if (t < st.arrMins) {
         legEndDist = st.dist;
         legEndTime = st.arrMins;
+        r.legKmh = st.legKmh;
         break;
       }
       legStartDist = st.dist;
@@ -382,6 +385,7 @@ export function buildDayTimeline(
           depMins: isTerm || r[2] < 0 ? null : rel(r[3] + (r[2] < r[1] ? 1 : 0), r[2]),
           dist,
           isTerm,
+          legKmh: r[5] ?? 0,
         });
       }
     }
@@ -500,6 +504,7 @@ export function buildDayTimeline(
         trainState(pt, tMins);
         const targetDist = trainScratch.dist;
         const speedFrac = trainScratch.speedFrac;
+        const legKmh = trainScratch.legKmh || undefined;
         const dw = trainScratch.dwell;
         const isDwelling = dw !== 0;
         let dwellStation: string | undefined;
@@ -554,6 +559,7 @@ export function buildDayTimeline(
               dwellStatus,
               dwellDetail,
               speedFrac,
+              legKmh,
               curDist: targetDist,
               onChord: true,
             });
@@ -569,6 +575,7 @@ export function buildDayTimeline(
         let distInSec: number;
         let isSecRev: boolean;
         let sLen: number;
+        let trackKmh: number | undefined; // the flow section's signed limit (none in a throat)
         if (th) {
           gSet = thrSet;
           gCum = thrGeo.secCumLens;
@@ -585,6 +592,7 @@ export function buildDayTimeline(
             secIdx++;
           }
           s = pt.secs[secIdx];
+          trackKmh = atlas.data.sections[s]?.v;
           distInSec = targetDist - pt.secStarts[secIdx];
           isSecRev = pt.secRevs[secIdx] === 1;
           sLen = secLengths[s] || 0;
@@ -619,6 +627,8 @@ export function buildDayTimeline(
               dwellStatus,
               dwellDetail,
               speedFrac,
+              legKmh,
+              trackKmh,
               curDist: targetDist,
             });
           }
@@ -667,6 +677,8 @@ export function buildDayTimeline(
           dwellStatus,
           dwellDetail,
           speedFrac,
+          legKmh,
+          trackKmh,
           curDist: targetDist,
         });
       }

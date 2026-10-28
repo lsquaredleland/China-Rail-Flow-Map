@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import {
   esc,
+  fmtSpeed,
   sourceRowsHtml,
   stationRowsHtml,
 } from "./format";
@@ -27,19 +28,23 @@ interface TooltipInput {
   ferry: boolean;
   /** The hovered section's OSM line names `[name, name:en]`. */
   lines?: [string, string][];
+  /** The hovered section's signed speed limit, km/h. */
+  speed?: number;
 }
 
-/** The OSM line names of flow section `s`: national flows and the outbound
-    view index `sections`, the inbound view `in_sections`. */
-export function sectionLines(
+/** Flow section `s`'s OSM line names and speed limit: national flows and
+    the outbound view index `sections`, the inbound view `in_sections`. */
+export function sectionInfo(
   data: AtlasData,
   view: { national?: boolean; direction: Direction },
   s: number,
-): [string, string][] {
-  const secs = view.national || view.direction === "out" ? data.sections : data.in_sections;
-  const names = data.lines;
-  if (!names) return [];
-  return (secs[s]?.l ?? []).map((i) => names[i]).filter((n) => n !== undefined);
+): { lines: [string, string][]; speed?: number } {
+  const sec = (view.national || view.direction === "out" ? data.sections : data.in_sections)[s];
+  const names = data.lines ?? [];
+  return {
+    lines: (sec?.l ?? []).map((i) => names[i]).filter((n) => n !== undefined),
+    speed: sec?.v,
+  };
 }
 
 export function tooltipHtml(hit: Hit, t: TooltipInput): string {
@@ -130,6 +135,9 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
       html +=
         "<div class='t-sub'>" + esc(zh) + (en ? " &middot; " + esc(en) : "") + "</div>";
     }
+    if (t.speed) {
+      html += "<div class='t-sub'>Line speed limit " + fmtSpeed(t.speed, t.distUnit) + "</div>";
+    }
     if (t.ferry) {
       const blueCol = t.dark ? "#38BDF8" : "#0284C7";
       html +=
@@ -187,6 +195,12 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
       `<tr><td>Arrival</td><td style='text-align:right'><b>${esc(tr.arrTime)}</b></td></tr>` +
       `<tr><td>Duration</td><td style='text-align:right'>${Math.floor(tr.durMins / 60)}h ${tr.durMins % 60}m</td></tr>` +
       `<tr><td>Journey Progress</td><td style='text-align:right'><b>${tr.progressPct}%</b></td></tr>` +
+      (tr.legKmh
+        ? `<tr><td>Speed (leg avg)</td><td style='text-align:right'>~${fmtSpeed(tr.legKmh, t.distUnit)}</td></tr>`
+        : "") +
+      (tr.trackKmh
+        ? `<tr><td>Track limit</td><td style='text-align:right'>${fmtSpeed(tr.trackKmh, t.distUnit)}</td></tr>`
+        : "") +
       "</table>" +
       `<div class='t-sub' style='margin-top:6px;color:${badgeColor};font-weight:600;'>Click train to inspect full station schedule</div>`;
   }

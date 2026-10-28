@@ -33,7 +33,10 @@ struct RawStop {
 /// One schedule row: [station idx, arrive mins, depart mins (-1 = none),
 /// day offset of the call from the train's origin day, leg km from the
 /// previous stop (-1 = unknown)].
-type ScheduleRow = (i64, i64, i64, i64, f64);
+/// (station idx, arr mins, dep mins, day offset, leg km, leg km/h): the leg
+/// is the one arriving at this stop; km/h is its timetable average (0 when
+/// unknown).
+type ScheduleRow = (i64, i64, i64, i64, f64, i64);
 #[derive(Default, Clone)]
 struct DestStats {
     total: u64,
@@ -76,6 +79,13 @@ struct AtlasSection {
     /// share of the section's named length, largest first.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     l: Vec<u32>,
+    /// Signed speed limit (OSM `maxspeed`, km/h) over most of the section's
+    /// tagged length; 0 (omitted) when under half its length is tagged.
+    #[serde(skip_serializing_if = "is_zero_u16")]
+    v: u16,
+}
+fn is_zero_u16(v: &u16) -> bool {
+    *v == 0
 }
 #[derive(serde::Serialize)]
 struct AtlasChord {
@@ -880,6 +890,31 @@ impl<'a> Ctx<'a> {
             .collect();
         ls.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         ls.into_iter().map(|(li, _)| li).collect()
+    }
+
+    /// The chain's signed speed limit: the `maxspeed` covering the most of
+    /// its length (ties to the higher), or 0 when tags cover under half of it.
+    fn chain_speed(&self, chain: &[i64]) -> u16 {
+        let coords = &self.inp.coords;
+        let (mut total, mut tagged) = (0.0, 0.0);
+        let mut km: HashMap<u16, f64> = HashMap::new();
+        for w in chain.windows(2) {
+            let (Some(&p), Some(&q)) = (coords.get(&w[0]), coords.get(&w[1])) else {
+                continue;
+            };
+            let d = hav_km_ll(p, q);
+            total += d;
+            if let Some(&v) = self.ways.edge_speed.get(&osm::edge_key(w[0], w[1])) {
+                tagged += d;
+                *km.entry(v).or_insert(0.0) += d;
+            }
+        }
+        if total <= 0.0 || tagged * 2.0 < total {
+            return 0;
+        }
+        km.into_iter()
+            .max_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
+            .map_or(0, |(v, _)| v)
     }
 }
 
@@ -1880,6 +1915,7 @@ fn build_sections(
                 .into_iter()
                 .map(|li| it.line(li, &cx.ways.lines))
                 .collect(),
+            v: cx.chain_speed(chain),
         });
         for (ci, n, cls_counts) in sig_list[*sid as usize].iter() {
             flows_per_city[*ci].push(pack_flow_row(sec_idx, *n as usize, cls_counts));
@@ -2802,11 +2838,15 @@ fn schedules_phase(m: &Model, it: &mut Interner) -> Vec<Vec<ScheduleRow>> {
             c / 1440
         };
         let mut rows: Vec<ScheduleRow> = Vec::with_capacity(stops.len());
+        // the previous stop's departure, in minutes from the first day
+        let mut prev_dep: Option<i64> = None;
         for (j, s) in stops.iter().enumerate() {
             let arr = mins(&s.arrive_time);
             let dep = mins(&s.start_time);
             let day = arr.map(&mut advance);
             let day_dep = dep.map(&mut advance);
+            let arr_abs = arr.zip(day).map(|(m, d)| d * 1440 + m);
+            let dep_abs = dep.zip(day_dep).map(|(m, d)| d * 1440 + m);
             let km = if j == 0 || names[j - 1] == names[j] {
                 0.0
             } else {
@@ -2819,12 +2859,15 @@ fn schedules_phase(m: &Model, it: &mut Interner) -> Vec<Vec<ScheduleRow>> {
                 }
             };
             let st = it.station(&names[j], city_en);
+            let kmh = leg_kmh(km, prev_dep, arr_abs);
+            prev_dep = dep_abs.or(arr_abs);
             rows.push((
                 st,
                 arr.unwrap_or(-1),
                 dep.unwrap_or(-1),
                 day.or(day_dep).unwrap_or(0),
                 km,
+                kmh,
             ));
         }
         schedules.push(rows);
@@ -2836,6 +2879,24 @@ fn schedules_phase(m: &Model, it: &mut Interner) -> Vec<Vec<ScheduleRow>> {
         sched_km_unknown
     );
     schedules
+}
+
+/// A leg's timetable average speed (km/h, rounded) from its km and the
+/// departure / arrival minutes either side; 0 when either is unknown or the
+/// result is no train's (over `LEG_KMH_MAX`: a timetable or distance slip).
+fn leg_kmh(km: f64, dep: Option<i64>, arr: Option<i64>) -> i64 {
+    const LEG_KMH_MAX: f64 = 400.0;
+    match (dep, arr) {
+        (Some(d), Some(a)) if a > d && km > 0.0 => {
+            let v = km * 60.0 / (a - d) as f64;
+            if v <= LEG_KMH_MAX {
+                v.round() as i64
+            } else {
+                0
+            }
+        }
+        _ => 0,
+    }
 }
 
 /// Network backdrop (shared, polyline-encoded).
@@ -3410,6 +3471,22 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn leg_kmh_is_the_timetable_average_or_zero() {
+        // 1318 km in 4h28 (G1 北京南 → 上海虹桥 nonstop shape)
+        assert_eq!(leg_kmh(1318.0, Some(540), Some(808)), 295);
+        // across midnight: minutes run from the first day
+        assert_eq!(leg_kmh(100.0, Some(1430), Some(1490)), 100);
+        assert_eq!(leg_kmh(-1.0, Some(0), Some(60)), 0, "unknown km");
+        assert_eq!(leg_kmh(50.0, None, Some(60)), 0, "no departure");
+        assert_eq!(leg_kmh(50.0, Some(60), Some(60)), 0, "no time");
+        assert_eq!(
+            leg_kmh(500.0, Some(0), Some(60)),
+            0,
+            "faster than any train"
+        );
+    }
 
     /// Nodes on the equator, 0.1 deg of lon (about 9.6 km) apart.
     fn line_coords() -> HashMap<i64, [f64; 2]> {

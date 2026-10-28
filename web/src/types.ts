@@ -9,6 +9,7 @@ interface RawSection {
   g: string; // Google-polyline-encoded track geometry, precision 1e4
   h?: number; // 1 for high-speed rail (HSR), omitted/0 for conventional rail
   l?: number[]; // OSM line names it runs on: indices into `lines`, largest share first
+  v?: number; // signed speed limit (OSM maxspeed, km/h) over most of it; absent when untagged
 }
 
 export interface RawCity {
@@ -449,6 +450,10 @@ export interface ActiveTrainVM {
   dwellStatus?: "origin" | "stop" | "dest";
   dwellDetail?: string;
   speedFrac?: number;
+  /** Moving: the current leg's timetable average speed, km/h. */
+  legKmh?: number;
+  /** On a flow section: its signed speed limit (OSM maxspeed), km/h. */
+  trackKmh?: number;
   curDist?: number;
   onChord?: boolean; // on a leg with no track geometry (straight-line stand-in)
 }
@@ -468,7 +473,7 @@ export interface ScheduleStop {
 
 export interface SchedulesData {
   extra_stations: string[];
-  schedules: [number, number, number, number, number?][][]; // indexed by train_table index
+  schedules: [number, number, number, number, number?, number?][][]; // indexed by train_table index; [5] = arriving leg's average km/h
 }
 
 export interface PrepTrainStop {
@@ -478,6 +483,7 @@ export interface PrepTrainStop {
   depMins: number | null;
   dist: number;
   isTerm: boolean;
+  legKmh: number; // the arriving leg's timetable average, km/h (0 unknown)
 }
 
 /** A station-throat piece on a train's route (O1): the dot runs along throat

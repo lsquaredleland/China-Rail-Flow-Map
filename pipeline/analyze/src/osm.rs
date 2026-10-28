@@ -1,7 +1,7 @@
 //! Reading what the pipeline needs from an OSM XML extract (`osmium`-style
 //! `<node .../>` / `<way>` elements, one attribute set per element): node
-//! coordinates for a known id set, and the highspeed/conventional class and
-//! line name of every rail edge. Language- and country-neutral, so it also works on an
+//! coordinates for a known id set, and the highspeed/conventional class,
+//! line name and signed speed limit of every rail edge. Language- and country-neutral, so it also works on an
 //! arbitrary OSM rail network.
 
 use crate::legs::{LegPathMap, PathMap};
@@ -94,6 +94,9 @@ pub struct WayClasses {
     /// Line names `(name, name:en)`, in order of first appearance; the
     /// English name is the one most of that name's ways carry ("" if none).
     pub lines: Vec<(String, String)>,
+    /// Edge -> `maxspeed` (km/h) of the first non-`service` rail way over it
+    /// that carries one.
+    pub edge_speed: HashMap<(i64, i64), u16>,
 }
 
 /// Classify every rail way of the extract (see [`WayClasses`]).
@@ -132,6 +135,7 @@ pub fn scan_ways(data: &[u8]) -> WayClasses {
     let mut name_en = String::new();
     let mut refs: Vec<i64> = Vec::new();
     let mut edge_line: HashMap<(i64, i64), u32> = HashMap::new();
+    let mut edge_speed: HashMap<(i64, i64), u16> = HashMap::new();
     let mut line_idx: HashMap<String, u32> = HashMap::new();
     let mut line_en: Vec<HashMap<String, u32>> = Vec::new();
     let mut hsr_edges: HashSet<(i64, i64)> = HashSet::new();
@@ -170,6 +174,13 @@ pub fn scan_ways(data: &[u8]) -> WayClasses {
             Ok(Event::End(e)) if e.name().as_ref() == b"way" => {
                 in_way = false;
                 if is_rail && refs.len() >= 2 {
+                    if let Some(v) = maxspeed.filter(|_| !is_service) {
+                        for w in refs.windows(2) {
+                            edge_speed
+                                .entry(edge_key(w[0], w[1]))
+                                .or_insert(v.round() as u16);
+                        }
+                    }
                     if !is_service && !name.is_empty() {
                         let li = *line_idx.entry(name.clone()).or_insert_with(|| {
                             line_en.push(HashMap::new());
@@ -234,6 +245,7 @@ pub fn scan_ways(data: &[u8]) -> WayClasses {
         hsr_nodes,
         edge_line,
         lines,
+        edge_speed,
     }
 }
 
@@ -331,6 +343,18 @@ mod tests {
         assert_eq!(line(2, 3), Some(("京广线".into(), String::new())));
         assert_eq!(line(1, 3), None, "a siding's name is not a line");
         assert_eq!(w.lines.len(), 2);
+    }
+
+    #[test]
+    fn scan_ways_records_signed_speed_skipping_service_ways() {
+        let w = scan_ways(XML.as_bytes());
+        assert_eq!(w.edge_speed.get(&edge_key(3, 2)), Some(&120));
+        assert_eq!(w.edge_speed.get(&(1, 2)), None, "untagged");
+        assert_eq!(
+            w.edge_speed.get(&(1, 3)),
+            None,
+            "a siding's limit is not the line's"
+        );
     }
 
     #[test]

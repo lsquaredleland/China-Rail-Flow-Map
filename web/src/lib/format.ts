@@ -141,6 +141,11 @@ export function fmtDist(km: number | null | undefined, unit: DistUnit): string {
   return km.toLocaleString("en-US") + " km";
 }
 
+/** A speed in the toolbar's unit (km/h or mph). */
+export function fmtSpeed(kmh: number, unit: DistUnit): string {
+  return unit === "mi" ? Math.round(kmh * 0.621371) + " mph" : kmh + " km/h";
+}
+
 /** The fact rows shared by the hover tooltip and the pinned detail panel. */
 export function stationRows(
   c: DestVM,
