@@ -259,13 +259,16 @@ fn path_keys(
         let path: Vec<(String, bool)> = ints(p)
             .into_iter()
             .map(|v| {
-                let (s, rev) = if v >= 0 { (v, false) } else { (!v, true) };
-                let key = if s < n {
-                    secs[s as usize].clone()
+                let e = pack::Entry::decode(v);
+                let key = if e.is_flow(n as usize) {
+                    secs[e.id].clone()
                 } else {
-                    format!("T:{}", throats.get((s - n) as usize).copied().unwrap_or(""))
+                    format!(
+                        "T:{}",
+                        throats.get(e.id - n as usize).copied().unwrap_or("")
+                    )
                 };
-                (key, rev)
+                (key, e.rev)
             })
             .collect();
         if let Some(k) = tk.get(t) {
