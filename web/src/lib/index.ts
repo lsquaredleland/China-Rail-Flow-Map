@@ -66,7 +66,8 @@ export {
   trainDistAt,
   trainSpeedFrac,
 } from "./timeline";
-export { buildNational, nat, natPositions, natState, natXY, requireNationalTrains } from "./national";
+export { buildNational, natMotion, natPositions, natState, natXY, requireNationalTrains } from "./national";
+export type { NatMotion } from "./national";
 export { natTrainVM } from "./natTrain";
 export { buildNatRows, natHistRows, selectNatRows, sortNatRows } from "./natTable";
 export type { HistRow, NatRow, NatSortKey } from "./natTable";

@@ -3,13 +3,15 @@
    the former Canvas renderer, so placement is unchanged;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
-import { dotPlaces, isTrainShown, nat, natCityR, natState, palette, placeLabels, splitRadius, stationR, stationT, stationZoomK } from "../../../lib";
+import { dotPlaces, isTrainShown, natCityR, natMotion, natState, palette, placeLabels, splitRadius, stationR, stationT, stationZoomK } from "../../../lib";
 import type { CloseupLabel, LabelPoint } from "../../../lib";
 import { closeupOf } from "../closeup";
 import type { Closeup } from "../closeup";
 import type { MapCtx } from "../context";
 import { nationalLabelPoints, LABEL_TRAINS_PER_UNIT } from "./layers/national";
 import { glowOf, shownTrains } from "./layers/trains";
+
+const scratch = natMotion();
 
 const fontOf = (fs: number, weight: string) =>
   weight +
@@ -192,8 +194,8 @@ function drawNationalTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
     if (row.code === iso && total > 0) {
       let j = i;
       while (j > 0 && f.qOf[j - 1] === q) j--;
-      natState(f.tl, q, f.m + 1440 * (Math.ceil((f.tl.start[q] - f.m) / 1440) + (i - j)));
-      pct = ` · ${Math.round((nat.dist / total) * 100)}%`;
+      const m = natState(f.tl, q, f.m + 1440 * (Math.ceil((f.tl.start[q] - f.m) / 1440) + (i - j)), scratch);
+      pct = ` · ${Math.round((m.dist / total) * 100)}%`;
     }
     paintTag(ctx, px, py, row.code + pct, row.class);
   }

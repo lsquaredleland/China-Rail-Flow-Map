@@ -119,13 +119,15 @@ export function buildNational(
   return tl;
 }
 
-/** Scratch result of natState. */
-export const nat = { dist: 0, speed: 1, dwell: false };
+/** A national train's motion at one minute (see natState). */
+export interface NatMotion { dist: number; speed: number; dwell: boolean }
+/** A fresh NatMotion for natState to write into. */
+export function natMotion(): NatMotion { return { dist: 0, speed: 1, dwell: false }; }
 
 /** State of train q at ABSOLUTE minute `a` (start <= a <= end): distance
-    along the path, speed fraction, dwelling. Same model as timeline.ts
-    trainState (dwell at stops, linear legs). */
-export function natState(tl: NationalTimeline, q: number, a: number): void {
+    along the path, speed fraction, dwelling. Writes into and returns `out`.
+    Same model as timeline.ts trainState (dwell at stops, linear legs). */
+export function natState(tl: NationalTimeline, q: number, a: number, out: NatMotion): NatMotion {
   const s0 = tl.sOff[q], s1 = tl.sOff[q + 1];
   let legStartDist = 0;
   let legStartTime = tl.start[q];
@@ -134,7 +136,7 @@ export function natState(tl: NationalTimeline, q: number, a: number): void {
   for (let s = s0; s < s1; s++) {
     const dep = tl.sDep[s];
     if (dep >= 0 && dep > tl.sArr[s] && a >= tl.sArr[s] && a <= dep) {
-      nat.dist = tl.sDist[s]; nat.speed = 0; nat.dwell = true; return;
+      out.dist = tl.sDist[s]; out.speed = 0; out.dwell = true; return out;
     }
   }
   for (let s = s0; s < s1; s++) {
@@ -144,9 +146,10 @@ export function natState(tl: NationalTimeline, q: number, a: number): void {
   }
   const legDur = Math.max(1, legEndTime - legStartTime);
   const tau = Math.max(0, Math.min(1, (a - legStartTime) / legDur));
-  nat.speed = trainSpeedFrac(tau, legDur);
-  nat.dwell = false;
-  nat.dist = legStartDist + tau * (legEndDist - legStartDist);
+  out.speed = trainSpeedFrac(tau, legDur);
+  out.dwell = false;
+  out.dist = legStartDist + tau * (legEndDist - legStartDist);
+  return out;
 }
 
 /** Writes lon, lat and the unit direction at route distance d of train q to
@@ -231,6 +234,8 @@ export function natXY(
   o[oi + 3] = dy / len;
 }
 
+const scratch = natMotion();
+
 /** All trains on the line at display minute m (0..1440), wrap-around:
     a train is shown if any m + 1440k lies in [start, end]. Writes 6 floats
     per dot (lon, lat, ux, uy, speed, cls | dwell<<4) and returns the count.
@@ -243,10 +248,10 @@ export function natPositions(tl: NationalTimeline, atlas: DecodedAtlas, m: numbe
     const s = tl.start[q], e = tl.end[q];
     let k = Math.ceil((s - m) / 1440);
     for (; m + 1440 * k <= e; k++) {
-      natState(tl, q, m + 1440 * k);
-      natXY(tl, atlas, q, nat.dist, out, c * 6);
-      out[c * 6 + 4] = nat.speed;
-      out[c * 6 + 5] = tl.cls[q] | (nat.dwell ? 16 : 0);
+      const mot = natState(tl, q, m + 1440 * k, scratch);
+      natXY(tl, atlas, q, mot.dist, out, c * 6);
+      out[c * 6 + 4] = mot.speed;
+      out[c * 6 + 5] = tl.cls[q] | (mot.dwell ? 16 : 0);
       if (qOut) qOut[c] = q;
       c++;
     }
