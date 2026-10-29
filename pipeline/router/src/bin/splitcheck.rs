@@ -6,6 +6,7 @@
 // alongside section carrying the flow; a split one has several whose
 // flows add up.
 // Usage: splitcheck --old <v1.json> --new <v1.json> [--city <zh>]
+use corridor_router::graph::hav;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -42,13 +43,6 @@ fn decode(s: &str) -> Vec<[f64; 2]> {
         out.push([lat as f64 / 1e5, lng as f64 / 1e5]);
     }
     out
-}
-
-fn hav(a: [f64; 2], b: [f64; 2]) -> f64 {
-    let (p1, p2) = (a[0].to_radians(), b[0].to_radians());
-    let dl = (b[1] - a[1]).to_radians();
-    let h = ((p2 - p1) / 2.0).sin().powi(2) + p1.cos() * p2.cos() * (dl / 2.0).sin().powi(2);
-    2.0 * 6371.0 * h.sqrt().asin()
 }
 
 /// Points every ~100 m along a polyline.
