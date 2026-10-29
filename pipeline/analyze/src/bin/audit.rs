@@ -35,80 +35,6 @@ struct AtlasSection {
     g: String,
 }
 
-/// Expand a fmt-5 tables file (per-train `paths` / `stop_pos` / `chords` plus
-/// per-origin `dep_off` / `arr_len`) back to per-row `dep_secs` /
-/// `dep_chord_legs` / `dep_stop_pos` (out) or `arr_secs` / `arr_chord_legs`
-/// (in), the shape the checks below read. Independent of atlaspack's packer.
-fn expand_tables(t: &mut Value, out: bool) {
-    let ints = |v: &Value| -> Vec<i64> {
-        v.as_array()
-            .unwrap()
-            .iter()
-            .map(|x| x.as_i64().unwrap())
-            .collect()
-    };
-    let paths: Vec<Vec<i64>> = t["paths"].as_array().unwrap().iter().map(ints).collect();
-    let stop_pos: Vec<Vec<i64>> = if out {
-        t["stop_pos"].as_array().unwrap().iter().map(ints).collect()
-    } else {
-        Vec::new()
-    };
-    let mut chords: HashMap<usize, Vec<Vec<i64>>> = HashMap::new();
-    for c in t["chords"].as_array().unwrap() {
-        let legs = c[1].as_array().unwrap().iter().map(ints).collect();
-        chords.insert(c[0].as_u64().unwrap() as usize, legs);
-    }
-    let (rows_key, mark_key) = if out {
-        ("deps", "dep_off")
-    } else {
-        ("arrs", "arr_len")
-    };
-    for o in t["origins"].as_array_mut().unwrap() {
-        let (mut secs, mut legs_all, mut sp_all) = (Vec::new(), Vec::new(), Vec::new());
-        let marks = ints(&o[mark_key]);
-        for (row, &m) in o[rows_key].as_array().unwrap().iter().zip(&marks) {
-            let tr = row[0].as_u64().unwrap() as usize;
-            let full = &paths[tr];
-            let (lo, hi) = if out {
-                (m as usize, full.len())
-            } else {
-                (0, m as usize)
-            };
-            secs.push(serde_json::json!(full[lo..hi]));
-            let legs: Vec<Vec<i64>> = chords
-                .get(&tr)
-                .into_iter()
-                .flatten()
-                .filter(|l| if out { l[1] >= m } else { l[2] <= m })
-                .map(|l| {
-                    if out {
-                        vec![l[0], l[1] - m, l[2] - m]
-                    } else {
-                        l.clone()
-                    }
-                })
-                .collect();
-            legs_all.push(serde_json::json!(legs));
-            if out {
-                let n = row[7].as_u64().unwrap() as usize;
-                let sp = &stop_pos[tr];
-                let v: Vec<i64> = sp[sp.len() - n..].iter().map(|x| x - m).collect();
-                sp_all.push(serde_json::json!(v));
-            }
-        }
-        let (sk, ck) = if out {
-            ("dep_secs", "dep_chord_legs")
-        } else {
-            ("arr_secs", "arr_chord_legs")
-        };
-        o[sk] = Value::Array(secs);
-        o[ck] = Value::Array(legs_all);
-        if out {
-            o["dep_stop_pos"] = Value::Array(sp_all);
-        }
-    }
-}
-
 fn arr(v: &Value) -> Vec<Value> {
     v.as_array().cloned().unwrap_or_default()
 }
@@ -129,24 +55,10 @@ fn int_rows(v: &Value) -> Vec<Vec<i64>> {
         .unwrap_or_default()
 }
 
-/// `[[t, rows]]` chord lists -> train -> rows.
-fn chord_map(v: &Value) -> HashMap<usize, Vec<Vec<i64>>> {
-    v.as_array()
-        .into_iter()
-        .flatten()
-        .map(|c| (c[0].as_u64().unwrap() as usize, int_rows(&c[1])))
-        .collect()
-}
-
-/// Section id of a signed path entry (`!id` = travelled against the stored order).
-fn sec_of(v: i64) -> usize {
-    (if v >= 0 { v } else { !v }) as usize
-}
-
 /// Flow sections among a path's entries (throats, ids >= `n`, excluded).
 fn flow_len(path: &[Value], n: usize) -> i64 {
     path.iter()
-        .filter(|v| sec_of(v.as_i64().unwrap()) < n)
+        .filter(|v| pack::Entry::decode(v.as_i64().unwrap()).is_flow(n))
         .count() as i64
 }
 
@@ -192,8 +104,8 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     ok &= check_columns(dir, &out_t, &in_t);
     ok &= check_city_points(&shared);
     if ok {
-        expand_tables(&mut out_t, true);
-        expand_tables(&mut in_t, false);
+        pack::expand_tables(&mut out_t, true);
+        pack::expand_tables(&mut in_t, false);
     }
     let f = PackFiles {
         shared,
@@ -469,7 +381,7 @@ fn check_paths_and_cutoffs(f: &PackFiles) -> PathStats {
                 let path: Vec<i64> = arr(path).iter().map(int).collect();
                 throat_refs += path
                     .iter()
-                    .filter(|&&v| (if v >= 0 { v } else { !v }) as usize >= n_secs)
+                    .filter(|&&v| !pack::Entry::decode(v).is_flow(n_secs))
                     .count() as u64;
                 let mut exempt: HashSet<usize> = HashSet::new();
                 let cl = arr(&chords[ri]);
@@ -483,11 +395,12 @@ fn check_paths_and_cutoffs(f: &PackFiles) -> PathStats {
                     }
                 }
                 let oriented = |v: i64| -> ([f64; 2], [f64; 2]) {
-                    if v >= 0 {
-                        ends[v as usize]
-                    } else {
-                        let (a, b) = ends[!v as usize];
+                    let e = pack::Entry::decode(v);
+                    let (a, b) = ends[e.id];
+                    if e.rev {
                         (b, a)
+                    } else {
+                        (a, b)
                     }
                 };
                 let (mut j_in, mut j_out, mut j20_out) = (false, false, false);
@@ -948,7 +861,7 @@ fn out_path_recount(
     for (t, p) in out_t["paths"].as_array().unwrap().iter().enumerate() {
         let mut secs: Vec<usize> = ints(p)
             .into_iter()
-            .map(|v| (if v >= 0 { v } else { !v }) as usize)
+            .map(|v| pack::Entry::decode(v).id)
             .filter(|&s| s < n)
             .collect();
         secs.sort_unstable();
@@ -1390,7 +1303,7 @@ fn read_national_trains<'a>(
         .collect();
     let paths = int_rows(&nt["paths"]);
     let stop_pos = int_rows(&nt["stop_pos"]);
-    let chords = chord_map(&nt["chords"]);
+    let chords = pack::chord_map(&nt["chords"]);
     let train_table = shared["train_table"].as_array().unwrap();
     let scheds = sch["schedules"].as_array().unwrap();
     let fmt = nt["fmt"].as_i64();
@@ -1402,7 +1315,7 @@ fn read_national_trains<'a>(
     let bad_ids = paths
         .iter()
         .flatten()
-        .filter(|&&v| sec_of(v) >= ends.len())
+        .filter(|&&v| pack::Entry::decode(v).id >= ends.len())
         .count();
     if !shape_ok || bad_ids > 0 {
         println!(
@@ -1468,11 +1381,11 @@ fn recount_vs_national(dir: &Path, shared: &Value, d: &NatTrains, trains: i64) -
         let mut secs: Vec<usize> = p
             .iter()
             .filter_map(|&v| {
-                let id = sec_of(v);
-                if id < n_sec {
-                    Some(id)
+                let e = pack::Entry::decode(v);
+                if e.is_flow(n_sec) {
+                    Some(e.id)
                 } else {
-                    on_sec.get(&id).copied()
+                    on_sec.get(&e.id).copied()
                 }
             })
             .collect();
@@ -1524,9 +1437,12 @@ struct TailStats {
 fn check_tails_and_joins(d: &NatTrains, out_t: &Value, out_p: &[Vec<i64>]) -> TailStats {
     let (paths, stop_pos, chords) = (&d.paths, &d.stop_pos, &d.chords);
     let (ends, n_sec, train_table, scheds) = (&d.ends, d.n_sec, d.train_table, d.scheds);
-    let is_flow = |v: i64| sec_of(v) < n_sec;
+    let is_flow = |v: i64| pack::Entry::decode(v).is_flow(n_sec);
 
-    let (out_sp, out_ch) = (int_rows(&out_t["stop_pos"]), chord_map(&out_t["chords"]));
+    let (out_sp, out_ch) = (
+        int_rows(&out_t["stop_pos"]),
+        pack::chord_map(&out_t["chords"]),
+    );
     let (mut tail_eq, mut tail_bad, mut seam_rev) = (0i64, 0i64, 0i64);
     let (mut stops_bad, mut stops_total) = (0i64, 0i64);
     let (mut checked, mut gaps, mut gaps_100m, mut chord_legs) = (0u64, 0i64, 0i64, 0i64);
@@ -1583,11 +1499,12 @@ fn check_tails_and_joins(d: &NatTrains, out_t: &Value, out_p: &[Vec<i64>]) -> Ta
             exempt.extend(l[1] as usize..=l[2] as usize);
         }
         let oriented = |v: i64| {
-            let (a, b) = ends[sec_of(v)];
-            if v >= 0 {
-                (a, b)
-            } else {
+            let e = pack::Entry::decode(v);
+            let (a, b) = ends[e.id];
+            if e.rev {
                 (b, a)
+            } else {
+                (a, b)
             }
         };
         for k in 1..w.len() {
