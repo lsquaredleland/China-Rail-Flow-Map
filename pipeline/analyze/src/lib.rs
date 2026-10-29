@@ -6,6 +6,8 @@
 //! - `export`: a train export with an operating calendar (a second timetable
 //!   source, `CRFM_SCHEDULE`).
 //! - `legs`: pair paths / router leg paths / overrides -> leg geometry.
+//! - `legwalk`: a leg's walk over its track segments, station throats and
+//!   one row's path of sections.
 //! - `osm`: reading node coordinates and way classes from an OSM XML extract.
 //! - `inputs`: the recipe's input files (env-driven paths) loaded in one place.
 //! - `chains`: station-chain canonicalization.
@@ -28,6 +30,7 @@ pub mod flows;
 pub mod geo;
 pub mod inputs;
 pub mod legs;
+pub mod legwalk;
 pub mod model;
 pub mod names;
 pub mod osm;
