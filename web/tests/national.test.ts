@@ -4,7 +4,7 @@
 // outbound tail of each sampled train: per the file's invariants that tail is
 // the out-tables path verbatim, with its stop positions and chord legs.
 import { describe, expect, test } from "bun:test";
-import { buildNational, haversineKm, nat, natPositions, natState, natXY, requireNationalTrains } from "../src/lib";
+import { buildNational, haversineKm, natMotion, natPositions, natState, natXY, requireNationalTrains } from "../src/lib";
 import type { NationalTimeline, NationalTrainsPack } from "../src/types";
 import { nationalTrains, pack } from "./fixture";
 
@@ -188,12 +188,13 @@ describe(`national timelines (${NT.source}: ${NT.path})`, () => {
     let q = 0;
     while (tl.sDep[tl.sOff[q]] <= tl.sArr[tl.sOff[q]]) q++;
     const s = tl.sOff[q];
-    natState(tl, q, (tl.sArr[s] + tl.sDep[s]) / 2);
-    expect(nat.dwell).toBe(true);
-    expect(nat.dist).toBe(tl.sDist[s]);
+    const m = natState(tl, q, (tl.sArr[s] + tl.sDep[s]) / 2, natMotion());
+    expect(m.dwell).toBe(true);
+    expect(m.dist).toBe(tl.sDist[s]);
   });
 
   test("natState is linear in time along a leg (midpoint = half the leg distance)", () => {
+    const m = natMotion();
     let checked = 0;
     for (let q = 0; q < tl.n && checked < 200; q += 7) {
       const s0 = tl.sOff[q], s1 = tl.sOff[q + 1];
@@ -202,10 +203,10 @@ describe(`national timelines (${NT.source}: ${NT.path})`, () => {
         const d1 = s < s1 ? tl.sDist[s] : tl.total[q];
         const a1 = s < s1 ? tl.sArr[s] : tl.end[q];
         if (d1 > d0 && a1 - t0 >= 1) {
-          natState(tl, q, t0 + (a1 - t0) / 2);
-          expect(nat.dist).toBeCloseTo(d0 + (d1 - d0) / 2, 4);
-          natState(tl, q, t0 + (a1 - t0) * 0.25);
-          expect(nat.dist).toBeCloseTo(d0 + (d1 - d0) / 4, 4);
+          natState(tl, q, t0 + (a1 - t0) / 2, m);
+          expect(m.dist).toBeCloseTo(d0 + (d1 - d0) / 2, 4);
+          natState(tl, q, t0 + (a1 - t0) * 0.25, m);
+          expect(m.dist).toBeCloseTo(d0 + (d1 - d0) / 4, 4);
           checked++;
         }
         d0 = d1;
