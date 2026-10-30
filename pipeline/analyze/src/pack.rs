@@ -2,6 +2,7 @@
 //! Brotli-compressed (`.json.br`, what ships in `web/public/assets`) or plain.
 
 use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
@@ -52,6 +53,133 @@ pub fn read_json(dir: &Path, name: &str) -> Value {
         .unwrap_or_else(|e| panic!("parse {name} in {}: {e}", dir.display()))
 }
 
+/// One entry of a fmt-6 per-train path: entry `id` (a flow section when
+/// `id < n`, else throat `id - n`), walked against its stored point order
+/// when `rev`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Entry {
+    pub id: usize,
+    pub rev: bool,
+}
+
+impl Entry {
+    /// Decode a signed path value (`!id` = reversed).
+    pub fn decode(v: i64) -> Entry {
+        if v >= 0 {
+            Entry {
+                id: v as usize,
+                rev: false,
+            }
+        } else {
+            Entry {
+                id: (!v) as usize,
+                rev: true,
+            }
+        }
+    }
+
+    /// Is this a flow section of a direction with `n` sections (not a throat)?
+    pub fn is_flow(self, n: usize) -> bool {
+        self.id < n
+    }
+}
+
+/// Flow sections among a path's signed entries (throats excluded).
+pub fn flow_count(path: &[i64], n: usize) -> usize {
+    path.iter()
+        .filter(|&&v| Entry::decode(v).is_flow(n))
+        .count()
+}
+
+fn ints(v: &Value) -> Vec<i64> {
+    v.as_array()
+        .map(|a| a.iter().map(|x| x.as_i64().unwrap()).collect())
+        .unwrap_or_default()
+}
+
+/// A tables file's `chords` list (`[[train, rows]]`) as train -> rows.
+pub fn chord_map(v: &Value) -> HashMap<usize, Vec<Vec<i64>>> {
+    v.as_array()
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            let legs = c[1].as_array().into_iter().flatten().map(ints).collect();
+            (c[0].as_u64().unwrap() as usize, legs)
+        })
+        .collect()
+}
+
+/// Expand a fmt-5 tables file (per-train `paths` / `stop_pos` / `chords` plus
+/// per-origin `dep_off` / `arr_len`) back to per-row `dep_secs` /
+/// `dep_chord_legs` / `dep_stop_pos` (out) or `arr_secs` / `arr_chord_legs`
+/// (in), the shape audit's checks read. Independent of atlaspack's packer.
+/// Panics on a malformed file (audit runs it only after the format checks).
+pub fn expand_tables(t: &mut Value, out: bool) {
+    let ints = |v: &Value| -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    };
+    let paths: Vec<Vec<i64>> = t["paths"].as_array().unwrap().iter().map(ints).collect();
+    let stop_pos: Vec<Vec<i64>> = if out {
+        t["stop_pos"].as_array().unwrap().iter().map(ints).collect()
+    } else {
+        Vec::new()
+    };
+    let chords = chord_map(&t["chords"]);
+    let (rows_key, mark_key) = if out {
+        ("deps", "dep_off")
+    } else {
+        ("arrs", "arr_len")
+    };
+    for o in t["origins"].as_array_mut().unwrap() {
+        let (mut secs, mut legs_all, mut sp_all) = (Vec::new(), Vec::new(), Vec::new());
+        let marks = ints(&o[mark_key]);
+        for (row, &m) in o[rows_key].as_array().unwrap().iter().zip(&marks) {
+            let tr = row[0].as_u64().unwrap() as usize;
+            let full = &paths[tr];
+            let (lo, hi) = if out {
+                (m as usize, full.len())
+            } else {
+                (0, m as usize)
+            };
+            secs.push(serde_json::json!(full[lo..hi]));
+            let legs: Vec<Vec<i64>> = chords
+                .get(&tr)
+                .into_iter()
+                .flatten()
+                .filter(|l| if out { l[1] >= m } else { l[2] <= m })
+                .map(|l| {
+                    if out {
+                        vec![l[0], l[1] - m, l[2] - m]
+                    } else {
+                        l.clone()
+                    }
+                })
+                .collect();
+            legs_all.push(serde_json::json!(legs));
+            if out {
+                let n = row[7].as_u64().unwrap() as usize;
+                let sp = &stop_pos[tr];
+                let v: Vec<i64> = sp[sp.len() - n..].iter().map(|x| x - m).collect();
+                sp_all.push(serde_json::json!(v));
+            }
+        }
+        let (sk, ck) = if out {
+            ("dep_secs", "dep_chord_legs")
+        } else {
+            ("arr_secs", "arr_chord_legs")
+        };
+        o[sk] = Value::Array(secs);
+        o[ck] = Value::Array(legs_all);
+        if out {
+            o["dep_stop_pos"] = Value::Array(sp_all);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,5 +217,102 @@ mod tests {
         fs::write(d.join("c.json.br"), br(br#"{"v":"br"}"#)).unwrap();
         assert_eq!(read_json(&d, "c.json")["v"], "br");
         fs::remove_dir_all(&d).ok();
+    }
+
+    #[test]
+    fn entry_decode() {
+        assert_eq!(Entry::decode(0), Entry { id: 0, rev: false });
+        assert_eq!(Entry::decode(5), Entry { id: 5, rev: false });
+        assert_eq!(Entry::decode(-1), Entry { id: 0, rev: true });
+        assert_eq!(Entry::decode(!7), Entry { id: 7, rev: true });
+    }
+
+    #[test]
+    fn entry_is_flow_boundary() {
+        let n = 10;
+        assert!(Entry { id: 9, rev: false }.is_flow(n));
+        assert!(Entry { id: 9, rev: true }.is_flow(n));
+        assert!(!Entry { id: 10, rev: false }.is_flow(n));
+        assert!(!Entry { id: 10, rev: true }.is_flow(n));
+        assert!(!Entry { id: 11, rev: false }.is_flow(n));
+    }
+
+    #[test]
+    fn flow_count_mixed_path() {
+        let path = [0, !1, 3, 4, !4, 5];
+        assert_eq!(flow_count(&path, 4), 3);
+    }
+
+    #[test]
+    fn chord_map_parses_json() {
+        let v = serde_json::json!([[0, [[1, 2, 5]]], [3, [[0, 1, 3], [2, 4, 6]]]]);
+        let m = chord_map(&v);
+        assert_eq!(m.len(), 2);
+        assert_eq!(m[&0], vec![vec![1, 2, 5]]);
+        assert_eq!(m[&3], vec![vec![0, 1, 3], vec![2, 4, 6]]);
+    }
+
+    #[test]
+    fn expand_tables_out_and_in() {
+        let mut out_table = serde_json::json!({
+            "paths": [
+                [10, 11, 12, 13],
+                [20, 21, 22]
+            ],
+            "stop_pos": [
+                [1, 3],
+                [0, 2]
+            ],
+            "chords": [
+                [0, [[1, 1, 3]]],
+                [1, [[2, 0, 2]]]
+            ],
+            "origins": [{
+                "dep_off": [1, 0],
+                "deps": [
+                    [0, 0, 0, 0, 0, 0, 0, 2],
+                    [1, 0, 0, 0, 0, 0, 0, 1]
+                ]
+            }]
+        });
+        expand_tables(&mut out_table, true);
+        let orig = &out_table["origins"][0];
+        assert_eq!(
+            orig["dep_secs"],
+            serde_json::json!([[11, 12, 13], [20, 21, 22]])
+        );
+        assert_eq!(
+            orig["dep_chord_legs"],
+            serde_json::json!([[[1, 0, 2]], [[2, 0, 2]]])
+        );
+        assert_eq!(orig["dep_stop_pos"], serde_json::json!([[0, 2], [2]]));
+
+        let mut in_table = serde_json::json!({
+            "paths": [
+                [10, 11, 12, 13],
+                [20, 21, 22]
+            ],
+            "chords": [
+                [0, [[1, 0, 2]]],
+                [1, [[2, 0, 2]]]
+            ],
+            "origins": [{
+                "arr_len": [2, 3],
+                "arrs": [
+                    [0],
+                    [1]
+                ]
+            }]
+        });
+        expand_tables(&mut in_table, false);
+        let in_orig = &in_table["origins"][0];
+        assert_eq!(
+            in_orig["arr_secs"],
+            serde_json::json!([[10, 11], [20, 21, 22]])
+        );
+        assert_eq!(
+            in_orig["arr_chord_legs"],
+            serde_json::json!([[[1, 0, 2]], [[2, 0, 2]]])
+        );
     }
 }
