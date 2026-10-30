@@ -12,6 +12,47 @@ import type {
 } from "../types";
 import { classIndex } from "./origin";
 
+/** Per-section train counts (total and per FLOW_CLASSES bucket) over `rows`, busiest first. */
+function countSections(
+  rows: readonly { cls: string; secs: number[] }[],
+): FlowVM[] {
+  const secMap = new Map<number, { n: number; byClass: number[] }>();
+  for (const r of rows) {
+    const ci = classIndex(r.cls);
+    for (const s of new Set(r.secs)) {
+      let entry = secMap.get(s);
+      if (!entry) {
+        entry = { n: 0, byClass: new Array(8).fill(0) };
+        secMap.set(s, entry);
+      }
+      entry.n++;
+      if (ci >= 0 && ci < 8) entry.byClass[ci]++;
+    }
+  }
+  const flows = Array.from(secMap.entries()).map(([s, { n, byClass }]) => ({
+    s,
+    n,
+    byClass,
+  }));
+  flows.sort((a, b) => b.n - a.n);
+  return flows;
+}
+
+/** Precomputed flows filtered to the selected class buckets, busiest first. */
+function filterFlowsByClass(
+  flows: readonly FlowVM[],
+  clsIndices: readonly number[],
+): FlowVM[] {
+  return flows
+    .map((f) => {
+      let n = 0;
+      for (const ci of clsIndices) n += f.byClass[ci] || 0;
+      return { s: f.s, n, byClass: f.byClass };
+    })
+    .filter((f) => f.n > 0)
+    .sort((a, b) => b.n - a.n);
+}
+
 /** Return a derived OriginVM filtered to the selected train classes,
     departure/arrival hour, journey distance bin, or journey duration bin.
     Preserves `o` reference identity so MapHost redraws in place without
@@ -146,34 +187,9 @@ export function filterOrigin(
     cur.deps.length > 0 &&
     (hasHourFilter || hasDistFilter || hasDurFilter || hasTrainFilter)
   ) {
-    const secMap = new Map<number, { n: number; byClass: number[] }>();
-    for (const d of deps) {
-      const ci = classIndex(d.cls);
-      for (const s of new Set(d.secs)) {
-        let entry = secMap.get(s);
-        if (!entry) {
-          entry = { n: 0, byClass: new Array(8).fill(0) };
-          secMap.set(s, entry);
-        }
-        entry.n++;
-        if (ci >= 0 && ci < 8) entry.byClass[ci]++;
-      }
-    }
-    flows = Array.from(secMap.entries()).map(([s, { n, byClass }]) => ({
-      s,
-      n,
-      byClass,
-    }));
-    flows.sort((a, b) => b.n - a.n);
+    flows = countSections(deps);
   } else {
-    flows = cur.flows
-      .map((f) => {
-        let n = 0;
-        for (const ci of clsIndices) n += f.byClass[ci] || 0;
-        return { s: f.s, n, byClass: f.byClass };
-      })
-      .filter((f) => f.n > 0)
-      .sort((a, b) => b.n - a.n);
+    flows = filterFlowsByClass(cur.flows, clsIndices);
   }
 
   let inFlows: FlowVM[];
@@ -181,34 +197,9 @@ export function filterOrigin(
     cur.arrs.length > 0 &&
     (hasHourFilter || hasDistFilter || hasDurFilter || hasTrainFilter)
   ) {
-    const secMap = new Map<number, { n: number; byClass: number[] }>();
-    for (const a of arrs) {
-      const ci = classIndex(a.cls);
-      for (const s of new Set(a.secs)) {
-        let entry = secMap.get(s);
-        if (!entry) {
-          entry = { n: 0, byClass: new Array(8).fill(0) };
-          secMap.set(s, entry);
-        }
-        entry.n++;
-        if (ci >= 0 && ci < 8) entry.byClass[ci]++;
-      }
-    }
-    inFlows = Array.from(secMap.entries()).map(([s, { n, byClass }]) => ({
-      s,
-      n,
-      byClass,
-    }));
-    inFlows.sort((a, b) => b.n - a.n);
+    inFlows = countSections(arrs);
   } else {
-    inFlows = cur.inFlows
-      .map((f) => {
-        let n = 0;
-        for (const ci of clsIndices) n += f.byClass[ci] || 0;
-        return { s: f.s, n, byClass: f.byClass };
-      })
-      .filter((f) => f.n > 0)
-      .sort((a, b) => b.n - a.n);
+    inFlows = filterFlowsByClass(cur.inFlows, clsIndices);
   }
 
   let dests = cur.dests;
