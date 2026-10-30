@@ -125,13 +125,6 @@ export default function TrainScheduleModal({
     ? (trainVM.fsZh || trainVM.tsZh || "")
     : "";
 
-  const originStDisplay = trainVM
-    ? stationName(trainVM.fsZh || "", trainVM.fsEn, "zh-paren")
-    : "";
-  const destStDisplay = trainVM
-    ? stationName(trainVM.tsZh || "", trainVM.tsEn, "zh-paren")
-    : "";
-
   const matchesOrigin = useCallback(
     (s: { stZh: string; stEn: string }) =>
       !!(
@@ -259,8 +252,6 @@ export default function TrainScheduleModal({
 
   const cls = trainVM ? trainVM.cls : code.charAt(0);
   const isHighSpeed = cls === "G" || cls === "D" || cls === "C";
-  const codeClass = "tsm-code" + (isHighSpeed ? " is-hs" : "");
-  const route = trainVM ? `${originStDisplay} ➔ ${destStDisplay}` : null;
   const legDist = (km: number) =>
     unit === "mi" ? `${(km * 0.621371).toFixed(1)} mi` : `${km} km`;
 

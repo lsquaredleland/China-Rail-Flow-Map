@@ -316,8 +316,7 @@ export function buildDayTimeline(
   }
 
   const { secLengths, secCumLens } = getSecGeometry(secSet);
-  // Station throats (O1): path entries >= nSecAll, geometry only
-  const nSecAll = secSet.len.length;
+  // Station throats (O1): path entries >= the section count, geometry only
   const thrSet = atlas.thr;
   const thrGeo = getSecGeometry(thrSet);
 

@@ -12,7 +12,7 @@
    Same marks as the origin view's train layers (../trains.ts). Memo keys: see
    ./index.ts. */
 import type { Layer } from "@deck.gl/core";
-import { PathLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { PathLayer } from "@deck.gl/layers";
 import type { DecodedAtlas, NationalTimeline } from "../../../../../types";
 import { natPositions, natXY } from "../../../../../lib";
 import { dotLayers, glowOf, isoDwellRings, ringLayer } from "../trains";
