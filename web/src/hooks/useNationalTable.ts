@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { DecodedAtlas, NationalIndexPack, SchedulesData } from "../types";
-import { FLOW_CLASSES, buildNatRows, classIndex, natHistRows, natSelect } from "../lib";
+import { FLOW_CLASSES, buildNatRows, natHistRows, natSelect } from "../lib";
 import type { NatFilter } from "../lib";
 import type { NatData } from "../components/departures/types";
 
@@ -31,7 +31,7 @@ export function useNationalTable(
   );
   const classCounts = useMemo(() => {
     const out: Record<string, number> = {};
-    if (rows) for (const r of rows) out[FLOW_CLASSES[classIndex(r.cls)]] = (out[FLOW_CLASSES[classIndex(r.cls)]] || 0) + 1;
+    if (rows) for (const r of rows) out[FLOW_CLASSES[r.ci]] = (out[FLOW_CLASSES[r.ci]] || 0) + 1;
     return out;
   }, [rows]);
   return useMemo(

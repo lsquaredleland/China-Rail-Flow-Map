@@ -29,6 +29,8 @@ pub struct AtlasStation {
 pub struct AtlasTrainRef {
     pub code: String,
     pub class: String,
+    /// Bucket index into FLOW_CLASSES (0..=7: G D C S Z T K, else plain).
+    pub ci: usize,
     /// Train-export builds only (`CRFM_SCHEDULE`): one char per date of the
     /// top-level `calendar`, '1' = runs that day.
     #[serde(skip_serializing_if = "Option::is_none")]

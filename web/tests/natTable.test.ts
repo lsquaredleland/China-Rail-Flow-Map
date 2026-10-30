@@ -18,8 +18,8 @@ const have = ["atlas-v2-shared.json", "atlas-v2-schedules.json", "atlas-v2-natio
 describe("national table", () => {
   test("synthetic: first / last stop, +1 day arrival, sorting", () => {
     const tt = [
-      { code: "G1", class: "G", days: "11" },
-      { code: "K2", class: "K", days: "10" },
+      { code: "G1", class: "G", ci: 0, days: "11" },
+      { code: "K2", class: "K", ci: 6, days: "10" },
     ];
     const st = [{ zh: "甲", en: "A" }, { zh: "乙", en: "B" }];
     const sched = {

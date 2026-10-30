@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use analyze_rs::chains;
-use analyze_rs::cn::*;
+use analyze_rs::cn::{self, *};
 use analyze_rs::columns;
 use analyze_rs::entries;
 use analyze_rs::geo::*;
@@ -104,6 +104,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     let mut ok = check_formats(&shared, &out_map, &in_map, &out_t, &in_t);
     ok &= check_columns(dir, &out_t, &in_t);
     ok &= check_city_points(&shared);
+    ok &= check_train_classes(&shared);
     if ok {
         pack::expand_tables(&mut out_t, true);
         pack::expand_tables(&mut in_t, false);
@@ -257,6 +258,27 @@ fn check_city_points(shared: &Value) -> bool {
         bad_city_pts.len()
     );
     bad_city_pts.is_empty()
+}
+
+/// Every `train_table` row carries `ci` = `cn::classes::class_idx(class)`, the
+/// flow-class bucket the client reads instead of classifying itself.
+fn check_train_classes(shared: &Value) -> bool {
+    let rows = arr(&shared["train_table"]);
+    let mut mismatched = 0usize;
+    for r in &rows {
+        let cls = r.get("class").and_then(|c| c.as_str()).unwrap_or("");
+        let expected_ci = cn::classes::class_idx(cls);
+        let actual_ci = r.get("ci").and_then(|ci| ci.as_u64()).map(|ci| ci as usize);
+        if actual_ci != Some(expected_ci) {
+            mismatched += 1;
+        }
+    }
+    println!(
+        "AUDIT train classes: {} rows, {} mismatched",
+        rows.len(),
+        mismatched
+    );
+    !rows.is_empty() && mismatched == 0
 }
 
 /// Flow rows: `[sec, total, g, d, c, s, z, t, k, plain]`; the class columns

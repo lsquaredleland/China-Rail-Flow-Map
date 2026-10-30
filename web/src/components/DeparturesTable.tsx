@@ -10,7 +10,7 @@ import type {
   OriginVM,
   SrcVM,
 } from "../types";
-import { classIndex, FLOW_CLASSES, selectNatRows, sortNatRows } from "../lib";
+import { FLOW_CLASSES, selectNatRows, sortNatRows } from "../lib";
 import type { HistRow, NatSortKey } from "../lib";
 import Histograms from "./Histograms";
 import FilterToolbar from "./departures/FilterToolbar";
@@ -266,23 +266,23 @@ export default function DeparturesTable({
     if (destFilter) {
       for (const c of destFilter.calls) {
         if (!c.dep) continue;
-        const cls = FLOW_CLASSES[classIndex(c.dep.cls)];
+        const cls = FLOW_CLASSES[c.dep.ci];
         counts[cls] = (counts[cls] || 0) + 1;
       }
     } else if (srcFilter) {
       for (const c of srcFilter.inCalls) {
         if (!c.arr) continue;
-        const cls = FLOW_CLASSES[classIndex(c.arr.cls)];
+        const cls = FLOW_CLASSES[c.arr.ci];
         counts[cls] = (counts[cls] || 0) + 1;
       }
     } else if (direction === "in") {
       for (const a of cur.arrs) {
-        const cls = FLOW_CLASSES[classIndex(a.cls)];
+        const cls = FLOW_CLASSES[a.ci];
         counts[cls] = (counts[cls] || 0) + 1;
       }
     } else {
       for (const d of cur.deps) {
-        const cls = FLOW_CLASSES[classIndex(d.cls)];
+        const cls = FLOW_CLASSES[d.ci];
         counts[cls] = (counts[cls] || 0) + 1;
       }
     }

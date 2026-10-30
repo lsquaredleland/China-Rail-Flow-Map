@@ -11,7 +11,7 @@ import { pack } from "./fixture";
 const { atlas } = pack();
 const none: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
 const delta = (a: number[]) => a.map((v, i) => (i ? v - a[i - 1] : v));
-const tt = [{ code: "G1", class: "G" }, { code: "G2", class: "G" }, { code: "K3", class: "K" }, { code: "1461", class: "plain" }] as RawTrain[];
+const tt = [{ code: "G1", class: "G", ci: 0 }, { code: "G2", class: "G", ci: 0 }, { code: "K3", class: "K", ci: 6 }, { code: "1461", class: "plain", ci: 7 }] as RawTrain[];
 const rows = {
   dep: [[0], [0], [1], [2]],
   arr: [[1], [2], [2], [1]],
