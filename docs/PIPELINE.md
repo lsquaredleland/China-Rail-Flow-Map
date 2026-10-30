@@ -160,7 +160,16 @@ then `cargo build --release` there), so `shared.build.pipeline_tree` is the
 committed `pipeline/` tree and there is no `dirty` key; outside a git checkout
 pass `CRFM_PIPELINE_TREE=$(git rev-parse HEAD:pipeline)`. Make every
 `pipeline/` commit (goldens included) before the build that ships, because
-any of them changes the tree hash. Rebuild staged:
+any of them changes the tree hash.
+
+**One command:** `scripts/rebuild_pack.sh <out_dir> --audit` runs the atlas →
+atlaspack → audit part of the block below with these inputs (`R=<dir>` picks the
+router outputs). `node scripts/cmp_pack.mjs web/public/assets <out_dir>` then checks
+the result byte for byte, ignoring the `build` provenance block. A refactor must
+print `PASS: pack identical`. Local paths in scripts stay repo-relative, so a
+moved checkout keeps working.
+
+Rebuild staged:
 ```bash
 # staging/ is a local, git-ignored scratch area. env.sh exports CRFM_DATA_DIR and
 # CRFM_OUTPUT_DIR (a copy of data/ and of the GTFS output, staging/inputs/{data,output}),
