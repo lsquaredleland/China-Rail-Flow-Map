@@ -1464,7 +1464,9 @@ fn build_sections(
 /// Atomic sections of one direction: outbound, the global sections over
 /// the union of all selected cities; inbound, the same machinery indexed
 /// by dest city. `per_city[ci]` is city `ci`'s trains' leg keys, `rows`
-/// the direction's rows (deps / arrs) for the chain cuts.
+/// the direction's rows (deps / arrs) for the chain cuts. Both must come
+/// from the same direction as `inbound` (out: `works` / deps, in:
+/// `in_works` / arrs); nothing checks it.
 fn sections<'a>(
     m: &Model,
     it: &mut Interner,

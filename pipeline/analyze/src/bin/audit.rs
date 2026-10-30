@@ -43,6 +43,10 @@ fn int(v: &Value) -> i64 {
     v.as_i64().unwrap()
 }
 
+fn ints_of(a: &[Value]) -> Vec<i64> {
+    a.iter().map(|x| x.as_i64().unwrap()).collect()
+}
+
 fn ints(v: &Value) -> Vec<i64> {
     v.as_array()
         .map(|a| a.iter().map(|x| x.as_i64().unwrap()).collect())
@@ -57,9 +61,7 @@ fn int_rows(v: &Value) -> Vec<Vec<i64>> {
 
 /// Flow sections among a path's entries (throats, ids >= `n`, excluded).
 fn flow_len(path: &[Value], n: usize) -> i64 {
-    path.iter()
-        .filter(|v| pack::Entry::decode(v.as_i64().unwrap()).is_flow(n))
-        .count() as i64
+    pack::flow_count(&ints_of(path), n) as i64
 }
 
 /// The pack files `audit_pack` checks, loaded once.
