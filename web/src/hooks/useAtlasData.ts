@@ -31,7 +31,6 @@ import {
 } from "../lib";
 import {
   aboutText,
-  IN_MAP_URL,
   IN_TABLES_URL,
   NATIONAL_ENTRIES_URL,
   NATIONAL_FLOWS_URL,

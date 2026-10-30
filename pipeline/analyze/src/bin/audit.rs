@@ -5,13 +5,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use analyze_rs::chains;
-use analyze_rs::cn::*;
+use analyze_rs::cn::{self, *};
 use analyze_rs::columns;
 use analyze_rs::entries;
 use analyze_rs::geo::*;
 use analyze_rs::inputs;
 use analyze_rs::legs::*;
-use analyze_rs::model::*;
 use analyze_rs::names::*;
 use analyze_rs::pack;
 use analyze_rs::polyline::*;
@@ -43,6 +42,10 @@ fn int(v: &Value) -> i64 {
     v.as_i64().unwrap()
 }
 
+fn ints_of(a: &[Value]) -> Vec<i64> {
+    a.iter().map(|x| x.as_i64().unwrap()).collect()
+}
+
 fn ints(v: &Value) -> Vec<i64> {
     v.as_array()
         .map(|a| a.iter().map(|x| x.as_i64().unwrap()).collect())
@@ -57,9 +60,7 @@ fn int_rows(v: &Value) -> Vec<Vec<i64>> {
 
 /// Flow sections among a path's entries (throats, ids >= `n`, excluded).
 fn flow_len(path: &[Value], n: usize) -> i64 {
-    path.iter()
-        .filter(|v| pack::Entry::decode(v.as_i64().unwrap()).is_flow(n))
-        .count() as i64
+    pack::flow_count(&ints_of(path), n) as i64
 }
 
 /// The pack files `audit_pack` checks, loaded once.
@@ -103,6 +104,7 @@ fn audit_pack(dir: &Path) -> (bool, BTreeMap<String, i64>) {
     let mut ok = check_formats(&shared, &out_map, &in_map, &out_t, &in_t);
     ok &= check_columns(dir, &out_t, &in_t);
     ok &= check_city_points(&shared);
+    ok &= check_train_classes(&shared);
     if ok {
         pack::expand_tables(&mut out_t, true);
         pack::expand_tables(&mut in_t, false);
@@ -256,6 +258,27 @@ fn check_city_points(shared: &Value) -> bool {
         bad_city_pts.len()
     );
     bad_city_pts.is_empty()
+}
+
+/// Every `train_table` row carries `ci` = `cn::classes::class_idx(class)`, the
+/// flow-class bucket the client reads instead of classifying itself.
+fn check_train_classes(shared: &Value) -> bool {
+    let rows = arr(&shared["train_table"]);
+    let mut mismatched = 0usize;
+    for r in &rows {
+        let cls = r.get("class").and_then(|c| c.as_str()).unwrap_or("");
+        let expected_ci = cn::classes::class_idx(cls);
+        let actual_ci = r.get("ci").and_then(|ci| ci.as_u64()).map(|ci| ci as usize);
+        if actual_ci != Some(expected_ci) {
+            mismatched += 1;
+        }
+    }
+    println!(
+        "AUDIT train classes: {} rows, {} mismatched",
+        rows.len(),
+        mismatched
+    );
+    !rows.is_empty() && mismatched == 0
 }
 
 /// Flow rows: `[sec, total, g, d, c, s, z, t, k, plain]`; the class columns
@@ -1865,42 +1888,50 @@ fn run_goldens_gate(counters: &BTreeMap<String, i64>, partial: bool) -> bool {
     )
 }
 
-fn main() {
-    let mut pack: Option<(bool, BTreeMap<String, i64>)> = None;
-    if let Ok(dir) = env::var("AUDIT_PACK_DIR") {
-        let r = audit_pack(Path::new(&dir));
-        if env::args().any(|a| a == "--pack-only") {
-            let ok = r.0 & run_goldens_gate(&r.1, true);
-            std::process::exit(if ok { 0 } else { 1 });
+/// Read-only state every phase shares: the loaded inputs plus what is derived
+/// from them once (per-train cleaned names and cities).
+struct Ctx<'a> {
+    inp: &'a inputs::Inputs,
+    train_names: Vec<Vec<String>>,
+    train_cities: Vec<Vec<String>>,
+}
+
+impl<'a> Ctx<'a> {
+    fn new(inp: &'a inputs::Inputs) -> Ctx<'a> {
+        // ---- precompute per-train names/cities ----
+        let train_names: Vec<Vec<String>> = inp
+            .trains
+            .iter()
+            .map(|t| t.stops.iter().map(|s| clean(&s.name)).collect())
+            .collect();
+        let train_cities: Vec<Vec<String>> = train_names
+            .iter()
+            .map(|ns| ns.iter().map(|n| city_of(n)).collect())
+            .collect();
+
+        Ctx {
+            inp,
+            train_names,
+            train_cities,
         }
-        pack = Some(r);
     }
-    let inp = inputs::load();
-    let override_map = &inp.override_map;
-    let trains = &inp.trains;
-    let d1_len = inp.d1_len;
-    let path_map = &inp.path_map;
-    let coords = &inp.coords;
-    let en = |c: &str| -> String { inp.en(c) };
-    let station_pt = |name: &str| -> Option<[f64; 2]> { inp.stations.point(name) };
 
-    let seg_coords = |ids: &[i64]| -> Vec<[f64; 2]> {
+    fn station_pt(&self, name: &str) -> Option<[f64; 2]> {
+        self.inp.stations.point(name)
+    }
+
+    fn seg_coords(&self, ids: &[i64]) -> Vec<[f64; 2]> {
         ids.iter()
-            .filter_map(|id| coords.get(id).copied())
+            .filter_map(|id| self.inp.coords.get(id).copied())
             .collect()
-    };
+    }
+}
 
-    // ---- precompute per-train names/cities ----
-    let train_names: Vec<Vec<String>> = trains
-        .iter()
-        .map(|t| t.stops.iter().map(|s| clean(&s.name)).collect())
-        .collect();
-    let train_cities: Vec<Vec<String>> = train_names
-        .iter()
-        .map(|ns| ns.iter().map(|n| city_of(n)).collect())
-        .collect();
+// ---- rank cities by outbound trains ----
+fn rank_cities(cx: &Ctx) -> Vec<String> {
+    let train_cities = &cx.train_cities;
+    let en = |c: &str| -> String { cx.inp.en(c) };
 
-    // ---- rank cities by outbound trains ----
     let mut outbound_count: HashMap<String, u64> = HashMap::new();
     for cities in train_cities.iter() {
         let mut seen: HashSet<&str> = HashSet::new();
@@ -1928,8 +1959,16 @@ fn main() {
     for (i, (c, n)) in ranked.iter().take(top_n).enumerate() {
         println!("  {:>2}. {} {} - {}", i + 1, c, en(c), n);
     }
+    selected
+}
 
-    // ---- global station stop counts per city -> principal points ----
+// ---- global station stop counts per city -> principal points ----
+fn principal_points(cx: &Ctx) -> HashMap<String, [f64; 2]> {
+    let trains = &cx.inp.trains;
+    let train_names = &cx.train_names;
+    let train_cities = &cx.train_cities;
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+
     let mut city_stations: HashMap<String, HashMap<String, (u64, usize)>> = HashMap::new();
     let mut cs_counter = 0usize;
     for (ti, _) in trains.iter().enumerate() {
@@ -1960,116 +1999,159 @@ fn main() {
             city_pt.insert(cty.clone(), p);
         }
     }
+    city_pt
+}
 
-    // ---- corridor graph (shared by all cities) ----
-    let pair_len: HashMap<(String, String), f64> = path_map
-        .iter()
-        .filter(|(_, (_, segs))| segs.iter().any(|s| s.len() >= 2))
-        .map(|(k, (_, segs))| {
-            let l: f64 = segs
-                .iter()
-                .map(|s| {
-                    let c = seg_coords(s);
-                    c.windows(2).map(|w| hav_km_ll(w[0], w[1])).sum::<f64>()
-                })
-                .sum();
-            (k.clone(), l)
-        })
-        .collect();
-    let mut adj_pure: CorridorAdj = HashMap::new();
-    let mut adj: CorridorAdj = HashMap::new();
-    let mut pair_lens: Vec<(&(String, String), &f64)> = pair_len.iter().collect();
-    pair_lens.sort_by(|a, b| a.0.cmp(b.0));
-    for (k, l) in pair_lens {
-        adj_pure
-            .entry(k.0.clone())
-            .or_default()
-            .push((k.1.clone(), Some(k.clone()), *l));
-        adj_pure
-            .entry(k.1.clone())
-            .or_default()
-            .push((k.0.clone(), Some(k.clone()), *l));
-        adj.entry(k.0.clone())
-            .or_default()
-            .push((k.1.clone(), Some(k.clone()), *l));
-        adj.entry(k.1.clone())
-            .or_default()
-            .push((k.0.clone(), Some(k.clone()), *l));
-    }
-    {
-        let mut all_stations: HashSet<String> = HashSet::new();
-        for (a, b) in path_map.keys() {
-            all_stations.insert(a.clone());
-            all_stations.insert(b.clone());
+// ---- corridor graph (shared by all cities) ----
+struct Corridor {
+    pair_len: HashMap<(String, String), f64>,
+    adj_pure: CorridorAdj,
+    adj: CorridorAdj,
+}
+
+impl Corridor {
+    fn build(cx: &Ctx) -> Corridor {
+        let path_map = &cx.inp.path_map;
+        let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+        let seg_coords = |ids: &[i64]| -> Vec<[f64; 2]> { cx.seg_coords(ids) };
+
+        let pair_len: HashMap<(String, String), f64> = path_map
+            .iter()
+            .filter(|(_, (_, segs))| segs.iter().any(|s| s.len() >= 2))
+            .map(|(k, (_, segs))| {
+                let l: f64 = segs
+                    .iter()
+                    .map(|s| {
+                        let c = seg_coords(s);
+                        c.windows(2).map(|w| hav_km_ll(w[0], w[1])).sum::<f64>()
+                    })
+                    .sum();
+                (k.clone(), l)
+            })
+            .collect();
+        let mut adj_pure: CorridorAdj = HashMap::new();
+        let mut adj: CorridorAdj = HashMap::new();
+        let mut pair_lens: Vec<(&(String, String), &f64)> = pair_len.iter().collect();
+        pair_lens.sort_by(|a, b| a.0.cmp(b.0));
+        for (k, l) in pair_lens {
+            adj_pure
+                .entry(k.0.clone())
+                .or_default()
+                .push((k.1.clone(), Some(k.clone()), *l));
+            adj_pure
+                .entry(k.1.clone())
+                .or_default()
+                .push((k.0.clone(), Some(k.clone()), *l));
+            adj.entry(k.0.clone())
+                .or_default()
+                .push((k.1.clone(), Some(k.clone()), *l));
+            adj.entry(k.1.clone())
+                .or_default()
+                .push((k.0.clone(), Some(k.clone()), *l));
         }
-        let mut by_city: HashMap<String, Vec<String>> = HashMap::new();
-        for s in all_stations.iter() {
-            by_city.entry(city_of(s)).or_default().push(s.clone());
-        }
-        let mut by_city: Vec<(String, Vec<String>)> = by_city.into_iter().collect();
-        by_city.sort();
-        for (_, sts) in by_city.iter_mut() {
-            sts.sort();
-            if sts.len() < 2 || sts.len() > 12 {
-                continue;
+        {
+            let mut all_stations: HashSet<String> = HashSet::new();
+            for (a, b) in path_map.keys() {
+                all_stations.insert(a.clone());
+                all_stations.insert(b.clone());
             }
-            for i in 0..sts.len() {
-                for j in (i + 1)..sts.len() {
-                    if let (Some(p), Some(q)) = (station_pt(&sts[i]), station_pt(&sts[j])) {
-                        let w = hav_km_ll([p[1], p[0]], [q[1], q[0]]) * 2.0 + 2.0;
-                        if w > 60.0 {
-                            continue;
+            let mut by_city: HashMap<String, Vec<String>> = HashMap::new();
+            for s in all_stations.iter() {
+                by_city.entry(city_of(s)).or_default().push(s.clone());
+            }
+            let mut by_city: Vec<(String, Vec<String>)> = by_city.into_iter().collect();
+            by_city.sort();
+            for (_, sts) in by_city.iter_mut() {
+                sts.sort();
+                if sts.len() < 2 || sts.len() > 12 {
+                    continue;
+                }
+                for i in 0..sts.len() {
+                    for j in (i + 1)..sts.len() {
+                        if let (Some(p), Some(q)) = (station_pt(&sts[i]), station_pt(&sts[j])) {
+                            let w = hav_km_ll([p[1], p[0]], [q[1], q[0]]) * 2.0 + 2.0;
+                            if w > 60.0 {
+                                continue;
+                            }
+                            adj.entry(sts[i].clone())
+                                .or_default()
+                                .push((sts[j].clone(), None, w));
+                            adj.entry(sts[j].clone())
+                                .or_default()
+                                .push((sts[i].clone(), None, w));
                         }
-                        adj.entry(sts[i].clone())
-                            .or_default()
-                            .push((sts[j].clone(), None, w));
-                        adj.entry(sts[j].clone())
-                            .or_default()
-                            .push((sts[i].clone(), None, w));
                     }
                 }
             }
         }
+        Corridor {
+            pair_len,
+            adj_pure,
+            adj,
+        }
     }
-    let mut leg_cache: HashMap<(String, String), Option<Vec<Vec<i64>>>> = HashMap::new();
-    let mut variant_cache: VariantCache = HashMap::new();
-    let mut variant_stats: (u64, u64) = (0, 0);
+}
 
-    // ---- interning tables (filled during assembly) ----
-    let _city_table: Vec<AtlasCity> = Vec::new();
-    let _city_idx: HashMap<String, i64> = HashMap::new();
-    let _station_table: Vec<AtlasStation> = Vec::new();
-    let _station_idx: HashMap<String, i64> = HashMap::new();
-    let _train_table: Vec<AtlasTrainRef> = Vec::new();
-    let _train_idx: HashMap<(String, String), usize> = HashMap::new();
+#[derive(Default)]
+struct LegCaches {
+    leg_cache: HashMap<(String, String), Option<Vec<Vec<i64>>>>,
+    variant_cache: VariantCache,
+    variant_stats: (u64, u64),
+}
 
-    // ---- per-city work ----
-    // Mirrors atlas.rs's data model; the audit reads only the flow fields.
-    #[allow(dead_code)]
-    struct DepRaw {
-        code: String,
-        class: String,
-        from_station: String,
-        depart: String,
-        to_station: String,
-        to_city: String,
-        arrive: String,
-        dur: Option<i64>,
-        stops_after: u64,
-        set: u8,
-    }
-    #[allow(dead_code)]
-    struct CityWork {
-        zh: String,
-        outbound: u64,
-        fully_tracked: u64,
-        legs: Vec<((String, String, String), u64)>,
-        dests: Vec<(String, DestStats)>,
-        deps: Vec<DepRaw>,
-        home_pt: [f64; 2],
-        train_leg_keys: Vec<Vec<(String, String, String)>>,
-        train_cls: Vec<usize>,
-    }
+// ---- per-city work ----
+// Mirrors atlas.rs's data model; the audit reads only the flow fields.
+#[allow(dead_code)]
+struct DepRaw {
+    code: String,
+    class: String,
+    from_station: String,
+    depart: String,
+    to_station: String,
+    to_city: String,
+    arrive: String,
+    dur: Option<i64>,
+    stops_after: u64,
+    set: u8,
+}
+#[allow(dead_code)]
+struct CityWork {
+    zh: String,
+    outbound: u64,
+    fully_tracked: u64,
+    legs: Vec<((String, String, String), u64)>,
+    dests: Vec<(String, DestStats)>,
+    deps: Vec<DepRaw>,
+    home_pt: [f64; 2],
+    train_leg_keys: Vec<Vec<(String, String, String)>>,
+    train_cls: Vec<usize>,
+}
+struct OutboundWorks {
+    works: Vec<CityWork>,
+    throat_stations: HashSet<String>,
+}
+
+fn outbound_works(
+    cx: &Ctx,
+    selected: &[String],
+    city_pt: &HashMap<String, [f64; 2]>,
+    corr: &Corridor,
+    lc: &mut LegCaches,
+) -> OutboundWorks {
+    let override_map = &cx.inp.override_map;
+    let trains = &cx.inp.trains;
+    let d1_len = cx.inp.d1_len;
+    let path_map = &cx.inp.path_map;
+    let train_names = &cx.train_names;
+    let train_cities = &cx.train_cities;
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+    let pair_len = &corr.pair_len;
+    let adj_pure = &corr.adj_pure;
+    let adj = &corr.adj;
+    let leg_cache = &mut lc.leg_cache;
+    let variant_cache = &mut lc.variant_cache;
+    let variant_stats = &mut lc.variant_stats;
+
     let mut works: Vec<CityWork> = Vec::new();
     let mut throat_stations: HashSet<String> = HashSet::new();
     for home_city in selected.iter() {
@@ -2116,7 +2198,7 @@ fn main() {
                 while last_k < j {
                     let (a, b) = (names[last_k].clone(), names[last_k + 1].clone());
                     if a != b {
-                        match leg_km(override_map, &pair_len, t, &a, &b) {
+                        match leg_km(override_map, pair_len, t, &a, &b) {
                             Some(l) => cum_km += l,
                             None => cum_ok = false,
                         }
@@ -2170,13 +2252,13 @@ fn main() {
             let r = resolve_leg3(
                 k,
                 path_map,
-                &adj_pure,
-                &adj,
-                &pair_len,
+                adj_pure,
+                adj,
+                pair_len,
                 &station_pt,
-                &mut leg_cache,
-                &mut variant_cache,
-                &mut variant_stats,
+                leg_cache,
+                variant_cache,
+                variant_stats,
             );
             resolved_flags.insert(k.clone(), r.is_some());
             legs_vec.push((k.clone(), *n));
@@ -2216,8 +2298,29 @@ fn main() {
             train_cls,
         });
     }
+    OutboundWorks {
+        works,
+        throat_stations,
+    }
+}
 
-    // ---- global atomic sections over the union of all selected cities ----
+// ---- global atomic sections over the union of all selected cities ----
+struct GlobalSections {
+    station_grid: HashMap<(i32, i32), Vec<[f64; 2]>>,
+    station_pts_all: HashMap<String, [f64; 2]>,
+    sig_list: Vec<chains::Sig>,
+    section_chains: Vec<(u32, Vec<i64>)>,
+}
+
+fn global_atomic_sections(cx: &Ctx, out: &OutboundWorks, lc: &LegCaches) -> GlobalSections {
+    let coords = &cx.inp.coords;
+    let path_map = &cx.inp.path_map;
+    let station_pt = |name: &str| -> Option<[f64; 2]> { cx.station_pt(name) };
+    let works = &out.works;
+    let throat_stations = &out.throat_stations;
+    let leg_cache = &lc.leg_cache;
+    let variant_cache = &lc.variant_cache;
+
     let mut station_grid: HashMap<(i32, i32), Vec<[f64; 2]>> = HashMap::new();
     for nm in throat_stations.iter() {
         if let Some(p) = station_pt(nm) {
@@ -2252,7 +2355,7 @@ fn main() {
         for (k, (legs, cidx)) in w.train_leg_keys.iter().zip(w.train_cls.iter()).enumerate() {
             let mut eset: HashSet<(i64, i64)> = HashSet::new();
             for key in legs.iter() {
-                let seqs = match leg_seqs(key, &leg_cache, &variant_cache) {
+                let seqs = match leg_seqs(key, leg_cache, variant_cache) {
                     Some(s) => s,
                     _ => continue,
                 };
@@ -2303,16 +2406,6 @@ fn main() {
             }
         }
     }
-    let nearest_station = |pt: [f64; 2]| -> String {
-        let mut best: Option<(&String, f64)> = None;
-        for (nm, sp) in station_pts_all.iter() {
-            let d = hav_km_ll(pt, *sp);
-            if d < 5.0 && best.is_none_or(|(bn, bd)| d < bd || (d == bd && nm < bn)) {
-                best = Some((nm, d));
-            }
-        }
-        best.map(|(nm, _)| nm.clone()).unwrap_or_default()
-    };
     let mut sections: Vec<AtlasSection> = Vec::new();
     let mut flows_per_city: Vec<Vec<[usize; 2]>> = vec![Vec::new(); works.len()];
     let mut total_sec_pts = 0usize;
@@ -2346,11 +2439,59 @@ fn main() {
         f.sort_by(|a, b| b[1].cmp(&a[1]));
     }
     println!("sections: {} points: {}", sections.len(), total_sec_pts);
+    GlobalSections {
+        station_grid,
+        station_pts_all,
+        sig_list,
+        section_chains,
+    }
+}
 
-    // ================= AUDIT (standalone bin) =================
-    // chain-level flows from signatures
-    let n_chains = section_chains.len();
-    // dropped chains: geometry missing -> counts lost in JSON output
+struct Model<'a> {
+    cx: &'a Ctx<'a>,
+    out: OutboundWorks,
+    sec: GlobalSections,
+    lc: LegCaches,
+}
+
+impl<'a> Model<'a> {
+    fn near_station(&self, pt: &[f64; 2]) -> bool {
+        let gx = (pt[0] * 50.0).floor() as i32;
+        let gy = (pt[1] * 50.0).floor() as i32;
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                if let Some(cell) = self.sec.station_grid.get(&(gx + dx, gy + dy)) {
+                    for c in cell {
+                        if hav_km_ll(*pt, *c) < 1.3 {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn nearest_station(&self, pt: [f64; 2]) -> String {
+        let mut best: Option<(&String, f64)> = None;
+        for (nm, sp) in self.sec.station_pts_all.iter() {
+            let d = hav_km_ll(pt, *sp);
+            if d < 5.0 && best.is_none_or(|(bn, bd)| d < bd || (d == bd && nm < bn)) {
+                best = Some((nm, d));
+            }
+        }
+        best.map(|(nm, _)| nm.clone()).unwrap_or_default()
+    }
+}
+
+// ================= AUDIT (standalone bin) =================
+// chain-level flows from signatures
+// dropped chains: geometry missing -> counts lost in JSON output
+fn audit_dropped_chains(m: &Model) -> (usize, u64) {
+    let coords = &m.cx.inp.coords;
+    let section_chains = &m.sec.section_chains;
+    let sig_list = &m.sec.sig_list;
+
     let mut dropped_flow = 0u64;
     let mut dropped_chains = 0usize;
     for (sid, chain) in section_chains.iter() {
@@ -2366,6 +2507,19 @@ fn main() {
         "AUDIT dropped chains (no geometry): {} (flow lost {})",
         dropped_chains, dropped_flow
     );
+    (dropped_chains, dropped_flow)
+}
+
+// edge -> chain
+// per-train dedup recount vs signature flows
+fn audit_dedup_recount(m: &Model) -> HashMap<(i64, i64), usize> {
+    let coords = &m.cx.inp.coords;
+    let works = &m.out.works;
+    let section_chains = &m.sec.section_chains;
+    let sig_list = &m.sec.sig_list;
+    let leg_cache = &m.lc.leg_cache;
+    let variant_cache = &m.lc.variant_cache;
+
     // edge -> chain
     let mut edge_to_chain: HashMap<(i64, i64), usize> = HashMap::new();
     for (ci2, (_, chain)) in section_chains.iter().enumerate() {
@@ -2396,7 +2550,7 @@ fn main() {
         for legs in w.train_leg_keys.iter() {
             let mut hit: HashSet<usize> = HashSet::new();
             for key in legs.iter() {
-                if let Some(seqs) = leg_seqs(key, &leg_cache, &variant_cache) {
+                if let Some(seqs) = leg_seqs(key, leg_cache, variant_cache) {
                     for s in seqs.iter() {
                         for win in s.windows(2) {
                             let (c1, c2) = match (coords.get(&win[0]), coords.get(&win[1])) {
@@ -2404,7 +2558,7 @@ fn main() {
                                 _ => continue,
                             };
                             let mid = [(c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0];
-                            if near_station(&mid) {
+                            if m.near_station(&mid) {
                                 continue;
                             }
                             let e = if win[0] < win[1] {
@@ -2447,129 +2601,178 @@ fn main() {
         "AUDIT dedup total differing chains: {}",
         total_diff_sections
     );
-    // decompose the single worst chain overall
-    {
-        let mut best: Option<(usize, usize, i64, u64, u64)> = None; // ci, chain, diff, sig, recount
-        for (ci, w) in works.iter().enumerate() {
-            let mut sig_flow: HashMap<usize, u64> = HashMap::new();
-            for (ch, (sid, _)) in section_chains.iter().enumerate() {
-                for (c2, n, _) in sig_list[*sid as usize].iter() {
-                    if *c2 == ci {
-                        sig_flow.insert(ch, *n);
-                    }
+    let _ = worst;
+    edge_to_chain
+}
+
+// decompose the single worst chain overall
+fn audit_worst_chain(m: &Model, edge_to_chain: &HashMap<(i64, i64), usize>) {
+    let coords = &m.cx.inp.coords;
+    let works = &m.out.works;
+    let section_chains = &m.sec.section_chains;
+    let sig_list = &m.sec.sig_list;
+    let leg_cache = &m.lc.leg_cache;
+    let variant_cache = &m.lc.variant_cache;
+
+    let mut best: Option<(usize, usize, i64, u64, u64)> = None; // ci, chain, diff, sig, recount
+    for (ci, w) in works.iter().enumerate() {
+        let mut sig_flow: HashMap<usize, u64> = HashMap::new();
+        for (ch, (sid, _)) in section_chains.iter().enumerate() {
+            for (c2, n, _) in sig_list[*sid as usize].iter() {
+                if *c2 == ci {
+                    sig_flow.insert(ch, *n);
                 }
             }
-            let mut recount: HashMap<usize, u64> = HashMap::new();
-            let mut touches: HashMap<usize, HashMap<usize, u32>> = HashMap::new(); // chain -> train idx -> legs touching
-            for (ti2, legs) in w.train_leg_keys.iter().enumerate() {
-                let mut hit: HashMap<usize, u32> = HashMap::new();
-                for key in legs.iter() {
-                    if let Some(seqs) = leg_seqs(key, &leg_cache, &variant_cache) {
-                        for s2 in seqs.iter() {
-                            for win in s2.windows(2) {
-                                let (c1, c2b) = match (coords.get(&win[0]), coords.get(&win[1])) {
-                                    (Some(x), Some(y)) => (*x, *y),
-                                    _ => continue,
-                                };
-                                let mid = [(c1[0] + c2b[0]) / 2.0, (c1[1] + c2b[1]) / 2.0];
-                                if near_station(&mid) {
-                                    continue;
-                                }
-                                let e = if win[0] < win[1] {
-                                    (win[0], win[1])
-                                } else {
-                                    (win[1], win[0])
-                                };
-                                if let Some(ch) = edge_to_chain.get(&e) {
-                                    *hit.entry(*ch).or_insert(0) += 1;
-                                }
+        }
+        let mut recount: HashMap<usize, u64> = HashMap::new();
+        let mut touches: HashMap<usize, HashMap<usize, u32>> = HashMap::new(); // chain -> train idx -> legs touching
+        for (ti2, legs) in w.train_leg_keys.iter().enumerate() {
+            let mut hit: HashMap<usize, u32> = HashMap::new();
+            for key in legs.iter() {
+                if let Some(seqs) = leg_seqs(key, leg_cache, variant_cache) {
+                    for s2 in seqs.iter() {
+                        for win in s2.windows(2) {
+                            let (c1, c2b) = match (coords.get(&win[0]), coords.get(&win[1])) {
+                                (Some(x), Some(y)) => (*x, *y),
+                                _ => continue,
+                            };
+                            let mid = [(c1[0] + c2b[0]) / 2.0, (c1[1] + c2b[1]) / 2.0];
+                            if m.near_station(&mid) {
+                                continue;
+                            }
+                            let e = if win[0] < win[1] {
+                                (win[0], win[1])
+                            } else {
+                                (win[1], win[0])
+                            };
+                            if let Some(ch) = edge_to_chain.get(&e) {
+                                *hit.entry(*ch).or_insert(0) += 1;
                             }
                         }
                     }
                 }
-                for ch in hit.keys() {
-                    *recount.entry(*ch).or_insert(0) += 1;
-                }
-                for (ch, cnt) in hit.iter() {
-                    touches.entry(*ch).or_default().insert(ti2, *cnt);
-                }
             }
-            let keys: HashSet<usize> = sig_flow.keys().chain(recount.keys()).copied().collect();
-            for ch in keys {
-                let a = sig_flow.get(&ch).copied().unwrap_or(0);
-                let b = recount.get(&ch).copied().unwrap_or(0);
-                let df = (a as i64 - b as i64).abs();
-                if best.is_none_or(|(_, _, bd, _, _)| df > bd) {
-                    best = Some((ci, ch, df, a, b));
-                }
+            for ch in hit.keys() {
+                *recount.entry(*ch).or_insert(0) += 1;
             }
-            if ci == 4 {
-                // Changsha deep-dive printed below via best if it is the worst
+            for (ch, cnt) in hit.iter() {
+                touches.entry(*ch).or_default().insert(ti2, *cnt);
             }
-            let _ = touches;
         }
-        if let Some((ci, ch, df, a, b)) = best {
-            let w = &works[ci];
-            let chain = &section_chains[ch].1;
-            let p0 = coords.get(&chain[0]).copied().unwrap_or([0.0, 0.0]);
-            let p1 = coords
-                .get(chain.last().unwrap())
-                .copied()
-                .unwrap_or([0.0, 0.0]);
-            println!("WORST chain: origin {} chain {} sig {} recount {} diff {} ends near {} .. {} nodes {}",
-                w.zh, ch, a, b, df, nearest_station(p0), nearest_station(p1), chain.len());
-            // which legs contribute, and how many of their trains touch the chain in >1 leg
-            let chain_edges: HashSet<(i64, i64)> = chain
-                .windows(2)
-                .map(|w2| {
-                    if w2[0] < w2[1] {
-                        (w2[0], w2[1])
-                    } else {
-                        (w2[1], w2[0])
-                    }
-                })
-                .collect();
-            let mut legstat: HashMap<(String, String, String), (u64, u64)> = HashMap::new(); // leg -> (trains using leg, trains whose THIS leg touches chain)
-            for legs in w.train_leg_keys.iter() {
-                let mut counted: HashSet<(String, String, String)> = HashSet::new();
-                for key in legs.iter() {
-                    if counted.contains(key) {
-                        continue;
-                    }
-                    let touch = if let Some(seqs) = leg_seqs(key, &leg_cache, &variant_cache) {
-                        seqs.iter().any(|s2| {
-                            s2.windows(2).any(|win| {
-                                let e = if win[0] < win[1] {
-                                    (win[0], win[1])
-                                } else {
-                                    (win[1], win[0])
-                                };
-                                chain_edges.contains(&e)
-                            })
-                        })
-                    } else {
-                        false
-                    };
-                    let e = legstat.entry(key.clone()).or_insert((0, 0));
-                    e.0 += 1;
-                    if touch {
-                        e.1 += 1;
-                    }
-                    counted.insert(key.clone());
+        let mut keys: Vec<usize> = sig_flow.keys().chain(recount.keys()).copied().collect();
+        keys.sort_unstable();
+        keys.dedup();
+        for ch in keys {
+            let a = sig_flow.get(&ch).copied().unwrap_or(0);
+            let b = recount.get(&ch).copied().unwrap_or(0);
+            let df = (a as i64 - b as i64).abs();
+            // Deterministic selection: largest diff first; tie-break by smallest chain id,
+            // then smallest city index. The old choice depended on HashSet iteration order
+            // and picked an arbitrary chain on ties.
+            let is_better = match best {
+                None => true,
+                Some((b_ci, b_ch, bd, _, _)) => {
+                    df > bd || (df == bd && (ch < b_ch || (ch == b_ch && ci < b_ci)))
                 }
+            };
+            if is_better {
+                best = Some((ci, ch, df, a, b));
             }
-            let mut rows: Vec<_> = legstat.into_iter().filter(|(_, (_, t))| *t > 0).collect();
-            rows.sort_by_key(|x| std::cmp::Reverse(x.1 .1));
-            for (k, (tot, t)) in rows.iter().take(10) {
-                println!(
-                    "   leg {} -> {} trains-on-leg {} touching-chain {}",
-                    k.0, k.1, tot, t
-                );
+        }
+        if ci == 4 {
+            // Changsha deep-dive printed below via best if it is the worst
+        }
+        let _ = touches;
+    }
+    if let Some((ci, ch, df, a, b)) = best {
+        let w = &works[ci];
+        let chain = &section_chains[ch].1;
+        let p0 = coords.get(&chain[0]).copied().unwrap_or([0.0, 0.0]);
+        let p1 = coords
+            .get(chain.last().unwrap())
+            .copied()
+            .unwrap_or([0.0, 0.0]);
+        println!(
+            "WORST chain: origin {} chain {} sig {} recount {} diff {} ends near {} .. {} nodes {}",
+            w.zh,
+            ch,
+            a,
+            b,
+            df,
+            m.nearest_station(p0),
+            m.nearest_station(p1),
+            chain.len()
+        );
+        // which legs contribute, and how many of their trains touch the chain in >1 leg
+        let chain_edges: HashSet<(i64, i64)> = chain
+            .windows(2)
+            .map(|w2| {
+                if w2[0] < w2[1] {
+                    (w2[0], w2[1])
+                } else {
+                    (w2[1], w2[0])
+                }
+            })
+            .collect();
+        let mut legstat: HashMap<(String, String, String), (u64, u64)> = HashMap::new(); // leg -> (trains using leg, trains whose THIS leg touches chain)
+        for legs in w.train_leg_keys.iter() {
+            let mut counted: HashSet<(String, String, String)> = HashSet::new();
+            for key in legs.iter() {
+                if counted.contains(key) {
+                    continue;
+                }
+                let touch = if let Some(seqs) = leg_seqs(key, leg_cache, variant_cache) {
+                    seqs.iter().any(|s2| {
+                        s2.windows(2).any(|win| {
+                            let e = if win[0] < win[1] {
+                                (win[0], win[1])
+                            } else {
+                                (win[1], win[0])
+                            };
+                            chain_edges.contains(&e)
+                        })
+                    })
+                } else {
+                    false
+                };
+                let e = legstat.entry(key.clone()).or_insert((0, 0));
+                e.0 += 1;
+                if touch {
+                    e.1 += 1;
+                }
+                counted.insert(key.clone());
             }
+        }
+        let mut rows: Vec<_> = legstat.into_iter().filter(|(_, (_, t))| *t > 0).collect();
+        // Deterministic sort: largest touching-chain first, then largest trains-on-leg,
+        // then alphabetical on leg key (k.0, k.1, k.2).
+        // The old sort_by_key only compared touching-chain, leaving ties in arbitrary
+        // HashMap iteration order.
+        rows.sort_by(|a, b| {
+            b.1 .1
+                .cmp(&a.1 .1)
+                .then_with(|| b.1 .0.cmp(&a.1 .0))
+                .then_with(|| a.0.cmp(&b.0))
+        });
+        for (k, (tot, t)) in rows.iter().take(10) {
+            println!(
+                "   leg {} -> {} trains-on-leg {} touching-chain {}",
+                k.0, k.1, tot, t
+            );
         }
     }
-    // junction balance: a section may not carry more than all other incident
-    // sections at a junction plus trains terminating at that junction's city
+}
+
+// junction balance: a section may not carry more than all other incident
+// sections at a junction plus trains terminating at that junction's city
+fn audit_junction_balance(m: &Model) {
+    let coords = &m.cx.inp.coords;
+    let works = &m.out.works;
+    let section_chains = &m.sec.section_chains;
+    let sig_list = &m.sec.sig_list;
+    let variant_stats = m.lc.variant_stats;
+    let n_chains = section_chains.len();
+
     let mut node_chains: HashMap<i64, Vec<usize>> = HashMap::new();
     for (ch, (_, chain)) in section_chains.iter().enumerate() {
         node_chains.entry(chain[0]).or_default().push(ch);
@@ -2578,6 +2781,13 @@ fn main() {
             .or_default()
             .push(ch);
     }
+    // Deterministic iteration: sort node_chains by node id so junction flags are evaluated
+    // and printed in stable (city, node id) order. The old iteration order over HashMap
+    // was arbitrary, causing different subsets of flags to be printed across runs.
+    let mut node_chains_sorted: Vec<(i64, &Vec<usize>)> =
+        node_chains.iter().map(|(&k, v)| (k, v)).collect();
+    node_chains_sorted.sort_unstable_by_key(|&(node, _)| node);
+
     let mut flags = 0usize;
     for (ci, w) in works.iter().enumerate() {
         let term_by_city: HashMap<String, u64> = w
@@ -2593,7 +2803,7 @@ fn main() {
                 }
             }
         }
-        for (node, chs) in node_chains.iter() {
+        for &(node, chs) in &node_chains_sorted {
             if chs.len() < 2 {
                 continue;
             }
@@ -2601,15 +2811,15 @@ fn main() {
                 .iter()
                 .map(|ch| sig_flow.get(ch).copied().unwrap_or(0))
                 .collect();
-            let m = *counts.iter().max().unwrap_or(&0);
-            if m == 0 {
+            let m_val = *counts.iter().max().unwrap_or(&0);
+            if m_val == 0 {
                 continue;
             }
-            let s: u64 = counts.iter().sum::<u64>() - m;
+            let s: u64 = counts.iter().sum::<u64>() - m_val;
             // termination credit: city of nearest station to this junction
-            let credit = match coords.get(node) {
+            let credit = match coords.get(&node) {
                 Some(pt) => {
-                    let nm = nearest_station(*pt);
+                    let nm = m.nearest_station(*pt);
                     if nm.is_empty() {
                         0
                     } else {
@@ -2623,12 +2833,12 @@ fn main() {
                 }
                 None => 0,
             };
-            if m > s + credit + 2 {
+            if m_val > s + credit + 2 {
                 flags += 1;
                 if flags <= 15 {
                     println!(
                         "AUDIT junction flag {}: node {} max {} others {} credit {}",
-                        w.zh, node, m, s, credit
+                        w.zh, node, m_val, s, credit
                     );
                 }
             }
@@ -2640,6 +2850,38 @@ fn main() {
     );
     println!("AUDIT junction flags total: {}", flags);
     println!("AUDIT chains total: {}", n_chains);
+}
+
+fn main() {
+    let mut pack: Option<(bool, BTreeMap<String, i64>)> = None;
+    if let Ok(dir) = env::var("AUDIT_PACK_DIR") {
+        let r = audit_pack(Path::new(&dir));
+        if env::args().any(|a| a == "--pack-only") {
+            let ok = r.0 & run_goldens_gate(&r.1, true);
+            std::process::exit(if ok { 0 } else { 1 });
+        }
+        pack = Some(r);
+    }
+    let inp = inputs::load();
+    let cx = Ctx::new(&inp);
+    let selected = rank_cities(&cx);
+    let city_pt = principal_points(&cx);
+    let corr = Corridor::build(&cx);
+    let mut lc = LegCaches::default();
+    let out = outbound_works(&cx, &selected, &city_pt, &corr, &mut lc);
+    let sec = global_atomic_sections(&cx, &out, &lc);
+    let m = Model {
+        cx: &cx,
+        out,
+        sec,
+        lc,
+    };
+
+    let (dropped_chains, dropped_flow) = audit_dropped_chains(&m);
+    let edge_to_chain = audit_dedup_recount(&m);
+    audit_worst_chain(&m, &edge_to_chain);
+    audit_junction_balance(&m);
+
     if let Some((ok, mut counters)) = pack {
         counters.insert("dropped_chains".into(), dropped_chains as i64);
         counters.insert("flow_lost".into(), dropped_flow as i64);

@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "unicorn", "oxc"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    // The pipeline owns domain types; the client keeps them typed end to end.
+    "typescript/no-explicit-any": "error",
+    "react-hooks/rules-of-hooks": "error",
+    // Each case is a judgement call (stale-closure risk vs. re-render cost).
+    "react-hooks/exhaustive-deps": "warn",
+    // `new Array(n).fill(0)` is the codebase's preallocation idiom.
+    "unicorn/no-new-array": "off",
+    // React Compiler rules: they flag the deliberate ref-based rendering
+    // (deck.gl state in refs, read during render) this app uses for speed.
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/immutability": "off"
+  },
+  "ignorePatterns": ["dist/**", "public/**"]
+}

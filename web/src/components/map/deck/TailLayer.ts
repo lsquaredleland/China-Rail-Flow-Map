@@ -10,7 +10,7 @@ export class TailLayer<DataT = unknown> extends LineLayer<DataT> {
     const shaders = super.getShaders();
     return {
       ...shaders,
-      inject: { ...(shaders.inject || {}), "vs:#main-end": "vColor.a *= positions.x;" },
+      inject: { ...shaders.inject, "vs:#main-end": "vColor.a *= positions.x;" },
     };
   }
 }

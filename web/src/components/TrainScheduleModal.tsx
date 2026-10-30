@@ -107,6 +107,7 @@ export default function TrainScheduleModal({
     return {
       code,
       cls: trainRow?.class ?? code.charAt(0),
+      ci: trainRow?.ci ?? 7,
       dep: first.dep,
       arr: last.arr,
       depMins: dep,
@@ -122,13 +123,6 @@ export default function TrainScheduleModal({
   // Identify the station corresponding to the currently selected city (e.g. Guangzhou, Wuhan, Beijing)
   const originStationZh = trainVM
     ? (trainVM.fsZh || trainVM.tsZh || "")
-    : "";
-
-  const originStDisplay = trainVM
-    ? stationName(trainVM.fsZh || "", trainVM.fsEn, "zh-paren")
-    : "";
-  const destStDisplay = trainVM
-    ? stationName(trainVM.tsZh || "", trainVM.tsEn, "zh-paren")
     : "";
 
   const matchesOrigin = useCallback(
@@ -258,8 +252,6 @@ export default function TrainScheduleModal({
 
   const cls = trainVM ? trainVM.cls : code.charAt(0);
   const isHighSpeed = cls === "G" || cls === "D" || cls === "C";
-  const codeClass = "tsm-code" + (isHighSpeed ? " is-hs" : "");
-  const route = trainVM ? `${originStDisplay} ➔ ${destStDisplay}` : null;
   const legDist = (km: number) =>
     unit === "mi" ? `${(km * 0.621371).toFixed(1)} mi` : `${km} km`;
 

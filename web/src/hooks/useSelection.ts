@@ -10,7 +10,7 @@ import type {
   OriginVM,
   SrcVM,
 } from "../types";
-import { FLOW_CLASSES, classIndex, filterOrigin } from "../lib";
+import { FLOW_CLASSES, filterOrigin } from "../lib";
 import type { MapApi } from "../components/MapHost";
 
 /* Selection state: the selected / isolated train, the class + histogram
@@ -191,11 +191,11 @@ export function useCityPanel({
     }
     if (direction === "out" && outTablesReady && cur.deps) {
       for (const d of cur.deps) {
-        originClasses.add(FLOW_CLASSES[classIndex(d.cls)]);
+        originClasses.add(FLOW_CLASSES[d.ci]);
       }
     } else if (direction === "in" && inTablesReady && cur.arrs) {
       for (const a of cur.arrs) {
-        originClasses.add(FLOW_CLASSES[classIndex(a.cls)]);
+        originClasses.add(FLOW_CLASSES[a.ci]);
       }
     }
 
@@ -206,13 +206,13 @@ export function useCityPanel({
       if (direction === "out" && outTablesReady && baseCity) {
         const set = new Set<string>();
         for (const c of (baseCity as DestVM).calls) {
-          if (c.dep) set.add(FLOW_CLASSES[classIndex(c.dep.cls)]);
+          if (c.dep) set.add(FLOW_CLASSES[c.dep.ci]);
         }
         return set;
       } else if (direction === "in" && inTablesReady && baseCity) {
         const set = new Set<string>();
         for (const c of (baseCity as SrcVM).inCalls) {
-          if (c.arr) set.add(FLOW_CLASSES[classIndex(c.arr.cls)]);
+          if (c.arr) set.add(FLOW_CLASSES[c.arr.ci]);
         }
         return set;
       }

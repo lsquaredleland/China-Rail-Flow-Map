@@ -25,10 +25,10 @@ const delta = (a: number[]) => a.map((v, i) => (i ? v - a[i - 1] : v));
 
 /* 4 trains over 5 sections and 3 cities (city_table ids 7, 9, 12). */
 const tt = [
-  { code: "G1", class: "G" },
-  { code: "G2", class: "G" },
-  { code: "K3", class: "K" },
-  { code: "1461", class: "plain" },
+  { code: "G1", class: "G", ci: 0 },
+  { code: "G2", class: "G", ci: 0 },
+  { code: "K3", class: "K", ci: 6 },
+  { code: "1461", class: "plain", ci: 7 },
 ] as RawTrain[];
 const rows = {
   secs: [[0, 1, 2], [1, 2], [2, 3, 4], [0, 4]],

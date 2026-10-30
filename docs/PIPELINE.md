@@ -92,6 +92,21 @@ single-day `calendar_dates`. Gotchas (self-closing `<node/>` coords;
 station points from the streamed elements, not `osm_stations.json`;
 strip 12306's space-typeset names) are handled in `osm_export.rs`.
 
+**Steps 3–4 still feed the live pack.** Their outputs are frozen inputs of the
+corridor router and of atlas, so `analyze-rs`, `chainfill`, `paths` and their
+rail graph (`pipeline/analyze/src/graph.rs`, separate from the router's
+`pipeline/router/src/graph.rs`) stay in the tree:
+- `data/derived/{,cs_out/}pair_distances.json` and `pair_paths.json` are the
+  router's production baseline (`router/src/china.rs` `load_baseline`);
+  atlas also reads `pair_paths.json` (`analyze/src/inputs.rs`).
+- `data/station_resolution.json` and `derived/cs_out/station_resolution.json`
+  (the analyzer's cluster picks) and `osm_stations.json` give the router its
+  station points (`load_stations`).
+
+Re-deriving these on the router's graph would route pairs differently and
+change flows: that is a data change (staged rebuild, `secdiff`, owner
+approval), not a cleanup. Decided 2026-10-29 (TODO item 8).
+
 ### Step 5 — the flow-atlas dataset (what the live artifact serves)
 **Since 2026-10-22 the live atlas is the corridor-v3 build** (owner's
 go-ahead; `docs/corridor-v3-report.md`): per-train corridor
