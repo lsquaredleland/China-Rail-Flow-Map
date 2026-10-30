@@ -1461,48 +1461,56 @@ fn build_sections(
     }
 }
 
-/// Global atomic sections over the union of all selected cities.
-fn out_sections(m: &Model, it: &mut Interner) -> SectionSet {
+/// Atomic sections of one direction: outbound, the global sections over
+/// the union of all selected cities; inbound, the same machinery indexed
+/// by dest city. `per_city[ci]` is city `ci`'s trains' leg keys, `rows`
+/// the direction's rows (deps / arrs) for the chain cuts.
+fn sections<'a>(
+    m: &Model,
+    it: &mut Interner,
+    per_city: impl ExactSizeIterator<Item = &'a Vec<TrainLegs>>,
+    rows: impl Iterator<Item = (&'a [(String, String, String)], &'a [bool])>,
+    inbound: bool,
+) -> SectionSet {
     let cx = m.cx;
-    let (coords, lc) = (&cx.inp.coords, &m.lc);
-    let (works, leg_walks) = (&m.out.works, &m.leg_walks);
-    let ec = count_edges(
-        works.iter().map(|w| &w.train_leg_keys),
-        lc,
-        coords,
-        &m.station_grid,
-    );
-    println!("union atomic edges: {}", ec.counts.len());
+    let (coords, lc, leg_walks) = (&cx.inp.coords, &m.lc, &m.leg_walks);
+    let n_cities = per_city.len();
+    let (grid, dir, tag) = if inbound {
+        (&m.in_station_grid, "inbound ", "in_")
+    } else {
+        (&m.station_grid, "", "")
+    };
+    let ec = count_edges(per_city, lc, coords, grid);
+    println!("union {dir}atomic edges: {}", ec.counts.len());
     // intern count signatures: a global section has constant per-city counts
     let (sig_list, edge_sig) = chains::intern_sigs(&ec.counts, &ec.class_counts);
-    println!("distinct signatures: {}", sig_list.len());
+    if !inbound {
+        println!("distinct signatures: {}", sig_list.len());
+    }
 
     let walk_geom = |key: &(String, String, String)| {
         leg_seqs(key, &lc.leg_cache, &lc.variant_cache).zip(leg_walks.get(key))
     };
-    let cuts = chain_cuts(
-        works
-            .iter()
-            .flat_map(|w| w.deps.iter())
-            .map(|d| (&d.leg_keys[..], &d.leg_fwd[..])),
-        &walk_geom,
-        &edge_sig,
-    );
-    println!(
-        "section chain cuts (rows leaving equal-signature track mid-way): {}",
-        cuts.len()
-    );
+    let cuts = chain_cuts(rows, &walk_geom, &edge_sig);
+    if inbound {
+        println!("inbound section chain cuts: {}", cuts.len());
+    } else {
+        println!(
+            "section chain cuts (rows leaving equal-signature track mid-way): {}",
+            cuts.len()
+        );
+    }
     let section_chains = chains::build_section_chains(&edge_sig, &ec.trains, &cuts);
     let ss = build_sections(
         cx,
         &section_chains,
         &sig_list,
-        works.len(),
+        n_cities,
         &m.station_pts_all,
         it,
     );
     println!(
-        "sections: {} points: {}",
+        "{tag}sections: {} points: {}",
         ss.sections.len(),
         ss.total_sec_pts
     );
@@ -1565,49 +1573,6 @@ fn national_table(
         nat_u.nonuniform, nat_u.max_spread, nat_u.union_above_max, nat_u.max_union_gain
     );
     (nat_legs, national)
-}
-
-/// Inbound atomic sections: same machinery, indexed by dest city.
-fn in_sections(m: &Model, it: &mut Interner) -> SectionSet {
-    let cx = m.cx;
-    let (coords, lc) = (&cx.inp.coords, &m.lc);
-    let (in_works, leg_walks) = (&m.in_works, &m.leg_walks);
-    let ec = count_edges(
-        in_works.iter().map(|w| &w.train_leg_keys),
-        lc,
-        coords,
-        &m.in_station_grid,
-    );
-    println!("union inbound atomic edges: {}", ec.counts.len());
-    let (in_sig_list, in_edge_sig) = chains::intern_sigs(&ec.counts, &ec.class_counts);
-
-    let walk_geom = |key: &(String, String, String)| {
-        leg_seqs(key, &lc.leg_cache, &lc.variant_cache).zip(leg_walks.get(key))
-    };
-    let in_cuts = chain_cuts(
-        in_works
-            .iter()
-            .flat_map(|w| w.arrs.iter())
-            .map(|a| (&a.leg_keys[..], &a.leg_fwd[..])),
-        &walk_geom,
-        &in_edge_sig,
-    );
-    println!("inbound section chain cuts: {}", in_cuts.len());
-    let in_section_chains = chains::build_section_chains(&in_edge_sig, &ec.trains, &in_cuts);
-    let ss = build_sections(
-        cx,
-        &in_section_chains,
-        &in_sig_list,
-        in_works.len(),
-        &m.station_pts_all,
-        it,
-    );
-    println!(
-        "in_sections: {} points: {}",
-        ss.sections.len(),
-        ss.total_sec_pts
-    );
-    ss
 }
 
 /// What `assemble_origins` threads through the per-city loop.
@@ -2937,9 +2902,28 @@ fn main() {
         in_station_grid,
         station_pts_all,
     };
-    let os = out_sections(&m, &mut it);
+    let (works, in_works) = (&m.out.works, &m.in_works);
+    let os = sections(
+        &m,
+        &mut it,
+        works.iter().map(|w| &w.train_leg_keys),
+        works
+            .iter()
+            .flat_map(|w| &w.deps)
+            .map(|d| (&d.leg_keys[..], &d.leg_fwd[..])),
+        false,
+    );
     let (nat_legs, mut national) = national_table(&m, &os);
-    let is_ = in_sections(&m, &mut it);
+    let is_ = sections(
+        &m,
+        &mut it,
+        in_works.iter().map(|w| &w.train_leg_keys),
+        in_works
+            .iter()
+            .flat_map(|w| &w.arrs)
+            .map(|a| (&a.leg_keys[..], &a.leg_fwd[..])),
+        true,
+    );
     let asm = assemble_origins(&m, &os, &is_, &mut it);
     let (mut national_trains, extra_chains) =
         national_trains_phase(&m, &os, &nat_legs, &national, &asm, &it);
