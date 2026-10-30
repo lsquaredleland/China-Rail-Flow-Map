@@ -13,20 +13,21 @@
 // pipeline's entries.rs and the file are rebuilt to match.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { buildNational, nat, natState } from "../src/lib";
+import { buildNational, natMotion, natState } from "../src/lib";
 import type { NationalTimeline } from "../src/types";
 import { nationalEntries, nationalTrains, pack } from "./fixture";
 
 const TOL = 0.1 + 1e-6; // minutes: one tick
 const { atlas } = pack();
+const scratch = natMotion();
 
 /** First absolute minute at which the client dot has reached route distance d. */
 function clientReach(tl: NationalTimeline, q: number, d: number): number {
   let lo = tl.start[q], hi = tl.end[q];
   for (let it = 0; it < 40; it++) {
     const mid = (lo + hi) / 2;
-    natState(tl, q, mid);
-    if (nat.dist >= d - 1e-9) hi = mid; else lo = mid;
+    const m = natState(tl, q, mid, scratch);
+    if (m.dist >= d - 1e-9) hi = mid; else lo = mid;
   }
   return hi;
 }

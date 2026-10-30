@@ -3,9 +3,10 @@
    the origin tooltip builder (tooltipHtml) is reused as is. */
 import type { ActiveTrainVM, AtlasData, NationalTimeline, SchedulesData } from "../types";
 import { fmtClock } from "./format";
-import { nat, natState } from "./national";
+import { natMotion, natState } from "./national";
 
 const CLS = ["G", "K", ""];
+const scratch = natMotion();
 
 /** Train q of `tl` at absolute minute `a`, at lon / lat with unit direction (ux, uy). */
 export function natTrainVM(
@@ -28,7 +29,7 @@ export function natTrainVM(
   const from = st[sd[b][0]];
   const to = st[sd[sd.length - 1][0]];
   const row = data.train_table[t];
-  natState(tl, q, a);
+  const m = natState(tl, q, a, scratch);
   const vm: ActiveTrainVM = {
     lon,
     lat,
@@ -42,9 +43,9 @@ export function natTrainVM(
     depTime: fmtClock(tl.start[q] % 1440),
     arrTime: fmtClock(tl.end[q] % 1440),
     durMins: Math.round(tl.end[q] - tl.start[q]),
-    progressPct: tl.total[q] > 0 ? Math.round((nat.dist / tl.total[q]) * 100) : 0,
+    progressPct: tl.total[q] > 0 ? Math.round((m.dist / tl.total[q]) * 100) : 0,
   };
-  if (nat.dwell) {
+  if (m.dwell) {
     for (let i = 0; i < nStops; i++) {
       const arr = tl.sArr[s0 + i], dep = tl.sDep[s0 + i];
       if (dep >= 0 && dep > arr && a >= arr && a <= dep) {
@@ -65,7 +66,7 @@ export function natTrainVM(
         break;
       }
     }
-    vm.trackKmh = sectionAt(tl, data, q, nat.dist);
+    vm.trackKmh = sectionAt(tl, data, q, m.dist);
   }
   return vm;
 }
