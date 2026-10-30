@@ -2,7 +2,7 @@
 // layer props, and the ?natSynth load. No GPU.
 import { describe, expect, test } from "bun:test";
 import { pickNationalCity } from "../src/components/map/interaction";
-import { DATA_FMT, NAT_CITY_ALL_ZOOM, NAT_CITY_TOP, NAT_WIDTH_FACTOR, natCityTier, placeLabels, NAT_CITY_R_MIN, WIDTH_K, classIndex, flowUnits, natCityCounts, natCityR, natPositions, natSelect, natTrainVM, stationR, tooltipHtml } from "../src/lib";
+import { DATA_FMT, NAT_CITY_ALL_ZOOM, NAT_CITY_TOP, NAT_WIDTH_FACTOR, natCityTier, placeLabels, NAT_CITY_R_MIN, WIDTH_K, flowUnits, natCityCounts, natCityR, natPositions, natSelect, natTrainVM, stationR, tooltipHtml } from "../src/lib";
 import { nationalFlowsPair } from "./fixture";
 import type { NatFilter } from "../src/lib";
 
@@ -115,7 +115,7 @@ describe("national class filter on the dots", () => {
     const keep = nationalKeep(tl, natSelect(atlas.data.train_table, null, { ...NOF, classes: ["G"] }))!;
     let g = 0;
     for (let q = 0; q < tl.n; q++) {
-      expect(keep[q]).toBe(classIndex(classOf(q)) === 0 ? 1 : 0);
+      expect(keep[q]).toBe(atlas.data.train_table[tl.tIdx[q]].ci === 0 ? 1 : 0);
       g += keep[q];
     }
     expect(g).toBeGreaterThan(0);
@@ -129,7 +129,7 @@ describe("national class filter on the dots", () => {
     expect(g).toBeLessThan(all);
     expect(g + rest).toBe(all);
     const f = nationalFrame(tl, atlas, 1095, 100, nationalKeep(tl, natSelect(atlas.data.train_table, null, { ...NOF, classes: ["G"] })));
-    for (let i = 0; i < f.count; i++) expect(classIndex(classOf(f.qOf[i]))).toBe(0);
+    for (let i = 0; i < f.count; i++) expect(atlas.data.train_table[tl.tIdx[f.qOf[i]]].ci).toBe(0);
   });
 });
 

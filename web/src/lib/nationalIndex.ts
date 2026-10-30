@@ -14,7 +14,7 @@ import type {
   RawTrain,
 } from "../types";
 import { requireFmt } from "./decode";
-import { classIndex } from "./origin";
+import { flowClassIndex } from "./origin";
 import { nationalCityCounts, nationalCounts } from "./nationalFlows";
 
 export interface NatFilter {
@@ -103,7 +103,7 @@ export function natSelect(
   f: NatFilter,
   skip: NatSkip = null,
 ): Uint8Array | null {
-  const cls = f.classes.length ? new Set(f.classes.map(classIndex)) : null;
+  const cls = f.classes.length ? new Set(f.classes.map(flowClassIndex)) : null;
   const useIx = !!ix && natIndexActive(f);
   if (!cls && !useIx) return null;
   const hours = useIx && skip !== "hour" && f.hours.length ? new Set(f.hours) : null;
@@ -113,7 +113,7 @@ export function natSelect(
   const distArr = ix ? (f.unit === "mi" ? ix.dist_mi : ix.dist_km) : [];
   const out = new Uint8Array(trainTable.length);
   for (let t = 0; t < out.length; t++) {
-    if (cls && !cls.has(classIndex(trainTable[t].class))) continue;
+    if (cls && !cls.has(trainTable[t].ci)) continue;
     if (hours && !hours.has(ix!.hour[t])) continue;
     if (dist && !dist.has(distArr[t])) continue;
     if (dur && !dur.has(ix!.dur[t])) continue;

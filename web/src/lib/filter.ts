@@ -10,15 +10,15 @@ import type {
   OriginFilterCriteria,
   OriginVM,
 } from "../types";
-import { classIndex } from "./origin";
+import { flowClassIndex } from "./origin";
 
 /** Per-section train counts (total and per FLOW_CLASSES bucket) over `rows`, busiest first. */
 function countSections(
-  rows: readonly { cls: string; secs: number[] }[],
+  rows: readonly { ci: number; secs: number[] }[],
 ): FlowVM[] {
   const secMap = new Map<number, { n: number; byClass: number[] }>();
   for (const r of rows) {
-    const ci = classIndex(r.cls);
+    const ci = r.ci;
     for (const s of new Set(r.secs)) {
       let entry = secMap.get(s);
       if (!entry) {
@@ -108,18 +108,17 @@ export function filterOrigin(
     hasTrainFilter;
   if (!hasAnyFilter) return cur;
 
-  const clsIndices = Array.from(new Set(classes.map(classIndex)));
-  const hasClass = (cls: string) =>
-    !hasClassFilter ||
-    classes.includes(cls) ||
-    (classes.includes("plain") && classIndex(cls) === 7);
+  const clsIndices = Array.from(new Set(classes.map(flowClassIndex)));
+  const clsIndexSet = new Set(clsIndices);
+  const hasClass = (ci: number) =>
+    !hasClassFilter || clsIndexSet.has(ci);
 
   const trainCodeSet = hasTrainFilter ? new Set(activeTrainCodes) : null;
   const hourSet = hasHourFilter ? new Set(activeHours) : null;
 
   const matchesDep = (d: DepVM) => {
     if (trainCodeSet && !trainCodeSet.has(d.code)) return false;
-    if (!hasClass(d.cls)) return false;
+    if (!hasClass(d.ci)) return false;
     if (hourSet) {
       const h = parseInt(d.dep.slice(0, 2), 10);
       if (!hourSet.has(h)) return false;
@@ -150,7 +149,7 @@ export function filterOrigin(
 
   const matchesArr = (a: ArrVM) => {
     if (trainCodeSet && !trainCodeSet.has(a.code)) return false;
-    if (!hasClass(a.cls)) return false;
+    if (!hasClass(a.ci)) return false;
     if (hourSet) {
       const h = parseInt(a.arr.slice(0, 2), 10);
       if (!hourSet.has(h)) return false;

@@ -11,6 +11,7 @@ export interface NatRow {
   t: number; // train_table index
   code: string;
   cls: string;
+  ci: number;
   from: string; // first stop: Chinese name
   fromEn: string;
   to: string; // last stop
@@ -40,7 +41,7 @@ export function buildNatRows(
     const s = sched.schedules[t];
     const runs = runRank(tr, calendar);
     if (!s || s.length === 0) {
-      return { t, code: tr.code, cls: tr.class, from: "", fromEn: "", to: "", toEn: "", dep: -1, arr: -1, dur: -1, km: -1, runs, hay: tr.code.toLowerCase() };
+      return { t, code: tr.code, cls: tr.class, ci: tr.ci, from: "", fromEn: "", to: "", toEn: "", dep: -1, arr: -1, dur: -1, km: -1, runs, hay: tr.code.toLowerCase() };
     }
     const first = s[0];
     const last = s[s.length - 1];
@@ -54,6 +55,7 @@ export function buildNatRows(
       t,
       code: tr.code,
       cls: tr.class,
+      ci: tr.ci,
       from,
       fromEn,
       to,

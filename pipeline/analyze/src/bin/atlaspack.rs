@@ -99,6 +99,10 @@
 //! 0 when unknown). `extra_stations` stays empty (kept for
 //! the client's type); every stop resolves into station_table.
 //!
+//! Train table rows in shared carry `{code, class, ci}`: `ci` is the bucket
+//! index `cn::classes::class_idx(class)` (0..=7, `FLOW_CLASSES` order: G D C S
+//! Z T K, else plain = 7).
+//!
 //! Train calendar (train-export builds only, `CRFM_SCHEDULE`; absent
 //! otherwise, so a 12306 build's bytes are unchanged): shared carries
 //! `calendar`, the export's dates, and each `train_table` row adds `days`

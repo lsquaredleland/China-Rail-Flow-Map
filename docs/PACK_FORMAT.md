@@ -96,6 +96,12 @@ The in file is the same with `arrs`, and `path = paths[path_off[t] .. path_off[t
 `expandOutColumns` / `expandInColumns` do exactly this, per origin, the first
 time an origin's fields are read.
 
+## Shared tables (`atlas-v2-shared.json`)
+
+`atlas-v2-shared.json` holds tables referenced by the per-train tables and the client:
+- `train_table`: array of train objects `{code, class, ci, ...}` indexed by train index `t`.
+  - `ci`: bucket index into `FLOW_CLASSES` (0..=7: `G`, `D`, `C`, `S`, `Z`, `T`, `K`, else `plain` = 7), emitted by the pipeline so the client does not duplicate classification rules.
+
 ## Changing the layout
 
 1. Change `encode_tables` / `decode_tables` in `columns.rs` and the reader in

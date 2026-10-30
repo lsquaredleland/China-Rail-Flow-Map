@@ -107,6 +107,7 @@ export default function TrainScheduleModal({
     return {
       code,
       cls: trainRow?.class ?? code.charAt(0),
+      ci: trainRow?.ci ?? 7,
       dep: first.dep,
       arr: last.arr,
       depMins: dep,

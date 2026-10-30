@@ -1,7 +1,7 @@
 // Pack-level invariants on the committed pack (O13): decode contract,
 // path ids in range, class columns, geometric continuity of paths.
 import { describe, expect, test } from "bun:test";
-import { DATA_FMT, decodeSecs, requireFmt } from "../src/lib";
+import { DATA_FMT, FLOW_CLASSES, decodeSecs, requireFmt } from "../src/lib";
 import { pack } from "./fixture";
 
 describe("pack decode", () => {
@@ -21,6 +21,16 @@ describe("pack decode", () => {
       expect(o.dep_secs.length).toBe(o.deps.length);
       expect(o.dep_chord_legs.length).toBe(o.deps.length);
       expect(o.dep_stop_pos.length).toBe(o.deps.length);
+    }
+  });
+
+  test("ci matches class on every train_table row", () => {
+    const p = pack();
+    expect(p.shared.train_table.length).toBeGreaterThan(0);
+    for (const tr of p.shared.train_table) {
+      const idx = (FLOW_CLASSES as readonly string[]).indexOf(tr.class);
+      const expected = idx >= 0 ? idx : 7;
+      expect(tr.ci).toBe(expected);
     }
   });
 

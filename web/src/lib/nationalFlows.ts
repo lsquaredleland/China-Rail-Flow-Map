@@ -8,7 +8,7 @@
 import type { NationalEntriesPack, NationalFlowsPack } from "../types";
 import { requireFmt } from "./decode";
 import type { FlowItem, FlowPass } from "./mapModel";
-import { classIndex } from "./origin";
+import { flowClassIndex } from "./origin";
 import { flowWidth } from "./palette";
 
 /** Throw a FmtError unless `d` is a national file for a shared pack with
@@ -65,7 +65,7 @@ function upperBound(a: readonly number[], x: number): number {
 export function nationalCountsAt(ne: NationalEntriesPack, classes: readonly string[], minute: number): Uint32Array {
   const out = new Uint32Array(ne.n_sec);
   const x = minute * ne.ticks_per_min;
-  const cis = classes.length ? new Set(classes.map(classIndex)) : [0, 1, 2, 3, 4, 5, 6, 7];
+  const cis = classes.length ? new Set(classes.map(flowClassIndex)) : [0, 1, 2, 3, 4, 5, 6, 7];
   for (const ci of cis) {
     const row = ne.by_class[ci];
     for (let s = 0; s < out.length; s++) {
@@ -82,7 +82,7 @@ export function nationalCountsAt(ne: NationalEntriesPack, classes: readonly stri
 export function nationalCounts(nf: NationalFlowsPack, classes: readonly string[]): Uint32Array {
   if (!classes.length) return Uint32Array.from(nf.total);
   const out = new Uint32Array(nf.total.length);
-  for (const ci of new Set(classes.map(classIndex))) {
+  for (const ci of new Set(classes.map(flowClassIndex))) {
     const row = nf.by_class[ci];
     for (let s = 0; s < out.length; s++) out[s] += row[s];
   }
@@ -125,7 +125,7 @@ export function nationalCityCounts(
   if (!c) return { idx: [], dep: new Uint32Array(0), arr: new Uint32Array(0) };
   if (!classes.length) return { idx: c.idx, dep: Uint32Array.from(c.dep), arr: Uint32Array.from(c.arr) };
   const dep = new Uint32Array(c.idx.length), arr = new Uint32Array(c.idx.length);
-  for (const ci of new Set(classes.map(classIndex))) {
+  for (const ci of new Set(classes.map(flowClassIndex))) {
     for (let i = 0; i < dep.length; i++) {
       dep[i] += c.dep_by_class[ci][i];
       arr[i] += c.arr_by_class[ci][i];

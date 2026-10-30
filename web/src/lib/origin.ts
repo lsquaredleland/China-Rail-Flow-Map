@@ -27,25 +27,9 @@ export const FLOW_CLASSES = [
   "plain",
 ] as const;
 
-export function classIndex(cls: string): number {
-  switch (cls) {
-    case "G":
-      return 0;
-    case "D":
-      return 1;
-    case "C":
-      return 2;
-    case "S":
-      return 3;
-    case "Z":
-      return 4;
-    case "T":
-      return 5;
-    case "K":
-      return 6;
-    default:
-      return 7;
-  }
+/** Bucket index of a class name chosen in the UI (a FLOW_CLASSES entry; -1 if none). */
+export function flowClassIndex(name: string): number {
+  return (FLOW_CLASSES as readonly string[]).indexOf(name);
 }
 
 export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
@@ -87,6 +71,7 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       t: d[0],
       code: t.code,
       cls: t.class,
+      ci: t.ci,
       dep: fmtClock(d[2]),
       arr: fmtClock(d[5]),
       depMins: d[2],
@@ -231,6 +216,7 @@ export function buildOrigin(atlas: DecodedAtlas, idx: number): OriginVM {
       t: a[0],
       code: t.code,
       cls: t.class,
+      ci: t.ci,
       dep: fmtClock(a[3]),
       arr: fmtClock(a[5]),
       depMins: a[3],

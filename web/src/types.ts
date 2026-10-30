@@ -32,6 +32,8 @@ export interface RawStation {
 export interface RawTrain {
   code: string;
   class: string; // "G" | "D" | "C" | "S" | "K" | ... | "plain"
+  /** Bucket index into FLOW_CLASSES (0..=7: G D C S Z T K, else plain), from the pipeline. */
+  ci: number;
   /** Train-export packs: one "0"/"1" per `calendar` date (runs that day). */
   days?: string;
   /** Train-export packs: "daily" | "weekday-set" | "date-specific" | "irregular" | "alternate-day". */
@@ -351,6 +353,7 @@ export interface ChordVM {
 export interface DepVM {
   code: string;
   cls: string;
+  ci: number;
   dep: string; // "HH:MM" (zero-padded, formatted from minutes at build time)
   arr: string; // "HH:MM"
   depMins: number;
@@ -391,6 +394,7 @@ export interface CallVM {
 export interface ArrVM {
   code: string;
   cls: string;
+  ci: number;
   dep: string; // departure "HH:MM" at the true origin
   arr: string; // arrival "HH:MM" in the selected city
   depMins: number;

@@ -58,7 +58,7 @@ export {
 export {
   FLOW_CLASSES,
   buildOrigin,
-  classIndex,
+  flowClassIndex,
 } from "./origin";
 export {
   buildDayTimeline,

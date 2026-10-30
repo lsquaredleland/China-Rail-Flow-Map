@@ -697,6 +697,7 @@ impl Interner {
         self.train_table.push(AtlasTrainRef {
             code: t.code.clone(),
             class: t.train_class.clone(),
+            ci: class_idx(&t.train_class),
             days: cal.map(|c| c.days.clone()),
             pattern: cal.and_then(|c| c.pattern.clone()),
             suspended: cal.and_then(|c| c.listed_suspended.then_some(true)),
