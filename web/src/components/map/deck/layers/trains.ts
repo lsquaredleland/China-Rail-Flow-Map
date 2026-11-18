@@ -15,19 +15,18 @@ import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { ActiveTrainVM } from "../../../../types";
 import { DEFAULT_SKIN, mapStyle } from "../../../../lib";
-import type { RGBA } from "../../../../lib";
+import type { MapStyle, RGBA } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
 
-const PAPER = mapStyle(DEFAULT_SKIN, "light").ink;
-const AMBER = PAPER.trainHs.rgba; // G D C
-const CYAN = PAPER.trainConv.rgba; // Z T K S
-const SLATE = PAPER.trainOther.rgba; // 普 and the rest
+const PAPER = mapStyle(DEFAULT_SKIN, "light");
 
-/** The train's glow colour (the former Canvas renderer: high-speed amber, conventional cyan). */
-export function glowOf(cls: string): RGBA {
-  if (cls === "G" || cls === "D" || cls === "C") return AMBER;
-  if (cls === "Z" || cls === "T" || cls === "K" || cls === "S") return CYAN;
-  return SLATE;
+/** The train's glow colour in `style` (paper: high-speed amber, conventional
+    cyan, the rest slate; the same in both modes). */
+export function glowOf(cls: string, style: MapStyle = PAPER): RGBA {
+  const ink = style.ink;
+  if (cls === "G" || cls === "D" || cls === "C") return ink.trainHs.rgba;
+  if (cls === "Z" || cls === "T" || cls === "K" || cls === "S") return ink.trainConv.rgba;
+  return ink.trainOther.rgba;
 }
 
 /** Tail length in px: 12 (22 isolated) times speed fraction; none while dwelling or on a chord. */
@@ -119,6 +118,7 @@ export function buildTrainBuffers(
   isolatedCode: string | null | undefined,
   selectedCode: string | null | undefined,
   hoveredCode: string | null,
+  style: MapStyle = PAPER,
 ): TrainBuffers {
   const b = ensure(trains.length);
   const dwell: Disc[] = [];
@@ -127,7 +127,7 @@ export function buildTrainBuffers(
   for (let i = 0; i < trains.length; i++) {
     const tr = trains[i];
     const iso = isolatedCode === tr.code;
-    const g = glowOf(tr.cls);
+    const g = glowOf(tr.cls, style);
     const a = tr.onChord ? 115 : 255; // globalAlpha 0.45 on chords
     b.pos[i * 2] = tr.lon;
     b.pos[i * 2 + 1] = tr.lat;
@@ -189,6 +189,8 @@ interface TrainLayerInput {
   hoveredCode: string | null;
   /** The clock, as an update-trigger for the per-frame disc accessors. */
   animTime: number;
+  /** The class colours' style (paper when absent). */
+  style?: MapStyle;
 }
 
 /** An unfilled ring layer, one disc per ring. `trigger` is the update-trigger of the per-frame accessors. */
@@ -257,7 +259,7 @@ export function dotLayers(
 }
 
 export function trainLayers(inp: TrainLayerInput): Layer[] {
-  const b = buildTrainBuffers(inp.trains, inp.scale, inp.isolatedCode, inp.selectedCode, inp.hoveredCode);
+  const b = buildTrainBuffers(inp.trains, inp.scale, inp.isolatedCode, inp.selectedCode, inp.hoveredCode, inp.style);
   const trig = inp.animTime + "|" + inp.scale;
   return [...dotLayers("", b, { pickable: false, isolated: !!inp.isolatedCode, trigger: trig }), ringLayer("trainring", b.rings, trig)];
 }

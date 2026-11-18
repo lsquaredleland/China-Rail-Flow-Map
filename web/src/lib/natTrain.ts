@@ -1,7 +1,7 @@
 /* The tooltip's train view-model for one national dot (P2.3): code, ends,
    times, progress and dwell, from the national timeline and the schedules, so
    the origin tooltip builder (tooltipHtml) is reused as is. */
-import type { ActiveTrainVM, AtlasData, NationalTimeline, SchedulesData } from "../types";
+import type { ActiveTrainVM, DecodedAtlas, DecodedSet, NationalTimeline, SchedulesData } from "../types";
 import { fmtClock } from "./format";
 import { natMotion, natState } from "./national";
 
@@ -11,7 +11,7 @@ const scratch = natMotion();
 /** Train q of `tl` at absolute minute `a`, at lon / lat with unit direction (ux, uy). */
 export function natTrainVM(
   tl: NationalTimeline,
-  data: AtlasData,
+  atlas: Pick<DecodedAtlas, "data" | "sec">,
   sched: SchedulesData["schedules"],
   q: number,
   a: number,
@@ -25,10 +25,10 @@ export function natTrainVM(
   const s0 = tl.sOff[q];
   const nStops = tl.sOff[q + 1] - s0;
   const b = sd.length - 1 - nStops;
-  const st = data.station_table;
+  const st = atlas.data.station_table;
   const from = st[sd[b][0]];
   const to = st[sd[sd.length - 1][0]];
-  const row = data.train_table[t];
+  const row = atlas.data.train_table[t];
   const m = natState(tl, q, a, scratch);
   const vm: ActiveTrainVM = {
     lon,
@@ -66,14 +66,14 @@ export function natTrainVM(
         break;
       }
     }
-    vm.trackKmh = sectionAt(tl, data, q, m.dist);
+    vm.trackKmh = sectionAt(tl, atlas.sec, q, m.dist);
   }
   return vm;
 }
 
-/** The signed speed limit of the flow section at route distance d of train
+/** The posted speed limit of the flow section at route distance d of train
     q (natXY's entry search); undefined on a throat or an untagged section. */
-function sectionAt(tl: NationalTimeline, data: AtlasData, q: number, d: number): number | undefined {
+function sectionAt(tl: NationalTimeline, sec: DecodedSet, q: number, d: number): number | undefined {
   let lo = tl.pOff[q], hi = tl.pOff[q + 1] - 1;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
@@ -81,5 +81,5 @@ function sectionAt(tl: NationalTimeline, data: AtlasData, q: number, d: number):
   }
   const v = tl.pId[lo];
   const id = v < 0 ? ~v : v;
-  return id < data.sections.length ? data.sections[id].v : undefined;
+  return id < sec.speed.length ? sec.speed[id] || undefined : undefined;
 }

@@ -32,13 +32,21 @@
 
     <script>
       (function () {
-        var d = false;
+        // Mirrors useUrlState (initialSkin, initialDark) and lib/style
+        // resolveMode. ONE: the single-mode skins and their mode; every other
+        // registered skin is listed with "".
+        var ONE = { paper: "", terminal: "dark" };
+        var d = false, k = "paper";
         try {
-          var p = new URLSearchParams(window.location.search).get("theme");
+          var q = new URLSearchParams(window.location.search);
+          var p = q.get("theme"), sk = q.get("skin");
           var s = null;
-          try { s = sessionStorage.getItem("crfa-theme"); } catch (e) {}
+          try { s = sessionStorage.getItem("crfa-theme"); if (sk === null) sk = sessionStorage.getItem("crfa-skin"); } catch (e) {}
+          if (sk && Object.prototype.hasOwnProperty.call(ONE, sk)) k = sk;
           d = (p === "dark" || p === "night") ? true : (p === "light" || p === "day") ? false : (s === "dark") ? true : (s === "light") ? false : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (ONE[k]) d = ONE[k] === "dark";
         } catch (e) {}
+        document.documentElement.setAttribute("data-skin", k);
         document.documentElement.setAttribute("data-theme", d ? "dark" : "light");
       })();
     </script>

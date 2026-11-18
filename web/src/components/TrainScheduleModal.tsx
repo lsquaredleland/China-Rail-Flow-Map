@@ -2,8 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import type { DepVM, ArrVM, DistUnit, RawTrain, SchedulesData } from "../types";
 import { RunsLabel } from "./departures/RunsCell";
 import type { MapApi } from "./MapHost";
-import { DEFAULT_SKIN, fmtDurationWords, formatScheduleStops, mapStyle, modeOf, stationName, tripStatus, unrollStops } from "../lib";
-import type { AlignedStop } from "../lib";
+import { fmtDurationWords, formatScheduleStops, stationName, tripStatus, unrollStops } from "../lib";
+import type { AlignedStop, MapStyle } from "../lib";
 import { TrainCard, cardBand, type TrainCardState } from "./MapCards";
 import { useDialogFocus } from "../hooks/useDialog";
 
@@ -15,7 +15,8 @@ interface Props {
   onClose: () => void;
   schedulesData: SchedulesData | null;
   stationTable: { zh: string; en: string }[];
-  dark: boolean;
+  /** The resolved map style (skin × mode). */
+  style: MapStyle;
   unit?: DistUnit;
   trainVM?: DepVM | ArrVM | null;
   currentTime?: number;
@@ -43,7 +44,7 @@ export default function TrainScheduleModal({
   onClose,
   schedulesData,
   stationTable,
-  dark,
+  style,
   unit = "km",
   currentTime,
   isIsolated = false,
@@ -287,7 +288,7 @@ export default function TrainScheduleModal({
         }
         state={state}
         leg={leg}
-        band={cardBand(trainVM ? trainVM.dur : 0, mapStyle(DEFAULT_SKIN, modeOf(dark)))}
+        band={cardBand(trainVM ? trainVM.dur : 0, style)}
         isolated={isIsolated}
         onTimetable={() => setMinimized(false)}
         onClose={onClose}

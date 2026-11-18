@@ -2,6 +2,7 @@
 import type {
   AtlasData,
   CityPointVM,
+  DecodedAtlas,
   DestVM,
   Direction,
   DistUnit,
@@ -17,7 +18,7 @@ import {
 } from "./format";
 import { rampColor } from "./palette";
 import { stationLabel } from "./geo";
-import { DEFAULT_SKIN, mapStyle, modeOf } from "./style";
+import type { MapStyle } from "./style";
 
 interface TooltipInput {
   data: AtlasData;
@@ -25,27 +26,30 @@ interface TooltipInput {
   direction: Direction;
   distUnit: DistUnit;
   panelDest: CityPointVM | null;
-  dark: boolean;
+  /** The resolved map style (skin × mode). */
+  style: MapStyle;
   /** The hovered section is the Qiongzhou Strait ferry corridor. */
   ferry: boolean;
   /** The hovered section's OSM line names `[name, name:en]`. */
   lines?: [string, string][];
-  /** The hovered section's signed speed limit, km/h. */
+  /** The hovered section's posted speed limit, km/h. */
   speed?: number;
 }
 
-/** Flow section `s`'s OSM line names and speed limit: national flows and
-    the outbound view index `sections`, the inbound view `in_sections`. */
+/** Flow section `s`'s OSM line names and posted speed limit (undefined when
+    untagged): national flows and the outbound view index `sections` / `sec`,
+    the inbound view `in_sections` / `inSec`. */
 export function sectionInfo(
-  data: AtlasData,
+  atlas: Pick<DecodedAtlas, "data" | "sec" | "inSec">,
   view: { national?: boolean; direction: Direction },
   s: number,
 ): { lines: [string, string][]; speed?: number } {
-  const sec = (view.national || view.direction === "out" ? data.sections : data.in_sections)[s];
-  const names = data.lines ?? [];
+  const out = view.national || view.direction === "out";
+  const sec = (out ? atlas.data.sections : atlas.data.in_sections)[s];
+  const names = atlas.data.lines ?? [];
   return {
     lines: (sec?.l ?? []).map((i) => names[i]).filter((n) => n !== undefined),
-    speed: sec?.v,
+    speed: (out ? atlas.sec : atlas.inSec).speed[s] || undefined,
   };
 }
 
@@ -109,7 +113,7 @@ function cityCardHtml(c: CityPointVM, t: TooltipInput): string {
   const fastest = (c as DestVM | SrcVM).fastest;
   const swatch =
     fastest > 0
-      ? "<i class='cc-swatch' style='background:" + rampColor(fastest, mapStyle(DEFAULT_SKIN, modeOf(t.dark)).pal) + "'></i>"
+      ? "<i class='cc-swatch' style='background:" + rampColor(fastest, t.style.pal) + "'></i>"
       : "";
   return (
     cityTitleHtml(c) +
@@ -199,7 +203,7 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
     html = natCityCardHtml(data.city_table[hit.idx], hit.dep, hit.arr);
   } else if (hit.kind === "train") {
     const tr = hit.train;
-    const ink = mapStyle(DEFAULT_SKIN, modeOf(t.dark)).ink;
+    const ink = t.style.ink;
     const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
     const badgeColor = isHighSpeed ? ink.badgeHs.css : ink.badgeConv.css;
     const fromDisplay =

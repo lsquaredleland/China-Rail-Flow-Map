@@ -16,24 +16,27 @@ import type { Palette, RampStop } from "../../types";
 import { palette, rgba } from "../palette";
 import type { RGBA } from "../palette";
 import { LINE_COLOR, NODE_COLOR, NODE_SIZE } from "./encodings";
-import type { LineColorEncoding, NodeColorEncoding, NodeSizeEncoding } from "./encodings";
+import type { LineColorEncoding, NodeColorEncoding, NodeSizeEncoding, SpeedRamp } from "./encodings";
 
-export { LINE_COLOR, NODE_COLOR, NODE_SIZE } from "./encodings";
+export { LINE_COLOR, NODE_COLOR, NODE_SIZE, SPEED_BANDS, boxSide, speedBand } from "./encodings";
 export type {
   LineColorEncoding,
   LineColorId,
+  LineColorStyle,
   LineFact,
   NodeColorEncoding,
   NodeColorId,
   NodeSizeEncoding,
   NodeSizeId,
+  SpeedRamp,
 } from "./encodings";
 
 /** Light or dark: the day/night axis, independent of the skin. */
 export type Mode = "light" | "dark";
 
-/** A registered skin. Only "paper" (today's look) exists in P1. */
-export type SkinId = "paper";
+/** A registered skin: "paper" (today's look, light and dark) or "terminal"
+    (the TSpeed look: dark only, speed-coloured lines, box cities). */
+export type SkinId = "paper" | "terminal";
 
 /** The skin used when nothing else selects one. */
 export const DEFAULT_SKIN: SkinId = "paper";
@@ -140,8 +143,8 @@ export interface LineStyle {
   readonly jointRounded: boolean;
 }
 
-/** City marker shape. Only circles exist in P1 (boxes come with terminal). */
-export type MarkerShape = "circle";
+/** City marker shape: discs, or squares of the same area (boxSide). */
+export type MarkerShape = "circle" | "box";
 
 /** City markers. */
 export interface MarkerStyle {
@@ -183,6 +186,8 @@ export interface MapStyle {
       saffron band lifts to #F0B85A; by day it is `pal`. */
   readonly cardPal: Palette;
   readonly ink: Inks;
+  /** The speed-band ramp the speedLimit line colour reads (SPEED_BANDS order). */
+  readonly speedBands: SpeedRamp;
   readonly alpha: Alphas;
   readonly line: LineStyle;
   readonly marker: MarkerStyle;
@@ -278,6 +283,11 @@ const PAPER: SkinDef = {
       pal,
       cardPal,
       ink: inks,
+      // Unused while paper colours lines by volume: the time bands and the flow red.
+      speedBands: {
+        bands: ["#8E1B17", "#C8302A", "#E3A63F", "#14746F", dark ? "#8F9CF2" : "#34488C"],
+        untagged: pal.network,
+      },
       alpha: {
         context: dark ? 0.16 : 0.18,
         isoFlow: dark ? 0.06 : 0.08,
@@ -296,21 +306,110 @@ const PAPER: SkinDef = {
         lineColor: LINE_COLOR.volume,
         nodeColor: NODE_COLOR.timeBand,
         natNodeColor: NODE_COLOR.flat,
-        nodeSize: NODE_SIZE.directTrains,
-        natNodeSize: NODE_SIZE.callsAtCity,
+        nodeSize: NODE_SIZE.stationRadius,
+        natNodeSize: NODE_SIZE.natCityRadius,
+      },
+    };
+  },
+};
+
+/* Terminal's map colours (the TSpeed frame). */
+const T_GROUND = "#04060C";
+const T_AMBER = "#FF8F40";
+const T_WHITE = "#EAF2FF";
+const T_CYAN = "#3FE6FF";
+
+/** Terminal (skins P2, map only): a dark-only skin on the paper night style,
+    with a near-black ground, navy land under a blue hairline outline, amber
+    labels and box cities, lines coloured by posted speed limit and cyan
+    trains. Square line caps and mitred joints; no glow yet (P3). */
+const TERMINAL: SkinDef = {
+  id: "terminal",
+  modes: ["dark"],
+  defaultMode: "dark",
+  build() {
+    const base = PAPER.build("dark");
+    const pal: Palette = {
+      ...base.pal,
+      paper: T_GROUND,
+      network: "#101A36",
+      graticule: "rgba(42,92,255,0.16)",
+      flowHi: T_WHITE,
+      chord: "#3A4A6E",
+      dot: "rgba(255,143,64,0.18)",
+      dotEdge: T_AMBER,
+      label: T_AMBER,
+      labelHalo: "rgba(4,6,12,0.92)",
+      origin: T_WHITE,
+      outline: "rgba(42,92,255,0.70)",
+      landFill: "#070C1C",
+    };
+    const inks: Inks = {
+      ...base.ink,
+      paper: ink(pal.paper),
+      network: ink(pal.network),
+      graticule: ink(pal.graticule),
+      flowHi: ink(pal.flowHi),
+      chord: ink(pal.chord),
+      dot: ink(pal.dot),
+      dotEdge: ink(pal.dotEdge),
+      label: ink(pal.label),
+      labelHalo: ink(pal.labelHalo),
+      origin: ink(pal.origin),
+      outline: ink(pal.outline),
+      landFill: ink(pal.landFill),
+      ring: ink(T_WHITE),
+      originFill: ink(T_WHITE),
+      originEdge: ink(T_GROUND),
+      originMark: ink(T_GROUND),
+      labelBox: ink(T_GROUND),
+      labelBoxEdge: ink(T_AMBER),
+      labelBoxText: ink(T_AMBER),
+      trainHs: ink(T_CYAN),
+      trainConv: ink(T_CYAN),
+      trainOther: ink(T_CYAN),
+    };
+    const mono = "'Share Tech Mono', ui-monospace, monospace";
+    return {
+      pal,
+      cardPal: pal,
+      ink: inks,
+      speedBands: { bands: ["#F4FFE8", "#FFD43B", T_AMBER, "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" },
+      // The city fill carries its own alpha (pal.dot), so the national boxes take it as is.
+      alpha: { ...base.alpha, natCityFill: 1 },
+      // Mitred joints, but rounded caps: deck's non-rounded cap is flat (it
+      // stops at the vertex), so two sections meeting end to end leave an
+      // antialiased dark seam across wide corridors. Round caps overlap and
+      // hide it. True mitres between sections need them chained into one
+      // path (planned with the angular geometry, P4).
+      line: { capRounded: true, jointRounded: false },
+      marker: { shape: "box", edgeWidth: 1.5 },
+      font: { family: mono, tag: mono },
+      enc: {
+        lineColor: LINE_COLOR.speedLimit,
+        nodeColor: NODE_COLOR.flat,
+        natNodeColor: NODE_COLOR.flat,
+        nodeSize: NODE_SIZE.stationRadius,
+        natNodeSize: NODE_SIZE.natCityRadius,
       },
     };
   },
 };
 
 /** Every skin by id. */
-export const SKINS: Readonly<Record<SkinId, SkinDef>> = { paper: PAPER };
+export const SKINS: Readonly<Record<SkinId, SkinDef>> = { paper: PAPER, terminal: TERMINAL };
 
 /** The mode a skin actually draws for a requested mode: the request when the
     skin supports it, else the skin's default (e.g. a dark-only skin). */
 export function resolveMode(skin: SkinId, requested: Mode): Mode {
   const def = SKINS[skin];
   return def.modes.includes(requested) ? requested : def.defaultMode;
+}
+
+/** A skin id from untrusted text (`?skin=`, storage): a registered id as is,
+    anything else (unknown, empty, null) the default skin. */
+export function parseSkin(s: string | null | undefined): SkinId {
+  return s && Object.prototype.hasOwnProperty.call(SKINS, s) ? (s as SkinId) : DEFAULT_SKIN;
 }
 
 /** True when the skin supports both modes, i.e. the day/night toggle applies. */

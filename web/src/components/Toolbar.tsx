@@ -28,6 +28,7 @@ export default function Toolbar({
   onSetDistUnit,
   dark,
   onSetDark,
+  modeToggle = true,
   national,
   showFlows,
   onToggleFlows,
@@ -55,6 +56,8 @@ export default function Toolbar({
   onSetDistUnit: (u: DistUnit) => void;
   dark: boolean;
   onSetDark: (d: boolean) => void;
+  /** False when the skin supports one mode only: the day/night pair is hidden. */
+  modeToggle?: boolean;
   /** National mode (D11: "National · beta", D13 map-only). */
   national: boolean;
   /** National mode's flows (and city circles): a map toggle like the others, on by default. */
@@ -264,6 +267,7 @@ export default function Toolbar({
           mi
         </button>
       </div>
+      {modeToggle && (
       <div
         id="themeToggle"
         className="group theme-toggle"
@@ -289,6 +293,7 @@ export default function Toolbar({
           Night
         </button>
       </div>
+      )}
       </div>
       <div id="tbFilters" className={"tb-panel" + (panel === "filters" ? " open" : "")}>
       <div

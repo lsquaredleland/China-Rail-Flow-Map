@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import type { MapStyle } from "../lib";
-import { DEFAULT_SKIN, NAT_WIDTH_FACTOR, WIDTH_K, flowUnits, mapStyle, rampColor, natCityR, stationR, stationZoomK } from "../lib";
+import { DEFAULT_SKIN, NAT_WIDTH_FACTOR, SPEED_BANDS, WIDTH_K, boxSide, flowUnits, mapStyle, rampColor, natCityR, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
     the stepped width bar's heights depend on the live zoom ratio and the
@@ -47,6 +47,11 @@ interface LegendProps {
   // national factor in steps of 10 / 100 / 300 / 500 trains/day, and circles
   // sized by a city's departures + arrivals.
   national?: boolean;
+  // The resolved style, for what the legend shows rather than how it is
+  // sized: a speedLimit line colour shows the speed bands (and no volume
+  // ramp), a box marker shows box samples, a node colour other than
+  // timeBand hides the travel-time bar. Paper (light) when absent.
+  style?: MapStyle;
 }
 
 const W = 196; // card content width in CSS px (matches the old canvas)
@@ -65,6 +70,11 @@ const BAND_LABELS: { label: string; mid: number; ink: string }[] = [
 ];
 const BAR_H = 15;
 const TIMESEC_H = 8 + BAR_H + 6; // vertical room the band section takes
+// Speed-band key (speedLimit line colour): a heading and the SPEED_BANDS plus
+// "untagged" in two columns of three rows; SPEED_H is the room it takes.
+const SPEED_ROW = 13;
+const SPEED_H = 16 + 3 * SPEED_ROW + 4;
+const SPEED_LABELS = [...SPEED_BANDS.map((b) => b.label), "untagged"];
 const SAMPLES = [10, 50, 200];
 const NAT_STEPS = [10, 100, 300, 500];
 const NAT_SAMPLES = [10, 100, 1000];
@@ -81,6 +91,8 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const widthGroupRef = useRef<SVGGElement | null>(null);
   const widthHeadRef = useRef<SVGTextElement | null>(null);
   const circleRefs = useRef<(SVGCircleElement | null)[]>([]);
+  const boxRefs = useRef<(SVGRectElement | null)[]>([]);
+  const speedGroupRef = useRef<SVGGElement | null>(null);
   const circleLabelRefs = useRef<(SVGTextElement | null)[]>([]);
   const circleHeadRef = useRef<SVGTextElement | null>(null);
   const circleGroupRef = useRef<SVGGElement | null>(null);
@@ -90,6 +102,8 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
   const animGroupRef = useRef<SVGGElement | null>(null);
   // What the draw handle lays out: the origin legend's scales or the national ones.
   const national = !!props.national;
+  const look = props.style ?? LIGHT;
+  const box = look.marker.shape === "box";
   const STEPS_NOW = national ? NAT_STEPS : STEPS;
   const SAMPLES_NOW = national ? NAT_SAMPLES : SAMPLES;
   const scaleRef = useRef({ steps: STEPS_NOW, samples: SAMPLES_NOW, k: WIDTH_K, nat: national });
@@ -134,8 +148,18 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           if (stop)
             stop.setAttribute("stop-color", rampColor(BAND_STOPS[i], style.pal));
         }
+        // The time bar keys the dots' travel-time colours; the speed key the
+        // lines' speedLimit colours (then the width steps are plain ink).
+        const showTime = hasOrigin && style.enc.nodeColor.id === "timeBand";
+        const speed = style.enc.lineColor.id === "speedLimit";
         if (gradGroupRef.current)
-          gradGroupRef.current.style.display = hasOrigin ? "" : "none";
+          gradGroupRef.current.style.display = showTime ? "" : "none";
+        let headH = showTime ? TIMESEC_H : 8;
+        if (speedGroupRef.current) {
+          speedGroupRef.current.style.display = speed ? "" : "none";
+          speedGroupRef.current.setAttribute("transform", "translate(0 " + headH + ")");
+        }
+        if (speed) headH += SPEED_H;
         // Same width mapping as the map; the zoom factor is capped for
         // the legend alone so a deep zoom cannot grow the panel without
         // bound. Step i spans [4 + i*stepW, ...] on a shared baseline.
@@ -153,16 +177,17 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
             // Each step wears its ramp colour, normalised to the
             // legend's own widest step — salmon for the thinnest,
             // deep crimson for the widest; both schemes have a flow ramp.
-            rect.style.fill = style.enc.lineColor.color(
-              { n: steps[i], maxN: steps[steps.length - 1] },
-              style.pal,
-            );
+            rect.style.fill = speed
+              ? "currentColor"
+              : style.enc.lineColor.color(
+                  { n: steps[i], maxN: steps[steps.length - 1], s: -1, speed: 0 },
+                  style,
+                );
           }
         }
         const barH = maxH;
         // The stepped bar's baseline sits headH + 15 below the top; the
         // rest of the card hangs off it, so both lower groups translate.
-        const headH = hasOrigin ? TIMESEC_H : 8;
         if (widthHeadRef.current)
           widthHeadRef.current.setAttribute("y", String(headH + 2));
         const base = headH + 15 + barH;
@@ -181,6 +206,12 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           circleRefs.current[i]?.setAttribute("cx", String(ccx));
           circleRefs.current[i]?.setAttribute("cy", String(-rr));
           circleRefs.current[i]?.setAttribute("r", String(rr));
+          // A box sample: the square of the circle's area, on the same baseline.
+          const side = boxSide(rr);
+          boxRefs.current[i]?.setAttribute("x", String(ccx - side / 2));
+          boxRefs.current[i]?.setAttribute("y", String(-side));
+          boxRefs.current[i]?.setAttribute("width", String(side));
+          boxRefs.current[i]?.setAttribute("height", String(side));
           circleLabelRefs.current[i]?.setAttribute("x", String(ccx));
           cxp = ccx + rr + 18;
         }
@@ -317,6 +348,25 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               </text>
             ))}
           </g>
+          {/* Speed-band key (speedLimit lines only; draw() shows and places it). */}
+          <g ref={speedGroupRef} style={{ display: "none" }}>
+            <text x={4} y={6} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
+              Section speed limit · km/h
+            </text>
+            {SPEED_LABELS.map((label, i) => {
+              const x = 4 + (i < 3 ? 0 : (W - 8) / 2);
+              const y = 18 + (i % 3) * SPEED_ROW;
+              const color = i < SPEED_BANDS.length ? look.speedBands.bands[i] : look.speedBands.untagged;
+              return (
+                <g key={label}>
+                  <rect x={x} y={y - 2} width={16} height={4} fill={color} />
+                  <text x={x + 22} y={y} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
           {/* Stepped width bar: the group origin is the shared baseline. */}
           <text
             ref={widthHeadRef}
@@ -375,21 +425,36 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               fill="currentColor"
               dominantBaseline="middle"
             >
-              {national ? "Circle size = departures + arrivals/day" : "Circle size = direct trains/day"}
+              {(box ? "Box" : "Circle") + (national ? " size = departures + arrivals/day" : " size = direct trains/day")}
             </text>
             <rect x={4} y={0} width={W - 8} height={1} fill="currentColor" />
             {circles.map((c, i) => (
               <g key={c.label}>
-                <circle
-                  ref={(el) => {
-                    circleRefs.current[i] = el;
-                  }}
-                  cx={c.cx}
-                  cy={-c.r}
-                  r={c.r}
-                  className="lg-dot"
-                  strokeWidth={0.8}
-                />
+                {box ? (
+                  <rect
+                    ref={(el) => {
+                      boxRefs.current[i] = el;
+                    }}
+                    x={c.cx - boxSide(c.r) / 2}
+                    y={-boxSide(c.r)}
+                    width={boxSide(c.r)}
+                    height={boxSide(c.r)}
+                    fill={look.ink.dot.css}
+                    stroke={look.ink.dotEdge.css}
+                    strokeWidth={0.8}
+                  />
+                ) : (
+                  <circle
+                    ref={(el) => {
+                      circleRefs.current[i] = el;
+                    }}
+                    cx={c.cx}
+                    cy={-c.r}
+                    r={c.r}
+                    className="lg-dot"
+                    strokeWidth={0.8}
+                  />
+                )}
                 <text
                   ref={(el) => {
                     circleLabelRefs.current[i] = el;
@@ -425,17 +490,17 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               Trains in motion = train class
             </text>
             <g transform="translate(0, 16)">
-              <line x1={4} y1={0} x2={16} y2={0} stroke={LIGHT.ink.trainHs.css} strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
-              <circle cx={18} cy={0} r={4.5} fill={LIGHT.ink.trainHs.css} />
-              <circle cx={18} cy={0} r={2} fill={LIGHT.ink.trainCore.css} />
+              <line x1={4} y1={0} x2={16} y2={0} stroke={look.ink.trainHs.css} strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
+              <circle cx={18} cy={0} r={4.5} fill={look.ink.trainHs.css} />
+              <circle cx={18} cy={0} r={2} fill={look.ink.trainCore.css} />
               <text x={28} y={0} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
                 High-speed (G / D / C)
               </text>
             </g>
             <g transform="translate(0, 32)">
-              <line x1={4} y1={0} x2={16} y2={0} stroke={LIGHT.ink.trainConv.css} strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
-              <circle cx={18} cy={0} r={4.5} fill={LIGHT.ink.trainConv.css} />
-              <circle cx={18} cy={0} r={2} fill={LIGHT.ink.trainCore.css} />
+              <line x1={4} y1={0} x2={16} y2={0} stroke={look.ink.trainConv.css} strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
+              <circle cx={18} cy={0} r={4.5} fill={look.ink.trainConv.css} />
+              <circle cx={18} cy={0} r={2} fill={look.ink.trainCore.css} />
               <text x={28} y={0} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
                 Conventional (K / T / Z / S)
               </text>

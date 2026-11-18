@@ -4,13 +4,14 @@ import { describe, expect, test } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TimelineScrubber } from "../src/components/TimelineScrubber";
+import { mapStyle } from "../src/lib";
 
 const noop = () => {};
 
 describe("TimelineScrubber", () => {
   test("collapsed state when onCollapse is not provided", () => {
     const h = renderToStaticMarkup(
-      <TimelineScrubber mapRef={{ current: null }} dark={false} direction="out" />
+      <TimelineScrubber mapRef={{ current: null }} style={mapStyle("paper", "light")} direction="out" />
     );
     expect(h).toContain("timeline-collapsed-bar");
     expect(h).toContain("24h Flow Animation · Expand ▴");
@@ -21,7 +22,7 @@ describe("TimelineScrubber", () => {
     const h = renderToStaticMarkup(
       <TimelineScrubber
         mapRef={{ current: null }}
-        dark={false}
+        style={mapStyle("paper", "light")}
         direction="out"
         onCollapse={noop}
       />
@@ -42,7 +43,7 @@ describe("TimelineScrubber", () => {
     const h = renderToStaticMarkup(
       <TimelineScrubber
         mapRef={{ current: null }}
-        dark={false}
+        style={mapStyle("paper", "light")}
         direction="in"
         onCollapse={noop}
       />
@@ -70,7 +71,7 @@ describe("TimelineScrubber", () => {
       try {
         return TimelineScrubber({
           mapRef: { current: null },
-          dark: false,
+          style: mapStyle("paper", "light"),
           direction: "out",
           onCollapse: noop,
         });

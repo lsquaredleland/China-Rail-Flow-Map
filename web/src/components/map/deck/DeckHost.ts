@@ -11,7 +11,7 @@
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import { DEFAULT_SKIN, dotPlaces, getSelCache, isTrainShown, mapStyle, modeOf, originIsolatedCities, stationStates, stationT, viewToViewState } from "../../../lib";
+import { dotPlaces, getSelCache, isTrainShown, originIsolatedCities, stationStates, stationT, viewToViewState } from "../../../lib";
 import { closeupOf, stepCloseup } from "../closeup";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
@@ -123,7 +123,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   const { P, S } = M;
   const atlas = P.current.atlas;
   if (!atlas) return [];
-  const style = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark));
+  const style = P.current.style;
   const layers: Layer[] = backdropLayers({
     atlas,
     outline: P.current.outline ?? null,
@@ -172,6 +172,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
           selectedCode: P.current.selectedTrainCode,
           hoveredCode: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
           animTime: st.animTime,
+          style,
         }),
       );
     }
@@ -362,7 +363,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement, onFatal?: () => void)
     const { S, P } = M;
     const st = S.current;
     if (!P.current.atlas || !P.current.cur || !deck.isInitialized) return;
-    canvas.style.background = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark)).ink.paper.css;
+    canvas.style.background = P.current.style.ink.paper.css;
     const layers = buildLayers(M, stats);
     const sig = layers.map((l) => l.id).join("|");
     if (sig !== layerSig) {

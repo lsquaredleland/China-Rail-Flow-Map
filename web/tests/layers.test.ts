@@ -1,12 +1,14 @@
 // Deck flow layers: buildPassData / layer props, no GPU.
 import { describe, expect, test } from "bun:test";
-import { WIDTH_K, WIDTH_KNEE, flowColor, flowUnits, flowPasses, getSelCache, isFerrySection, isTrainShown, mapStyle, newModelCaches, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
-import type { SelCache, SelInput } from "../src/lib";
+import { LINE_COLOR, boxSide, WIDTH_K, WIDTH_KNEE, speedBand, flowColor, flowUnits, flowPasses, getSelCache, isFerrySection, isTrainShown, mapStyle, newModelCaches, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
+import type { MapStyle, SelCache, SelInput } from "../src/lib";
 import type { ModelState } from "../src/lib";
 import { buildPassData, flowPassLayers } from "../src/components/map/deck/layers/flows";
 import type { DestVM } from "../src/types";
 import { stationDots, stationLayers, stationRipples, stationRings } from "../src/components/map/deck/layers/stations";
 import { buildTrainBuffers, glowOf, shownTrains, tailLength, trainLayers } from "../src/components/map/deck/layers/trains";
+import { BOX_DIST, BoxLayer, CIRCLE_DIST } from "../src/components/map/deck/BoxLayer";
+import { ScatterplotLayer } from "@deck.gl/layers";
 import { origin, pack } from "./fixture";
 
 const cur = origin("广州");
@@ -63,6 +65,27 @@ describe("buildPassData", () => {
     expect(buildPassData(set, items, style, 1, pass.maxN)).toBe(pd);
     // A different style is a different cache entry (the key is the style, not only paper + flow).
     expect(buildPassData(set, items, mapStyle("paper", "dark"), 1, pass.maxN)).not.toBe(pd);
+  });
+
+  test("by: count colours every path with flowColor of its count", () => {
+    for (let p = 0; p < pd.data.length; p++)
+      expect(Array.from(pd.rgba.subarray(p * 4, p * 4 + 4))).toEqual(rgba(flowColor(pd.n[p], pass.maxN, pal)));
+  });
+
+  test("by: section colours each path by its own section's speed band", () => {
+    const ramp = { bands: ["#010101", "#020202", "#030303", "#040404", "#050505"], untagged: "#0F0F0F" };
+    const speedStyle = { ...style, key: "test|speed", speedBands: ramp, enc: { ...style.enc, lineColor: LINE_COLOR.speedLimit } } as MapStyle;
+    const sp = buildPassData(set, items, speedStyle, 1, pass.maxN);
+    const seen = new Set<string>();
+    for (let p = 0; p < sp.data.length; p++) {
+      const b = speedBand(set.speed[sp.idxToSec[p]]);
+      const want = rgba(b < 0 ? ramp.untagged : ramp.bands[b]);
+      const got = Array.from(sp.rgba.subarray(p * 4, p * 4 + 4));
+      expect(got).toEqual(want);
+      seen.add(got.join());
+    }
+    expect(seen.size).toBeGreaterThan(2);
+    expect(Array.from(sp.n)).toEqual(Array.from(pd.n)); // width still the count
   });
 
   test("n = 0 sections are absent", () => {
@@ -177,10 +200,47 @@ describe("station layers", () => {
     const ls = stationLayers({ states, style, hasDest: false, originPt: [1, 2], panelDest: null, hoverStation: null, hoverOrigin: false, sk: 0.5, key: "k", posKey: "p" });
     expect(ls.map((l) => l.id)).toEqual(["stations", "ripples", "origin", "rings"]);
     expect(ls[2].props.getRadius).toBe(9);
+    // paper draws discs: the plain ScatterplotLayer, never the box subclass
+    for (const l of ls) expect(l).not.toBeInstanceOf(BoxLayer);
+  });
+
+  test("box marker: squares of the circle's area, rings keep their px gap", () => {
+    const box = { ...style, key: "test|box", marker: { ...style.marker, shape: "box" } } as MapStyle;
+    const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
+    const ls = stationLayers({ states, style: box, hasDest: false, originPt: [1, 2], originPlaces: [[1, 2]], panelDest: dest, hoverStation: null, hoverOrigin: false, sk: 0.5, closeup: null, key: "k", posKey: "p" });
+    expect(ls.map((l) => l.id)).toEqual(["stations", "ripples", "origin", "rings"]);
+    for (const l of ls) expect(l).toBeInstanceOf(BoxLayer);
+    const dots = stationDots(states, box, false);
+    const getR = ls[0].props.getRadius as (d: unknown) => number;
+    for (let i = 0; i < dots.length; i += 37) {
+      const half = getR(dots[i]);
+      expect(half).toBeCloseTo((dots[i].r * Math.sqrt(Math.PI)) / 2, 9);
+      expect((2 * half) ** 2).toBeCloseTo(Math.PI * dots[i].r ** 2, 6); // same area as the disc
+    }
+    expect(ls[2].props.getRadius).toBeCloseTo((9 * Math.sqrt(Math.PI)) / 2, 9);
+    const rings = stationRings({ panelDest: dest, hoverStation: null, hoverOrigin: false, originPt: [0, 0], sk: 0.5, style: box });
+    const g = stationR(dest.trains) * stationZoomK(stationR(dest.trains), 0.5);
+    expect(rings[0].r).toBeCloseTo(boxSide(g) / 2 + 3.8, 9);
+  });
+
+  test("BoxLayer swaps the fragment shader's circle distance for the square one", () => {
+    const l = new BoxLayer({ id: "b", data: [] });
+    (l as unknown as { context: unknown }).context = { defaultShaderModules: [], device: { type: "webgl" } };
+    const fs = l.getShaders().fs;
+    expect(fs).not.toContain(CIRCLE_DIST);
+    expect(fs).toContain("float distToCenter = " + BOX_DIST);
+    const circle = new ScatterplotLayer({ id: "c", data: [] });
+    (circle as unknown as { context: unknown }).context = { defaultShaderModules: [], device: { type: "webgl" } };
+    expect(circle.getShaders().fs).toContain("float distToCenter = " + CIRCLE_DIST);
   });
 });
 
 describe("train layers", () => {
+  test("glowOf follows the style: paper's classes are the same in both modes; terminal's trains are cyan", () => {
+    for (const c of ["G", "K", "", "D", "Z"]) expect(glowOf(c, mapStyle("paper", "dark"))).toEqual(glowOf(c));
+    for (const c of ["G", "K", ""]) expect(glowOf(c, mapStyle("terminal", "dark"))).toEqual([63, 230, 255, 255]);
+  });
+
   const tl = cur.timeline!;
   const pd = dest;
   const sel: SelInput = { cur, panelDest: pd, isolatedTrainCode: null, direction: "out" };

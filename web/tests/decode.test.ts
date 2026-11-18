@@ -1,8 +1,32 @@
 // Pack-level invariants on the committed pack (O13): decode contract,
 // path ids in range, class columns, geometric continuity of paths.
 import { describe, expect, test } from "bun:test";
-import { DATA_FMT, FLOW_CLASSES, decodeSecs, requireFmt } from "../src/lib";
+import { DATA_FMT, FLOW_CLASSES, decodeSecs, decodeSet, requireFmt } from "../src/lib";
 import { pack } from "./fixture";
+
+describe("section speed column", () => {
+  test("decodeSet: speed per polyline from v; 0 when untagged or not given", () => {
+    const g = ["", "", ""];
+    expect(Array.from(decodeSet(g, undefined, [350, undefined, 120]).speed)).toEqual([350, 0, 120]);
+    expect(Array.from(decodeSet(g).speed)).toEqual([0, 0, 0]);
+    expect(decodeSet(g).speed).toBeInstanceOf(Uint16Array);
+  });
+
+  test("prepAtlas: sec / inSec speed equals each section's v (0 = absent)", () => {
+    const a = pack().atlas;
+    let tagged = 0;
+    for (const [set, raw] of [[a.sec, a.data.sections], [a.inSec, a.data.in_sections]] as const) {
+      expect(set.speed.length).toBe(raw.length);
+      for (let s = 0; s < raw.length; s++) {
+        expect(set.speed[s]).toBe(raw[s].v ?? 0);
+        if (raw[s].v) tagged++;
+        // a posted limit is a positive km/h (the pipeline keeps 5..450), never signed
+        if (raw[s].v !== undefined) expect(raw[s].v!).toBeGreaterThan(0);
+      }
+    }
+    expect(tagged).toBeGreaterThan(0);
+  });
+});
 
 describe("pack decode", () => {
   test("every file carries the supported fmt", () => {

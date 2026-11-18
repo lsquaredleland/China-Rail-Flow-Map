@@ -2,13 +2,13 @@
    totals (or growing with the clock), the label candidates and the circle
    layers. Memo keys: see ./index.ts. */
 import type { Layer } from "@deck.gl/core";
-import { ScatterplotLayer } from "@deck.gl/layers";
 import type { DecodedAtlas, NationalFlowsPack, NationalIndexPack } from "../../../../../types";
 import { natCityEvents, natCityEventsAt, natCityR, natCityTier, rgba, stationZoomK } from "../../../../../lib";
 import type { LabelPoint, MapStyle, NatCityEvents } from "../../../../../lib";
 import { rippleRing } from "../stations";
 import type { Ripple } from "../stations";
 import type { NatView } from "./timeline";
+import { markerLayer, markerRadius } from "../../BoxLayer";
 
 /* ---------- national city circles ---------- */
 
@@ -138,15 +138,18 @@ export function nationalLabelPoints(atlas: DecodedAtlas | null | undefined, d: N
 
 /** The city circles, biggest first so small ones stay on top: a translucent
     fill (so the flows show through) and a thin stroke styled by `style`;
-    the hovered city (`hoverIdx`, a `city_table` index) is opaque with a ring. */
+    the hovered city (`hoverIdx`, a `city_table` index) is opaque with a ring.
+    A "box" skin draws squares of the circles' areas (BoxLayer). */
 export function nationalCityLayers(d: NationalCityDots, style: MapStyle, hoverIdx = -1): Layer[] {
   const order = d.idx.map((_, i) => i).sort((a, b) => d.r[b] - d.r[a]);
+  const Marker = markerLayer(style);
+  const mr = (r: number) => markerRadius(style, r);
   const layers: Layer[] = [
-    new ScatterplotLayer<number>({
+    new Marker<number>({
       id: "nat-cities",
       data: order,
       getPosition: (i: number) => d.pos[i],
-      getRadius: (i: number) => d.r[i],
+      getRadius: (i: number) => mr(d.r[i]),
       radiusUnits: "pixels",
       lineWidthUnits: "pixels",
       stroked: true,
@@ -165,11 +168,11 @@ export function nationalCityLayers(d: NationalCityDots, style: MapStyle, hoverId
   }
   if (rip.length) {
     layers.push(
-      new ScatterplotLayer<Ripple>({
+      new Marker<Ripple>({
         id: "nat-city-ripples",
         data: rip,
         getPosition: (r: Ripple) => r.pos,
-        getRadius: (r: Ripple) => r.r,
+        getRadius: (r: Ripple) => mr(r.r),
         radiusUnits: "pixels",
         lineWidthUnits: "pixels",
         stroked: true,
@@ -184,11 +187,11 @@ export function nationalCityLayers(d: NationalCityDots, style: MapStyle, hoverId
   const h = hoverIdx >= 0 ? d.idx.indexOf(hoverIdx) : -1;
   if (h >= 0) {
     layers.push(
-      new ScatterplotLayer<number>({
+      new Marker<number>({
         id: "nat-city-hover",
         data: [h],
         getPosition: (i: number) => d.pos[i],
-        getRadius: (i: number) => d.r[i],
+        getRadius: (i: number) => mr(d.r[i]),
         radiusUnits: "pixels",
         lineWidthUnits: "pixels",
         stroked: true,

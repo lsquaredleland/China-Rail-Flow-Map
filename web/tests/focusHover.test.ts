@@ -4,13 +4,14 @@ import { describe, expect, test } from "bun:test";
 import { pick } from "../src/components/map/interaction";
 import { createMapCtx } from "../src/components/map/context";
 import type { MapCtx, Props } from "../src/components/map/context";
+import { mapStyle } from "../src/lib";
 import { origin, pack } from "./fixture";
 
 const ref = <T>(v: T | null = null) => ({ current: v });
 
 function ctx(panelDest: unknown): MapCtx {
   const P = {
-    current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national: false, panelDest } as unknown as Props,
+    current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national: false, panelDest, style: mapStyle("paper", "light") } as unknown as Props,
   };
   const M = createMapCtx(P, {
     wrapRef: ref(),

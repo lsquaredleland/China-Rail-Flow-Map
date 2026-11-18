@@ -95,13 +95,13 @@ describe("national layers", () => {
       const k = Math.ceil((tl.start[q] - 1095) / 1440);
       let first = i;
       while (first > 0 && f.qOf[first - 1] === q) first--;
-      const vm = natTrainVM(tl, atlas.data, data.schedules, q, 1095 + 1440 * (k + i - first), f.pos[i * 6], f.pos[i * 6 + 1], f.pos[i * 6 + 2], f.pos[i * 6 + 3]);
+      const vm = natTrainVM(tl, atlas, data.schedules, q, 1095 + 1440 * (k + i - first), f.pos[i * 6], f.pos[i * 6 + 1], f.pos[i * 6 + 2], f.pos[i * 6 + 3]);
       expect(vm.code).toBe(atlas.data.train_table[tl.tIdx[q]].code);
       expect(vm.progressPct).toBeGreaterThanOrEqual(0);
       expect(vm.progressPct).toBeLessThanOrEqual(100);
       expect(vm.fromStation).not.toBe("");
       expect(!!vm.isDwelling).toBe((f.pos[i * 6 + 5] & 16) !== 0);
-      expect(tooltipHtml({ kind: "train", train: vm }, { data: atlas.data, cur: null as never, direction: "out", distUnit: "km", panelDest: null, dark: false, ferry: false })).toContain(vm.code);
+      expect(tooltipHtml({ kind: "train", train: vm }, { data: atlas.data, cur: null as never, direction: "out", distUnit: "km", panelDest: null, style: mapStyle("paper", "light"), ferry: false })).toContain(vm.code);
     }
   });
 });

@@ -8,11 +8,12 @@ import {
 import type { MapApi, AnimState } from "./MapHost";
 import SpeedSelect from "./SpeedSelect";
 import type { Direction } from "../types";
-import { DEFAULT_SKIN, mapStyle, modeOf } from "../lib";
+import type { MapStyle } from "../lib";
 
 export interface TimelineScrubberProps {
   mapRef: RefObject<MapApi | null>;
-  dark: boolean;
+  /** The resolved map style (skin × mode). */
+  style: MapStyle;
   direction: Direction;
   originZh?: string;
   onCollapse?: () => void;
@@ -60,7 +61,7 @@ function fmtTimelineClock(mins: number, totalMins: number = 1440): string {
 
 export const TimelineScrubber: FC<TimelineScrubberProps> = ({
   mapRef,
-  dark,
+  style,
   direction,
   onCollapse,
 }) => {
@@ -95,7 +96,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
   // Subscribe to MapHost animation ticks with direct DOM updates (0% React re-render overhead)
   useEffect(() => {
-    const ink = mapStyle(DEFAULT_SKIN, modeOf(dark)).ink;
+    const ink = style.ink;
     const handleAnimUpdate = (state: AnimState) => {
       const totM = state.totalMins || 1440;
       totalMinsRef.current = totM;
@@ -223,7 +224,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       if (pollInterval) clearInterval(pollInterval);
       if (unsub) unsub();
     };
-  }, [mapRef, direction, dark, isNational]); // a mode flip remounts counters: re-pull the state
+  }, [mapRef, direction, style, isNational]); // a skin or mode flip remounts counters: re-pull the state
 
   // Global Keyboard Shortcuts (Space, ArrowLeft, ArrowRight, Home)
   useEffect(() => {

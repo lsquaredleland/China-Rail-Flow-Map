@@ -2,24 +2,29 @@
 // literals exactly, is memoised per (skin, mode), and its encodings equal the
 // palette helpers they wrap.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   LINE_COLOR,
   NODE_COLOR,
   NODE_SIZE,
   SKINS,
+  SPEED_BANDS,
+  boxSide,
   flowColor,
   mapStyle,
   modeOf,
   natCityR,
+  parseSkin,
   palette,
   paletteRGBA,
   rampColor,
   resolveMode,
   rgba,
   skinHasModeToggle,
+  speedBand,
   stationR,
 } from "../src/lib";
-import type { Mode } from "../src/lib";
+import type { Mode, SkinId } from "../src/lib";
 
 const MODES: Mode[] = ["light", "dark"];
 
@@ -79,6 +84,50 @@ describe("mapStyle", () => {
   });
 });
 
+describe("terminal skin", () => {
+  const t = mapStyle("terminal", "dark");
+  test("dark only: light resolves to dark, no day/night toggle, one memoised style", () => {
+    expect(SKINS.terminal.modes).toEqual(["dark"]);
+    expect(SKINS.terminal.defaultMode).toBe("dark");
+    expect(resolveMode("terminal", "light")).toBe("dark");
+    expect(skinHasModeToggle("terminal")).toBe(false);
+    expect(mapStyle("terminal", "light")).toBe(t);
+    expect(t.key).toBe("terminal|dark");
+    expect(t.mode).toBe("dark");
+  });
+
+  test("encodings and shapes: speedLimit lines, flat box cities, round caps and mitred joints", () => {
+    expect(t.enc.lineColor).toBe(LINE_COLOR.speedLimit);
+    expect(t.enc.nodeColor).toBe(NODE_COLOR.flat);
+    expect(t.enc.nodeSize).toBe(NODE_SIZE.stationRadius);
+    expect(t.enc.natNodeSize).toBe(NODE_SIZE.natCityRadius);
+    expect(t.marker.shape).toBe("box");
+    expect(t.line).toEqual({ capRounded: true, jointRounded: false });
+    expect(t.font.family).toBe("'Share Tech Mono', ui-monospace, monospace");
+  });
+
+  test("the TSpeed colours", () => {
+    expect(t.speedBands).toEqual({ bands: ["#F4FFE8", "#FFD43B", "#FF8F40", "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" });
+    expect(t.ink.paper.css).toBe("#04060C");
+    expect(t.ink.label.css).toBe("#FF8F40");
+    expect(t.ink.dotEdge.css).toBe("#FF8F40");
+    expect(t.ink.dot.rgba).toEqual([255, 143, 64, 46]);
+    expect(t.ink.originFill.css).toBe("#EAF2FF");
+    for (const k of ["trainHs", "trainConv", "trainOther"] as const) expect(t.ink[k].css).toBe("#3FE6FF");
+    // the national boxes take the fill's own alpha
+    expect(t.alpha.natCityFill).toBe(1);
+    // ink and pal agree where both exist
+    expect(t.ink.landFill.css).toBe(t.pal.landFill);
+    expect(t.ink.outline.css).toBe(t.pal.outline);
+  });
+
+  test("paper is untouched by the second skin", () => {
+    expect(mapStyle("paper", "light").enc.lineColor).toBe(LINE_COLOR.volume);
+    expect(mapStyle("paper", "dark").marker.shape).toBe("circle");
+    expect(mapStyle("paper", "light").pal).toEqual(palette(false));
+  });
+});
+
 describe("skin modes", () => {
   test("paper supports both modes and keeps the requested one", () => {
     expect(SKINS.paper.modes).toEqual(["light", "dark"]);
@@ -88,21 +137,95 @@ describe("skin modes", () => {
   });
 });
 
+describe("skin selection", () => {
+  test("parseSkin: registered ids as is; unknown, empty and null are paper", () => {
+    for (const id of Object.keys(SKINS)) expect(parseSkin(id)).toBe(id as SkinId);
+    for (const s of ["", null, undefined, "Paper", "neon", "toString", "__proto__"]) expect(parseSkin(s)).toBe("paper");
+  });
+
+  /* The pre-paint script in index.template.html, run on a fake window: it must
+     pick the same skin and mode as useUrlState + resolveMode. */
+  const html = readFileSync(new URL("../index.template.html", import.meta.url), "utf8");
+  const body = /<script>\s*([\s\S]*?)<\/script>/.exec(html)![1];
+  const prePaint = (search: string, store: Record<string, string>, prefersDark: boolean) => {
+    const attrs: Record<string, string> = {};
+    const win = { location: { search }, matchMedia: () => ({ matches: prefersDark }) };
+    const doc = { documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v) } };
+    const ss = { getItem: (k: string) => (k in store ? store[k] : null) };
+    new Function("window", "document", "sessionStorage", body)(win, doc, ss);
+    return attrs;
+  };
+  const expected = (search: string, store: Record<string, string>, prefersDark: boolean) => {
+    const q = new URLSearchParams(search);
+    const sk = q.get("skin");
+    const skin = parseSkin(sk === null ? store["crfa-skin"] : sk);
+    const p = q.get("theme");
+    const s = store["crfa-theme"];
+    const dark = p === "dark" || p === "night" ? true : p === "light" || p === "day" ? false : s === "dark" ? true : s === "light" ? false : prefersDark;
+    return { "data-skin": skin, "data-theme": resolveMode(skin, modeOf(dark)) };
+  };
+  const searches = ["", "?skin=paper", "?skin=bogus", "?theme=light", "?theme=night&skin=paper", ...Object.keys(SKINS).map((k) => "?theme=light&skin=" + k)];
+  const stores: Record<string, string>[] = [{}, { "crfa-theme": "dark" }, ...Object.keys(SKINS).map((k) => ({ "crfa-skin": k, "crfa-theme": "light" })), { "crfa-skin": "bogus" }];
+  for (const search of searches)
+    for (const store of stores)
+      for (const pd of [false, true])
+        test(`pre-paint script ${search || "(none)"} ${JSON.stringify(store)} prefersDark=${pd}`, () => {
+          expect(prePaint(search, store, pd)).toEqual(expected(search, store, pd));
+        });
+
+  test("pre-paint script does not throw without storage or matchMedia", () => {
+    const attrs: Record<string, string> = {};
+    const doc = { documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v) } };
+    new Function("window", "document", "sessionStorage", body)({ location: { search: "?skin=paper" } }, doc, undefined);
+    expect(attrs).toEqual({ "data-skin": "paper", "data-theme": "light" });
+  });
+});
+
 describe("encodings", () => {
   const pal = palette(false);
+  const st = mapStyle("paper", "light");
   test("volume = flowColor; timeBand = rampColor or pal.dot; flat = pal.dot", () => {
+    expect(LINE_COLOR.volume.by).toBe("count");
     for (const [n, maxN] of [[1, 100], [37, 100], [100, 100], [5, 0]])
-      expect(LINE_COLOR.volume.color({ n, maxN }, pal)).toBe(flowColor(n, maxN, pal));
+      for (const [s, speed] of [[-1, 0], [3, 350]])
+        expect(LINE_COLOR.volume.color({ n, maxN, s, speed }, st)).toBe(flowColor(n, maxN, pal));
     for (const m of [0, 200, 240, 600, 720, 1500]) expect(NODE_COLOR.timeBand.color(m, pal)).toBe(rampColor(m, pal));
     expect(NODE_COLOR.timeBand.color(undefined, pal)).toBe(pal.dot);
     expect(NODE_COLOR.flat.color(300, pal)).toBe(pal.dot);
     expect(rgba(NODE_COLOR.flat.color(undefined, pal))).toEqual(rgba(pal.dot));
   });
 
-  test("directTrains = stationR; callsAtCity = natCityR", () => {
+  test("stationRadius = stationR; natCityRadius = natCityR", () => {
     for (const n of [0, 1, 10, 250, 3000]) {
-      expect(NODE_SIZE.directTrains.radius(n)).toBe(stationR(n));
-      expect(NODE_SIZE.callsAtCity.radius(n)).toBe(natCityR(n));
+      expect(NODE_SIZE.stationRadius.radius(n)).toBe(stationR(n));
+      expect(NODE_SIZE.natCityRadius.radius(n)).toBe(natCityR(n));
+    }
+  });
+
+  test("speedBand: boundaries at 120 / 200 / 250 / 300; 0 is untagged", () => {
+    const cases: [number, number][] = [
+      [0, -1], [1, 4], [119, 4], [120, 3], [199, 3], [200, 2], [249, 2], [250, 1], [299, 1], [300, 0], [350, 0], [450, 0],
+    ];
+    for (const [v, b] of cases) expect(speedBand(v)).toBe(b);
+    expect(SPEED_BANDS.map((b) => b.label)).toEqual(["300+", "250–299", "200–249", "120–199", "<120"]);
+  });
+
+  test("speedLimit: the skin's band colour by the section's speed, untagged colour at 0", () => {
+    const ramp = { bands: ["#000001", "#000002", "#000003", "#000004", "#000005"], untagged: "#00000F" };
+    const style = { pal, speedBands: ramp };
+    const c = (speed: number) => LINE_COLOR.speedLimit.color({ n: 10, maxN: 100, s: 0, speed }, style);
+    expect(LINE_COLOR.speedLimit.by).toBe("section");
+    expect([300, 299, 250, 249, 200, 199, 120, 119, 1, 0].map(c)).toEqual([
+      "#000001", "#000002", "#000002", "#000003", "#000003", "#000004", "#000004", "#000005", "#000005", "#00000F",
+    ]);
+    // the count never matters
+    expect(LINE_COLOR.speedLimit.color({ n: 99, maxN: 1, s: 7, speed: 310 }, style)).toBe("#000001");
+  });
+
+  test("boxSide: a square of the circle's area (side = r * sqrt(pi))", () => {
+    for (const r of [0, 1.5, 2, 7.3, 26]) {
+      expect(boxSide(r)).toBeCloseTo(r * Math.sqrt(Math.PI), 12);
+      expect(boxSide(r) ** 2).toBeCloseTo(Math.PI * r * r, 9);
     }
   });
 });

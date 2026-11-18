@@ -20,7 +20,7 @@
                   rankMemo    WeakMap by the counts object
                   labelMemo   WeakMap by the drawn circle set */
 import type { Layer } from "@deck.gl/core";
-import { DEFAULT_SKIN, isolatedCityIdxs, isoFlowAlpha, mapStyle, modeOf, natTrainEnds, stationT } from "../../../../../lib";
+import { isolatedCityIdxs, isoFlowAlpha, natTrainEnds, stationT } from "../../../../../lib";
 import type { NatFilter } from "../../../../../lib";
 import type { MapCtx } from "../../../context";
 import type { DeckStats } from "../../DeckHost";
@@ -43,7 +43,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   const { P, S } = M;
   const atlas = P.current.atlas;
   if (!atlas) return [];
-  const style = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark));
+  const style = P.current.style;
   const layers: Layer[] = [];
   const st = S.current;
   const { flows: withFlows, trains: withTrains } = P.current.nationalLayers ?? { flows: true, trains: false };
@@ -109,7 +109,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     return layers;
   }
   const keep = iso ? iso.keep : nationalKeep(built.tl, view.sel);
-  const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep);
+  const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep, style);
   let kept = built.tl.n;
   if (keep) {
     kept = 0;
@@ -126,7 +126,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       hover: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
       selected: P.current.selectedTrainCode,
       isolated: iso ? isoCode : null,
-    }),
+    }, style),
   );
   return layers;
 }

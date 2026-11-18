@@ -2,8 +2,9 @@
 // (dep_min / arr_min of the index) counted up to the minute. Synthetic pack:
 // 4 trains over 3 cities (city_table 0, 1, 2).
 import { describe, expect, test } from "bun:test";
-import { DATA_FMT, mapStyle, natCityCounts, natCityEvents, natCityEventsAt, natSelect } from "../src/lib";
-import type { NatFilter } from "../src/lib";
+import { DATA_FMT, boxSide, mapStyle, natCityCounts, natCityEvents, natCityEventsAt, natSelect } from "../src/lib";
+import type { MapStyle, NatFilter } from "../src/lib";
+import { BoxLayer } from "../src/components/map/deck/BoxLayer";
 import { NAT_RIPPLE_MIN, nationalCityDots, nationalCityLayers } from "../src/components/map/deck/layers/national";
 import type { NationalFlowsPack, NationalIndexPack, RawTrain } from "../src/types";
 import { pack } from "./fixture";
@@ -110,5 +111,17 @@ describe("national city growth", () => {
     expect(nationalCityLayers(dots(none, 70), mapStyle("paper", "light")).map((l) => l.id)).toContain("nat-city-ripples");
     expect(nationalCityLayers(dots(none, 300), mapStyle("paper", "light")).map((l) => l.id)).not.toContain("nat-city-ripples");
     expect(nationalCityLayers(dots(none, null), mapStyle("paper", "light")).map((l) => l.id)).not.toContain("nat-city-ripples");
+  });
+  test("box marker: every city layer is a BoxLayer with the circle's area; paper stays discs", () => {
+    const paper = mapStyle("paper", "light");
+    const box = { ...paper, key: "test|box", marker: { ...paper.marker, shape: "box" } } as MapStyle;
+    const d = dots(none, 70);
+    const h = d.idx[0];
+    for (const l of nationalCityLayers(d, paper, h)) expect(l).not.toBeInstanceOf(BoxLayer);
+    const ls = nationalCityLayers(d, box, h);
+    expect(ls.map((l) => l.id)).toEqual(["nat-cities", "nat-city-ripples", "nat-city-hover"]);
+    for (const l of ls) expect(l).toBeInstanceOf(BoxLayer);
+    const getR = ls[0].props.getRadius as (i: number) => number;
+    for (let i = 0; i < d.r.length; i++) expect(getR(i)).toBeCloseTo(boxSide(d.r[i]) / 2, 9);
   });
 });
