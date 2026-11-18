@@ -15,6 +15,7 @@ import type { Layer } from "@deck.gl/core";
 import { PathLayer } from "@deck.gl/layers";
 import type { DecodedAtlas, NationalTimeline } from "../../../../../types";
 import { natPositions, natXY } from "../../../../../lib";
+import type { MapStyle } from "../../../../../lib";
 import { dotLayers, glowOf, isoDwellRings, ringLayer } from "../trains";
 import type { Disc, DotBuffers } from "../trains";
 import { maxDots } from "./timeline";
@@ -133,9 +134,9 @@ export function nationalRings(
 }
 
 /** The isolated train's whole run as a line in its class colour (the origin
-    view's corridor): sampled along the run with natXY. */
+    view's corridor): sampled along the run with natXY, stroked with `style`. */
 const corridorMemo = new WeakMap<NationalTimeline, Map<number, number[]>>();
-export function nationalCorridor(tl: NationalTimeline, atlas: DecodedAtlas, q: number): Layer[] {
+export function nationalCorridor(tl: NationalTimeline, atlas: DecodedAtlas, q: number, style: MapStyle): Layer[] {
   let m = corridorMemo.get(tl);
   if (!m) corridorMemo.set(tl, (m = new Map()));
   let path = m.get(q);
@@ -160,8 +161,7 @@ export function nationalCorridor(tl: NationalTimeline, atlas: DecodedAtlas, q: n
       widthUnits: "pixels",
       getWidth: 2.5,
       getColor: [g[0], g[1], g[2], 255],
-      capRounded: true,
-      jointRounded: true,
+      ...style.line,
     } as object),
   ];
 }

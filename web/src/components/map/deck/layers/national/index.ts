@@ -13,14 +13,14 @@
                   isoMemo     (timeline, train code)
      trains.ts    pool        timeline identity (buffers regrow with it)
                   corridorMemo  WeakMap timeline -> train row -> sampled path
-     flows.ts     dayMemo     (flows pack, view key, theme)
+     flows.ts     dayMemo     (flows pack, view key, style)
                   atMemo      (day pass, entries pack, entry tick)
                   infraMemo   WeakMap by the drawn counts array
      cities.ts    eventsMemo  WeakMap by the view
                   rankMemo    WeakMap by the counts object
                   labelMemo   WeakMap by the drawn circle set */
 import type { Layer } from "@deck.gl/core";
-import { isolatedCityIdxs, isoFlowAlpha, natTrainEnds, stationT } from "../../../../../lib";
+import { DEFAULT_SKIN, isolatedCityIdxs, isoFlowAlpha, mapStyle, modeOf, natTrainEnds, stationT } from "../../../../../lib";
 import type { NatFilter } from "../../../../../lib";
 import type { MapCtx } from "../../../context";
 import type { DeckStats } from "../../DeckHost";
@@ -43,6 +43,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   const { P, S } = M;
   const atlas = P.current.atlas;
   if (!atlas) return [];
+  const style = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark));
   const layers: Layer[] = [];
   const st = S.current;
   const { flows: withFlows, trains: withTrains } = P.current.nationalLayers ?? { flows: true, trains: false };
@@ -72,7 +73,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       minute,
       classes: filter.classes,
       view,
-      dark: P.current.dark,
+      style,
       scale: st.view.scale,
       fitScale: st.fitScale,
       alpha: flowAlpha,
@@ -86,8 +87,8 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     }
   }
   // The infrastructure overlay over the flows (as in the origin view), under the circles.
-  if (withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, P.current.dark, flowAlpha));
-  if (iso && tlAll) layers.push(...nationalCorridor(tlAll.tl, atlas, iso.q));
+  if (withFlows && nf && P.current.showInfra) layers.push(...nationalInfraLayers(atlas, view.counts, style, flowAlpha));
+  if (iso && tlAll) layers.push(...nationalCorridor(tlAll.tl, atlas, iso.q, style));
   if (withFlows && nf) {
     // The city circles ride with the flows (day totals, whatever the clock).
     // With the clock running (flows + trains) the circles grow as the trains stop there.
@@ -98,8 +99,8 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     const only = iso ? isolatedCityIdxs(ix ? natTrainEnds(ix, t) : []) : null;
     st.natCities = nationalCityDots(atlas, nf, view.cities, stationT(st.view, st.fitScale), st.view.scale / st.fitScale, growth, only);
     const hv = st.hover;
-    if (!iso && hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, P.current.dark));
-    if (st.natCities) layers.push(...nationalCityLayers(st.natCities, P.current.dark, hv && hv.kind === "natCity" ? hv.idx : -1));
+    if (!iso && hv && hv.kind === "seg") layers.push(...nationalHighlight(atlas, hv.s, hv.n, st.view.scale, st.fitScale, style));
+    if (st.natCities) layers.push(...nationalCityLayers(st.natCities, style, hv && hv.kind === "natCity" ? hv.idx : -1));
   }
   const built = withTrains ? nationalTimeline(atlas, P.current.nationalTrains) : null;
   if (!built) {

@@ -129,7 +129,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     outline: P.current.outline ?? null,
     showOutline: !!P.current.showOutline,
     showNetwork: P.current.showNetwork,
-    dark: P.current.dark,
+    style,
     scale: S.current.view.scale,
   });
   if (P.current.national) return [...layers, ...nationalBuildLayers(M, stats)];

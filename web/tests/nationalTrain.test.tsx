@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import TrainScheduleModal from "../src/components/TrainScheduleModal";
-import { formatScheduleStops } from "../src/lib";
+import { formatScheduleStops, mapStyle } from "../src/lib";
 import type { NationalTrainsData, SchedulesData } from "../src/types";
 import { nationalCorridor, nationalFrame, nationalIsolated, nationalTimeline } from "../src/components/map/deck/layers/national";
 import { loadJson, nationalTrains, pack } from "./fixture";
@@ -102,7 +102,7 @@ describe("isolating a national train", () => {
   });
   test("its run is one corridor line from its first to its last position", () => {
     const iso = nationalIsolated(atlas, tl, code)!;
-    const [layer] = nationalCorridor(tl, atlas, iso.q);
+    const [layer] = nationalCorridor(tl, atlas, iso.q, mapStyle("paper", "light"));
     expect(layer.id).toBe("nat-corridor");
     const path = (layer.props.data as number[][])[0];
     expect(path.length).toBeGreaterThanOrEqual(4);

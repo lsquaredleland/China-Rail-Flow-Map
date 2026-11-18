@@ -4,8 +4,8 @@
 import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { DecodedAtlas, NationalFlowsPack, NationalIndexPack } from "../../../../../types";
-import { DEFAULT_SKIN, mapStyle, modeOf, natCityEvents, natCityEventsAt, natCityR, natCityTier, palette, rgba, stationZoomK } from "../../../../../lib";
-import type { LabelPoint, NatCityEvents } from "../../../../../lib";
+import { natCityEvents, natCityEventsAt, natCityR, natCityTier, rgba, stationZoomK } from "../../../../../lib";
+import type { LabelPoint, MapStyle, NatCityEvents } from "../../../../../lib";
 import { rippleRing } from "../stations";
 import type { Ripple } from "../stations";
 import type { NatView } from "./timeline";
@@ -137,10 +137,9 @@ export function nationalLabelPoints(atlas: DecodedAtlas | null | undefined, d: N
 }
 
 /** The city circles, biggest first so small ones stay on top: a translucent
-    fill (so the flows show through) and a thin stroke; the hovered city
-    (`hoverIdx`, a `city_table` index) is opaque with a ring. */
-export function nationalCityLayers(d: NationalCityDots, dark: boolean, hoverIdx = -1): Layer[] {
-  const pal = palette(dark);
+    fill (so the flows show through) and a thin stroke styled by `style`;
+    the hovered city (`hoverIdx`, a `city_table` index) is opaque with a ring. */
+export function nationalCityLayers(d: NationalCityDots, style: MapStyle, hoverIdx = -1): Layer[] {
   const order = d.idx.map((_, i) => i).sort((a, b) => d.r[b] - d.r[a]);
   const layers: Layer[] = [
     new ScatterplotLayer<number>({
@@ -153,16 +152,16 @@ export function nationalCityLayers(d: NationalCityDots, dark: boolean, hoverIdx 
       stroked: true,
       filled: true,
       // The city view's dot colours and edge rule (1.5 px day, 3 px night), thinner on the smallest circles.
-      getFillColor: rgba(pal.dot, dark ? 0.4 : 0.35),
-      getLineColor: rgba(pal.dotEdge),
-      getLineWidth: (i: number) => Math.min(dark ? 3 : 1.5, 0.3 * d.r[i]),
+      getFillColor: rgba(style.ink.dot.css, style.alpha.natCityFill),
+      getLineColor: style.ink.dotEdge.rgba,
+      getLineWidth: (i: number) => Math.min(style.marker.edgeWidth, 0.3 * d.r[i]),
       pickable: false,
-      updateTriggers: { getPosition: [d], getRadius: [d], getLineWidth: [d, dark] },
+      updateTriggers: { getPosition: [d], getRadius: [d], getLineWidth: [d, style.key] },
     }),
   ];
   const rip: Ripple[] = [];
   for (let i = 0; i < d.ripple.length; i++) {
-    if (d.ripple[i] >= 0) rip.push(rippleRing(d.pos[i], d.r[i], d.ripple[i], mapStyle(DEFAULT_SKIN, modeOf(dark))));
+    if (d.ripple[i] >= 0) rip.push(rippleRing(d.pos[i], d.r[i], d.ripple[i], style));
   }
   if (rip.length) {
     layers.push(
@@ -194,8 +193,8 @@ export function nationalCityLayers(d: NationalCityDots, dark: boolean, hoverIdx 
         lineWidthUnits: "pixels",
         stroked: true,
         filled: true,
-        getFillColor: rgba(pal.dot, 1),
-        getLineColor: rgba(pal.dotEdge),
+        getFillColor: rgba(style.ink.dot.css, 1),
+        getLineColor: style.ink.dotEdge.rgba,
         getLineWidth: 2,
         pickable: false,
         updateTriggers: { getPosition: [d], getRadius: [d] },
