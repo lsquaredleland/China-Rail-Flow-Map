@@ -11,6 +11,7 @@ import {
   SPEED_BANDS,
   boxSide,
   flowColor,
+  legendTitle,
   mapStyle,
   modeOf,
   natCityR,
@@ -103,15 +104,22 @@ describe("terminal skin", () => {
     expect(t.enc.natNodeSize).toBe(NODE_SIZE.natCityRadius);
     expect(t.marker.shape).toBe("box");
     expect(t.line).toEqual({ capRounded: true, jointRounded: false });
-    expect(t.font.family).toBe("'Share Tech Mono', ui-monospace, monospace");
+    expect(t.font.family).toBe("'Share Tech Mono', 'Noto Sans SC', ui-monospace, monospace");
+    // canvas labels in capitals, once the web face is loaded
+    expect(t.font.caps).toBe(true);
+    expect(t.font.load).toEqual(["16px 'Share Tech Mono'"]);
+    expect(t.glow).toEqual({ widthScale: 1.8, minPixels: 5, alpha: 0.24 });
   });
 
   test("the TSpeed colours", () => {
     expect(t.speedBands).toEqual({ bands: ["#F4FFE8", "#FFD43B", "#FF8F40", "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" });
     expect(t.ink.paper.css).toBe("#04060C");
     expect(t.ink.label.css).toBe("#FF8F40");
-    expect(t.ink.dotEdge.css).toBe("#FF8F40");
-    expect(t.ink.dot.rgba).toEqual([255, 143, 64, 46]);
+    // boxes: a dark well under a soft edge, apart from the amber 200-249 band
+    expect(t.ink.dotEdge.css).toBe("#8DA2CC");
+    expect(t.ink.dot.rgba).toEqual([4, 6, 12, 184]);
+    expect(t.speedBands.bands).not.toContain(t.ink.dotEdge.css);
+    expect(t.ink.rushPeak.css).toBe("#FFC21A");
     expect(t.ink.originFill.css).toBe("#EAF2FF");
     for (const k of ["trainHs", "trainConv", "trainOther"] as const) expect(t.ink[k].css).toBe("#3FE6FF");
     // the national boxes take the fill's own alpha
@@ -125,6 +133,30 @@ describe("terminal skin", () => {
     expect(mapStyle("paper", "light").enc.lineColor).toBe(LINE_COLOR.volume);
     expect(mapStyle("paper", "dark").marker.shape).toBe("circle");
     expect(mapStyle("paper", "light").pal).toEqual(palette(false));
+    for (const m of ["light", "dark"] as const) {
+      const p = mapStyle("paper", m);
+      expect(p.glow).toBeNull();
+      expect(p.font.caps).toBe(false);
+      expect(p.font.load).toEqual([]);
+    }
+  });
+});
+
+describe("legendTitle", () => {
+  const paper = mapStyle("paper", "light");
+  const term = mapStyle("terminal", "dark");
+  test("paper keeps the view's captions", () => {
+    expect(legendTitle(paper, { national: false, direction: "out", cityEn: "Beijing" })).toBe("Fastest time from origin");
+    expect(legendTitle(paper, { national: false, direction: "in", cityEn: "Beijing" })).toBe("Fastest time to Beijing");
+    expect(legendTitle(paper, { national: false, direction: "in", cityEn: null })).toBe("Fastest time to destination");
+    expect(legendTitle(paper, { national: true, direction: "out", cityEn: null })).toBe("All trains of China Rail");
+  });
+  test("a line colour with its own title names the card in every view", () => {
+    for (const national of [false, true])
+      for (const direction of ["out", "in"] as const)
+        expect(legendTitle(term, { national, direction, cityEn: "Beijing" })).toBe("Section speed limit");
+    expect(LINE_COLOR.speedLimit.title).toBe("Section speed limit");
+    expect(LINE_COLOR.volume.title).toBeUndefined();
   });
 });
 

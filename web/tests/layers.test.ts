@@ -128,6 +128,27 @@ describe("buildPassData", () => {
     expect(l.props.getWidth(undefined, { index: 0 })).toBeCloseTo((flowUnits(pdf.n[0]) * WIDTH_K) / 12.5, 9);
     expect(l.props.data).toBe(pdf.data);
   });
+
+  test("glow (terminal): one underlay per full-opacity pass, under every pass; paper has none", () => {
+    const passes = flowPasses(st({ panelDest: dest }), newModelCaches());
+    expect(flowPassLayers(set, passes, style, 100, 12.5).some((l) => l.id.startsWith("flows-glow-"))).toBe(false);
+    const term = mapStyle("terminal", "dark");
+    const glow = term.glow!;
+    const layers = flowPassLayers(set, passes, term, 100, 12.5);
+    const ids = layers.map((l) => l.id);
+    // the faded context pass keeps flat pre-blended colours: only the focus pass glows
+    expect(ids.filter((i) => i.startsWith("flows-glow-"))).toEqual(["flows-glow-focus"]);
+    expect(ids.indexOf("flows-glow-focus")).toBeLessThan(ids.indexOf("flows-context"));
+    const g: any = layers[ids.indexOf("flows-glow-focus")];
+    const pdf = buildPassData(set, passes[1].items, term, 1, passes[1].maxN);
+    expect(g.props.data).toBe(pdf.data);
+    expect(g.props.pickable).toBe(false);
+    expect(g.props.widthMinPixels).toBe(glow.minPixels);
+    expect(g.props.getWidth(undefined, { index: 0 })).toBeCloseTo((flowUnits(pdf.n[0]) * WIDTH_K * glow.widthScale) / 12.5, 9);
+    const c = g.props.getColor(undefined, { index: 0 });
+    expect(Array.from(c.slice(0, 3))).toEqual(Array.from(pdf.rgba.slice(0, 3)));
+    expect(c[3]).toBe(Math.round(pdf.rgba[3] * glow.alpha));
+  });
 });
 
 describe("station layers", () => {

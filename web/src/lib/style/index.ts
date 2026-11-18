@@ -160,6 +160,23 @@ export interface FontStyle {
   readonly family: string;
   /** Train code tags on the label overlay (canvas). */
   readonly tag: string;
+  /** Canvas labels are drawn in capitals (the page's CSS cannot reach them). */
+  readonly caps: boolean;
+  /** Web font faces (CSS font shorthands, for document.fonts.load) the canvas
+      text needs before it is measured and drawn. Empty when the faces are
+      already in use by the page (paper: Inter). */
+  readonly load: readonly string[];
+}
+
+/** A wide translucent underlay drawn beneath the full-opacity flow passes, in
+    each line's own colour, so lines read as lit traces. */
+export interface GlowStyle {
+  /** Underlay width as a multiple of the line's width. */
+  readonly widthScale: number;
+  /** Underlay minimum width, CSS px (thin lines still get a halo). */
+  readonly minPixels: number;
+  /** Underlay opacity (0..1), applied to the line colour. */
+  readonly alpha: number;
 }
 
 /** The encodings a skin draws with, resolved from the registries. */
@@ -190,6 +207,8 @@ export interface MapStyle {
   readonly speedBands: SpeedRamp;
   readonly alpha: Alphas;
   readonly line: LineStyle;
+  /** Flow glow underlay; null draws none (paper). */
+  readonly glow: GlowStyle | null;
   readonly marker: MarkerStyle;
   readonly font: FontStyle;
   readonly enc: Encodings;
@@ -297,10 +316,13 @@ const PAPER: SkinDef = {
         natCityFill: dark ? 0.4 : 0.35,
       },
       line: { capRounded: true, jointRounded: true },
+      glow: null,
       marker: { shape: "circle", edgeWidth: dark ? 3.0 : 1.5 },
       font: {
         family: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif",
         tag: "monospace",
+        caps: false,
+        load: [],
       },
       enc: {
         lineColor: LINE_COLOR.volume,
@@ -318,11 +340,14 @@ const T_GROUND = "#04060C";
 const T_AMBER = "#FF8F40";
 const T_WHITE = "#EAF2FF";
 const T_CYAN = "#3FE6FF";
+const T_SOFT = "#8DA2CC";
+const T_ACTIVE = "#FFC21A";
 
 /** Terminal (skins P2, map only): a dark-only skin on the paper night style,
     with a near-black ground, navy land under a blue hairline outline, amber
     labels and box cities, lines coloured by posted speed limit and cyan
-    trains. Square line caps and mitred joints; no glow yet (P3). */
+    trains. Mitred joints, a translucent glow under the flows, boxes with a
+    soft edge, Share Tech Mono in capitals on the canvas (P3). */
 const TERMINAL: SkinDef = {
   id: "terminal",
   modes: ["dark"],
@@ -336,8 +361,10 @@ const TERMINAL: SkinDef = {
       graticule: "rgba(42,92,255,0.16)",
       flowHi: T_WHITE,
       chord: "#3A4A6E",
-      dot: "rgba(255,143,64,0.18)",
-      dotEdge: T_AMBER,
+      // City boxes: a dark well under a soft blue-grey edge, so they read as
+      // stations and not as one more amber (200-249 km/h) line.
+      dot: "rgba(4,6,12,0.72)",
+      dotEdge: T_SOFT,
       label: T_AMBER,
       labelHalo: "rgba(4,6,12,0.92)",
       origin: T_WHITE,
@@ -368,8 +395,13 @@ const TERMINAL: SkinDef = {
       trainHs: ink(T_CYAN),
       trainConv: ink(T_CYAN),
       trainOther: ink(T_CYAN),
+      rushPeak: ink(T_ACTIVE),
+      rushDone: ink("#7CF04A"),
+      rushNight: ink(T_SOFT),
+      rushTail: ink(T_AMBER),
+      rushRegular: ink(T_SOFT),
     };
-    const mono = "'Share Tech Mono', ui-monospace, monospace";
+    const mono = "'Share Tech Mono', 'Noto Sans SC', ui-monospace, monospace";
     return {
       pal,
       cardPal: pal,
@@ -383,8 +415,9 @@ const TERMINAL: SkinDef = {
       // hide it. True mitres between sections need them chained into one
       // path (planned with the angular geometry, P4).
       line: { capRounded: true, jointRounded: false },
+      glow: { widthScale: 1.8, minPixels: 5, alpha: 0.24 },
       marker: { shape: "box", edgeWidth: 1.5 },
-      font: { family: mono, tag: mono },
+      font: { family: mono, tag: mono, caps: true, load: ["16px 'Share Tech Mono'"] },
       enc: {
         lineColor: LINE_COLOR.speedLimit,
         nodeColor: NODE_COLOR.flat,
@@ -415,6 +448,19 @@ export function parseSkin(s: string | null | undefined): SkinId {
 /** True when the skin supports both modes, i.e. the day/night toggle applies. */
 export function skinHasModeToggle(skin: SkinId): boolean {
   return SKINS[skin].modes.length > 1;
+}
+
+/** The legend card's title, following the encodings: the line colour's own
+    title when it has one (terminal: "Section speed limit"), else the view's
+    (the time bands' caption in the origin view, the national caption). */
+export function legendTitle(
+  style: Pick<MapStyle, "enc">,
+  view: { national: boolean; direction: "out" | "in"; cityEn: string | null },
+): string {
+  const own = style.enc.lineColor.title;
+  if (own) return own;
+  if (view.national) return "All trains of China Rail";
+  return view.direction === "out" ? "Fastest time from origin" : "Fastest time to " + (view.cityEn || "destination");
 }
 
 /** The P1 bridge from the legacy `dark` boolean to a Mode. */

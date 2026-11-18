@@ -41,6 +41,9 @@ export interface LineColorStyle {
 export interface LineColorEncoding {
   readonly id: LineColorId;
   readonly by: "count" | "section";
+  /** The legend card's title when this encoding is the line colour; absent
+      when the card keeps its view title (legendTitle). */
+  readonly title?: string;
   /** CSS colour of the section, from the style's ramp colours. */
   color(f: LineFact, st: LineColorStyle): string;
 }
@@ -92,6 +95,7 @@ export const LINE_COLOR: Readonly<Record<LineColorId, LineColorEncoding>> = {
   speedLimit: {
     id: "speedLimit",
     by: "section",
+    title: "Section speed limit",
     color: (f, st) => {
       const b = speedBand(f.speed);
       return b < 0 ? st.speedBands.untagged : st.speedBands.bands[b];

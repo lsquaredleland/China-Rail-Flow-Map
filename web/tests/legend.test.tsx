@@ -28,7 +28,7 @@ describe("Legend", () => {
     for (const c of [...t.speedBands.bands, t.speedBands.untagged]) expect(h).toContain('fill="' + c + '"');
     expect(h).toContain("Box size = direct trains/day");
     expect(h).not.toContain('class="lg-dot"');
-    expect(h).toContain('stroke="#FF8F40"');
+    expect(h).toContain('stroke="#8DA2CC"');
     // the trains key wears the skin's class colours
     expect(h).toContain('fill="#3FE6FF"');
   });

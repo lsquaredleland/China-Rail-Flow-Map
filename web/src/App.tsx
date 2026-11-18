@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
-import { buildOrigin, natCityCounts, natFlowCounts, stationName } from "./lib";
+import { buildOrigin, legendTitle, natCityCounts, natFlowCounts, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
@@ -500,13 +500,7 @@ export default function App() {
               ref={legendRef}
               national={national}
               style={style}
-              title={
-                national
-                  ? "All trains of China Rail"
-                  : direction === "out"
-                  ? "Fastest time from origin"
-                  : "Fastest time to " + (cur ? cur.en : "destination")
-              }
+              title={legendTitle(style, { national, direction, cityEn: cur ? cur.en : null })}
             />
           </div>
 

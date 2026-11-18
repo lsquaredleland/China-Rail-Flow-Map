@@ -17,6 +17,9 @@ const scratch = natMotion();
 const fontOf = (style: MapStyle, fs: number, weight: string) =>
   weight + " " + fs + "px " + style.font.family;
 
+/** A label's text as drawn: in capitals when the style says so (font.caps). */
+const cased = (style: MapStyle, text: string) => (style.font.caps ? text.toUpperCase() : text);
+
 /** Clears the overlay and draws labels + origin diamond for the current view. */
 export function drawLabelsOverlay(M: MapCtx) {
   const { S, P, canvasRef, points } = M;
@@ -51,7 +54,7 @@ export function drawLabelsOverlay(M: MapCtx) {
       const key = text + "|" + fs + "|" + weight;
       let tw = st.labelWidthCache.get(key);
       if (tw === undefined) {
-        tw = ctx.measureText(text).width;
+        tw = ctx.measureText(cased(style, text)).width;
         st.labelWidthCache.set(key, tw);
       }
       return tw;
@@ -81,7 +84,7 @@ export function drawLabelsOverlay(M: MapCtx) {
       ctx.fillStyle = ink.label.css;
     }
     ctx.textAlign = align;
-    ctx.fillText(text, x, y);
+    ctx.fillText(cased(style, text), x, y);
   }
   if (national) {
     drawNationalTags(M, ctx, style);
