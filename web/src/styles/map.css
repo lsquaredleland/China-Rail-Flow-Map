@@ -250,3 +250,5 @@
     transition: none;
   }
 }
+/* Ruler-tick strips on the map edges: terminal.css shows them. */
+.map-ruler { display: none; }

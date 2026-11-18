@@ -89,6 +89,27 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
     w.__draw = () => M.render();
   }, [M]);
 
+  // The canvas labels' web font (style.font.load; none for paper): the browser
+  // fetches a face only once text uses it, and canvas text does not wait for
+  // it, so ask for it and redraw (re-measuring every label) once it is in.
+  const fontLoad = props.style.font.load;
+  useEffect(() => {
+    if (fontLoad.length === 0 || typeof document === "undefined" || !document.fonts) return;
+    let live = true;
+    Promise.all(fontLoad.map((f) => document.fonts.load(f)))
+      .then(() => {
+        if (!live) return;
+        M.S.current.labelWidthCache.clear();
+        M.render();
+      })
+      .catch(() => {
+        // The fallback face stays; nothing to redo.
+      });
+    return () => {
+      live = false;
+    };
+  }, [M, fontLoad]);
+
   /* ---------- lifecycle ---------- */
   useEffect(() => {
     return () => {
@@ -328,6 +349,10 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
             : "Unfolding the timetable…"}
         </div>
       )}
+      {/* Ruler-tick strips on the map's left and right edges: decoration,
+          hidden unless a skin shows them (terminal.css). */}
+      <div className="map-ruler is-left" aria-hidden="true" />
+      <div className="map-ruler is-right" aria-hidden="true" />
       <div id="tooltip" role="status" ref={tooltipRef}></div>
       <div
         id="scalebar"

@@ -149,6 +149,7 @@ const CSS_ORDER = [
   "overlays.css",
   "cards.css",
   "responsive.css",
+  "terminal.css",
 ];
 const cssOnDisk = readdirSync("src/styles").filter((f) => f.endsWith(".css"));
 const unlisted = cssOnDisk.filter((f) => !CSS_ORDER.includes(f));

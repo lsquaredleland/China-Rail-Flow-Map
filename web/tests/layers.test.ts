@@ -128,6 +128,27 @@ describe("buildPassData", () => {
     expect(l.props.getWidth(undefined, { index: 0 })).toBeCloseTo((flowUnits(pdf.n[0]) * WIDTH_K) / 12.5, 9);
     expect(l.props.data).toBe(pdf.data);
   });
+
+  test("glow (terminal): one underlay per full-opacity pass, under every pass; paper has none", () => {
+    const passes = flowPasses(st({ panelDest: dest }), newModelCaches());
+    expect(flowPassLayers(set, passes, style, 100, 12.5).some((l) => l.id.startsWith("flows-glow-"))).toBe(false);
+    const term = mapStyle("terminal", "dark");
+    const glow = term.glow!;
+    const layers = flowPassLayers(set, passes, term, 100, 12.5);
+    const ids = layers.map((l) => l.id);
+    // the faded context pass keeps flat pre-blended colours: only the focus pass glows
+    expect(ids.filter((i) => i.startsWith("flows-glow-"))).toEqual(["flows-glow-focus"]);
+    expect(ids.indexOf("flows-glow-focus")).toBeLessThan(ids.indexOf("flows-context"));
+    const g: any = layers[ids.indexOf("flows-glow-focus")];
+    const pdf = buildPassData(set, passes[1].items, term, 1, passes[1].maxN);
+    expect(g.props.data).toBe(pdf.data);
+    expect(g.props.pickable).toBe(false);
+    expect(g.props.widthMinPixels).toBe(glow.minPixels);
+    expect(g.props.getWidth(undefined, { index: 0 })).toBeCloseTo((flowUnits(pdf.n[0]) * WIDTH_K * glow.widthScale) / 12.5, 9);
+    const c = g.props.getColor(undefined, { index: 0 });
+    expect(Array.from(c.slice(0, 3))).toEqual(Array.from(pdf.rgba.slice(0, 3)));
+    expect(c[3]).toBe(Math.round(pdf.rgba[3] * glow.alpha));
+  });
 });
 
 describe("station layers", () => {
@@ -202,6 +223,19 @@ describe("station layers", () => {
     expect(ls[2].props.getRadius).toBe(9);
     // paper draws discs: the plain ScatterplotLayer, never the box subclass
     for (const l of ls) expect(l).not.toBeInstanceOf(BoxLayer);
+  });
+
+  test("marker.minRadius leaves small markers out (terminal); 0 keeps every lit city (paper)", () => {
+    const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
+    const all = stationDots(states, style, false);
+    const rs = all.map((d) => d.r).sort((x, y) => x - y);
+    const min = rs[Math.floor(rs.length / 2)];
+    const small = { ...style, key: "test|min", marker: { ...style.marker, minRadius: min } } as MapStyle;
+    const kept = stationDots(states, small, false);
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.length).toBeLessThan(all.length);
+    for (const d of kept) expect(d.r).toBeGreaterThanOrEqual(min);
+    expect(all.filter((d) => d.r >= min).length).toBe(kept.length);
   });
 
   test("box marker: squares of the circle's area, rings keep their px gap", () => {

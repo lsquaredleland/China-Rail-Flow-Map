@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import DestinationPanel from "../src/components/DestinationPanel";
+import DestinationPanel, { EndBar, PanelHead } from "../src/components/DestinationPanel";
 import { origin } from "./fixture";
 
 describe("DestinationPanel", () => {
@@ -55,7 +55,7 @@ describe("DestinationPanel", () => {
     expect(h).toContain(dest.en);
     expect(h).toContain(dest.zh);
     expect(h).toContain("from Guangzhou");
-    expect(h).toContain("<table>");
+    expect(h).toContain('<table class="dp-has-head">');
     expect(h).toContain("See all " + dest.trains + " trains");
   });
 
@@ -74,7 +74,41 @@ describe("DestinationPanel", () => {
     expect(h).toContain(src.en);
     expect(h).toContain(src.zh);
     expect(h).toContain("to Guangzhou");
-    expect(h).toContain("<table>");
+    expect(h).toContain('<table class="dp-has-head">');
+  });
+
+  test("skin headline (hidden in paper): padded count, fast / conventional split and its tick bar", () => {
+    const h = renderToStaticMarkup(<PanelHead trains={86} fast={72} />);
+    expect(h).toContain('class="dp-term dp-head"');
+    expect(h).toContain(">086<");
+    expect(h).toContain("Fast G/D/C/S</span> 72");
+    expect(h).toContain("Conventional</span> 14");
+    expect(h).toContain('flex-grow:72');
+    expect(h).toContain('flex-grow:14');
+    // more fast trains than trains (inconsistent input) never goes negative
+    expect(renderToStaticMarkup(<PanelHead trains={3} fast={5} />)).toContain("Conventional</span> 0");
+    expect(renderToStaticMarkup(<PanelHead trains={1234} fast={0} />)).toContain(">1234<");
+  });
+
+  test("skin end bar: n / of and the share, 0 % without trains", () => {
+    const h = renderToStaticMarkup(<EndBar label="Trains ending here" n={61} of={86} />);
+    expect(h).toContain("61 / 86 · 70.9 %");
+    expect(h).toContain("width:70.9%");
+    expect(renderToStaticMarkup(<EndBar label="x" n={0} of={0} />)).toContain("0 / 0 · 0.0 %");
+  });
+
+  test("the headline reads the origin view's point; national rows have none", () => {
+    const out = renderToStaticMarkup(
+      <DestinationPanel point={dest} direction="out" cityEn="Guangzhou" cityZh="广州" unit="km" onClose={noop} />,
+    );
+    expect(out).toContain("Fast G/D/C/S</span> " + dest.fast);
+    expect(out).toContain("Conventional</span> " + (dest.trains - dest.fast));
+    expect(out).toContain(dest.terminating + " / " + dest.trains);
+    const nat = renderToStaticMarkup(
+      <DestinationPanel point={dest} rows={[["Departures", "3"], ["Arrivals", "4"]]} direction="out" unit="km" onClose={noop} />,
+    );
+    expect(nat).not.toContain("dp-term");
+    expect(nat).toContain("<table>");
   });
 
   test("minimised state: collapses to CityCard with Details and Close buttons", () => {

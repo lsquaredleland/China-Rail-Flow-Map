@@ -370,7 +370,41 @@ function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: numbe
   } as object);
 }
 
-/** One pass's layers: the flows, the pick proxy when pickable, the ferry dashes. */
+/** The glow underlay of a full-opacity pass (MapStyle.glow): the same geometry,
+    `widthScale` times wider (at least `minPixels`), in each path's colour at
+    `glow.alpha`. Not pickable and not depth-writing, so it never hides the
+    lines or changes picking. Null when the style has no glow or the pass is
+    faded (its colours are pre-blended over the paper and must stay flat).
+    Costs one more path draw per glowing pass. */
+export function flowGlowLayer(role: string, pd: PassData, alpha: number, fitScale: number, style: MapStyle): Layer | null {
+  const glow = style.glow;
+  if (!glow || alpha < 1) return null;
+  return new PathLayer({
+    id: "flows-glow-" + role,
+    data: pd.data,
+    _pathType: "open",
+    widthUnits: "common",
+    widthScale: 1,
+    widthMinPixels: glow.minPixels,
+    capRounded: true,
+    jointRounded: true,
+    getWidth: (_: unknown, { index }: { index: number }) => (flowUnits(pd.n[index]) * WIDTH_K * glow.widthScale) / fitScale,
+    getColor: (_: unknown, { index, target }: { index: number; target?: number[] }) => {
+      const t = target ?? [0, 0, 0, 0];
+      t[0] = pd.rgba[index * 4];
+      t[1] = pd.rgba[index * 4 + 1];
+      t[2] = pd.rgba[index * 4 + 2];
+      t[3] = Math.round(pd.rgba[index * 4 + 3] * glow.alpha);
+      return t as unknown as RGBA;
+    },
+    parameters: { depthWriteEnabled: false },
+    updateTriggers: { getWidth: [pd.id, fitScale], getColor: [pd.id, style.key] },
+  } as object);
+}
+
+/** One pass's layers: the glow underlay (unless `glow` is false: the caller
+    draws the glows itself, under every pass), the flows, the pick proxy when
+    pickable, the ferry dashes. */
 export function passDataLayers(
   role: string,
   pd: PassData,
@@ -379,8 +413,12 @@ export function passDataLayers(
   style: MapStyle,
   scale: number,
   fitScale: number,
+  glow = true,
 ): Layer[] {
-  const L: Layer[] = [flowPassLayer(role, pd, fitScale, style)];
+  const L: Layer[] = [];
+  const g = glow ? flowGlowLayer(role, pd, alpha, fitScale, style) : null;
+  if (g) L.push(g);
+  L.push(flowPassLayer(role, pd, fitScale, style));
   if (pickable) L.push(flowPickLayer(role, pd));
   if (pd.ferry.length) {
     const blue = style.ink.ferry.rgba;
@@ -390,7 +428,8 @@ export function passDataLayers(
   return L;
 }
 
-/** The flow passes in paint order, each followed by its ferry dashes (Canvas order). */
+/** The flow passes in paint order, each followed by its ferry dashes (Canvas
+    order); with a glowing style, every pass's glow first, under all of them. */
 export function flowPassLayers(
   set: DecodedSet,
   passes: FlowPass[],
@@ -398,12 +437,15 @@ export function flowPassLayers(
   scale: number,
   fitScale: number,
 ): Layer[] {
+  const glows: Layer[] = [];
   const L: Layer[] = [];
   for (const pass of passes) {
     const pd = buildPassData(set, pass.items, style, pass.alpha, pass.maxN);
-    L.push(...passDataLayers(pass.role, pd, pass.alpha, pass.pickable, style, scale, fitScale));
+    const g = flowGlowLayer(pass.role, pd, pass.alpha, fitScale, style);
+    if (g) glows.push(g);
+    L.push(...passDataLayers(pass.role, pd, pass.alpha, pass.pickable, style, scale, fitScale, false));
   }
-  return L;
+  return glows.length ? [...glows, ...L] : L;
 }
 
 /* ---------- infra ---------- */
