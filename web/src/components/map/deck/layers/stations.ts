@@ -61,7 +61,9 @@ export function stationDots(states: StationState[], style: MapStyle, hasDest: bo
     const line = withAlpha(edge, s.alpha);
     return placesOf(s.c, cu).map((p) => ({ c: s.c, pos: p.pos, r: splitRadius(s.r0 * s.kd, p.f), fill, line, lw }));
   };
-  const lit = states.filter((s) => s.lit);
+  const min = style.marker.minRadius;
+  // Small markers drop out (marker.minRadius) unless they belong to a selected destination's view.
+  const lit = states.filter((s) => s.lit && (min <= 0 || (hasDest && s.alpha === 1) || s.r0 * s.kd >= min));
   if (!hasDest) return lit.flatMap(mk);
   const out: StationDot[] = [];
   for (const s of lit) if (s.alpha < 1) out.push(...mk(s));

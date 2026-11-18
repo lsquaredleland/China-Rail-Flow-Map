@@ -108,7 +108,8 @@ describe("terminal skin", () => {
     // canvas labels in capitals, once the web face is loaded
     expect(t.font.caps).toBe(true);
     expect(t.font.load).toEqual(["16px 'Share Tech Mono'"]);
-    expect(t.glow).toEqual({ widthScale: 1.8, minPixels: 5, alpha: 0.24 });
+    expect(t.glow).toEqual({ widthScale: 1.3, minPixels: 3, alpha: 0.12 });
+    expect(t.marker).toEqual({ shape: "box", edgeWidth: 1, minRadius: 5 });
   });
 
   test("the TSpeed colours", () => {
@@ -117,7 +118,7 @@ describe("terminal skin", () => {
     expect(t.ink.label.css).toBe("#FF8F40");
     // boxes: a dark well under a soft edge, apart from the amber 200-249 band
     expect(t.ink.dotEdge.css).toBe("#8DA2CC");
-    expect(t.ink.dot.rgba).toEqual([4, 6, 12, 184]);
+    expect(t.ink.dot.rgba).toEqual([4, 6, 12, 128]);
     expect(t.speedBands.bands).not.toContain(t.ink.dotEdge.css);
     expect(t.ink.rushPeak.css).toBe("#FFC21A");
     expect(t.ink.originFill.css).toBe("#EAF2FF");
@@ -136,6 +137,7 @@ describe("terminal skin", () => {
     for (const m of ["light", "dark"] as const) {
       const p = mapStyle("paper", m);
       expect(p.glow).toBeNull();
+      expect(p.marker.minRadius).toBe(0);
       expect(p.font.caps).toBe(false);
       expect(p.font.load).toEqual([]);
     }

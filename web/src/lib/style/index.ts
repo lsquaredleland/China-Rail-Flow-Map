@@ -152,6 +152,11 @@ export interface MarkerStyle {
   /** Edge stroke of a city marker in CSS px (origin dots; the national
       circles cap at it). */
   readonly edgeWidth: number;
+  /** Origin-view city markers drawn smaller than this radius (CSS px, the
+      circle-equivalent radius after zoom growth) are left out, so a busy
+      view keeps its lines readable; they appear as the map zooms in. 0 draws
+      every city (paper). Presentation only: picking and labels are unchanged. */
+  readonly minRadius: number;
 }
 
 /** Fonts for Canvas 2D and SVG text. */
@@ -317,7 +322,7 @@ const PAPER: SkinDef = {
       },
       line: { capRounded: true, jointRounded: true },
       glow: null,
-      marker: { shape: "circle", edgeWidth: dark ? 3.0 : 1.5 },
+      marker: { shape: "circle", edgeWidth: dark ? 3.0 : 1.5, minRadius: 0 },
       font: {
         family: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif",
         tag: "monospace",
@@ -363,7 +368,7 @@ const TERMINAL: SkinDef = {
       chord: "#3A4A6E",
       // City boxes: a dark well under a soft blue-grey edge, so they read as
       // stations and not as one more amber (200-249 km/h) line.
-      dot: "rgba(4,6,12,0.72)",
+      dot: "rgba(4,6,12,0.5)",
       dotEdge: T_SOFT,
       label: T_AMBER,
       labelHalo: "rgba(4,6,12,0.92)",
@@ -415,8 +420,8 @@ const TERMINAL: SkinDef = {
       // hide it. True mitres between sections need them chained into one
       // path (planned with the angular geometry, P4).
       line: { capRounded: true, jointRounded: false },
-      glow: { widthScale: 1.8, minPixels: 5, alpha: 0.24 },
-      marker: { shape: "box", edgeWidth: 1.5 },
+      glow: { widthScale: 1.3, minPixels: 3, alpha: 0.12 },
+      marker: { shape: "box", edgeWidth: 1, minRadius: 5 },
       font: { family: mono, tag: mono, caps: true, load: ["16px 'Share Tech Mono'"] },
       enc: {
         lineColor: LINE_COLOR.speedLimit,

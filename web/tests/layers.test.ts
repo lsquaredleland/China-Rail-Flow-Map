@@ -225,6 +225,19 @@ describe("station layers", () => {
     for (const l of ls) expect(l).not.toBeInstanceOf(BoxLayer);
   });
 
+  test("marker.minRadius leaves small markers out (terminal); 0 keeps every lit city (paper)", () => {
+    const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
+    const all = stationDots(states, style, false);
+    const rs = all.map((d) => d.r).sort((x, y) => x - y);
+    const min = rs[Math.floor(rs.length / 2)];
+    const small = { ...style, key: "test|min", marker: { ...style.marker, minRadius: min } } as MapStyle;
+    const kept = stationDots(states, small, false);
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.length).toBeLessThan(all.length);
+    for (const d of kept) expect(d.r).toBeGreaterThanOrEqual(min);
+    expect(all.filter((d) => d.r >= min).length).toBe(kept.length);
+  });
+
   test("box marker: squares of the circle's area, rings keep their px gap", () => {
     const box = { ...style, key: "test|box", marker: { ...style.marker, shape: "box" } } as MapStyle;
     const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
