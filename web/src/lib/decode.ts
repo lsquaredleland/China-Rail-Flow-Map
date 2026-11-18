@@ -53,10 +53,13 @@ export function decodeFlat(str: string): number[] {
   return pts;
 }
 
-// Decode a list of encoded strings once into one typed array + offsets + bboxes.
+/** Decode a list of encoded strings once into one typed array + offsets +
+    bboxes, with the per-polyline HSR flag and posted speed limit (km/h, 0 =
+    untagged) when given. */
 export function decodeSet(
   strings: string[],
   hsrFlags?: ArrayLike<number>,
+  speeds?: ArrayLike<number | undefined>,
 ): DecodedSet {
   const flats = new Array<number[]>(strings.length);
   let total = 0;
@@ -72,6 +75,10 @@ export function decodeSet(
   const hsr = new Uint8Array(strings.length);
   if (hsrFlags) {
     for (let i = 0; i < strings.length; i++) hsr[i] = hsrFlags[i] ? 1 : 0;
+  }
+  const speed = new Uint16Array(strings.length);
+  if (speeds) {
+    for (let i = 0; i < strings.length; i++) speed[i] = speeds[i] || 0;
   }
   let pos = 0;
   for (let i = 0; i < strings.length; i++) {
@@ -95,7 +102,7 @@ export function decodeSet(
     bb[i * 4 + 3] = y1;
     pos += f.length;
   }
-  return { pts, off, len, bb, hsr };
+  return { pts, off, len, bb, hsr, speed };
 }
 
 export function flatBB(f: number[]): BBox {
@@ -117,10 +124,12 @@ export function prepAtlas(data: AtlasData): DecodedAtlas {
   const sec = decodeSet(
     data.sections.map((s) => s.g),
     data.sections.map((s) => (s.h ? 1 : 0)),
+    data.sections.map((s) => s.v),
   );
   const inSec = decodeSet(
     data.in_sections.map((s) => s.g),
     data.in_sections.map((s) => (s.h ? 1 : 0)),
+    data.in_sections.map((s) => s.v),
   );
   const net = decodeSet(data.network);
   const thr = decodeSet(data.throats || []);

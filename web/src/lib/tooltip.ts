@@ -2,6 +2,7 @@
 import type {
   AtlasData,
   CityPointVM,
+  DecodedAtlas,
   DestVM,
   Direction,
   DistUnit,
@@ -31,22 +32,24 @@ interface TooltipInput {
   ferry: boolean;
   /** The hovered section's OSM line names `[name, name:en]`. */
   lines?: [string, string][];
-  /** The hovered section's signed speed limit, km/h. */
+  /** The hovered section's posted speed limit, km/h. */
   speed?: number;
 }
 
-/** Flow section `s`'s OSM line names and speed limit: national flows and
-    the outbound view index `sections`, the inbound view `in_sections`. */
+/** Flow section `s`'s OSM line names and posted speed limit (undefined when
+    untagged): national flows and the outbound view index `sections` / `sec`,
+    the inbound view `in_sections` / `inSec`. */
 export function sectionInfo(
-  data: AtlasData,
+  atlas: Pick<DecodedAtlas, "data" | "sec" | "inSec">,
   view: { national?: boolean; direction: Direction },
   s: number,
 ): { lines: [string, string][]; speed?: number } {
-  const sec = (view.national || view.direction === "out" ? data.sections : data.in_sections)[s];
-  const names = data.lines ?? [];
+  const out = view.national || view.direction === "out";
+  const sec = (out ? atlas.data.sections : atlas.data.in_sections)[s];
+  const names = atlas.data.lines ?? [];
   return {
     lines: (sec?.l ?? []).map((i) => names[i]).filter((n) => n !== undefined),
-    speed: sec?.v,
+    speed: (out ? atlas.sec : atlas.inSec).speed[s] || undefined,
   };
 }
 

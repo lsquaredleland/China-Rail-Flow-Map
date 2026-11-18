@@ -160,7 +160,7 @@ function pickNationalTrain(M: MapCtx, px: number, py: number): Hit | null {
   const o = i * 6;
   return {
     kind: "train",
-    train: natTrainVM(f.tl, atlas.data, data.schedules, q, a, f.buf[o], f.buf[o + 1], f.buf[o + 2], f.buf[o + 3]),
+    train: natTrainVM(f.tl, atlas, data.schedules, q, a, f.buf[o], f.buf[o + 1], f.buf[o + 2], f.buf[o + 3]),
   };
 }
 
@@ -244,7 +244,7 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
     panelDest: P.current.panelDest,
     style: P.current.style,
     ferry: hit.kind === "seg" && !!set && isFerrySection(set.bb, hit.s),
-    ...(hit.kind === "seg" ? sectionInfo(atlas.data, P.current, hit.s) : {}),
+    ...(hit.kind === "seg" ? sectionInfo(atlas, P.current, hit.s) : {}),
   });
   tooltip.innerHTML = html;
   // the section and city cards (lib/tooltip) open with a count row or a city title

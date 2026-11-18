@@ -2,7 +2,8 @@
 // tooltip.golden.json was captured once by running the original code from
 // components/map/interaction.ts (as of the P1a.1 base) on these fixture hits.
 import { expect, test } from "bun:test";
-import { isFerrySection, mapStyle, modeOf, sectionInfo, tooltipHtml } from "../src/lib";
+import { decodeSet, isFerrySection, mapStyle, modeOf, sectionInfo, tooltipHtml } from "../src/lib";
+import type { AtlasData } from "../src/types";
 import golden from "./tooltip.golden.json";
 import { pack } from "./fixture";
 import { cases } from "./tooltipCases";
@@ -45,16 +46,28 @@ test("seg tooltips list the section's OSM line names", () => {
   expect(tooltipHtml(c.hit, base)).toBe(gold["seg 1"]);
 });
 
-test("sectionInfo reads l / v by direction; national uses sections", () => {
+test("sectionInfo reads l / the decoded speed by direction; national uses sections", () => {
   const data = {
     lines: [["甲线", "A Line"], ["乙线", ""]],
     sections: [{ g: "", l: [1, 0], v: 350 }],
     in_sections: [{ g: "", l: [0] }],
-  } as never;
-  expect(sectionInfo(data, { direction: "out" }, 0)).toEqual({ lines: [["乙线", ""], ["甲线", "A Line"]], speed: 350 });
-  expect(sectionInfo(data, { direction: "in" }, 0)).toEqual({ lines: [["甲线", "A Line"]], speed: undefined });
-  expect(sectionInfo(data, { direction: "in", national: true }, 0).speed).toBe(350);
-  expect(sectionInfo({ ...(data as object), lines: undefined } as never, { direction: "out" }, 0).lines).toEqual([]);
+  } as unknown as AtlasData;
+  const atlas = {
+    data,
+    sec: decodeSet([""], undefined, data.sections.map((s) => s.v)),
+    inSec: decodeSet([""], undefined, data.in_sections.map((s) => s.v)),
+  };
+  expect(sectionInfo(atlas, { direction: "out" }, 0)).toEqual({ lines: [["乙线", ""], ["甲线", "A Line"]], speed: 350 });
+  expect(sectionInfo(atlas, { direction: "in" }, 0)).toEqual({ lines: [["甲线", "A Line"]], speed: undefined });
+  expect(sectionInfo(atlas, { direction: "in", national: true }, 0).speed).toBe(350);
+  expect(sectionInfo({ ...atlas, data: { ...data, lines: undefined } as unknown as AtlasData }, { direction: "out" }, 0).lines).toEqual([]);
+});
+
+test("sectionInfo's speed equals the raw v of every section on the pack", () => {
+  const atlas = pack().atlas;
+  for (const [out, raw] of [[true, atlas.data.sections], [false, atlas.data.in_sections]] as const)
+    for (let s = 0; s < raw.length; s++)
+      expect(sectionInfo(atlas, { direction: out ? "out" : "in" }, s).speed).toBe(raw[s].v);
 });
 
 test("train tooltips show the leg average and the track limit when known", () => {

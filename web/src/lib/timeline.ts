@@ -574,7 +574,7 @@ export function buildDayTimeline(
         let distInSec: number;
         let isSecRev: boolean;
         let sLen: number;
-        let trackKmh: number | undefined; // the flow section's signed limit (none in a throat)
+        let trackKmh: number | undefined; // the flow section's posted limit (none in a throat)
         if (th) {
           gSet = thrSet;
           gCum = thrGeo.secCumLens;
@@ -591,7 +591,7 @@ export function buildDayTimeline(
             secIdx++;
           }
           s = pt.secs[secIdx];
-          trackKmh = atlas.data.sections[s]?.v;
+          trackKmh = atlas.sec.speed[s] || undefined;
           distInSec = targetDist - pt.secStarts[secIdx];
           isSecRev = pt.secRevs[secIdx] === 1;
           sLen = secLengths[s] || 0;

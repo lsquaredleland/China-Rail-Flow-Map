@@ -9,7 +9,7 @@ interface RawSection {
   g: string; // Google-polyline-encoded track geometry, precision 1e4
   h?: number; // 1 for high-speed rail (HSR), omitted/0 for conventional rail
   l?: number[]; // OSM line names it runs on: indices into `lines`, largest share first
-  v?: number; // signed speed limit (OSM maxspeed, km/h) over most of it; absent when untagged
+  v?: number; // posted ("signed") speed limit (OSM maxspeed, km/h, > 0) over most of it; absent when untagged
 }
 
 export interface RawCity {
@@ -266,6 +266,8 @@ export interface DecodedSet {
   len: Int32Array; // point count of each polyline
   bb: Float32Array; // [x0, y0, x1, y1] per polyline
   hsr: Uint8Array; // 1 for high-speed rail (HSR), 0 for conventional rail
+  /** Posted speed limit per polyline, km/h (the pack's `v`); 0 = untagged. */
+  speed: Uint16Array;
 }
 
 export interface Extent {
