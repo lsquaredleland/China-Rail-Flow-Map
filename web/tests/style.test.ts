@@ -96,13 +96,13 @@ describe("terminal skin", () => {
     expect(t.mode).toBe("dark");
   });
 
-  test("encodings and shapes: speedLimit lines, flat box cities, square caps and mitred joints", () => {
+  test("encodings and shapes: speedLimit lines, flat box cities, round caps and mitred joints", () => {
     expect(t.enc.lineColor).toBe(LINE_COLOR.speedLimit);
     expect(t.enc.nodeColor).toBe(NODE_COLOR.flat);
     expect(t.enc.nodeSize).toBe(NODE_SIZE.stationRadius);
     expect(t.enc.natNodeSize).toBe(NODE_SIZE.natCityRadius);
     expect(t.marker.shape).toBe("box");
-    expect(t.line).toEqual({ capRounded: false, jointRounded: false });
+    expect(t.line).toEqual({ capRounded: true, jointRounded: false });
     expect(t.font.family).toBe("'Share Tech Mono', ui-monospace, monospace");
   });
 

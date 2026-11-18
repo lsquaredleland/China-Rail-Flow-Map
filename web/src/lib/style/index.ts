@@ -377,7 +377,12 @@ const TERMINAL: SkinDef = {
       speedBands: { bands: ["#F4FFE8", "#FFD43B", T_AMBER, "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" },
       // The city fill carries its own alpha (pal.dot), so the national boxes take it as is.
       alpha: { ...base.alpha, natCityFill: 1 },
-      line: { capRounded: false, jointRounded: false },
+      // Mitred joints, but rounded caps: deck's non-rounded cap is flat (it
+      // stops at the vertex), so two sections meeting end to end leave an
+      // antialiased dark seam across wide corridors. Round caps overlap and
+      // hide it. True mitres between sections need them chained into one
+      // path (planned with the angular geometry, P4).
+      line: { capRounded: true, jointRounded: false },
       marker: { shape: "box", edgeWidth: 1.5 },
       font: { family: mono, tag: mono },
       enc: {
