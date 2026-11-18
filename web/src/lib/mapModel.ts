@@ -19,7 +19,8 @@ import type {
   PrepTrain,
   SrcVM,
 } from "../types";
-import { stationR, stationZoomK } from "./palette";
+import { stationZoomK } from "./palette";
+import type { MapStyle } from "./style";
 import type { DestWindow } from "./stopEffects";
 import { destWindow, stopArrivalTimes, trainShownAt } from "./stopEffects";
 import { trainDistAt } from "./timeline";
@@ -35,7 +36,7 @@ export interface ModelState {
   panelDest: CityPointVM | null;
   /** Isolated train code, if any. */
   iso: string | null | undefined;
-  dark: boolean;
+  style: MapStyle;
 }
 
 /** Per-selection memo slots (the engine keeps them on its state object;
@@ -221,7 +222,7 @@ export interface FlowPass {
 }
 
 /** Alpha of the flows an isolated train fades to (origin and national views). */
-export const isoFlowAlpha = (dark: boolean) => (dark ? 0.06 : 0.08);
+export const isoFlowAlpha = (style: MapStyle) => style.alpha.isoFlow;
 
 /** The flow passes for the current state, in paint order:
     - isolated train: one faded context pass (the corridor is separate,
@@ -273,13 +274,13 @@ export function flowPasses(s: ModelState, caches: ModelCaches): FlowPass[] {
     activeFlows = flows;
   }
 
-  const ctxAlpha = s.dark ? 0.16 : 0.18;
+  const ctxAlpha = s.style.alpha.context;
   if (isolatedTrain(s)) {
     return [
       {
         role: "context",
         items: activeFlows,
-        alpha: isoFlowAlpha(s.dark),
+        alpha: isoFlowAlpha(s.style),
         maxN: effectiveMaxN,
         pickable: false,
       },
@@ -350,7 +351,7 @@ export function isolatedCorridor(
   const isoPt = timeline?.getPrepTrain(isoTrain.code);
   const isoSecs = isoPt ? isoPt.secs : isoTrain.secs;
   const isHs = isoTrain.cls === "G" || isoTrain.cls === "D" || isoTrain.cls === "C";
-  const out: IsolatedCorridor = { color: isHs ? "#F59E0B" : "#06B6D4", secs: [] };
+  const out: IsolatedCorridor = { color: isHs ? s.style.ink.trainHs.css : s.style.ink.trainConv.css, secs: [] };
   const animTime = s.animTime;
   const depMins = isoTrain.depMins >= 0 ? isoTrain.depMins : 0;
   const dur = isoTrain.dur > 0 ? isoTrain.dur : 1;
@@ -417,9 +418,9 @@ export function infraPasses(s: ModelState, caches: ModelCaches): InfraPass[] {
   const destSecCounts = getDestSectionCounts(s, caches);
   const connected = (sec: number) => (destSecCounts ? destSecCounts.has(sec) : false);
   const subset = (want: boolean) => flows.filter((f) => connected(f.s) === want);
-  if (s.iso) return [{ alpha: s.dark ? 0.08 : 0.1, sections: subset(false) }];
+  if (s.iso) return [{ alpha: s.style.alpha.isoInfra, sections: subset(false) }];
   if (destSecCounts) {
-    const passes: InfraPass[] = [{ alpha: s.dark ? 0.18 : 0.2, sections: subset(false) }];
+    const passes: InfraPass[] = [{ alpha: s.style.alpha.contextInfra, sections: subset(false) }];
     if (destSecCounts.size > 0) passes.push({ alpha: 1, sections: subset(true) });
     return passes;
   }
@@ -443,9 +444,9 @@ export function chordPlan(s: ModelState, caches: ModelCaches, forPick = false): 
   // In a filtered view every chord is faded context (as on main), not gated by time.
   const filtered = isFilteredView(cur, s.baseCur);
   const alpha = isIsolated
-    ? s.dark ? 0.05 : 0.08
+    ? s.style.alpha.isoChord
     : s.panelDest || filtered
-      ? s.dark ? 0.16 : 0.18
+      ? s.style.alpha.context
       : 1;
   const isAnimated = s.animEnabled && !s.showInfra && (forPick || !filtered);
   const timeline = activeTimeline(s);
@@ -754,7 +755,7 @@ export interface StationInput {
   panelDest: CityPointVM | null;
   /** idx of the hovered station, -1 when none. */
   hoverIdx: number;
-  dark: boolean;
+  style: MapStyle;
   animEnabled: boolean;
   animTime: number;
   /** Total minutes of the active timeline; undefined when there is none. */
@@ -770,7 +771,7 @@ export interface StationState {
   r0: number;
   /** Zoom factor on the radius; the drawn radius is r0 * kd. */
   kd: number;
-  /** 1, or 0.16 / 0.18 (dark / light) for non-selected cities when a
+  /** 1, or style.alpha.context for non-selected cities when a
       destination is selected. */
   alpha: number;
   /** Golden arrival ripple (frac 0..1 of its 20-minute life). */
@@ -787,7 +788,7 @@ export function stationStates(s: StationInput, sel: SelCache | null): StationSta
   const timeline = s.totalMins !== undefined;
   const isAnimated = s.animEnabled && timeline;
   const allowedCodes = sel?.allowedCodes ?? null;
-  const dim = s.dark ? 0.16 : 0.18;
+  const dim = s.style.alpha.context;
 
   function one(c: CityPointVM): StationState {
     const cityArrTimes = allowedCodes
@@ -827,7 +828,7 @@ export function stationStates(s: StationInput, sel: SelCache | null): StationSta
         effectiveTrains = 0;
       }
     }
-    const r0 = stationR(effectiveTrains);
+    const r0 = s.style.enc.nodeSize.radius(effectiveTrains);
     const st: StationState = {
       c,
       idx: c.idx,

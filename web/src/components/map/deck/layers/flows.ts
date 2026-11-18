@@ -260,7 +260,7 @@ function animKey(ms: ModelState): unknown[] {
 }
 
 function memoFlowPasses(ms: ModelState, caches: ModelCaches): FlowPass[] {
-  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.dark, ...animKey(ms)];
+  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.style, ...animKey(ms)];
   if (passMemo && sameKey(passMemo.key, key)) return passMemo.passes;
   const passes = flowPasses(ms, caches);
   passMemo = { key, passes };
@@ -268,7 +268,7 @@ function memoFlowPasses(ms: ModelState, caches: ModelCaches): FlowPass[] {
 }
 
 function memoInfraPasses(ms: ModelState, caches: ModelCaches): InfraPass[] {
-  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.dark];
+  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.style];
   if (infraMemo && sameKey(infraMemo.key, key)) return infraMemo.passes;
   const passes = infraPasses(ms, caches);
   infraMemo = { key, passes };

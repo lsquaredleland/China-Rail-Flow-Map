@@ -9,6 +9,8 @@ import {
   getDestSectionCounts,
   infraPasses,
   isolatedCorridor,
+  mapStyle,
+  modeOf,
   newModelCaches,
   pickableFlows,
 } from "../src/lib";
@@ -29,7 +31,7 @@ const st = (over: Partial<ModelState> = {}): ModelState => ({
   showInfra: false,
   panelDest: null,
   iso: null,
-  dark: false,
+  style: mapStyle("paper", "light"),
   ...over,
 });
 const trainsAt = (t: any, m: number) => t.getActiveTrains(m);
@@ -46,7 +48,7 @@ describe("flowPasses", () => {
   test("(b) selected city: context 0.16/0.18 + focus equals dest section counts", () => {
     const caches = newModelCaches();
     for (const dark of [false, true]) {
-      const p = flowPasses(st({ panelDest: dest as any, dark }), caches);
+      const p = flowPasses(st({ panelDest: dest as any, style: mapStyle("paper", modeOf(dark)) }), caches);
       expect(p.map((x) => x.role)).toEqual(["context", "focus"]);
       expect(p[0].alpha).toBe(dark ? 0.16 : 0.18);
       expect(p[1].alpha).toBe(1);
@@ -77,7 +79,7 @@ describe("flowPasses", () => {
     const p = flowPasses(s, newModelCaches());
     expect(p.length).toBe(1);
     expect(p[0].alpha).toBe(0.08);
-    expect(flowPasses(st({ iso: code, dark: true }), newModelCaches())[0].alpha).toBe(0.06);
+    expect(flowPasses(st({ iso: code, style: mapStyle("paper", "dark") }), newModelCaches())[0].alpha).toBe(0.06);
     const c = isolatedCorridor(s, trainsAt)!;
     expect(c).toBeTruthy();
     const pt = tl.getPrepTrain(code)!;

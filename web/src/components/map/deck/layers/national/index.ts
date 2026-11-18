@@ -59,7 +59,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   const tlAll = isoCode ? nationalTimeline(atlas, P.current.nationalTrains) : null;
   const iso = isoCode && tlAll ? nationalIsolated(atlas, tlAll.tl, isoCode) : null;
   if (iso && tlAll) st.natLoop = { start: tlAll.tl.start[iso.q], dur: tlAll.tl.end[iso.q] - tlAll.tl.start[iso.q] };
-  const flowAlpha = iso ? isoFlowAlpha(P.current.dark) : 1;
+  const flowAlpha = iso ? isoFlowAlpha(style) : 1;
   if (withFlows && nf && (!withTrains || P.current.nationalEntries)) {
     // A+B: cumulative since 00:00 (D7), by entry tick (the file's sub-minute step, so sections
     // light up smoothly with the clock); 24:00 is the day's totals. The entry ticks know only

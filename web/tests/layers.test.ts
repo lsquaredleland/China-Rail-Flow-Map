@@ -23,7 +23,7 @@ const st = (over: Partial<ModelState> = {}): ModelState => ({
   showInfra: false,
   panelDest: null,
   iso: null,
-  dark: false,
+  style,
   ...over,
 });
 
@@ -109,7 +109,7 @@ describe("buildPassData", () => {
 
 describe("station layers", () => {
   const stIn = (animTime: number, pd: DestVM | null) => ({
-    points: cur.dests, panelDest: pd, hoverIdx: -1, dark: false, animEnabled: true,
+    points: cur.dests, panelDest: pd, hoverIdx: -1, style, animEnabled: true,
     animTime, totalMins: cur.timeline?.totalMins, sk: 0.5,
   });
   const memo = { selCache: null as SelCache | null };

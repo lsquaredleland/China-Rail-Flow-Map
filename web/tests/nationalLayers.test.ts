@@ -188,9 +188,9 @@ describe("national flow picking and circle size", () => {
     expect(out.counts[idxToSec[0]]).toBe(Math.max(...Array.from(out.counts)));
   });
   test("an isolated train fades the flows (isoFlowAlpha) instead of hiding them", () => {
-    const faded = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, style: mapStyle("paper", "light"), scale: 100, fitScale: 100, alpha: isoFlowAlpha(false) });
-    expect(isoFlowAlpha(false)).toBe(0.08);
-    expect(isoFlowAlpha(true)).toBe(0.06);
+    const faded = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, style: mapStyle("paper", "light"), scale: 100, fitScale: 100, alpha: isoFlowAlpha(mapStyle("paper", "light")) });
+    expect(isoFlowAlpha(mapStyle("paper", "light"))).toBe(0.08);
+    expect(isoFlowAlpha(mapStyle("paper", "dark"))).toBe(0.06);
     expect(faded.sections).toBe(out.sections);
     expect(faded.layers.some((l) => l.id.startsWith("pick-"))).toBe(false);
     const col = (ls: typeof out.layers) => {

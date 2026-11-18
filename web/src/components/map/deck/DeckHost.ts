@@ -148,7 +148,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         showInfra: P.current.showInfra,
         panelDest: P.current.panelDest,
         iso: P.current.isolatedTrainCode,
-        dark: P.current.dark,
+        style,
       },
       caches: st,
       style,
@@ -177,7 +177,6 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     }
     layers.push(...over);
     const sk = stationT(st.view, st.fitScale);
-    const dark = P.current.dark;
     const pd = P.current.panelDest ?? null;
     const hover = st.hover;
     const shown = originIsolatedCities(cur, P.current.direction, P.current.isolatedTrainCode);
@@ -187,7 +186,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         points: M.points(),
         panelDest: pd,
         hoverIdx: hover && hover.kind === "station" ? hover.station.idx : -1,
-        dark,
+        style,
         animEnabled: st.animEnabled,
         animTime: st.animTime,
         totalMins: M.activeTimeline()?.totalMins,
