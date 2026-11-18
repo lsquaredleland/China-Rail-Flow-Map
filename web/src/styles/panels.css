@@ -77,3 +77,5 @@
 #destMin { font-size: 14px; }
 #destMin:hover,
 #destClose:hover { background: var(--paper-deep); }
+/* Skin-only panel parts (the headline count, tick bars): terminal.css shows them. */
+.dp-term { display: none; }

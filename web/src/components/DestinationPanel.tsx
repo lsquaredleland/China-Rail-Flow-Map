@@ -21,6 +21,55 @@ interface Props {
   onClose: () => void;
 }
 
+/** The panel's headline (skins that show it; hidden in paper, which keeps
+    these numbers as table rows): the day's direct trains as a large
+    three-digit count, the fast / conventional split beside it and as a
+    tick bar under it. Conventional is the trains that are not fast. */
+export function PanelHead({ trains, fast }: { trains: number; fast: number }) {
+  const conv = Math.max(0, trains - fast);
+  return (
+    <div className="dp-term dp-head">
+      <div className="dp-head-row">
+        <div className="dp-head-n">
+          <span className="dp-k">Direct trains / day</span>
+          <span className="dp-big">{String(trains).padStart(3, "0")}</span>
+        </div>
+        <div className="dp-head-split">
+          <span>
+            <span className="dp-k">Fast G/D/C/S</span> {fast}
+          </span>
+          <span>
+            <span className="dp-k">Conventional</span> {conv}
+          </span>
+        </div>
+      </div>
+      <div className="dp-bar" aria-hidden="true">
+        <span className="dp-bar-fast" style={{ flexGrow: fast }} />
+        <span className="dp-bar-conv" style={{ flexGrow: conv }} />
+      </div>
+    </div>
+  );
+}
+
+/** The share of the day's trains that end (outbound) or start (inbound) at
+    the city, as a label, "n / of · p %" and a tick bar (skins that show it). */
+export function EndBar({ label, n, of }: { label: string; n: number; of: number }) {
+  const pct = of > 0 ? (100 * n) / of : 0;
+  return (
+    <div className="dp-term dp-end">
+      <div className="dp-end-row">
+        <span className="dp-k">{label}</span>
+        <span>
+          {n} / {of} · {pct.toFixed(1)} %
+        </span>
+      </div>
+      <div className="dp-bar is-thin" aria-hidden="true">
+        <span className="dp-bar-end" style={{ width: pct.toFixed(1) + "%" }} />
+      </div>
+    </div>
+  );
+}
+
 /* The pinned city detail card: a corner panel on wide screens, a bottom
    sheet on phones (CSS). Outbound it describes a destination reached
    from the origin; inbound it mirrors for a source city sending trains
@@ -64,6 +113,15 @@ export default function DestinationPanel({
     (direction === "out"
       ? stationRows(point as DestVM, cityEn, unit)
       : sourceRows(point as SrcVM, cityEn, unit));
+
+  // The headline block and end bar of the skins that show them (terminal.css;
+  // hidden in paper): the origin view's own rows only, from fields the point
+  // already carries.
+  const head = givenRows
+    ? null
+    : direction === "out"
+      ? { fast: (point as DestVM).fast ?? 0, end: (point as DestVM).terminating ?? 0, endLabel: "Trains ending here" }
+      : { fast: (point as SrcVM).fast ?? 0, end: (point as SrcVM).originating ?? 0, endLabel: "Trains starting here" };
 
   const scrollToDepartures = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -124,7 +182,8 @@ export default function DestinationPanel({
             {cityEn} &middot; {cityZh}
           </div>
         )}
-        <table>
+        {head && <PanelHead trains={point.trains} fast={head.fast} />}
+        <table className={head ? "dp-has-head" : undefined}>
           <tbody>
             {rows.map((r) => {
               const isAccent = r[0].startsWith("Fastest") || r[0] === "By rail";
@@ -137,6 +196,7 @@ export default function DestinationPanel({
             })}
           </tbody>
         </table>
+        {head && <EndBar label={head.endLabel} n={head.end} of={point.trains} />}
         {link ? (
           <div className="dp-link-row">
             <a

@@ -247,6 +247,24 @@ export function Chart({
   );
 }
 
+/** Tick-fill patterns a skin's CSS may fill the bars with (terminal.css:
+    `fill: url(#histTick)`); paper never references them. Zero-size and out
+    of the flex flow, so they change no layout. */
+export function TickPatterns() {
+  return (
+    <svg aria-hidden="true" focusable="false" width="0" height="0" style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+      <defs>
+        <pattern id="histTick" width="4" height="4" patternUnits="userSpaceOnUse">
+          <rect className="hist-tick-on" width="4" height="2" y="2" />
+        </pattern>
+        <pattern id="histTickDim" width="4" height="4" patternUnits="userSpaceOnUse">
+          <rect className="hist-tick-dim" width="4" height="2" y="2" />
+        </pattern>
+      </defs>
+    </svg>
+  );
+}
+
 function pad2(n: number): string {
   return n < 10 ? "0" + n : String(n);
 }
@@ -729,6 +747,7 @@ export default function Histograms({
 
   return (
     <div className="hist-strip">
+      <TickPatterns />
       <figure className="hist">
         <figcaption>
           <span>{inbound ? "Arrivals by hour" : "Departures by hour"}</span>
