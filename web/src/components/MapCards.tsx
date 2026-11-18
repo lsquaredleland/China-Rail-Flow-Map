@@ -4,8 +4,8 @@
    close. Styles in styles/cards.css. */
 
 import { createPortal } from "react-dom";
-import { palette, rampColor } from "../lib/palette";
-import type { RampStop } from "../types";
+import { rampColor } from "../lib/palette";
+import type { MapStyle } from "../lib/style";
 
 /** The cards live in one reserved stack (#mapCards, top-right of the map)
     that the legend, scale bar, expand button and timeline are laid out
@@ -30,14 +30,10 @@ const STATE_LABEL: Record<TrainCardState, string> = {
   isolated: "Isolated",
 };
 
-/** A train's fastest-time band colour for the card; at night the saffron
-    band lifts to #F0B85A (the global ramp is unchanged). */
-export function cardBand(mins: number, dark: boolean): string {
-  const pal = palette(dark);
-  if (!dark) return rampColor(mins, pal);
-  const lift = pal.ramp.map(([t, c]) =>
-    [t, c[0] === 227 && c[1] === 166 && c[2] === 63 ? [240, 184, 90] : c] as RampStop);
-  return rampColor(mins, { ...pal, ramp: lift });
+/** A train's fastest-time band colour for the card using `style.cardPal`; at night
+    the saffron band lifts to #F0B85A (the global ramp is unchanged). */
+export function cardBand(mins: number, style: MapStyle): string {
+  return rampColor(mins, style.cardPal);
 }
 
 export function CityCard({

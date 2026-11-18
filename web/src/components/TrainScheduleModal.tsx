@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import type { DepVM, ArrVM, DistUnit, RawTrain, SchedulesData } from "../types";
 import { RunsLabel } from "./departures/RunsCell";
 import type { MapApi } from "./MapHost";
-import { fmtDurationWords, formatScheduleStops, stationName, tripStatus, unrollStops } from "../lib";
+import { DEFAULT_SKIN, fmtDurationWords, formatScheduleStops, mapStyle, modeOf, stationName, tripStatus, unrollStops } from "../lib";
 import type { AlignedStop } from "../lib";
 import { TrainCard, cardBand, type TrainCardState } from "./MapCards";
 import { useDialogFocus } from "../hooks/useDialog";
@@ -287,7 +287,7 @@ export default function TrainScheduleModal({
         }
         state={state}
         leg={leg}
-        band={cardBand(trainVM ? trainVM.dur : 0, dark)}
+        band={cardBand(trainVM ? trainVM.dur : 0, mapStyle(DEFAULT_SKIN, modeOf(dark)))}
         isolated={isIsolated}
         onTimetable={() => setMinimized(false)}
         onClose={onClose}

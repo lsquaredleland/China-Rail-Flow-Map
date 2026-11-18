@@ -206,10 +206,7 @@
 #pageFooter { max-width: 1240px; }
 #legendNotes .note { margin: 0 0 5px; }
 #legendNotes .note:last-child { margin-bottom: 0; }
-:root[data-theme="dark"] .lg-band-label { fill: #111214 !important; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .lg-band-label { fill: #111214 !important; }
-}
+:root[data-theme="dark"] .lg-band-label { fill: var(--paper) !important; }
 #legend h2 {
   margin: 0;
   font-size: 11px;

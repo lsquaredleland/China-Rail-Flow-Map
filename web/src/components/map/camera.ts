@@ -2,11 +2,13 @@
    debounced view report and the per-frame tail. */
 import type { MapCtx } from "./context";
 import {
+  DEFAULT_SKIN,
   fitCountryView,
   fitExtentView,
   fitGuangzhouInitialView,
   fitHomeView,
-  palette as makePalette,
+  mapStyle,
+  modeOf,
   stationT as stationTOf,
   zoomBounds,
 } from "../../lib";
@@ -204,10 +206,10 @@ export function resize(M: MapCtx) {
 export function frameTail(M: MapCtx) {
   const { S, P } = M;
   const st = S.current;
-  const pal = makePalette(P.current.dark);
+  const style = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark));
   if (P.current.legendRef.current)
     P.current.legendRef.current.draw(
-      pal,
+      style,
       st.view.scale / st.fitScale,
       !P.current.national,
       P.current.showInfra,
