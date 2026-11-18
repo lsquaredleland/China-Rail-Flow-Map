@@ -32,7 +32,7 @@ export {
   stationZoomK,
 } from "./palette";
 export type { RGBA } from "./palette";
-export { DEFAULT_SKIN, LINE_COLOR, NODE_COLOR, NODE_SIZE, SKINS, mapStyle, modeOf, parseSkin, resolveMode, skinHasModeToggle } from "./style";
+export { DEFAULT_SKIN, LINE_COLOR, NODE_COLOR, NODE_SIZE, SKINS, SPEED_BANDS, boxSide, mapStyle, modeOf, parseSkin, resolveMode, skinHasModeToggle, speedBand } from "./style";
 export type {
   Alphas,
   Encodings,
@@ -41,6 +41,7 @@ export type {
   Inks,
   LineColorEncoding,
   LineColorId,
+  LineColorStyle,
   LineFact,
   LineStyle,
   MapStyle,
@@ -53,6 +54,7 @@ export type {
   NodeSizeId,
   SkinDef,
   SkinId,
+  SpeedRamp,
 } from "./style";
 export {
   DATA_FMT,

@@ -154,8 +154,8 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
             // legend's own widest step — salmon for the thinnest,
             // deep crimson for the widest; both schemes have a flow ramp.
             rect.style.fill = style.enc.lineColor.color(
-              { n: steps[i], maxN: steps[steps.length - 1] },
-              style.pal,
+              { n: steps[i], maxN: steps[steps.length - 1], s: -1, speed: 0 },
+              style,
             );
           }
         }

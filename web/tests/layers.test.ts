@@ -1,7 +1,7 @@
 // Deck flow layers: buildPassData / layer props, no GPU.
 import { describe, expect, test } from "bun:test";
-import { WIDTH_K, WIDTH_KNEE, flowColor, flowUnits, flowPasses, getSelCache, isFerrySection, isTrainShown, mapStyle, newModelCaches, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
-import type { SelCache, SelInput } from "../src/lib";
+import { LINE_COLOR, WIDTH_K, WIDTH_KNEE, speedBand, flowColor, flowUnits, flowPasses, getSelCache, isFerrySection, isTrainShown, mapStyle, newModelCaches, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
+import type { MapStyle, SelCache, SelInput } from "../src/lib";
 import type { ModelState } from "../src/lib";
 import { buildPassData, flowPassLayers } from "../src/components/map/deck/layers/flows";
 import type { DestVM } from "../src/types";
@@ -63,6 +63,27 @@ describe("buildPassData", () => {
     expect(buildPassData(set, items, style, 1, pass.maxN)).toBe(pd);
     // A different style is a different cache entry (the key is the style, not only paper + flow).
     expect(buildPassData(set, items, mapStyle("paper", "dark"), 1, pass.maxN)).not.toBe(pd);
+  });
+
+  test("by: count colours every path with flowColor of its count", () => {
+    for (let p = 0; p < pd.data.length; p++)
+      expect(Array.from(pd.rgba.subarray(p * 4, p * 4 + 4))).toEqual(rgba(flowColor(pd.n[p], pass.maxN, pal)));
+  });
+
+  test("by: section colours each path by its own section's speed band", () => {
+    const ramp = { bands: ["#010101", "#020202", "#030303", "#040404", "#050505"], untagged: "#0F0F0F" };
+    const speedStyle = { ...style, key: "test|speed", speedBands: ramp, enc: { ...style.enc, lineColor: LINE_COLOR.speedLimit } } as MapStyle;
+    const sp = buildPassData(set, items, speedStyle, 1, pass.maxN);
+    const seen = new Set<string>();
+    for (let p = 0; p < sp.data.length; p++) {
+      const b = speedBand(set.speed[sp.idxToSec[p]]);
+      const want = rgba(b < 0 ? ramp.untagged : ramp.bands[b]);
+      const got = Array.from(sp.rgba.subarray(p * 4, p * 4 + 4));
+      expect(got).toEqual(want);
+      seen.add(got.join());
+    }
+    expect(seen.size).toBeGreaterThan(2);
+    expect(Array.from(sp.n)).toEqual(Array.from(pd.n)); // width still the count
   });
 
   test("n = 0 sections are absent", () => {

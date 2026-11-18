@@ -16,17 +16,19 @@ import type { Palette, RampStop } from "../../types";
 import { palette, rgba } from "../palette";
 import type { RGBA } from "../palette";
 import { LINE_COLOR, NODE_COLOR, NODE_SIZE } from "./encodings";
-import type { LineColorEncoding, NodeColorEncoding, NodeSizeEncoding } from "./encodings";
+import type { LineColorEncoding, NodeColorEncoding, NodeSizeEncoding, SpeedRamp } from "./encodings";
 
-export { LINE_COLOR, NODE_COLOR, NODE_SIZE } from "./encodings";
+export { LINE_COLOR, NODE_COLOR, NODE_SIZE, SPEED_BANDS, boxSide, speedBand } from "./encodings";
 export type {
   LineColorEncoding,
   LineColorId,
+  LineColorStyle,
   LineFact,
   NodeColorEncoding,
   NodeColorId,
   NodeSizeEncoding,
   NodeSizeId,
+  SpeedRamp,
 } from "./encodings";
 
 /** Light or dark: the day/night axis, independent of the skin. */
@@ -183,6 +185,8 @@ export interface MapStyle {
       saffron band lifts to #F0B85A; by day it is `pal`. */
   readonly cardPal: Palette;
   readonly ink: Inks;
+  /** The speed-band ramp the speedLimit line colour reads (SPEED_BANDS order). */
+  readonly speedBands: SpeedRamp;
   readonly alpha: Alphas;
   readonly line: LineStyle;
   readonly marker: MarkerStyle;
@@ -278,6 +282,11 @@ const PAPER: SkinDef = {
       pal,
       cardPal,
       ink: inks,
+      // Unused while paper colours lines by volume: the time bands and the flow red.
+      speedBands: {
+        bands: ["#8E1B17", "#C8302A", "#E3A63F", "#14746F", dark ? "#8F9CF2" : "#34488C"],
+        untagged: pal.network,
+      },
       alpha: {
         context: dark ? 0.16 : 0.18,
         isoFlow: dark ? 0.06 : 0.08,
@@ -296,8 +305,8 @@ const PAPER: SkinDef = {
         lineColor: LINE_COLOR.volume,
         nodeColor: NODE_COLOR.timeBand,
         natNodeColor: NODE_COLOR.flat,
-        nodeSize: NODE_SIZE.directTrains,
-        natNodeSize: NODE_SIZE.callsAtCity,
+        nodeSize: NODE_SIZE.stationRadius,
+        natNodeSize: NODE_SIZE.natCityRadius,
       },
     };
   },

@@ -8,6 +8,8 @@ import {
   NODE_COLOR,
   NODE_SIZE,
   SKINS,
+  SPEED_BANDS,
+  boxSide,
   flowColor,
   mapStyle,
   modeOf,
@@ -19,6 +21,7 @@ import {
   resolveMode,
   rgba,
   skinHasModeToggle,
+  speedBand,
   stationR,
 } from "../src/lib";
 import type { Mode, SkinId } from "../src/lib";
@@ -136,19 +139,49 @@ describe("skin selection", () => {
 
 describe("encodings", () => {
   const pal = palette(false);
+  const st = mapStyle("paper", "light");
   test("volume = flowColor; timeBand = rampColor or pal.dot; flat = pal.dot", () => {
+    expect(LINE_COLOR.volume.by).toBe("count");
     for (const [n, maxN] of [[1, 100], [37, 100], [100, 100], [5, 0]])
-      expect(LINE_COLOR.volume.color({ n, maxN }, pal)).toBe(flowColor(n, maxN, pal));
+      for (const [s, speed] of [[-1, 0], [3, 350]])
+        expect(LINE_COLOR.volume.color({ n, maxN, s, speed }, st)).toBe(flowColor(n, maxN, pal));
     for (const m of [0, 200, 240, 600, 720, 1500]) expect(NODE_COLOR.timeBand.color(m, pal)).toBe(rampColor(m, pal));
     expect(NODE_COLOR.timeBand.color(undefined, pal)).toBe(pal.dot);
     expect(NODE_COLOR.flat.color(300, pal)).toBe(pal.dot);
     expect(rgba(NODE_COLOR.flat.color(undefined, pal))).toEqual(rgba(pal.dot));
   });
 
-  test("directTrains = stationR; callsAtCity = natCityR", () => {
+  test("stationRadius = stationR; natCityRadius = natCityR", () => {
     for (const n of [0, 1, 10, 250, 3000]) {
-      expect(NODE_SIZE.directTrains.radius(n)).toBe(stationR(n));
-      expect(NODE_SIZE.callsAtCity.radius(n)).toBe(natCityR(n));
+      expect(NODE_SIZE.stationRadius.radius(n)).toBe(stationR(n));
+      expect(NODE_SIZE.natCityRadius.radius(n)).toBe(natCityR(n));
+    }
+  });
+
+  test("speedBand: boundaries at 120 / 200 / 250 / 300; 0 is untagged", () => {
+    const cases: [number, number][] = [
+      [0, -1], [1, 4], [119, 4], [120, 3], [199, 3], [200, 2], [249, 2], [250, 1], [299, 1], [300, 0], [350, 0], [450, 0],
+    ];
+    for (const [v, b] of cases) expect(speedBand(v)).toBe(b);
+    expect(SPEED_BANDS.map((b) => b.label)).toEqual(["300+", "250–299", "200–249", "120–199", "<120"]);
+  });
+
+  test("speedLimit: the skin's band colour by the section's speed, untagged colour at 0", () => {
+    const ramp = { bands: ["#000001", "#000002", "#000003", "#000004", "#000005"], untagged: "#00000F" };
+    const style = { pal, speedBands: ramp };
+    const c = (speed: number) => LINE_COLOR.speedLimit.color({ n: 10, maxN: 100, s: 0, speed }, style);
+    expect(LINE_COLOR.speedLimit.by).toBe("section");
+    expect([300, 299, 250, 249, 200, 199, 120, 119, 1, 0].map(c)).toEqual([
+      "#000001", "#000002", "#000002", "#000003", "#000003", "#000004", "#000004", "#000005", "#000005", "#00000F",
+    ]);
+    // the count never matters
+    expect(LINE_COLOR.speedLimit.color({ n: 99, maxN: 1, s: 7, speed: 310 }, style)).toBe("#000001");
+  });
+
+  test("boxSide: a square of the circle's area (side = r * sqrt(pi))", () => {
+    for (const r of [0, 1.5, 2, 7.3, 26]) {
+      expect(boxSide(r)).toBeCloseTo(r * Math.sqrt(Math.PI), 12);
+      expect(boxSide(r) ** 2).toBeCloseTo(Math.PI * r * r, 9);
     }
   });
 });

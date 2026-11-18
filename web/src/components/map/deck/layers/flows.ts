@@ -156,10 +156,24 @@ function blendOver(c: RGBA, paper: RGBA, alpha: number): RGBA {
 const passCache = new WeakMap<object, Map<string, PassData>>();
 
 /** One flow colour as RGBA: the style's line-colour encoding, pre-blended
-    over the paper when the pass is faded. */
-function flowRGBA(style: MapStyle, n: number, maxN: number, alpha: number): RGBA {
-  const c = rgba(style.enc.lineColor.color({ n, maxN }, style.pal));
+    over the paper when the pass is faded. `s` is the section (-1 when the
+    colour is memoised per count). */
+function flowRGBA(style: MapStyle, set: DecodedSet, s: number, n: number, maxN: number, alpha: number): RGBA {
+  const c = rgba(style.enc.lineColor.color({ n, maxN, s, speed: s < 0 ? 0 : set.speed[s] }, style));
   return alpha < 1 ? blendOver(c, style.ink.paper.rgba, alpha) : c;
+}
+
+/** The colour of path p (section `s`, count `v`): memoised per count for a
+    `by: "count"` encoding (s never reaches it), per section otherwise. */
+function pathRGBA(style: MapStyle, set: DecodedSet, memo: Map<number, RGBA>, s: number, v: number, maxN: number, alpha: number): RGBA {
+  const bySection = style.enc.lineColor.by === "section";
+  const k = bySection ? s : v;
+  let c = memo.get(k);
+  if (!c) {
+    c = flowRGBA(style, set, bySection ? s : -1, v, maxN, alpha);
+    memo.set(k, c);
+  }
+  return c;
 }
 
 /** Binary PathLayer data for one flow pass, in `items` order, n > 0 only.
@@ -187,17 +201,12 @@ export function buildPassData(
   const a = assemble(set, secs, "land");
   const n = new Float32Array(a.data.length);
   const col = new Uint8Array(a.data.length * 4);
-  // Colours are memoised per count: valid while the encoding is `by: "count"`.
+  // Colours are memoised per count (by: "count") or per section (by: "section").
   const colours = new Map<number, RGBA>();
   for (let p = 0; p < a.data.length; p++) {
     const v = ns[a.itemOfPath[p]];
     n[p] = v;
-    let c = colours.get(v);
-    if (!c) {
-      c = flowRGBA(style, v, maxN, alpha);
-      colours.set(v, c);
-    }
-    col.set(c, p * 4);
+    col.set(pathRGBA(style, set, colours, a.idxToSec[p], v, maxN, alpha), p * 4);
   }
   const fs = ferryOf(set);
   const ferry: DashPiece[] = [];
@@ -225,12 +234,7 @@ export function recountPassData(pd: PassData, counts: ArrayLike<number>, style: 
     const v = counts[pd.idxToSec[p]];
     n[p] = v;
     if (v <= 0) continue; // rgba 0: transparent
-    let c = colours.get(v);
-    if (!c) {
-      c = flowRGBA(style, v, maxN, alpha);
-      colours.set(v, c);
-    }
-    col.set(c, p * 4);
+    col.set(pathRGBA(style, pd.set, colours, pd.idxToSec[p], v, maxN, alpha), p * 4);
   }
   const ferry: DashPiece[] = [];
   for (const f of pd.ferry) {
