@@ -47,11 +47,7 @@ node tools/shots/shots.mjs /tmp/p1-base /tmp/sb-l --dpr 1 && node tools/shots/sh
 node tools/shots/cmp.mjs /tmp/sb-l /tmp/sn-l            # must print 0 images over threshold
 ```
 
-`SHOTS_QUERY='&theme=dark'` does **not** switch to dark: shots.mjs loads
-`/?theme=light${SHOTS_QUERY}`, and the first `theme` parameter wins. For dark, make a temporary
-copy: `sed 's#/?theme=light#/?theme=dark#' tools/shots/shots.mjs > tools/shots/_dark_tmp.mjs`.
-Run it on both builds, compare the results with cmp.mjs, then delete the copy. (A permanent fix
-is to let shots.mjs take the theme from SHOTS_QUERY; that is a separate tools change.)
+For dark, prefix both shots runs with `SHOTS_THEME=dark` (commit 64455d7 on `skins`), then compare the results with cmp.mjs. Light animation scenes (`anim-*`, `isolated-train-mid`) show 1–5 px run-to-run noise, so compare light with `--pixelmatch`. Dark must be exact.
 
 ---
 
