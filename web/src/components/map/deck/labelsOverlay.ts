@@ -3,8 +3,8 @@
    the former Canvas renderer, so placement is unchanged;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
-import { dotPlaces, isTrainShown, natCityR, natMotion, natState, palette, placeLabels, splitRadius, stationR, stationT, stationZoomK } from "../../../lib";
-import type { CloseupLabel, LabelPoint } from "../../../lib";
+import { DEFAULT_SKIN, dotPlaces, isTrainShown, mapStyle, modeOf, natMotion, natState, placeLabels, splitRadius, stationT, stationZoomK } from "../../../lib";
+import type { CloseupLabel, LabelPoint, MapStyle } from "../../../lib";
 import { closeupOf } from "../closeup";
 import type { Closeup } from "../closeup";
 import type { MapCtx } from "../context";
@@ -13,11 +13,9 @@ import { glowOf, shownTrains } from "./layers/trains";
 
 const scratch = natMotion();
 
-const fontOf = (fs: number, weight: string) =>
-  weight +
-  " " +
-  fs +
-  "px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif";
+/** Builds a Canvas 2D font string from the resolved style. */
+const fontOf = (style: MapStyle, fs: number, weight: string) =>
+  weight + " " + fs + "px " + style.font.family;
 
 /** Clears the overlay and draws labels + origin diamond for the current view. */
 export function drawLabelsOverlay(M: MapCtx) {
@@ -33,8 +31,8 @@ export function drawLabelsOverlay(M: MapCtx) {
   if (canvas.height !== h) canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const dark = P.current.dark;
-  const pal = palette(dark);
+  const style = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark));
+  const ink = style.ink;
   ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
   ctx.clearRect(0, 0, st.W, st.H);
   const national = P.current.national;
@@ -49,7 +47,7 @@ export function drawLabelsOverlay(M: MapCtx) {
     st.W,
     st.H,
     (text, fs, weight) => {
-      ctx.font = fontOf(fs, weight);
+      ctx.font = fontOf(style, fs, weight);
       const key = text + "|" + fs + "|" + weight;
       let tw = st.labelWidthCache.get(key);
       if (tw === undefined) {
@@ -60,52 +58,52 @@ export function drawLabelsOverlay(M: MapCtx) {
     },
     {
       origin: national ? null : { zh: cur.o.zh, en: cur.en, pt: cur.o.pt },
-      radius: national ? (n) => natCityR(n * LABEL_TRAINS_PER_UNIT) : undefined,
+      radius: national ? (n) => style.enc.natNodeSize.radius(n * LABEL_TRAINS_PER_UNIT) : undefined,
       panelDest: P.current.panelDest ?? null,
       showDest: P.current.showLabels,
       fitScale: st.fitScale,
       sk,
-      closeups: cu ? closeupLabels(cu, cur.o.zh, P.current.panelDest ?? null, lit, sk) : undefined,
+      closeups: cu ? closeupLabels(cu, cur.o.zh, P.current.panelDest ?? null, lit, sk, style) : undefined,
     },
   );
-  for (const { box, style, text, x, y, align } of labels) {
-    ctx.font = fontOf(style.fs, style.weight);
-    if (style.isBoxed) {
-      ctx.fillStyle = dark ? "#1A1B1E" : "#ffffff";
+  for (const { box, style: lStyle, text, x, y, align } of labels) {
+    ctx.font = fontOf(style, lStyle.fs, lStyle.weight);
+    if (lStyle.isBoxed) {
+      ctx.fillStyle = ink.labelBox.css;
       ctx.fillRect(box.x, box.y, box.w, box.h);
-      ctx.strokeStyle = dark ? "#EDEDEA" : "#111111";
+      ctx.strokeStyle = ink.labelBoxEdge.css;
       ctx.lineWidth = 1;
       ctx.strokeRect(box.x, box.y, box.w, box.h);
-      ctx.fillStyle = dark ? "#EDEDEA" : "#111111";
+      ctx.fillStyle = ink.labelBoxText.css;
     } else {
-      ctx.fillStyle = pal.labelHalo;
+      ctx.fillStyle = ink.labelHalo.css;
       ctx.fillRect(box.x, box.y, box.w, box.h);
-      ctx.fillStyle = pal.label;
+      ctx.fillStyle = ink.label.css;
     }
     ctx.textAlign = align;
     ctx.fillText(text, x, y);
   }
   if (national) {
-    drawNationalTags(M, ctx);
+    drawNationalTags(M, ctx, style);
     return;
   }
-  drawTrainTags(M, ctx);
+  drawTrainTags(M, ctx, style);
   // The origin's diamond, on each of its stations while it splits; its disc is a deck layer (P1b.3).
   for (const p of dotPlaces([cur.o.pt[0], cur.o.pt[1]], cu?.byCity.get(cur.o.zh), cu?.k ?? 0)) {
     ctx.save();
     ctx.translate(M.X(p.pos[0]), M.Y(p.pos[1]));
     ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = dark ? "#1A1B1E" : "#ffffff";
+    ctx.fillStyle = ink.originMark.css;
     ctx.fillRect(-2.2, -2.2, 4.4, 4.4);
     ctx.restore();
   }
 }
 
-/* The close-ups' labels: every split city (the origin, the selected city, the
-   lit cities) drops its own label; once fully split its stations are named,
-   the origin's and the selected city's boxed. Mid-split none are, so no
-   label rides a moving dot. */
-function closeupLabels(cu: Closeup, originZh: string, pd: LabelPoint | null, lit: LabelPoint[], sk: number) {
+/** Computes close-up station labels and skipped city names using `style`'s node-size encoding.
+    Every split city (the origin, the selected city, the lit cities) drops its own label;
+    once fully split its stations are named, the origin's and the selected city's boxed.
+    Mid-split none are, so no label rides a moving dot. */
+function closeupLabels(cu: Closeup, originZh: string, pd: LabelPoint | null, lit: LabelPoint[], sk: number, style: MapStyle) {
   const skip = new Set<string>();
   const stations: CloseupLabel[] = [];
   const add = (zh: string, off: (f: number) => number, boxed: boolean) => {
@@ -116,16 +114,16 @@ function closeupLabels(cu: Closeup, originZh: string, pd: LabelPoint | null, lit
     const f = 1 / Math.sqrt(list.length);
     for (const s of list) stations.push({ zh: s.zh, en: s.en, pt: s.pt, off: off(f), boxed });
   };
-  const grown = (c: LabelPoint) => stationR(c.trains) * stationZoomK(stationR(c.trains), sk);
+  const grown = (c: LabelPoint) => style.enc.nodeSize.radius(c.trains) * stationZoomK(style.enc.nodeSize.radius(c.trains), sk);
   add(originZh, () => 13, true);
   if (pd) add(pd.zh, (f) => splitRadius(grown(pd), f) + 5, true);
   for (const c of lit) add(c.zh, (f) => splitRadius(grown(c), f) + 2, false);
   return { skip, stations };
 }
 
-/* The hovered / selected / isolated train's code tag (map/trains.ts), above
-   the dots. The same visibility rules as the dot layer. */
-function drawTrainTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
+/** Draws the hovered / selected / isolated train's code tag above its dot using `style`
+    (same visibility rules as the dot layer). */
+function drawTrainTags(M: MapCtx, ctx: CanvasRenderingContext2D, style: MapStyle) {
   const { S, P } = M;
   const st = S.current;
   if (!st.animEnabled) return;
@@ -142,35 +140,35 @@ function drawTrainTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
     const px = M.X(tr.lon);
     const py = M.Y(tr.lat);
     if (px < -20 || px > st.W + 20 || py < -20 || py > st.H + 20) continue;
-    paintTag(ctx, px, py, isIsolated ? `${tr.code} · ${tr.progressPct}%` : tr.code, tr.cls);
+    paintTag(ctx, px, py, isIsolated ? `${tr.code} · ${tr.progressPct}%` : tr.code, tr.cls, style);
   }
 }
 
-/* The code tag above a dot, in its class colour. */
-function paintTag(ctx: CanvasRenderingContext2D, px: number, py: number, tagText: string, cls: string) {
+/** Paints the code tag above a dot in its class colour using `style`'s tag font and inks. */
+function paintTag(ctx: CanvasRenderingContext2D, px: number, py: number, tagText: string, cls: string, style: MapStyle) {
   const g = glowOf(cls);
   const glow = `rgb(${g[0]},${g[1]},${g[2]})`;
-  ctx.font = "bold 10px monospace";
+  ctx.font = "bold 10px " + style.font.tag;
   const tagW = ctx.measureText(tagText).width + 8;
   const tagH = 16;
   const tagX = px - tagW / 2;
   const tagY = py - 18;
-  ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+  ctx.fillStyle = style.ink.tagPlate.css;
   ctx.beginPath();
   ctx.roundRect(tagX, tagY, tagW, tagH, 3);
   ctx.fill();
   ctx.strokeStyle = glow;
   ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = "#FFFFFF";
+  ctx.fillStyle = style.ink.tagText.css;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(tagText, px, tagY + tagH / 2);
 }
 
-/* National mode: the same tag on the hovered / selected / isolated train's dot
-   (the last frame's dots, `natPick`); the isolated one also shows its progress. */
-function drawNationalTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
+/** National mode: draws the code tag on the hovered / selected / isolated train's dot
+    (the last frame's dots, `natPick`) using `style`; the isolated one also shows its progress. */
+function drawNationalTags(M: MapCtx, ctx: CanvasRenderingContext2D, style: MapStyle) {
   const { S, P } = M;
   const st = S.current;
   const f = st.natPick;
@@ -197,6 +195,6 @@ function drawNationalTags(M: MapCtx, ctx: CanvasRenderingContext2D) {
       const m = natState(f.tl, q, f.m + 1440 * (Math.ceil((f.tl.start[q] - f.m) / 1440) + (i - j)), scratch);
       pct = ` · ${Math.round((m.dist / total) * 100)}%`;
     }
-    paintTag(ctx, px, py, row.code + pct, row.class);
+    paintTag(ctx, px, py, row.code + pct, row.class, style);
   }
 }

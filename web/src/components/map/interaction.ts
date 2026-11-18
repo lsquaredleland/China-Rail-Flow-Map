@@ -1,11 +1,13 @@
 /* Hit-testing and the floating tooltip. */
 import type { ChordVM, FlowVM, Hit } from "../../types";
 import {
+  DEFAULT_SKIN,
   dotPlaces,
   isFerrySection,
   isTrainShown as modelIsTrainShown,
+  mapStyle,
+  modeOf,
   natTrainVM,
-  stationR,
   stationZoomK,
   tooltipHtml,
   pickableChords,
@@ -50,6 +52,7 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
   const pd = P.current.panelDest;
   // A split city answers at each of its station dots (lib/closeups), still as the city.
   const cu = closeupOf(M);
+  const size = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark)).enc.nodeSize;
   for (let i = 0; i < pts.length; i++) {
     const c = pts[i];
     if (pd && c.idx !== pd.idx) continue;
@@ -58,7 +61,7 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
       const x = X(p.pos[0]),
         y = Y(p.pos[1]);
       if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
-      const radius = p.f >= 1 ? 14 * stationZoomK(stationR(c.trains), sk) : Math.max(8, splitRadius(14 * stationZoomK(stationR(c.trains), sk), p.f));
+      const radius = p.f >= 1 ? 14 * stationZoomK(size.radius(c.trains), sk) : Math.max(8, splitRadius(14 * stationZoomK(size.radius(c.trains), sk), p.f));
       const dx = px - x,
         dy = py - y;
       if (dx * dx + dy * dy > radius * radius) continue;

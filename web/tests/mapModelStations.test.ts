@@ -1,7 +1,7 @@
 // mapModel (stations section): selection cache, visible-train rule and
 // per-station state, on the real fixture origins.
 import { describe, expect, test } from "bun:test";
-import { getSelCache, isTrainShown, stationStates } from "../src/lib";
+import { getSelCache, isTrainShown, mapStyle, modeOf, stationStates } from "../src/lib";
 import type { SelCache, SelInput, StationInput } from "../src/lib";
 import type { CityPointVM, DestVM } from "../src/types";
 import { origin } from "./fixture";
@@ -16,7 +16,7 @@ function setup(o: string, d: string | null) {
     points: cur.dests,
     panelDest: dest,
     hoverIdx: -1,
-    dark: false,
+    style: mapStyle("paper", "light"),
     animEnabled: true,
     animTime,
     totalMins: cur.timeline?.totalMins,
@@ -84,7 +84,7 @@ describe("mapModel stations: (i) dimming", () => {
     test(`${dark ? "dark" : "light"}: non-selected cities dim to ${dark ? 0.16 : 0.18}`, () => {
       const { dest, sel, memo, input } = setup("上海", "杭州");
       const hover = (input(0).points.find((c: CityPointVM) => c.idx !== dest!.idx) as CityPointVM).idx;
-      const states = stationStates(input(0, { dark, hoverIdx: hover }), getSelCache(sel, memo));
+      const states = stationStates(input(0, { style: mapStyle("paper", modeOf(dark)), hoverIdx: hover }), getSelCache(sel, memo));
       expect(states.length).toBe(input(0).points.length);
       for (const s of states) {
         const full = s.idx === dest!.idx || s.idx === hover;

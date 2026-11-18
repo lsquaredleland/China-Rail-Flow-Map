@@ -1,5 +1,5 @@
 /* Flow-model access for the pointer / pick code: the decisions live in lib/mapModel. */
-import { getDestSectionCounts as modelDestSectionCounts } from "../../lib";
+import { DEFAULT_SKIN, getDestSectionCounts as modelDestSectionCounts, mapStyle, modeOf } from "../../lib";
 import type { ModelState } from "../../lib";
 import type { MapCtx } from "./context";
 
@@ -14,7 +14,7 @@ export function modelState(M: MapCtx): ModelState {
     showInfra: P.current.showInfra,
     panelDest: P.current.panelDest,
     iso: P.current.isolatedTrainCode,
-    dark: P.current.dark,
+    style: mapStyle(DEFAULT_SKIN, modeOf(P.current.dark)),
   };
 }
 

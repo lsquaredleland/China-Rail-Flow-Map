@@ -11,7 +11,7 @@
    gets viewToViewState(view) on every render(). */
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import { dotPlaces, getSelCache, isTrainShown, originIsolatedCities, palette, stationStates, stationT, viewToViewState } from "../../../lib";
+import { DEFAULT_SKIN, dotPlaces, getSelCache, isTrainShown, mapStyle, modeOf, originIsolatedCities, stationStates, stationT, viewToViewState } from "../../../lib";
 import { closeupOf, stepCloseup } from "../closeup";
 import type { MapCtx } from "../context";
 import { drawLabelsOverlay } from "./labelsOverlay";
@@ -123,12 +123,13 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   const { P, S } = M;
   const atlas = P.current.atlas;
   if (!atlas) return [];
+  const style = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark));
   const layers: Layer[] = backdropLayers({
     atlas,
     outline: P.current.outline ?? null,
     showOutline: !!P.current.showOutline,
     showNetwork: P.current.showNetwork,
-    dark: P.current.dark,
+    style,
     scale: S.current.view.scale,
   });
   if (P.current.national) return [...layers, ...nationalBuildLayers(M, stats)];
@@ -147,10 +148,10 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         showInfra: P.current.showInfra,
         panelDest: P.current.panelDest,
         iso: P.current.isolatedTrainCode,
-        dark: P.current.dark,
+        style,
       },
       caches: st,
-      dark: P.current.dark,
+      style,
       scale: st.view.scale,
       fitScale: st.fitScale,
       hover: st.hover,
@@ -176,7 +177,6 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     }
     layers.push(...over);
     const sk = stationT(st.view, st.fitScale);
-    const dark = P.current.dark;
     const pd = P.current.panelDest ?? null;
     const hover = st.hover;
     const shown = originIsolatedCities(cur, P.current.direction, P.current.isolatedTrainCode);
@@ -186,7 +186,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         points: M.points(),
         panelDest: pd,
         hoverIdx: hover && hover.kind === "station" ? hover.station.idx : -1,
-        dark,
+        style,
         animEnabled: st.animEnabled,
         animTime: st.animTime,
         totalMins: M.activeTimeline()?.totalMins,
@@ -204,8 +204,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     layers.push(
       ...stationLayers({
         states,
-        pal: palette(dark),
-        dark,
+        style,
         hasDest: !!pd,
         originPt,
         originPlaces: dotPlaces(originPt, closeup?.byCity.get(cur.o.zh), closeup?.k ?? 0).map((p) => p.pos),
@@ -214,7 +213,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
         hoverOrigin: !!hover && hover.kind === "origin",
         sk,
         closeup,
-        key: [dark, Math.round(sk * 1000), st.closeupK, st.animEnabled ? st.animTime : -1, pd?.idx, hover?.kind, hover && hover.kind === "station" ? hover.station.idx : -1, P.current.cur?.o.zh, P.current.direction].join("|"),
+        key: [style.key, Math.round(sk * 1000), st.closeupK, st.animEnabled ? st.animTime : -1, pd?.idx, hover?.kind, hover && hover.kind === "station" ? hover.station.idx : -1, P.current.cur?.o.zh, P.current.direction].join("|"),
         posKey: (cur.o.zh ?? "") + "|" + P.current.direction,
       }),
     );
@@ -363,7 +362,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement, onFatal?: () => void)
     const { S, P } = M;
     const st = S.current;
     if (!P.current.atlas || !P.current.cur || !deck.isInitialized) return;
-    canvas.style.background = palette(P.current.dark).paper;
+    canvas.style.background = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark)).ink.paper.css;
     const layers = buildLayers(M, stats);
     const sig = layers.map((l) => l.id).join("|");
     if (sig !== layerSig) {

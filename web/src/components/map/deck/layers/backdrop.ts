@@ -1,6 +1,6 @@
 /* Backdrop layers: land fill, outline, graticule, base network and the
    dashed Qiongzhou ferry crossing. Pure props builders: a function of the
-   decoded atlas / outline, the palette and the view scale. The geometry is
+   decoded atlas / outline, the style and the view scale. The geometry is
    uploaded once per data object (WeakMap caches); only colours and the
    scale-dependent dash/width values change between calls, through
    updateTriggers. */
@@ -8,7 +8,8 @@ import type { Layer } from "@deck.gl/core";
 import { PathStyleExtension } from "@deck.gl/extensions";
 import { LineLayer, PathLayer, SolidPolygonLayer } from "@deck.gl/layers";
 import type { DecodedAtlas, DecodedOutline, DecodedSet } from "../../../../types";
-import { isFerrySection, paletteRGBA, splitFerry } from "../../../../lib";
+import { isFerrySection, splitFerry } from "../../../../lib";
+import type { MapStyle } from "../../../../lib";
 import { binaryPaths } from "./binary";
 import type { BinaryPaths } from "./binary";
 
@@ -17,7 +18,7 @@ interface BackdropInput {
   outline: DecodedOutline | null;
   showOutline: boolean;
   showNetwork: boolean;
-  dark: boolean;
+  style: MapStyle;
   /** View scale in px per degree (S.current.view.scale). */
   scale: number;
 }
@@ -104,12 +105,13 @@ function backdropMetrics(scale: number) {
   };
 }
 
+/** Backdrop layers (outline, graticule, base network and ferry crossing) styled by `inp.style`. */
 export function backdropLayers(inp: BackdropInput): Layer[] {
-  const { atlas, outline, showOutline, showNetwork, dark, scale } = inp;
-  const pal = paletteRGBA(dark);
+  const { atlas, outline, showOutline, showNetwork, style, scale } = inp;
+  const ink = style.ink;
   const m = backdropMetrics(scale);
   const L: Layer[] = [];
-  const themeKey = dark ? "dark" : "light";
+  const themeKey = style.key;
   if (showOutline && outline) {
     const g = outlineGeom(outline);
     L.push(
@@ -119,7 +121,7 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
         data: g.polys,
         getPolygon: (d: number[]) => d,
         positionFormat: "XY",
-        getFillColor: pal.landFill,
+        getFillColor: ink.landFill.rgba,
         updateTriggers: { getFillColor: themeKey },
       }),
       new PathLayer({
@@ -129,9 +131,8 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
         widthUnits: "common",
         getWidth: 0.015,
         widthMinPixels: 0.65,
-        capRounded: true,
-        jointRounded: true,
-        getColor: pal.outline,
+        ...style.line,
+        getColor: ink.outline.rgba,
         updateTriggers: { getColor: themeKey },
       }),
       new PathLayer({
@@ -141,9 +142,8 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
         widthUnits: "common",
         getWidth: 0.015,
         widthMinPixels: 0.65,
-        capRounded: true,
-        jointRounded: true,
-        getColor: pal.outline,
+        ...style.line,
+        getColor: ink.outline.rgba,
         updateTriggers: { getColor: themeKey },
       }),
       new PathLayer({
@@ -153,7 +153,7 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
         widthUnits: "common",
         getWidth: 0.02,
         widthMinPixels: 1,
-        getColor: pal.outline,
+        getColor: ink.outline.rgba,
         extensions: [dashExt],
         dashUnits: "pixels",
         getDashArray: m.nineDash,
@@ -169,7 +169,7 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
       getTargetPosition: (d) => d.t,
       widthUnits: "pixels",
       getWidth: 0.5,
-      getColor: pal.graticule,
+      getColor: ink.graticule.rgba,
       updateTriggers: { getColor: themeKey },
     }),
   );
@@ -184,9 +184,8 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
         getWidth: 0.008,
         widthMinPixels: 0.45,
         widthMaxPixels: 2.5,
-        capRounded: true,
-        jointRounded: true,
-        getColor: pal.network,
+        ...style.line,
+        getColor: ink.network.rgba,
         updateTriggers: { getColor: themeKey },
       }),
     );
@@ -198,7 +197,7 @@ export function backdropLayers(inp: BackdropInput): Layer[] {
           _pathType: "open",
           widthUnits: "pixels",
           getWidth: m.ferryW,
-          getColor: pal.ferry,
+          getColor: ink.ferry.rgba,
           extensions: [dashExt],
           dashUnits: "pixels",
           getDashArray: m.ferryDash,

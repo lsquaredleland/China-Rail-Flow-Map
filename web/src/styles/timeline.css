@@ -17,6 +17,12 @@
   --tl-on-ink: #FFFFFF;
   --tl-btn-bg: #FFFFFF;
   --tl-edge: 1.5px solid #111111;
+  --tl-collapsed-bg: #F4F4F0;
+  --tl-collapsed-edge: 1.5px solid #111111;
+  --tl-dot: #C8302A;
+  --tl-dock-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --tl-pill-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --tl-float-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 :root[data-theme="dark"] .timeline-bar-dock,
 :root[data-theme="dark"] .timeline-collapsed-bar,
@@ -35,6 +41,8 @@
   --tl-on-ink: #111111;
   --tl-btn-bg: #27272A;
   --tl-edge: 1px solid rgba(255, 255, 255, 0.18);
+  --tl-collapsed-bg: #18181B;
+  --tl-collapsed-edge: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .timeline-bar-dock {
@@ -44,7 +52,7 @@
   color: var(--tl-ink);
   border-top: var(--tl-edge);
   border-bottom: var(--tl-edge);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--tl-dock-shadow);
   padding: 8px 24px 6px 24px;
   display: flex;
   flex-direction: column;
@@ -62,15 +70,11 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #F4F4F0;
-  border-top: var(--tl-edge);
-  border-bottom: var(--tl-edge);
+  background: var(--tl-collapsed-bg);
+  border-top: var(--tl-collapsed-edge);
+  border-bottom: var(--tl-collapsed-edge);
   user-select: none;
   box-sizing: border-box;
-}
-:root[data-theme="dark"] .timeline-collapsed-bar {
-  background: #18181B;
-  --tl-edge: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* pill that expands the bar (in the collapsed bar and over the map) */
@@ -86,15 +90,15 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--tl-pill-shadow);
   transition: transform 0.12s ease, background 0.15s ease;
 }
 .tl-expand-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #C8302A;
-  box-shadow: 0 0 6px #C8302A;
+  background: var(--tl-dot);
+  box-shadow: 0 0 6px var(--tl-dot);
 }
 
 .tb-row {
@@ -393,12 +397,12 @@
 }
 .tl-expand-btn.is-over-map {
   padding: 6px 20px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--tl-float-shadow);
 }
 .tl-expand-btn.is-over-map .tl-expand-dot {
   width: 8px;
   height: 8px;
-  box-shadow: 0 0 8px #C8302A;
+  box-shadow: 0 0 8px var(--tl-dot);
 }
 
 /* Phones: one compact row. A black play square at the left, the red clock with

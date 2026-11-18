@@ -615,8 +615,8 @@ export interface Palette {
   graticule: string;
   flow: string;
   flowHi: string;
-  /** Flow-colour ramp stops [t, rgb] with t = sqrt(n / N) in 0..1.
-      Empty in the dark scheme, where flows keep the flat `flow` colour. */
+  /** Flow-colour ramp stops [t, rgb] with t = sqrt(n / N) in 0..1 (both
+      schemes have four). With none, flows keep the flat `flow` colour. */
   flowStops: [number, [number, number, number]][];
   chord: string;
   /** Infrastructure overlay strokes: distinct colours for high-speed rail

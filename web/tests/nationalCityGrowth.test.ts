@@ -2,7 +2,7 @@
 // (dep_min / arr_min of the index) counted up to the minute. Synthetic pack:
 // 4 trains over 3 cities (city_table 0, 1, 2).
 import { describe, expect, test } from "bun:test";
-import { DATA_FMT, natCityCounts, natCityEvents, natCityEventsAt, natSelect } from "../src/lib";
+import { DATA_FMT, mapStyle, natCityCounts, natCityEvents, natCityEventsAt, natSelect } from "../src/lib";
 import type { NatFilter } from "../src/lib";
 import { NAT_RIPPLE_MIN, nationalCityDots, nationalCityLayers } from "../src/components/map/deck/layers/national";
 import type { NationalFlowsPack, NationalIndexPack, RawTrain } from "../src/types";
@@ -107,8 +107,8 @@ describe("national city growth", () => {
     expect(at(70)).toBeCloseTo(0.5);
     expect(at(60 + NAT_RIPPLE_MIN)).toBe(1);
     expect(at(60 + NAT_RIPPLE_MIN + 1)).toBe(-1);
-    expect(nationalCityLayers(dots(none, 70), false).map((l) => l.id)).toContain("nat-city-ripples");
-    expect(nationalCityLayers(dots(none, 300), false).map((l) => l.id)).not.toContain("nat-city-ripples");
-    expect(nationalCityLayers(dots(none, null), false).map((l) => l.id)).not.toContain("nat-city-ripples");
+    expect(nationalCityLayers(dots(none, 70), mapStyle("paper", "light")).map((l) => l.id)).toContain("nat-city-ripples");
+    expect(nationalCityLayers(dots(none, 300), mapStyle("paper", "light")).map((l) => l.id)).not.toContain("nat-city-ripples");
+    expect(nationalCityLayers(dots(none, null), mapStyle("paper", "light")).map((l) => l.id)).not.toContain("nat-city-ripples");
   });
 });

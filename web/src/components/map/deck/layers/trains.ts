@@ -14,12 +14,14 @@
 import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { ActiveTrainVM } from "../../../../types";
+import { DEFAULT_SKIN, mapStyle } from "../../../../lib";
 import type { RGBA } from "../../../../lib";
 import { TailLayer } from "../TailLayer";
 
-const AMBER: RGBA = [245, 158, 11, 255]; // G D C
-const CYAN: RGBA = [6, 182, 212, 255]; // Z T K S
-const SLATE: RGBA = [226, 232, 240, 255]; // 普 and the rest
+const PAPER = mapStyle(DEFAULT_SKIN, "light").ink;
+const AMBER = PAPER.trainHs.rgba; // G D C
+const CYAN = PAPER.trainConv.rgba; // Z T K S
+const SLATE = PAPER.trainOther.rgba; // 普 and the rest
 
 /** The train's glow colour (the former Canvas renderer: high-speed amber, conventional cyan). */
 export function glowOf(cls: string): RGBA {

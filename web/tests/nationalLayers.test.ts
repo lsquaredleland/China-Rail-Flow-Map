@@ -9,7 +9,7 @@ import type { NatFilter } from "../src/lib";
 const NOF: NatFilter = { classes: [], hours: [], distBins: [], durBins: [], trainCodes: [], unit: "km" };
 import type { NationalTrainsData } from "../src/types";
 import { LABEL_TRAINS_PER_UNIT, maxDots, natView, nationalCityDots, nationalInfraLayers, nationalLabelPoints, nationalFlowLayers, nationalFrame, nationalHighlight, nationalKeep, nationalLayers, nationalTimeline, synthNational } from "../src/components/map/deck/layers/national";
-import { isoFlowAlpha } from "../src/lib";
+import { isoFlowAlpha, mapStyle } from "../src/lib";
 import { glowOf } from "../src/components/map/deck/layers/trains";
 import { nationalTrains, pack } from "./fixture";
 
@@ -176,7 +176,7 @@ describe("national flow picking and circle size", () => {
   const pair = nationalFlowsPair();
   const nfReal = pair.flows;
   const view = natView(atlas, nfReal, null, NOF);
-  const out = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, dark: false, scale: 100, fitScale: 100 });
+  const out = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, style: mapStyle("paper", "light"), scale: 100, fitScale: 100 });
   test("the flows come with a hairline pick proxy mapping paths to sections", () => {
     const pick = out.layers.find((l) => l.id === "pick-flows-national")!;
     expect(pick).toBeDefined();
@@ -188,9 +188,9 @@ describe("national flow picking and circle size", () => {
     expect(out.counts[idxToSec[0]]).toBe(Math.max(...Array.from(out.counts)));
   });
   test("an isolated train fades the flows (isoFlowAlpha) instead of hiding them", () => {
-    const faded = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, dark: false, scale: 100, fitScale: 100, alpha: isoFlowAlpha(false) });
-    expect(isoFlowAlpha(false)).toBe(0.08);
-    expect(isoFlowAlpha(true)).toBe(0.06);
+    const faded = nationalFlowLayers({ atlas, nf: nfReal, ne: null, minute: null, classes: [], view, style: mapStyle("paper", "light"), scale: 100, fitScale: 100, alpha: isoFlowAlpha(mapStyle("paper", "light")) });
+    expect(isoFlowAlpha(mapStyle("paper", "light"))).toBe(0.08);
+    expect(isoFlowAlpha(mapStyle("paper", "dark"))).toBe(0.06);
     expect(faded.sections).toBe(out.sections);
     expect(faded.layers.some((l) => l.id.startsWith("pick-"))).toBe(false);
     const col = (ls: typeof out.layers) => {
@@ -203,7 +203,7 @@ describe("national flow picking and circle size", () => {
   });
   test("the hover highlight is one wider path on the hovered section", () => {
     const n = 40;
-    const [h] = nationalHighlight(atlas, 0, n, 100, 100, false);
+    const [h] = nationalHighlight(atlas, 0, n, 100, 100, mapStyle("paper", "light"));
     expect(h.id).toBe("nat-seg-highlight");
     expect(h.props.getWidth).toBeCloseTo(Math.max(0.5, flowUnits(n) * WIDTH_K * NAT_WIDTH_FACTOR) + 1.6, 9);
   });
@@ -287,9 +287,9 @@ describe("national city tiers, labels and infrastructure", () => {
   });
   test("the infrastructure overlay draws the track under the flowing sections", () => {
     const flowsCounts = Uint32Array.from({ length: atlas.sec.len.length }, (_, s) => (s % 7 === 0 ? 3 : 0));
-    const layers = nationalInfraLayers(atlas, flowsCounts, false);
+    const layers = nationalInfraLayers(atlas, flowsCounts, mapStyle("paper", "light"));
     expect(layers.length).toBeGreaterThan(0);
     expect(layers.every((l) => l.id.startsWith("infra-"))).toBe(true);
-    expect(nationalInfraLayers(atlas, flowsCounts, false)).toHaveLength(layers.length);
+    expect(nationalInfraLayers(atlas, flowsCounts, mapStyle("paper", "light"))).toHaveLength(layers.length);
   });
 });

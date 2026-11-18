@@ -8,6 +8,7 @@ import {
 import type { MapApi, AnimState } from "./MapHost";
 import SpeedSelect from "./SpeedSelect";
 import type { Direction } from "../types";
+import { DEFAULT_SKIN, mapStyle, modeOf } from "../lib";
 
 export interface TimelineScrubberProps {
   mapRef: RefObject<MapApi | null>;
@@ -94,6 +95,7 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
   // Subscribe to MapHost animation ticks with direct DOM updates (0% React re-render overhead)
   useEffect(() => {
+    const ink = mapStyle(DEFAULT_SKIN, modeOf(dark)).ink;
     const handleAnimUpdate = (state: AnimState) => {
       const totM = state.totalMins || 1440;
       totalMinsRef.current = totM;
@@ -148,11 +150,11 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
 
       // 4. Time period / Rush hour badge
       if (rushBadgeRef.current && rushBadgeTextRef.current) {
-        const rushColor = dark ? "#E54035" : "#C8302A";
+        const rushColor = ink.rushPeak.css;
         if (t >= totM && !state.national) {
           rushBadgeTextRef.current.textContent = "ALL ARRIVED";
-          rushBadgeRef.current.style.borderColor = "#10B981";
-          rushBadgeRef.current.style.color = "#10B981";
+          rushBadgeRef.current.style.borderColor = ink.rushDone.css;
+          rushBadgeRef.current.style.color = ink.rushDone.css;
         } else if (day === 1 && minsInDay >= 420 && minsInDay <= 570) {
           rushBadgeTextRef.current.textContent = "MORNING RUSH";
           rushBadgeRef.current.style.borderColor = rushColor;
@@ -163,16 +165,16 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
           rushBadgeRef.current.style.color = rushColor;
         } else if (day === 1 && minsInDay < 360) {
           rushBadgeTextRef.current.textContent = "NIGHT SERVICES";
-          rushBadgeRef.current.style.borderColor = dark ? "#6B7280" : "#9CA3AF";
-          rushBadgeRef.current.style.color = dark ? "#6B7280" : "#9CA3AF";
+          rushBadgeRef.current.style.borderColor = ink.rushNight.css;
+          rushBadgeRef.current.style.color = ink.rushNight.css;
         } else if (day > 1) {
           rushBadgeTextRef.current.textContent = `DAY ${day} TAIL`;
-          rushBadgeRef.current.style.borderColor = dark ? "#F59E0B" : "#D97706";
-          rushBadgeRef.current.style.color = dark ? "#F59E0B" : "#D97706";
+          rushBadgeRef.current.style.borderColor = ink.rushTail.css;
+          rushBadgeRef.current.style.color = ink.rushTail.css;
         } else {
           rushBadgeTextRef.current.textContent = "DAY 1 REGULAR";
-          rushBadgeRef.current.style.borderColor = dark ? "#4B5563" : "#6B7280";
-          rushBadgeRef.current.style.color = dark ? "#4B5563" : "#6B7280";
+          rushBadgeRef.current.style.borderColor = ink.rushRegular.css;
+          rushBadgeRef.current.style.color = ink.rushRegular.css;
         }
       }
 

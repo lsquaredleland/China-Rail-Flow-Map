@@ -13,7 +13,7 @@
 import type { Layer } from "@deck.gl/core";
 import { PathStyleExtension } from "@deck.gl/extensions";
 import { PathLayer } from "@deck.gl/layers";
-import type { ActiveTrainVM, ChordVM, DayTimelineVM, DecodedSet, Hit, Palette } from "../../../../types";
+import type { ActiveTrainVM, ChordVM, DayTimelineVM, DecodedSet, Hit } from "../../../../types";
 import {
   WIDTH_K,
   flowUnits,
@@ -22,17 +22,15 @@ import {
   animStep,
   chordPlan,
   chordVisible,
-  flowColor,
   flowPasses,
   highlightSegN,
   infraPasses,
   isFerrySection,
   isolatedCorridor,
-  palette,
   rgba,
   splitFerry,
 } from "../../../../lib";
-import type { FlowItem, FlowPass, InfraPass, ModelCaches, ModelState, RGBA } from "../../../../lib";
+import type { FlowItem, FlowPass, InfraPass, MapStyle, ModelCaches, ModelState, RGBA } from "../../../../lib";
 
 /** Infrastructure hairline width, CSS px (the former Canvas renderer's INFRA_WIDTH). */
 const INFRA_WIDTH = 1.25;
@@ -157,16 +155,24 @@ function blendOver(c: RGBA, paper: RGBA, alpha: number): RGBA {
 
 const passCache = new WeakMap<object, Map<string, PassData>>();
 
+/** One flow colour as RGBA: the style's line-colour encoding, pre-blended
+    over the paper when the pass is faded. */
+function flowRGBA(style: MapStyle, n: number, maxN: number, alpha: number): RGBA {
+  const c = rgba(style.enc.lineColor.color({ n, maxN }, style.pal));
+  return alpha < 1 ? blendOver(c, style.ink.paper.rgba, alpha) : c;
+}
+
 /** Binary PathLayer data for one flow pass, in `items` order, n > 0 only.
-    Cached per items identity; an unchanged pass costs nothing. */
+    Cached per items identity and style (the colours depend on the whole
+    style, not only its paper and flow colours); an unchanged pass costs nothing. */
 export function buildPassData(
   set: DecodedSet,
   items: readonly FlowItem[],
-  pal: Palette,
+  style: MapStyle,
   alpha: number,
   maxN: number,
 ): PassData {
-  const key = `${alpha}|${maxN}|${pal.paper}|${pal.flow}`;
+  const key = `${alpha}|${maxN}|${style.key}`;
   let perItems = passCache.get(items);
   const hit = perItems?.get(key);
   if (hit && hit.set === set) return hit;
@@ -181,15 +187,14 @@ export function buildPassData(
   const a = assemble(set, secs, "land");
   const n = new Float32Array(a.data.length);
   const col = new Uint8Array(a.data.length * 4);
-  const paper = rgba(pal.paper);
+  // Colours are memoised per count: valid while the encoding is `by: "count"`.
   const colours = new Map<number, RGBA>();
   for (let p = 0; p < a.data.length; p++) {
     const v = ns[a.itemOfPath[p]];
     n[p] = v;
     let c = colours.get(v);
     if (!c) {
-      c = rgba(flowColor(v, maxN, pal));
-      if (alpha < 1) c = blendOver(c, paper, alpha);
+      c = flowRGBA(style, v, maxN, alpha);
       colours.set(v, c);
     }
     col.set(c, p * 4);
@@ -211,20 +216,19 @@ export function buildPassData(
     and colour attributes (no re-tessellation); n and colours from
     `counts[section]`, a section at 0 fully transparent; the colour ramp
     stays normalised to `maxN`; ferry dashes of the sections with n > 0. */
-export function recountPassData(pd: PassData, counts: ArrayLike<number>, pal: Palette, maxN: number, alpha = 1): PassData {
+export function recountPassData(pd: PassData, counts: ArrayLike<number>, style: MapStyle, maxN: number, alpha = 1): PassData {
   const len = pd.data.length;
   const n = new Float32Array(len);
   const col = new Uint8Array(len * 4);
   const colours = new Map<number, RGBA>();
-  const paper = rgba(pal.paper);
   for (let p = 0; p < len; p++) {
     const v = counts[pd.idxToSec[p]];
     n[p] = v;
     if (v <= 0) continue; // rgba 0: transparent
     let c = colours.get(v);
     if (!c) {
-      c = rgba(flowColor(v, maxN, pal));
-      colours.set(v, (c = alpha < 1 ? blendOver(c, paper, alpha) : c));
+      c = flowRGBA(style, v, maxN, alpha);
+      colours.set(v, c);
     }
     col.set(c, p * 4);
   }
@@ -256,7 +260,7 @@ function animKey(ms: ModelState): unknown[] {
 }
 
 function memoFlowPasses(ms: ModelState, caches: ModelCaches): FlowPass[] {
-  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.dark, ...animKey(ms)];
+  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.style, ...animKey(ms)];
   if (passMemo && sameKey(passMemo.key, key)) return passMemo.passes;
   const passes = flowPasses(ms, caches);
   passMemo = { key, passes };
@@ -264,7 +268,7 @@ function memoFlowPasses(ms: ModelState, caches: ModelCaches): FlowPass[] {
 }
 
 function memoInfraPasses(ms: ModelState, caches: ModelCaches): InfraPass[] {
-  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.dark];
+  const key = [ms.cur, ms.baseCur, ms.dir, ms.panelDest, ms.iso, ms.style];
   if (infraMemo && sameKey(infraMemo.key, key)) return infraMemo.passes;
   const passes = infraPasses(ms, caches);
   infraMemo = { key, passes };
@@ -277,7 +281,7 @@ interface FlowLayersInput {
   set: DecodedSet;
   ms: ModelState;
   caches: ModelCaches;
-  dark: boolean;
+  style: MapStyle;
   /** View scale (px per degree) and the fit scale of the national view. */
   scale: number;
   fitScale: number;
@@ -286,11 +290,10 @@ interface FlowLayersInput {
   chords: ChordVM[];
 }
 
-const ferryBlue = (dark: boolean) => rgba(dark ? "#38BDF8" : "#0284C7");
 /** Canvas flowWidth in CSS px. */
 const widthPx = (n: number, scale: number, fitScale: number) => flowWidth(n, scale, fitScale);
 
-function flowPassLayer(role: string, pd: PassData, scale: number, fitScale: number, dark: boolean) {
+function flowPassLayer(role: string, pd: PassData, fitScale: number, style: MapStyle) {
   return new PathLayer({
     id: "flows-" + role,
     data: pd.data,
@@ -298,8 +301,7 @@ function flowPassLayer(role: string, pd: PassData, scale: number, fitScale: numb
     widthUnits: "common",
     widthScale: 1,
     widthMinPixels: 0.5,
-    capRounded: true,
-    jointRounded: true,
+    ...style.line,
     getWidth: (_: unknown, { index }: { index: number }) => (flowUnits(pd.n[index]) * WIDTH_K) / fitScale,
     getColor: (_: unknown, { index, target }: { index: number; target?: number[] }) => {
       const t = target ?? [0, 0, 0, 0];
@@ -309,7 +311,7 @@ function flowPassLayer(role: string, pd: PassData, scale: number, fitScale: numb
       t[3] = pd.rgba[index * 4 + 3];
       return t as unknown as RGBA;
     },
-    updateTriggers: { getWidth: [pd.id, fitScale], getColor: [pd.id, dark] },
+    updateTriggers: { getWidth: [pd.id, fitScale], getColor: [pd.id, style.key] },
   } as object);
 }
 
@@ -341,7 +343,7 @@ function flowPickLayer(role: string, pd: PassData) {
 }
 
 /** Dashed open-water crossings of a pass's ferry items (the former Canvas renderer's strokeFlowList). */
-function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: number, colour: RGBA) {
+function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: number, colour: RGBA, style: MapStyle) {
   return new PathLayer<DashPiece>({
     id,
     data: pd.ferry,
@@ -353,7 +355,7 @@ function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: numbe
     getWidth: (d: DashPiece) => (flowUnits(d.n) * WIDTH_K) / fitScale,
     getColor: colour,
     capRounded: false,
-    jointRounded: true,
+    jointRounded: style.line.jointRounded,
     extensions: [dashExt],
     dashUnits: "pixels",
     getDashArray: (d: DashPiece) => {
@@ -370,17 +372,16 @@ export function passDataLayers(
   pd: PassData,
   alpha: number,
   pickable: boolean,
-  pal: Palette,
-  dark: boolean,
+  style: MapStyle,
   scale: number,
   fitScale: number,
 ): Layer[] {
-  const L: Layer[] = [flowPassLayer(role, pd, scale, fitScale, dark)];
+  const L: Layer[] = [flowPassLayer(role, pd, fitScale, style)];
   if (pickable) L.push(flowPickLayer(role, pd));
   if (pd.ferry.length) {
-    const blue = ferryBlue(dark);
-    const col = alpha >= 1 ? blue : blendOver(blue, rgba(pal.paper), alpha);
-    L.push(ferryDashLayer(`flows-${role}-ferry`, pd, scale, fitScale, col));
+    const blue = style.ink.ferry.rgba;
+    const col = alpha >= 1 ? blue : blendOver(blue, style.ink.paper.rgba, alpha);
+    L.push(ferryDashLayer(`flows-${role}-ferry`, pd, scale, fitScale, col, style));
   }
   return L;
 }
@@ -389,15 +390,14 @@ export function passDataLayers(
 export function flowPassLayers(
   set: DecodedSet,
   passes: FlowPass[],
-  pal: Palette,
-  dark: boolean,
+  style: MapStyle,
   scale: number,
   fitScale: number,
 ): Layer[] {
   const L: Layer[] = [];
   for (const pass of passes) {
-    const pd = buildPassData(set, pass.items, pal, pass.alpha, pass.maxN);
-    L.push(...passDataLayers(pass.role, pd, pass.alpha, pass.pickable, pal, dark, scale, fitScale));
+    const pd = buildPassData(set, pass.items, style, pass.alpha, pass.maxN);
+    L.push(...passDataLayers(pass.role, pd, pass.alpha, pass.pickable, style, scale, fitScale));
   }
   return L;
 }
@@ -432,9 +432,9 @@ function infraGeom(set: DecodedSet, pass: InfraPass): InfraGeom {
   return g;
 }
 
-export function infraLayers(set: DecodedSet, passes: InfraPass[], pal: Palette, dark: boolean): Layer[] {
+export function infraLayers(set: DecodedSet, passes: InfraPass[], style: MapStyle): Layer[] {
   const L: Layer[] = [];
-  const blue = ferryBlue(dark);
+  const blue = style.ink.ferry.rgba;
   passes.forEach((pass, i) => {
     const g = infraGeom(set, pass);
     const line = (id: string, data: BinaryData, css: string) =>
@@ -444,12 +444,11 @@ export function infraLayers(set: DecodedSet, passes: InfraPass[], pal: Palette, 
         _pathType: "open",
         widthUnits: "pixels",
         getWidth: INFRA_WIDTH,
-        capRounded: true,
-        jointRounded: true,
+        ...style.line,
         getColor: rgba(css, pass.alpha),
-        updateTriggers: { getColor: [dark, pass.alpha] },
+        updateTriggers: { getColor: [style.key, pass.alpha] },
       } as object);
-    L.push(line("conv", g.conv, pal.infraConv));
+    L.push(line("conv", g.conv, style.ink.infraConv.css));
     if (g.ferry.length) {
       L.push(
         new PathLayer<DashPiece>({
@@ -464,11 +463,11 @@ export function infraLayers(set: DecodedSet, passes: InfraPass[], pal: Palette, 
           extensions: [dashExt],
           dashUnits: "pixels",
           getDashArray: [7, 6],
-          updateTriggers: { getColor: [dark, pass.alpha] },
+          updateTriggers: { getColor: [style.key, pass.alpha] },
         } as object),
       );
     }
-    L.push(line("hsr", g.hsr, pal.infraHsr));
+    L.push(line("hsr", g.hsr, style.ink.infraHsr.css));
   });
   return L;
 }
@@ -489,8 +488,8 @@ let chordMemo: ChordItem[] = [];
 
 const chordDash = (w: number): [number, number] => [Math.max(3, w * 1.1), Math.max(2.5, w * 0.8)];
 
-function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
-  const { ms, caches, scale, fitScale, hover, chords } = inp;
+function chordLayers(inp: FlowLayersInput): Layer[] {
+  const { ms, caches, scale, fitScale, hover, chords, style } = inp;
   if (ms.dir !== "out") return [];
   const plan = chordPlan(ms, caches);
   if (!plan) return [];
@@ -508,7 +507,7 @@ function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
   if (pickable && highlight) pickable = [...vis, chordItem(highlight)];
   // Keep the data identity while the visible set is unchanged (gated by first departure).
   if (vis.length !== chordMemo.length || vis.some((v, i) => v !== chordMemo[i])) chordMemo = vis;
-  const colour = rgba(pal.chord, plan.alpha);
+  const colour = rgba(style.ink.chord.css, plan.alpha);
   const L: Layer[] = [
     new PathLayer<ChordItem>({
       id: "chords",
@@ -521,7 +520,7 @@ function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
       getWidth: plan.isolated ? 1.5 : (d: ChordItem) => (flowUnits(d.ch.n) * WIDTH_K) / fitScale,
       getColor: colour,
       capRounded: false,
-      jointRounded: true,
+      jointRounded: style.line.jointRounded,
       extensions: [dashExt],
       dashUnits: "pixels",
       getDashArray: (d: ChordItem) => chordDash(plan.isolated ? 1.5 : widthPx(d.ch.n, scale, fitScale)),
@@ -555,7 +554,7 @@ function chordLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
         positionFormat: "XY",
         widthUnits: "pixels",
         getWidth: hw,
-        getColor: rgba(pal.flowHi),
+        getColor: style.ink.flowHi.rgba,
         capRounded: false,
         extensions: [dashExt],
         dashUnits: "pixels",
@@ -601,7 +600,7 @@ export function wholePath(set: DecodedSet, s: number, rev: boolean): number[] {
 }
 
 function corridorLayers(inp: FlowLayersInput): Layer[] {
-  const { set, ms, activeTrainsAt } = inp;
+  const { set, ms, activeTrainsAt, style } = inp;
   const corridor = isolatedCorridor(ms, activeTrainsAt);
   if (!corridor) return [];
   const paths: number[][] = [];
@@ -624,16 +623,15 @@ function corridorLayers(inp: FlowLayersInput): Layer[] {
       widthUnits: "pixels",
       getWidth: 2,
       getColor: rgba(corridor.color),
-      capRounded: true,
-      jointRounded: true,
+      ...style.line,
     } as object),
   ];
 }
 
 /* ---------- hover highlight ---------- */
 
-function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
-  const { set, ms, caches, scale, fitScale, hover, dark } = inp;
+function highlightLayers(inp: FlowLayersInput): Layer[] {
+  const { set, ms, caches, scale, fitScale, hover, style } = inp;
   if (!hover || hover.kind !== "seg") return [];
   const n = hover.subN !== undefined ? hover.subN : hover.n;
   const effectiveN = highlightSegN(ms, caches, hover.s, n);
@@ -647,9 +645,8 @@ function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
       positionFormat: "XY",
       widthUnits: "pixels",
       getWidth: hw,
-      getColor: rgba(pal.flowHi),
-      capRounded: true,
-      jointRounded: true,
+      getColor: style.ink.flowHi.rgba,
+      ...style.line,
       updateTriggers: { getWidth: hw },
     } as object);
   if (!isFerrySection(set.bb, hover.s)) return [solid([wholePath(set, hover.s, false)])];
@@ -668,7 +665,7 @@ function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
         positionFormat: "XY",
         widthUnits: "pixels",
         getWidth: hw,
-        getColor: rgba(dark ? "#7DD3FC" : "#0284C7"),
+        getColor: style.ink.ferryHi.rgba,
         capRounded: false,
         extensions: [dashExt],
         dashUnits: "pixels",
@@ -685,13 +682,12 @@ function highlightLayers(inp: FlowLayersInput, pal: Palette): Layer[] {
 /** `under`: chords, flow passes, corridor, infra (Canvas order; trains follow in P1b.3).
     `over`: the hover highlight (stations follow in P1b.3). */
 export function flowLayers(inp: FlowLayersInput): { under: Layer[]; over: Layer[] } {
-  const { set, ms, caches, scale, fitScale, dark } = inp;
-  const pal = palette(dark);
+  const { set, ms, caches, scale, fitScale, style } = inp;
   const under: Layer[] = [
-    ...chordLayers(inp, pal),
-    ...flowPassLayers(set, memoFlowPasses(ms, caches), pal, dark, scale, fitScale),
+    ...chordLayers(inp),
+    ...flowPassLayers(set, memoFlowPasses(ms, caches), style, scale, fitScale),
     ...corridorLayers(inp),
-    ...(ms.showInfra ? infraLayers(set, memoInfraPasses(ms, caches), pal, dark) : []),
+    ...(ms.showInfra ? infraLayers(set, memoInfraPasses(ms, caches), style) : []),
   ];
-  return { under, over: highlightLayers(inp, pal) };
+  return { under, over: highlightLayers(inp) };
 }
