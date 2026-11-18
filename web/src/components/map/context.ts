@@ -20,7 +20,7 @@ import type {
   PrepTrain,
 } from "../../types";
 import { flowWidth, isFilteredView as isFilteredViewOf } from "../../lib";
-import type { DestWindow, NatFilter, SplitAnim } from "../../lib";
+import type { DestWindow, MapStyle, NatFilter, SplitAnim } from "../../lib";
 import type { LegendHandle } from "../Legend";
 import type { DeckHandle } from "./deck/DeckHost";
 import type { NationalCityDots } from "./deck/layers/national";
@@ -67,7 +67,8 @@ export interface Props {
   baseCur?: OriginVM | null;
   cur: OriginVM | null;
   direction: Direction;
-  dark: boolean;
+  /** The resolved map style (skin × mode). */
+  style: MapStyle;
   showNetwork: boolean;
   showLabels: boolean;
   /** Infrastructure overlay: the proportional flows stay as they are

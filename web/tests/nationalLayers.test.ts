@@ -101,7 +101,7 @@ describe("national layers", () => {
       expect(vm.progressPct).toBeLessThanOrEqual(100);
       expect(vm.fromStation).not.toBe("");
       expect(!!vm.isDwelling).toBe((f.pos[i * 6 + 5] & 16) !== 0);
-      expect(tooltipHtml({ kind: "train", train: vm }, { data: atlas.data, cur: null as never, direction: "out", distUnit: "km", panelDest: null, dark: false, ferry: false })).toContain(vm.code);
+      expect(tooltipHtml({ kind: "train", train: vm }, { data: atlas.data, cur: null as never, direction: "out", distUnit: "km", panelDest: null, style: mapStyle("paper", "light"), ferry: false })).toContain(vm.code);
     }
   });
 });

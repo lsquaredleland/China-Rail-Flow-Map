@@ -1,12 +1,9 @@
 /* Hit-testing and the floating tooltip. */
 import type { ChordVM, FlowVM, Hit } from "../../types";
 import {
-  DEFAULT_SKIN,
   dotPlaces,
   isFerrySection,
   isTrainShown as modelIsTrainShown,
-  mapStyle,
-  modeOf,
   natTrainVM,
   stationZoomK,
   tooltipHtml,
@@ -52,7 +49,7 @@ function stationCandidates(M: MapCtx, px: number, py: number, cands: PickCandida
   const pd = P.current.panelDest;
   // A split city answers at each of its station dots (lib/closeups), still as the city.
   const cu = closeupOf(M);
-  const size = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark)).enc.nodeSize;
+  const size = P.current.style.enc.nodeSize;
   for (let i = 0; i < pts.length; i++) {
     const c = pts[i];
     if (pd && c.idx !== pd.idx) continue;
@@ -245,7 +242,7 @@ export function showTooltip(M: MapCtx, hit: Hit, px: number, py: number) {
     direction: P.current.direction,
     distUnit: P.current.distUnit,
     panelDest: P.current.panelDest,
-    dark: P.current.dark,
+    style: P.current.style,
     ferry: hit.kind === "seg" && !!set && isFerrySection(set.bb, hit.s),
     ...(hit.kind === "seg" ? sectionInfo(atlas.data, P.current, hit.s) : {}),
   });

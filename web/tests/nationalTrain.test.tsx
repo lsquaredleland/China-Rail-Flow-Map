@@ -40,7 +40,7 @@ const modal = (t: number, over: Record<string, unknown> = {}) =>
       onClose={() => {}}
       schedulesData={sched}
       stationTable={stationTable}
-      dark={false}
+      style={mapStyle("paper", "light")}
       national
       direction="out"
       onToggleIsolate={() => {}}

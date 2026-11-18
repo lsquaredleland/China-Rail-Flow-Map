@@ -2,6 +2,7 @@
 // literals exactly, is memoised per (skin, mode), and its encodings equal the
 // palette helpers they wrap.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   LINE_COLOR,
   NODE_COLOR,
@@ -11,6 +12,7 @@ import {
   mapStyle,
   modeOf,
   natCityR,
+  parseSkin,
   palette,
   paletteRGBA,
   rampColor,
@@ -19,7 +21,7 @@ import {
   skinHasModeToggle,
   stationR,
 } from "../src/lib";
-import type { Mode } from "../src/lib";
+import type { Mode, SkinId } from "../src/lib";
 
 const MODES: Mode[] = ["light", "dark"];
 
@@ -85,6 +87,50 @@ describe("skin modes", () => {
     expect(resolveMode("paper", "dark")).toBe("dark");
     expect(resolveMode("paper", "light")).toBe("light");
     expect(skinHasModeToggle("paper")).toBe(true);
+  });
+});
+
+describe("skin selection", () => {
+  test("parseSkin: registered ids as is; unknown, empty and null are paper", () => {
+    for (const id of Object.keys(SKINS)) expect(parseSkin(id)).toBe(id as SkinId);
+    for (const s of ["", null, undefined, "Paper", "neon", "toString", "__proto__"]) expect(parseSkin(s)).toBe("paper");
+  });
+
+  /* The pre-paint script in index.template.html, run on a fake window: it must
+     pick the same skin and mode as useUrlState + resolveMode. */
+  const html = readFileSync(new URL("../index.template.html", import.meta.url), "utf8");
+  const body = /<script>\s*([\s\S]*?)<\/script>/.exec(html)![1];
+  const prePaint = (search: string, store: Record<string, string>, prefersDark: boolean) => {
+    const attrs: Record<string, string> = {};
+    const win = { location: { search }, matchMedia: () => ({ matches: prefersDark }) };
+    const doc = { documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v) } };
+    const ss = { getItem: (k: string) => (k in store ? store[k] : null) };
+    new Function("window", "document", "sessionStorage", body)(win, doc, ss);
+    return attrs;
+  };
+  const expected = (search: string, store: Record<string, string>, prefersDark: boolean) => {
+    const q = new URLSearchParams(search);
+    const sk = q.get("skin");
+    const skin = parseSkin(sk === null ? store["crfa-skin"] : sk);
+    const p = q.get("theme");
+    const s = store["crfa-theme"];
+    const dark = p === "dark" || p === "night" ? true : p === "light" || p === "day" ? false : s === "dark" ? true : s === "light" ? false : prefersDark;
+    return { "data-skin": skin, "data-theme": resolveMode(skin, modeOf(dark)) };
+  };
+  const searches = ["", "?skin=paper", "?skin=bogus", "?theme=light", "?theme=night&skin=paper", ...Object.keys(SKINS).map((k) => "?theme=light&skin=" + k)];
+  const stores: Record<string, string>[] = [{}, { "crfa-theme": "dark" }, ...Object.keys(SKINS).map((k) => ({ "crfa-skin": k, "crfa-theme": "light" })), { "crfa-skin": "bogus" }];
+  for (const search of searches)
+    for (const store of stores)
+      for (const pd of [false, true])
+        test(`pre-paint script ${search || "(none)"} ${JSON.stringify(store)} prefersDark=${pd}`, () => {
+          expect(prePaint(search, store, pd)).toEqual(expected(search, store, pd));
+        });
+
+  test("pre-paint script does not throw without storage or matchMedia", () => {
+    const attrs: Record<string, string> = {};
+    const doc = { documentElement: { setAttribute: (k: string, v: string) => (attrs[k] = v) } };
+    new Function("window", "document", "sessionStorage", body)({ location: { search: "?skin=paper" } }, doc, undefined);
+    expect(attrs).toEqual({ "data-skin": "paper", "data-theme": "light" });
   });
 });
 

@@ -313,6 +313,12 @@ export function resolveMode(skin: SkinId, requested: Mode): Mode {
   return def.modes.includes(requested) ? requested : def.defaultMode;
 }
 
+/** A skin id from untrusted text (`?skin=`, storage): a registered id as is,
+    anything else (unknown, empty, null) the default skin. */
+export function parseSkin(s: string | null | undefined): SkinId {
+  return s && Object.prototype.hasOwnProperty.call(SKINS, s) ? (s as SkinId) : DEFAULT_SKIN;
+}
+
 /** True when the skin supports both modes, i.e. the day/night toggle applies. */
 export function skinHasModeToggle(skin: SkinId): boolean {
   return SKINS[skin].modes.length > 1;

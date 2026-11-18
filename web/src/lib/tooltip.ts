@@ -17,7 +17,7 @@ import {
 } from "./format";
 import { rampColor } from "./palette";
 import { stationLabel } from "./geo";
-import { DEFAULT_SKIN, mapStyle, modeOf } from "./style";
+import type { MapStyle } from "./style";
 
 interface TooltipInput {
   data: AtlasData;
@@ -25,7 +25,8 @@ interface TooltipInput {
   direction: Direction;
   distUnit: DistUnit;
   panelDest: CityPointVM | null;
-  dark: boolean;
+  /** The resolved map style (skin × mode). */
+  style: MapStyle;
   /** The hovered section is the Qiongzhou Strait ferry corridor. */
   ferry: boolean;
   /** The hovered section's OSM line names `[name, name:en]`. */
@@ -109,7 +110,7 @@ function cityCardHtml(c: CityPointVM, t: TooltipInput): string {
   const fastest = (c as DestVM | SrcVM).fastest;
   const swatch =
     fastest > 0
-      ? "<i class='cc-swatch' style='background:" + rampColor(fastest, mapStyle(DEFAULT_SKIN, modeOf(t.dark)).pal) + "'></i>"
+      ? "<i class='cc-swatch' style='background:" + rampColor(fastest, t.style.pal) + "'></i>"
       : "";
   return (
     cityTitleHtml(c) +
@@ -199,7 +200,7 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
     html = natCityCardHtml(data.city_table[hit.idx], hit.dep, hit.arr);
   } else if (hit.kind === "train") {
     const tr = hit.train;
-    const ink = mapStyle(DEFAULT_SKIN, modeOf(t.dark)).ink;
+    const ink = t.style.ink;
     const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
     const badgeColor = isHighSpeed ? ink.badgeHs.css : ink.badgeConv.css;
     const fromDisplay =

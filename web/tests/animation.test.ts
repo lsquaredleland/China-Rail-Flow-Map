@@ -2,7 +2,7 @@
 // dwell positions, final-step flows == static flows (with and without
 // filters), animated trains subset of the filter, no teleporting dots.
 import { describe, expect, test } from "bun:test";
-import { filterOrigin, getSelCache, trainDistAt, trainSpeedFrac } from "../src/lib";
+import { filterOrigin, getSelCache, mapStyle, trainDistAt, trainSpeedFrac } from "../src/lib";
 import { animLoop, getAnimState, setAnimEnabled, setPlaying, setTime } from "../src/components/map/anim";
 import { createMapCtx } from "../src/components/map/context";
 import type { MapCtx, Props } from "../src/components/map/context";
@@ -211,7 +211,7 @@ describe("isolated train loops the clock", () => {
   const ref = <T,>() => ({ current: null as T | null });
   const ctx = (national: boolean, iso: string | null): MapCtx =>
     createMapCtx(
-      { current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national, isolatedTrainCode: iso } as unknown as Props },
+      { current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national, isolatedTrainCode: iso, style: mapStyle("paper", "light") } as unknown as Props },
       { wrapRef: ref(), canvasRef: ref(), tooltipRef: ref(), scaleWrapRef: ref(), scaleLabelRef: ref(), scaleBarRef: ref(), viewReportTimerRef: { current: null } },
     );
   const step = (M: MapCtx, mins: number) => {
@@ -277,7 +277,7 @@ describe("national clock (P2.2)", () => {
   const ref = <T,>() => ({ current: null as T | null });
   const ctx = (national: boolean): MapCtx => {
     const P = {
-      current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national } as unknown as Props,
+      current: { atlas: pack().atlas, cur: origin("广州"), baseCur: origin("广州"), direction: "out", national, style: mapStyle("paper", "light") } as unknown as Props,
     };
     return createMapCtx(P, {
       wrapRef: ref(),

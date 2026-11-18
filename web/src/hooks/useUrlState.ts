@@ -2,11 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { RefObject } from "react";
 import { local as localStore, session as sessionStore } from "../storage";
 import type { DecodedAtlas, Direction, DistUnit } from "../types";
-import { enName } from "../lib";
+import { enName, mapStyle, modeOf, parseSkin, resolveMode, skinHasModeToggle } from "../lib";
+import type { MapStyle, SkinId } from "../lib";
 import type { MapApi } from "../components/MapHost";
 
-/* URL and persisted state: the ?city/lat/lon/z/theme/national query, and the
-   direction, unit, infrastructure and theme choices kept in storage. */
+/* URL and persisted state: the ?city/lat/lon/z/theme/skin/national query, and
+   the direction, unit, infrastructure, theme and skin choices kept in storage. */
 
 export interface Camera {
   lon: number;
@@ -62,6 +63,21 @@ export function writeNatFlowsParam(on: boolean): void {
   const search = params.toString();
   if (window.location.search !== (search ? "?" + search : "")) {
     window.history.replaceState(null, "", `${window.location.pathname}${search ? "?" + search : ""}`);
+  }
+}
+
+/* The skin: ?skin= when present (then kept for the session, key crfa-skin),
+   else the session's choice; an unknown value is the default skin. The
+   pre-paint script in index.template.html resolves it the same way. */
+function initialSkin(): SkinId {
+  try {
+    const p = new URLSearchParams(window.location.search).get("skin");
+    if (p === null) return parseSkin(sessionStore.get("crfa-skin"));
+    const skin = parseSkin(p);
+    sessionStore.set("crfa-skin", skin);
+    return skin;
+  } catch {
+    return parseSkin(null);
   }
 }
 
@@ -132,19 +148,26 @@ export function matchesCity(o: { zh: string; en: string }, query: string): boole
   );
 }
 
-/* Direction, distance unit, infrastructure overlay and day/night theme:
-   initial values come from storage / the URL, each setter persists. */
+/* Direction, distance unit, infrastructure overlay, day/night theme and skin:
+   initial values come from storage / the URL, each setter persists. `dark` is
+   the mode the skin draws (resolveMode): a dark-only skin is dark whatever was
+   requested, and `modeToggle` is then false. `style` is the resolved MapStyle. */
 export function usePrefs() {
   const [showInfra, setShowInfraState] = useState<boolean>(initialInfra);
   const [distUnit, setDistUnitState] = useState<DistUnit>(initialDistUnit);
   const [direction, setDirectionState] = useState<Direction>(initialDirection);
-  const [dark, setDarkState] = useState<boolean>(initialDark);
+  const [requestedDark, setDarkState] = useState<boolean>(initialDark);
+  const [skin] = useState<SkinId>(initialSkin);
+  const mode = resolveMode(skin, modeOf(requestedDark));
+  const dark = mode === "dark";
+  const style: MapStyle = mapStyle(skin, mode);
 
-  // Layout effect: the CSS dark theme keys off this attribute, so it must
-  // change in the same frame as the `dark` state the canvas draws with.
+  // Layout effect: the CSS skin and theme key off these attributes, so they
+  // must change in the same frame as the style the canvas draws with.
   useLayoutEffect(() => {
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-  }, [dark]);
+    document.documentElement.setAttribute("data-skin", skin);
+    document.documentElement.setAttribute("data-theme", mode);
+  }, [skin, mode]);
 
   useEffect(() => {
     localStore.remove("crfa-theme");
@@ -182,7 +205,7 @@ export function usePrefs() {
   };
 
   const setDark = (d: boolean) => {
-    if (d === dark) return;
+    if (d === requestedDark) return;
     setDarkState(d);
     sessionStore.set("crfa-theme", d ? "dark" : "light");
     localStore.remove("crfa-theme");
@@ -197,6 +220,9 @@ export function usePrefs() {
     setDirection,
     dark,
     setDark,
+    skin,
+    style,
+    modeToggle: skinHasModeToggle(skin),
   };
 }
 

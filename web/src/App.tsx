@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
-import { DEFAULT_SKIN, buildOrigin, mapStyle, modeOf, natCityCounts, natFlowCounts, stationName } from "./lib";
+import { buildOrigin, natCityCounts, natFlowCounts, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
@@ -41,7 +41,7 @@ export default function App() {
   const [national, setNational] = useState<boolean>(initialNational);
 
   const prefs = usePrefs();
-  const { showInfra, distUnit, direction, dark, setDark, toggleInfra } = prefs;
+  const { showInfra, distUnit, direction, dark, setDark, style, modeToggle, toggleInfra } = prefs;
   const { selectedTrainCode, setSelectedTrainCode, isolatedTrainCode, setIsolatedTrainCode } =
     useTrainSelection();
   // Each click on a train opens a fresh timetable (expanded), even the same
@@ -134,7 +134,7 @@ export default function App() {
   const isolatedRoute = isolatedVM
     ? `${stationName(isolatedVM.fsZh, isolatedVM.fsEn, "zh-en")} → ${stationName(isolatedVM.tsZh, isolatedVM.tsEn, "zh-en")}`
     : "";
-  const isolatedBand = cardBand(isolatedVM ? isolatedVM.dur : 0, mapStyle(DEFAULT_SKIN, modeOf(dark)));
+  const isolatedBand = cardBand(isolatedVM ? isolatedVM.dur : 0, style);
 
   const { panelCity, setPanelCity, availableClasses, closePanel } = useCityPanel({
     cur,
@@ -390,6 +390,7 @@ export default function App() {
           distUnit={distUnit}
           onSetDistUnit={setDistUnit}
           dark={dark}
+          modeToggle={modeToggle}
           onSetDark={setDark}
           national={national}
           showFlows={natFlowsOn}
@@ -411,7 +412,7 @@ export default function App() {
           baseCur={cur}
           cur={viewCur}
           direction={direction}
-          dark={dark}
+          style={style}
           showNetwork={showNetwork}
           showLabels={showLabels}
           showInfra={showInfra}
@@ -521,7 +522,7 @@ export default function App() {
         <div ref={timelineRef}>
           <TimelineScrubber
             mapRef={mapRef}
-            dark={dark}
+            style={style}
             direction={direction}
             originZh={cur?.o.zh}
             onCollapse={collapseTimeline}
@@ -586,7 +587,7 @@ export default function App() {
         onClose={() => setSelectedTrainCode(null)}
         schedulesData={schedulesData}
         stationTable={atlas ? atlas.data.station_table : []}
-        dark={dark}
+        style={style}
         unit={distUnit}
         trainVM={selectedTrainVM}
         national={national}

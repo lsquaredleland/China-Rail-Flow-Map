@@ -3,7 +3,7 @@
    the former Canvas renderer, so placement is unchanged;
    glyph anti-aliasing is softer on a transparent canvas (C21). The canvas
    also stays the pointer-capturing element (D17). */
-import { DEFAULT_SKIN, dotPlaces, isTrainShown, mapStyle, modeOf, natMotion, natState, placeLabels, splitRadius, stationT, stationZoomK } from "../../../lib";
+import { dotPlaces, isTrainShown, natMotion, natState, placeLabels, splitRadius, stationT, stationZoomK } from "../../../lib";
 import type { CloseupLabel, LabelPoint, MapStyle } from "../../../lib";
 import { closeupOf } from "../closeup";
 import type { Closeup } from "../closeup";
@@ -31,7 +31,7 @@ export function drawLabelsOverlay(M: MapCtx) {
   if (canvas.height !== h) canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const style = mapStyle(DEFAULT_SKIN, modeOf(P.current.dark));
+  const style = P.current.style;
   const ink = style.ink;
   ctx.setTransform(st.DPR, 0, 0, st.DPR, 0, 0);
   ctx.clearRect(0, 0, st.W, st.H);

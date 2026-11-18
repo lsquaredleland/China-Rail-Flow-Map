@@ -258,7 +258,7 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
     props.showInfra,
     props.showOutline,
     props.outline,
-    props.dark,
+    props.style,
     props.direction,
     props.panelDest,
     props.nationalLayers,

@@ -2,7 +2,7 @@
 // tooltip.golden.json was captured once by running the original code from
 // components/map/interaction.ts (as of the P1a.1 base) on these fixture hits.
 import { expect, test } from "bun:test";
-import { isFerrySection, sectionInfo, tooltipHtml } from "../src/lib";
+import { isFerrySection, mapStyle, modeOf, sectionInfo, tooltipHtml } from "../src/lib";
 import golden from "./tooltip.golden.json";
 import { pack } from "./fixture";
 import { cases } from "./tooltipCases";
@@ -18,7 +18,7 @@ for (const c of cases()) {
       direction: c.P.direction,
       distUnit: c.P.distUnit,
       panelDest: c.P.panelDest,
-      dark: c.P.dark,
+      style: mapStyle("paper", modeOf(c.P.dark)),
       ferry,
     });
     expect(html).toBe(gold[c.name]);
@@ -34,7 +34,7 @@ test("ferry hits carry the ferry line, others do not", () => {
 
 test("seg tooltips list the section's OSM line names", () => {
   const c = cases().find((x) => x.name === "seg 1")!;
-  const base = { data: pack().atlas.data, cur: c.cur, direction: c.P.direction, distUnit: c.P.distUnit, panelDest: null, dark: false, ferry: false };
+  const base = { data: pack().atlas.data, cur: c.cur, direction: c.P.direction, distUnit: c.P.distUnit, panelDest: null, style: mapStyle("paper", "light"), ferry: false };
   const html = tooltipHtml(c.hit, { ...base, lines: [["京广高速线", "Beijing–Guangzhou HSR"], ["京广线", ""]] });
   expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广高速线</div><div class='sc-en'>Beijing–Guangzhou HSR</div></div>");
   expect(html).toContain("<div class='sc-line'><div class='sc-zh'>京广线</div></div>");
@@ -59,7 +59,7 @@ test("sectionInfo reads l / v by direction; national uses sections", () => {
 
 test("train tooltips show the leg average and the track limit when known", () => {
   const train = { code: "G1", cls: "G", fromStation: "北京南", toStation: "上海虹桥", depTime: "09:00", arrTime: "13:28", durMins: 268, progressPct: 40, lon: 0, lat: 0, heading: 0 };
-  const base = { data: pack().atlas.data, cur: null as never, direction: "out" as const, distUnit: "km" as const, panelDest: null, dark: false, ferry: false };
+  const base = { data: pack().atlas.data, cur: null as never, direction: "out" as const, distUnit: "km" as const, panelDest: null, style: mapStyle("paper", "light"), ferry: false };
   const html = tooltipHtml({ kind: "train", train: { ...train, legKmh: 295, trackKmh: 350 } }, base);
   expect(html).toContain("Speed (leg avg)</td><td style='text-align:right'>~295 km/h");
   expect(html).toContain("Track limit</td><td style='text-align:right'>350 km/h");
@@ -71,7 +71,7 @@ test("train tooltips show the leg average and the track limit when known", () =>
 
 test("the city card's fastest time is the rust accent", () => {
   const c = cases().find((x) => x.name === "station out km")!;
-  const html = tooltipHtml(c.hit, { data: pack().atlas.data, cur: c.cur, direction: "out", distUnit: "km", panelDest: null, dark: false, ferry: false });
+  const html = tooltipHtml(c.hit, { data: pack().atlas.data, cur: c.cur, direction: "out", distUnit: "km", panelDest: null, style: mapStyle("paper", "light"), ferry: false });
   expect(html).toMatch(/<span>Fastest from Guangzhou<\/span><b class='cc-accent'><i class='cc-swatch'[^>]*><\/i>0:25<\/b>/);
   expect(html).toContain("<span>By rail</span><b>");
 });
