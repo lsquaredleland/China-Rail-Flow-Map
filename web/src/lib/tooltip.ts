@@ -15,8 +15,9 @@ import {
   sourceRows,
   stationRows,
 } from "./format";
-import { palette, rampColor } from "./palette";
+import { rampColor } from "./palette";
 import { stationLabel } from "./geo";
+import { DEFAULT_SKIN, mapStyle, modeOf } from "./style";
 
 interface TooltipInput {
   data: AtlasData;
@@ -108,7 +109,7 @@ function cityCardHtml(c: CityPointVM, t: TooltipInput): string {
   const fastest = (c as DestVM | SrcVM).fastest;
   const swatch =
     fastest > 0
-      ? "<i class='cc-swatch' style='background:" + rampColor(fastest, palette(t.dark)) + "'></i>"
+      ? "<i class='cc-swatch' style='background:" + rampColor(fastest, mapStyle(DEFAULT_SKIN, modeOf(t.dark)).pal) + "'></i>"
       : "";
   return (
     cityTitleHtml(c) +
@@ -198,8 +199,9 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
     html = natCityCardHtml(data.city_table[hit.idx], hit.dep, hit.arr);
   } else if (hit.kind === "train") {
     const tr = hit.train;
+    const ink = mapStyle(DEFAULT_SKIN, modeOf(t.dark)).ink;
     const isHighSpeed = tr.cls === "G" || tr.cls === "D" || tr.cls === "C";
-    const badgeColor = isHighSpeed ? "#F59E0B" : "#0284C7";
+    const badgeColor = isHighSpeed ? ink.badgeHs.css : ink.badgeConv.css;
     const fromDisplay =
       tr.fromStationEn && tr.fromStationEn !== tr.fromStation
         ? `${esc(tr.fromStation)} <span style='font-size:11px;font-weight:400;opacity:0.8;'>(${esc(tr.fromStationEn)})</span>`
@@ -215,18 +217,18 @@ export function tooltipHtml(hit: Hit, t: TooltipInput): string {
 
     html =
       "<div class='t-title' style='display:flex;align-items:center;gap:6px;margin-bottom:6px;'>" +
-      `<span style='background:${badgeColor};color:#fff;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;font-family:monospace;'>${esc(tr.code)}</span>` +
+      `<span style='background:${badgeColor};color:${ink.badgeText.css};padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;font-family:monospace;'>${esc(tr.code)}</span>` +
       `<span style='font-size:13px;font-weight:600;'>${fromDisplay} &rarr; ${toDisplay}</span>` +
       "</div>" +
       (tr.isDwelling
         ? (tr.dwellStatus === "origin"
-          ? `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName} &middot; ${esc(tr.dwellDetail || "")}</div>`
+          ? `<div style='font-size:12px;color:${ink.statusDwell.css};font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName} &middot; ${esc(tr.dwellDetail || "")}</div>`
           : tr.dwellStatus === "dest"
-            ? `<div style='font-size:12px;color:#10B981;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${dwellName} &middot; Final Stop</div>`
-            : `<div style='font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
+            ? `<div style='font-size:12px;color:${ink.statusArrived.css};font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🏁</span> Arrived at ${dwellName} &middot; Final Stop</div>`
+            : `<div style='font-size:12px;color:${ink.statusDwell.css};font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;'><span>🛑</span> Boarding at ${dwellName}${tr.dwellDetail ? ` &middot; ${esc(tr.dwellDetail)}` : ""}</div>`)
         : "") +
       (tr.onChord
-        ? "<div style='font-size:12px;color:#9CA3AF;margin-bottom:6px;'>No track geometry on this leg (straight-line stand-in)</div>"
+        ? `<div style='font-size:12px;color:${ink.statusMuted.css};margin-bottom:6px;'>No track geometry on this leg (straight-line stand-in)</div>`
         : "") +
       "<table style='width:100%;margin-bottom:4px;'>" +
       `<tr><td>Departure</td><td style='text-align:right'><b>${esc(tr.depTime)}</b></td></tr>` +

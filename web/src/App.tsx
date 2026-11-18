@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
-import { buildOrigin, natCityCounts, natFlowCounts, stationName } from "./lib";
+import { DEFAULT_SKIN, buildOrigin, mapStyle, modeOf, natCityCounts, natFlowCounts, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
 import {
@@ -134,7 +134,7 @@ export default function App() {
   const isolatedRoute = isolatedVM
     ? `${stationName(isolatedVM.fsZh, isolatedVM.fsEn, "zh-en")} → ${stationName(isolatedVM.tsZh, isolatedVM.tsEn, "zh-en")}`
     : "";
-  const isolatedBand = cardBand(isolatedVM ? isolatedVM.dur : 0, dark);
+  const isolatedBand = cardBand(isolatedVM ? isolatedVM.dur : 0, mapStyle(DEFAULT_SKIN, modeOf(dark)));
 
   const { panelCity, setPanelCity, availableClasses, closePanel } = useCityPanel({
     cur,

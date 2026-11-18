@@ -5,17 +5,17 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Palette } from "../types";
-import { NAT_WIDTH_FACTOR, WIDTH_K, flowColor, flowUnits, rampColor, natCityR, stationR, stationZoomK } from "../lib";
+import type { MapStyle } from "../lib";
+import { DEFAULT_SKIN, NAT_WIDTH_FACTOR, WIDTH_K, flowUnits, mapStyle, rampColor, natCityR, stationR, stationZoomK } from "../lib";
 
 /** The map's render loop redraws the legend scales through this handle:
-    the stepped width bar's heights depend on the live zoom ratio. The
-    Infrastructure overlay never changes what the widths mean — they
-    still encode trains/day — so the legend keeps this normal form
-    whether the toggle is on or off. */
+    the stepped width bar's heights depend on the live zoom ratio and the
+    resolved `MapStyle`. The Infrastructure overlay never changes what the
+    widths mean — they still encode trains/day — so the legend keeps this
+    normal form whether the toggle is on or off. */
 export interface LegendHandle {
   draw: (
-    pal: Palette,
+    style: MapStyle,
     zoomRatio: number,
     hasOrigin: boolean,
     showInfra?: boolean,
@@ -55,12 +55,13 @@ const STEPS = [1, 10, 50, 100];
 // gradient stops in minutes — each band flat, with the same ±30-minute
 // blend at the 4h / 12h joins — under three labels centred on their
 // blocks. BAR_H is tall enough to carry the labels inside the bar.
+const LIGHT = mapStyle(DEFAULT_SKIN, "light");
 const BAND_STOPS = [0, 210, 270, 690, 750, 1440];
-const BAND_HEX = ["#14746F", "#14746F", "#E3A63F", "#E3A63F", "#34488C", "#34488C"];
+const BAND_HEX = BAND_STOPS.map((m) => rampColor(m, LIGHT.pal));
 const BAND_LABELS: { label: string; mid: number; ink: string }[] = [
-  { label: "0–4h", mid: 120, ink: "#ffffff" },
-  { label: "4–12h", mid: 480, ink: "#111111" },
-  { label: "12–24h", mid: 1080, ink: "#ffffff" },
+  { label: "0–4h", mid: 120, ink: LIGHT.ink.bandLabelOnDark.css },
+  { label: "4–12h", mid: 480, ink: LIGHT.ink.bandLabelOnLight.css },
+  { label: "12–24h", mid: 1080, ink: LIGHT.ink.bandLabelOnDark.css },
 ];
 const BAR_H = 15;
 const TIMESEC_H = 8 + BAR_H + 6; // vertical room the band section takes
@@ -117,7 +118,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
     ref,
     () => ({
       draw(
-        pal: Palette,
+        style: MapStyle,
         zoomRatio: number,
         hasOrigin: boolean,
         showInfra?: boolean,
@@ -127,11 +128,11 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
         const svg = svgRef.current;
         if (!svg) return;
         // Band stop colours come from the same rampColor as the dots
-        // (the bands are identical in the light and dark schemes).
+        // (the 12–24h band is periwinkle at night).
         for (let i = 0; i < BAND_STOPS.length; i++) {
           const stop = stopRefs.current[i];
           if (stop)
-            stop.setAttribute("stop-color", rampColor(BAND_STOPS[i], pal));
+            stop.setAttribute("stop-color", rampColor(BAND_STOPS[i], style.pal));
         }
         if (gradGroupRef.current)
           gradGroupRef.current.style.display = hasOrigin ? "" : "none";
@@ -151,9 +152,11 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
             rect.setAttribute("height", String(h));
             // Each step wears its ramp colour, normalised to the
             // legend's own widest step — salmon for the thinnest,
-            // deep crimson for the widest. In the dark scheme
-            // flowColor is the flat flow colour, as before.
-            rect.style.fill = flowColor(steps[i], steps[steps.length - 1], pal);
+            // deep crimson for the widest; both schemes have a flow ramp.
+            rect.style.fill = style.enc.lineColor.color(
+              { n: steps[i], maxN: steps[steps.length - 1] },
+              style.pal,
+            );
           }
         }
         const barH = maxH;
@@ -208,9 +211,9 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
           );
         }
         if (infraHsrLineRef.current)
-          infraHsrLineRef.current.setAttribute("stroke", pal.infraHsr);
+          infraHsrLineRef.current.setAttribute("stroke", style.ink.infraHsr.css);
         if (infraConvLineRef.current)
-          infraConvLineRef.current.setAttribute("stroke", pal.infraConv);
+          infraConvLineRef.current.setAttribute("stroke", style.ink.infraConv.css);
         const totalH = Math.round(
           headH + 15 + barH + 14 + 24 + 8 + circD + 14 + animH + infraH,
         );
@@ -422,17 +425,17 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               Trains in motion = train class
             </text>
             <g transform="translate(0, 16)">
-              <line x1={4} y1={0} x2={16} y2={0} stroke="#F59E0B" strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
-              <circle cx={18} cy={0} r={4.5} fill="#F59E0B" />
-              <circle cx={18} cy={0} r={2} fill="#ffffff" />
+              <line x1={4} y1={0} x2={16} y2={0} stroke={LIGHT.ink.trainHs.css} strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
+              <circle cx={18} cy={0} r={4.5} fill={LIGHT.ink.trainHs.css} />
+              <circle cx={18} cy={0} r={2} fill={LIGHT.ink.trainCore.css} />
               <text x={28} y={0} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
                 High-speed (G / D / C)
               </text>
             </g>
             <g transform="translate(0, 32)">
-              <line x1={4} y1={0} x2={16} y2={0} stroke="#06B6D4" strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
-              <circle cx={18} cy={0} r={4.5} fill="#06B6D4" />
-              <circle cx={18} cy={0} r={2} fill="#ffffff" />
+              <line x1={4} y1={0} x2={16} y2={0} stroke={LIGHT.ink.trainConv.css} strokeWidth={2.5} strokeLinecap="round" opacity={0.65} />
+              <circle cx={18} cy={0} r={4.5} fill={LIGHT.ink.trainConv.css} />
+              <circle cx={18} cy={0} r={2} fill={LIGHT.ink.trainCore.css} />
               <text x={28} y={0} fontSize={10.5} fontFamily={FONT} fill="currentColor" dominantBaseline="middle">
                 Conventional (K / T / Z / S)
               </text>
@@ -461,7 +464,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               y1={14}
               x2={24}
               y2={14}
-              stroke="#FF6A00"
+              stroke={LIGHT.ink.infraHsr.css}
               strokeWidth={2.2}
               strokeLinecap="round"
             />
@@ -481,7 +484,7 @@ const Legend = forwardRef<LegendHandle, LegendProps>(function Legend(
               y1={28}
               x2={24}
               y2={28}
-              stroke="#111111"
+              stroke={LIGHT.ink.infraConv.css}
               strokeWidth={2.2}
               strokeLinecap="round"
             />
