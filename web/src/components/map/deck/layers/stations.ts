@@ -7,13 +7,17 @@
    ScatterplotLayer strokes are centred on `radius` (C17), as Canvas strokes
    are centred on `r`, so getRadius = r and getLineWidth = the Canvas
    lineWidth. The origin's diamond is drawn on the label overlay. No module
-   state shared with the entry bundle (C23). */
+   state shared with the entry bundle (C23).
+
+   A "box" skin draws every marker here (dots, ripples, rings, the origin) as
+   a square of the circle's area (BoxLayer, markerRadius); the dots' r stays
+   the circle radius. */
 import type { Layer } from "@deck.gl/core";
-import { ScatterplotLayer } from "@deck.gl/layers";
 import type { CityPointVM } from "../../../../types";
 import { dotPlaces, rgba, splitRadius, stationZoomK } from "../../../../lib";
 import type { MapStyle, RGBA, StationState } from "../../../../lib";
 import type { Closeup } from "../../closeup";
+import { markerLayer, markerRadius } from "../BoxLayer";
 
 interface StationDot {
   c: CityPointVM;
@@ -108,14 +112,16 @@ export function stationRings(opts: {
   const rings: Ring[] = [];
   const size = opts.style.enc.nodeSize;
   const grown = (c: CityPointVM) => size.radius(c.trains) * stationZoomK(size.radius(c.trains), opts.sk);
+  // The gap to the marker stays `extra` px whatever its shape.
+  const mr = (r: number) => markerRadius(opts.style, r);
   const around = (c: CityPointVM, extra: number, w: number) => {
-    for (const p of placesOf(c, opts.closeup)) rings.push({ pos: p.pos, r: splitRadius(grown(c), p.f) + extra, w, col: ink });
+    for (const p of placesOf(c, opts.closeup)) rings.push({ pos: p.pos, r: mr(splitRadius(grown(c), p.f)) + extra, w, col: ink });
   };
   const pd = opts.panelDest;
   if (pd) around(pd, 3.8, 3);
   const hc = opts.hoverStation;
   if (hc) around(hc, 3.5, 2);
-  else if (opts.hoverOrigin) for (const pos of opts.originPlaces ?? [opts.originPt]) rings.push({ pos, r: 14.5, w: 2, col: ink });
+  else if (opts.hoverOrigin) for (const pos of opts.originPlaces ?? [opts.originPt]) rings.push({ pos, r: mr(9) + 5.5, w: 2, col: ink });
   return rings;
 }
 
@@ -152,14 +158,16 @@ export function stationLayers(inp: StationLayerInput): Layer[] {
     closeup: inp.closeup,
   });
   const common = { radiusUnits: "pixels", lineWidthUnits: "pixels", stroked: true } as const;
+  const Marker = markerLayer(style);
+  const mr = (r: number) => markerRadius(style, r);
   return [
-    new ScatterplotLayer<StationDot>({
+    new Marker<StationDot>({
       ...common,
       id: "stations",
       data: dots,
       filled: true,
       getPosition: (d) => d.pos,
-      getRadius: (d) => d.r,
+      getRadius: (d) => mr(d.r),
       getFillColor: (d) => d.fill,
       getLineColor: (d) => d.line,
       getLineWidth: (d) => d.lw,
@@ -172,32 +180,32 @@ export function stationLayers(inp: StationLayerInput): Layer[] {
         getLineWidth: key,
       },
     }),
-    new ScatterplotLayer<Ripple>({
+    new Marker<Ripple>({
       ...common,
       id: "ripples",
       data: ripples,
       filled: false,
       getPosition: (d) => d.pos,
-      getRadius: (d) => d.r,
+      getRadius: (d) => mr(d.r),
       getLineWidth: 1.5,
       getLineColor: (d) => d.col,
       pickable: false,
       updateTriggers: { getPosition: key, getRadius: key, getLineColor: key },
     }),
-    new ScatterplotLayer<[number, number]>({
+    new Marker<[number, number]>({
       ...common,
       id: "origin",
       data: inp.originPlaces,
       filled: true,
       getPosition: (d) => d,
-      getRadius: 9,
+      getRadius: mr(9),
       getLineWidth: 1.5,
       getFillColor: style.ink.originFill.rgba,
       getLineColor: style.ink.originEdge.rgba,
       pickable: true,
       updateTriggers: { getPosition: inp.posKey + "|" + key, getFillColor: style.key, getLineColor: style.key },
     }),
-    new ScatterplotLayer<Ring>({
+    new Marker<Ring>({
       ...common,
       id: "rings",
       data: rings,

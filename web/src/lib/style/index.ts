@@ -142,8 +142,8 @@ export interface LineStyle {
   readonly jointRounded: boolean;
 }
 
-/** City marker shape. Only circles exist in P1 (boxes come with terminal). */
-export type MarkerShape = "circle";
+/** City marker shape: discs, or squares of the same area (boxSide). */
+export type MarkerShape = "circle" | "box";
 
 /** City markers. */
 export interface MarkerStyle {
