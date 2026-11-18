@@ -1,6 +1,6 @@
 // Deck flow layers: buildPassData / layer props, no GPU.
 import { describe, expect, test } from "bun:test";
-import { WIDTH_K, WIDTH_KNEE, flowColor, flowUnits, flowPasses, getSelCache, isFerrySection, isTrainShown, newModelCaches, palette, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
+import { WIDTH_K, WIDTH_KNEE, flowColor, flowUnits, flowPasses, getSelCache, isFerrySection, isTrainShown, mapStyle, newModelCaches, rgba, stationR, stationStates, stationZoomK } from "../src/lib";
 import type { SelCache, SelInput } from "../src/lib";
 import type { ModelState } from "../src/lib";
 import { buildPassData, flowPassLayers } from "../src/components/map/deck/layers/flows";
@@ -11,7 +11,8 @@ import { origin, pack } from "./fixture";
 
 const cur = origin("广州");
 const set = pack().atlas.sec;
-const pal = palette(false);
+const style = mapStyle("paper", "light");
+const pal = style.pal;
 const dest = cur.dests.find((d) => d.zh === "长沙") as DestVM;
 const st = (over: Partial<ModelState> = {}): ModelState => ({
   cur,
@@ -29,7 +30,7 @@ const st = (over: Partial<ModelState> = {}): ModelState => ({
 describe("buildPassData", () => {
   const [pass] = flowPasses(st(), newModelCaches());
   const items = pass.items.filter((f) => !isFerrySection(set.bb, f.s));
-  const pd = buildPassData(set, items, pal, 1, pass.maxN);
+  const pd = buildPassData(set, items, style, 1, pass.maxN);
 
   test("one path per item with n > 0, in items order", () => {
     const pos = items.filter((f) => f.n > 0);
@@ -59,18 +60,20 @@ describe("buildPassData", () => {
   });
 
   test("same items identity returns the same object", () => {
-    expect(buildPassData(set, items, pal, 1, pass.maxN)).toBe(pd);
+    expect(buildPassData(set, items, style, 1, pass.maxN)).toBe(pd);
+    // A different style is a different cache entry (the key is the style, not only paper + flow).
+    expect(buildPassData(set, items, mapStyle("paper", "dark"), 1, pass.maxN)).not.toBe(pd);
   });
 
   test("n = 0 sections are absent", () => {
     const withZero = [{ s: items[0].s, n: 0 }, ...items.slice(0, 3)];
-    expect(buildPassData(set, withZero, pal, 1, pass.maxN).data.length).toBe(3);
+    expect(buildPassData(set, withZero, style, 1, pass.maxN).data.length).toBe(3);
   });
 
   test("colour follows the ramp; a faded pass is pre-blended opaque (D3)", () => {
     const c = rgba(flowColor(pd.n[0], pass.maxN, pal));
     expect(Array.from(pd.rgba.subarray(0, 4))).toEqual(Array.from(c));
-    const faded = buildPassData(set, items, pal, 0.18, pass.maxN);
+    const faded = buildPassData(set, items, style, 0.18, pass.maxN);
     const paper = rgba(pal.paper);
     for (let i = 0; i < 3; i++) expect(faded.rgba[i]).toBe(Math.round(c[i] * 0.18 + paper[i] * 0.82));
     expect(faded.rgba[3]).toBe(255);
@@ -88,7 +91,7 @@ describe("buildPassData", () => {
   test("layer width = flowUnits(n) * WIDTH_K / fitScale, ids per role, pickable only for focus", () => {
     const passes = flowPasses(st({ panelDest: dest }), newModelCaches());
     expect(passes.map((p) => p.role)).toEqual(["context", "focus"]);
-    const layers = flowPassLayers(set, passes, pal, false, 100, 12.5);
+    const layers = flowPassLayers(set, passes, style, 100, 12.5);
     const flows = layers.filter((l) => l.id.startsWith("flows-") && !l.id.endsWith("-ferry"));
     expect(flows.map((l) => l.id)).toEqual(["flows-context", "flows-focus"]);
     // Drawn flows are never picked (their width is the train count); the hairline proxy of the focus pass is.
@@ -96,9 +99,9 @@ describe("buildPassData", () => {
     const proxies = layers.filter((l) => l.id.startsWith("pick-"));
     expect(proxies.map((l) => l.id)).toEqual(["pick-flows-focus"]);
     expect(proxies[0].props.pickable).toBe(true);
-    expect((proxies[0].props as any).idxToSec).toBe(buildPassData(set, passes[1].items, pal, 1, passes[1].maxN).idxToSec);
+    expect((proxies[0].props as any).idxToSec).toBe(buildPassData(set, passes[1].items, style, 1, passes[1].maxN).idxToSec);
     const l: any = flows[1];
-    const pdf = buildPassData(set, passes[1].items, pal, 1, passes[1].maxN);
+    const pdf = buildPassData(set, passes[1].items, style, 1, passes[1].maxN);
     expect(l.props.getWidth(undefined, { index: 0 })).toBeCloseTo((flowUnits(pdf.n[0]) * WIDTH_K) / 12.5, 9);
     expect(l.props.data).toBe(pdf.data);
   });
@@ -114,12 +117,12 @@ describe("station layers", () => {
   test("animating: a city is drawn only once a shown train has stopped there", () => {
     const at0 = stationStates(stIn(0, null), null);
     expect(at0.every((s) => !s.lit)).toBe(true);
-    expect(stationDots(at0, pal, false, false).length).toBe(0);
+    expect(stationDots(at0, style, false).length).toBe(0);
     const noon = stationStates(stIn(720, null), null);
     const litNoon = noon.filter((s) => s.lit).length;
     expect(litNoon).toBeGreaterThan(0);
     expect(litNoon).toBeLessThan(noon.length);
-    expect(stationDots(noon, pal, false, false).length).toBe(litNoon);
+    expect(stationDots(noon, style, false).length).toBe(litNoon);
     // monotone over the day, and every city lit at the end
     expect(stationStates(stIn(1080, null), null).filter((s) => s.lit).length).toBeGreaterThanOrEqual(litNoon);
     expect(stationStates(stIn(cur.timeline!.totalMins, null), null).every((s) => s.lit)).toBe(true);
@@ -132,21 +135,21 @@ describe("station layers", () => {
 
   test("dot radius = stationR(n) * stationZoomK(r, t); stroke 1.5 light / 3 dark", () => {
     const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
-    const dots = stationDots(states, pal, false, false);
+    const dots = stationDots(states, style, false);
     expect(dots.length).toBe(cur.dests.length);
     for (let i = 0; i < dots.length; i += 37) {
       const r = stationR(cur.dests[i].trains);
       expect(dots[i].r).toBeCloseTo(r * stationZoomK(r, 0.5), 9);
       expect(dots[i].lw).toBe(1.5);
     }
-    expect(stationDots(states, palette(true), true, false)[0].lw).toBe(3);
+    expect(stationDots(states, mapStyle("paper", "dark"), false)[0].lw).toBe(3);
   });
 
   test("ripple spreads from the current circle by max(3, 0.8r), alpha 1 - frac; dimmed dots paint first", () => {
     let found = false;
     for (let t = 300; t < 1400 && !found; t += 5) {
       const states = stationStates(stIn(t, null), null);
-      const rp = stationRipples(states, false);
+      const rp = stationRipples(states, style);
       const withR = states.filter((s) => s.ripple);
       expect(rp.length).toBe(withR.length);
       for (let k = 0; k < rp.length; k++) {
@@ -160,18 +163,18 @@ describe("station layers", () => {
     expect(found).toBe(true);
     const pd = dest;
     const states = stationStates({ ...stIn(0, pd), animEnabled: false }, null);
-    const dots = stationDots(states, pal, false, true);
+    const dots = stationDots(states, style, true);
     const firstFull = dots.findIndex((d) => d.fill[3] === 255);
     expect(dots.slice(0, firstFull).every((d) => d.fill[3] < 255)).toBe(true);
     expect(dots.slice(firstFull).every((d) => d.fill[3] === 255)).toBe(true);
-    const rings = stationRings({ panelDest: pd, hoverStation: null, hoverOrigin: true, originPt: [0, 0], sk: 0.5, dark: false });
+    const rings = stationRings({ panelDest: pd, hoverStation: null, hoverOrigin: true, originPt: [0, 0], sk: 0.5, style });
     expect(rings.map((r) => r.w)).toEqual([3, 2]);
     expect(rings[1].r).toBe(14.5);
   });
 
   test("layer ids and origin disc", () => {
     const states = stationStates({ ...stIn(0, null), animEnabled: false }, null);
-    const ls = stationLayers({ states, pal, dark: false, hasDest: false, originPt: [1, 2], panelDest: null, hoverStation: null, hoverOrigin: false, sk: 0.5, key: "k", posKey: "p" });
+    const ls = stationLayers({ states, style, hasDest: false, originPt: [1, 2], panelDest: null, hoverStation: null, hoverOrigin: false, sk: 0.5, key: "k", posKey: "p" });
     expect(ls.map((l) => l.id)).toEqual(["stations", "ripples", "origin", "rings"]);
     expect(ls[2].props.getRadius).toBe(9);
   });

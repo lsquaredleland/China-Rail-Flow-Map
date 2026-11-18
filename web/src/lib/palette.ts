@@ -109,12 +109,12 @@ function rgbStr(c: [number, number, number]): string {
   return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
 }
 
-// Flow colour ramp (light scheme only): a section's stroke runs pale
-// salmon → mid red → deep crimson as t = sqrt(n / N) goes 0 → 1, where
-// N is the widest section of the origin currently on show — so the
-// busiest corridors read hottest and the ramp re-normalises on every
-// origin / direction switch. The dark scheme carries no stops and keeps
-// its single flat flow colour.
+// Flow colour ramp: a section's stroke follows the palette's flowStops as
+// t = sqrt(n / N) goes 0 → 1 (light: pale salmon → deep crimson; dark: deep
+// red → luminous red), where N is the widest section of the pass on show,
+// so the busiest corridors read hottest and the ramp re-normalises on every
+// origin / direction switch. A palette with no stops (or N = 0) draws the
+// flat `flow` colour.
 export function flowColor(n: number, maxN: number, pal: Palette): string {
   const stops = pal.flowStops;
   if (!stops.length || maxN <= 0) return pal.flow;

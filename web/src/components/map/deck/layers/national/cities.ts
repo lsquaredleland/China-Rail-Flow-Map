@@ -4,7 +4,7 @@
 import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { DecodedAtlas, NationalFlowsPack, NationalIndexPack } from "../../../../../types";
-import { natCityEvents, natCityEventsAt, natCityR, natCityTier, palette, rgba, stationZoomK } from "../../../../../lib";
+import { DEFAULT_SKIN, mapStyle, modeOf, natCityEvents, natCityEventsAt, natCityR, natCityTier, palette, rgba, stationZoomK } from "../../../../../lib";
 import type { LabelPoint, NatCityEvents } from "../../../../../lib";
 import { rippleRing } from "../stations";
 import type { Ripple } from "../stations";
@@ -162,7 +162,7 @@ export function nationalCityLayers(d: NationalCityDots, dark: boolean, hoverIdx 
   ];
   const rip: Ripple[] = [];
   for (let i = 0; i < d.ripple.length; i++) {
-    if (d.ripple[i] >= 0) rip.push(rippleRing(d.pos[i], d.r[i], d.ripple[i], dark));
+    if (d.ripple[i] >= 0) rip.push(rippleRing(d.pos[i], d.r[i], d.ripple[i], mapStyle(DEFAULT_SKIN, modeOf(dark))));
   }
   if (rip.length) {
     layers.push(
