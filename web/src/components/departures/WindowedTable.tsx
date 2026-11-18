@@ -68,6 +68,31 @@ export default function WindowedTable({
     return () => window.removeEventListener("resize", measure);
   }, []);
 
+  // Column widths are measured once from the first window (auto layout) and
+  // then locked with table-layout: fixed. Otherwise the auto layout re-sizes
+  // the columns to whichever rows happen to be in view, and they jump while
+  // scrolling. They unlock (and are re-measured) when the list, the columns
+  // or the window width change.
+  const table = useRef<HTMLTableElement>(null);
+  const [colW, setColW] = useState<{ cols: number[]; total: number } | null>(null);
+  const [vw, setVw] = useState(() => (typeof window === "undefined" ? 0 : window.innerWidth));
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  useLayoutEffect(() => {
+    setColW(null);
+  }, [n, cols, className, resetKey, vw]);
+  useLayoutEffect(() => {
+    if (colW || n === 0) return;
+    const head = table.current?.tHead?.rows[0];
+    if (!head || !table.current) return;
+    const ws = Array.from(head.cells, (c) => c.getBoundingClientRect().width);
+    if (ws.some((x) => x <= 0)) return;
+    setColW({ cols: ws, total: table.current.getBoundingClientRect().width });
+  }, [colW, n]);
+
   const [first, last] = rowWindow(scrollTop, viewH, n, rowH);
   const spacer = (rows: number) =>
     rows > 0 ? (
@@ -88,7 +113,19 @@ export default function WindowedTable({
 
   return (
     <div className="dep-scroll" ref={scroller} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
-      <table id="depTable" className={"win-table" + (className ? " " + className : "")}>
+      <table
+        id="depTable"
+        ref={table}
+        className={"win-table" + (className ? " " + className : "")}
+        style={colW ? { tableLayout: "fixed", width: colW.total } : undefined}
+      >
+        {colW && (
+          <colgroup>
+            {colW.cols.map((x, i) => (
+              <col key={i} style={{ width: x }} />
+            ))}
+          </colgroup>
+        )}
         {children(w)}
       </table>
     </div>
