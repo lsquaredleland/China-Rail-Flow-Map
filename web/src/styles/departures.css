@@ -154,6 +154,12 @@
 #depFilter:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
 .dep-showing { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
 .dep-chip {
+  --dep-dest-ink: #ffffff;
+  --dep-dest-hover: rgba(0, 0, 0, 0.22);
+  --dep-chip-hover: rgba(128, 128, 128, 0.25);
+  --dep-iso-bg: #2563EB;
+  --dep-iso-ink: #FFFFFF;
+  --dep-iso-edge: #1D4ED8;
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--btn-on); color: var(--btn-on-ink);
   border: 1px solid var(--btn-on);
@@ -163,12 +169,12 @@
 }
 #depChip {
   background: var(--rust);
-  color: #ffffff;
+  color: var(--dep-dest-ink);
   border: 1px solid var(--rust);
 }
 #depChip button:hover {
   border-color: transparent;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--dep-dest-hover);
 }
 .dep-chip button {
   background: transparent; border: 0; color: inherit;
@@ -176,7 +182,7 @@
   padding: 0; font-size: 14px; line-height: 1;
   display: flex; align-items: center; justify-content: center;
 }
-.dep-chip button:hover { border-color: transparent; background: rgba(128, 128, 128, 0.25); }
+.dep-chip button:hover { border-color: transparent; background: var(--dep-chip-hover); }
 .dep-swipe { margin: 0 0 6px; font-size: 12px; color: var(--ink-soft); font-style: italic; }
 .dep-scroll { overflow-x: auto; overflow-y: auto; max-height: 50dvh; -webkit-overflow-scrolling: touch; border: 1px solid var(--rule); }
 #depTable {
@@ -284,12 +290,12 @@
 }
 /* "Isolated: K9217" chip */
 .dep-chip.is-isolated {
-  background: #2563EB;
-  color: #FFFFFF;
-  border-color: #1D4ED8;
+  background: var(--dep-iso-bg);
+  color: var(--dep-iso-ink);
+  border-color: var(--dep-iso-edge);
 }
-.dep-chip.is-isolated b { margin-left: 4px; color: #FFFFFF; }
-.dep-chip.is-isolated button { color: #FFFFFF; }
+.dep-chip.is-isolated b { margin-left: 4px; color: var(--dep-iso-ink); }
+.dep-chip.is-isolated button { color: var(--dep-iso-ink); }
 /* ---------- run days + national table ---------- */
 .c-runs { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .runs-label { color: var(--ink-soft); }
