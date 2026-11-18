@@ -236,6 +236,11 @@ describe("station layers", () => {
 });
 
 describe("train layers", () => {
+  test("glowOf follows the style: paper's classes are the same in both modes; terminal's trains are cyan", () => {
+    for (const c of ["G", "K", "", "D", "Z"]) expect(glowOf(c, mapStyle("paper", "dark"))).toEqual(glowOf(c));
+    for (const c of ["G", "K", ""]) expect(glowOf(c, mapStyle("terminal", "dark"))).toEqual([63, 230, 255, 255]);
+  });
+
   const tl = cur.timeline!;
   const pd = dest;
   const sel: SelInput = { cur, panelDest: pd, isolatedTrainCode: null, direction: "out" };

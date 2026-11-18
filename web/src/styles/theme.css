@@ -55,3 +55,12 @@
   --card-time: #F0B85A;
   --card-live: #F07A63;
 }
+/* Terminal skin (dark only; data-theme is always "dark" with it): the page
+   ground and ink around the map. The panel / toolbar reskin is P3. */
+:root[data-skin="terminal"] {
+  --paper: #04060C;
+  --paper-deep: #070B16;
+  --ink: #EAF2FF;
+  --ink-soft: #8FA3C8;
+  --rule: #1A2A55;
+}

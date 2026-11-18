@@ -146,7 +146,7 @@ function drawTrainTags(M: MapCtx, ctx: CanvasRenderingContext2D, style: MapStyle
 
 /** Paints the code tag above a dot in its class colour using `style`'s tag font and inks. */
 function paintTag(ctx: CanvasRenderingContext2D, px: number, py: number, tagText: string, cls: string, style: MapStyle) {
-  const g = glowOf(cls);
+  const g = glowOf(cls, style);
   const glow = `rgb(${g[0]},${g[1]},${g[2]})`;
   ctx.font = "bold 10px " + style.font.tag;
   const tagW = ctx.measureText(tagText).width + 8;

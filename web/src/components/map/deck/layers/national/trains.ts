@@ -14,14 +14,21 @@
 import type { Layer } from "@deck.gl/core";
 import { PathLayer } from "@deck.gl/layers";
 import type { DecodedAtlas, NationalTimeline } from "../../../../../types";
-import { natPositions, natXY } from "../../../../../lib";
-import type { MapStyle } from "../../../../../lib";
+import { DEFAULT_SKIN, mapStyle, natPositions, natXY } from "../../../../../lib";
+import type { MapStyle, RGBA } from "../../../../../lib";
 import { dotLayers, glowOf, isoDwellRings, ringLayer } from "../trains";
 import type { Disc, DotBuffers } from "../trains";
 import { maxDots } from "./timeline";
 
-/** Glow colour per NationalTimeline class: 0 G/D/C, 1 Z/T/K/S, 2 other. */
-const GLOW = [glowOf("G"), glowOf("K"), glowOf("")];
+/** Glow colour per NationalTimeline class in `style`: 0 G/D/C, 1 Z/T/K/S, 2 other. */
+const PAPER_LIGHT = mapStyle(DEFAULT_SKIN, "light");
+const glowMemo = new WeakMap<MapStyle, RGBA[]>();
+function glowTable(style: MapStyle | undefined): RGBA[] {
+  const key = style ?? PAPER_LIGHT;
+  let g = glowMemo.get(key);
+  if (!g) glowMemo.set(key, (g = [glowOf("G", key), glowOf("K", key), glowOf("", key)]));
+  return g;
+}
 
 interface NationalFrame extends DotBuffers {
   count: number;
@@ -36,7 +43,8 @@ interface NationalFrame extends DotBuffers {
 let pool: { tl: NationalTimeline; f: NationalFrame } | null = null;
 
 /** Fills the pooled frame buffers for display minute m (0..1440). */
-export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: number, scale: number, keep?: Uint8Array | null): NationalFrame {
+export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: number, scale: number, keep?: Uint8Array | null, style?: MapStyle): NationalFrame {
+  const GLOW = glowTable(style);
   if (!pool || pool.tl !== tl) {
     const cap = Math.max(1, maxDots(tl));
     pool = {
@@ -108,8 +116,10 @@ export function nationalRings(
   tl: NationalTimeline,
   atlas: DecodedAtlas,
   codes: { hover: string | null; selected: string | null | undefined; isolated: string | null | undefined },
+  style?: MapStyle,
 ): Layer[] {
   if (!codes.hover && !codes.selected && !codes.isolated) return [];
+  const GLOW = glowTable(style);
   const tt = atlas.data.train_table;
   const rings: Disc[] = [];
   for (let i = 0; i < f.count; i++) {
@@ -151,7 +161,8 @@ export function nationalCorridor(tl: NationalTimeline, atlas: DecodedAtlas, q: n
     }
     m.set(q, path);
   }
-  const g = GLOW[tl.cls[q]] || GLOW[2];
+  const glow = glowTable(style);
+  const g = glow[tl.cls[q]] || glow[2];
   return [
     new PathLayer<number[]>({
       id: "nat-corridor",

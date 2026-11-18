@@ -84,6 +84,50 @@ describe("mapStyle", () => {
   });
 });
 
+describe("terminal skin", () => {
+  const t = mapStyle("terminal", "dark");
+  test("dark only: light resolves to dark, no day/night toggle, one memoised style", () => {
+    expect(SKINS.terminal.modes).toEqual(["dark"]);
+    expect(SKINS.terminal.defaultMode).toBe("dark");
+    expect(resolveMode("terminal", "light")).toBe("dark");
+    expect(skinHasModeToggle("terminal")).toBe(false);
+    expect(mapStyle("terminal", "light")).toBe(t);
+    expect(t.key).toBe("terminal|dark");
+    expect(t.mode).toBe("dark");
+  });
+
+  test("encodings and shapes: speedLimit lines, flat box cities, square caps and mitred joints", () => {
+    expect(t.enc.lineColor).toBe(LINE_COLOR.speedLimit);
+    expect(t.enc.nodeColor).toBe(NODE_COLOR.flat);
+    expect(t.enc.nodeSize).toBe(NODE_SIZE.stationRadius);
+    expect(t.enc.natNodeSize).toBe(NODE_SIZE.natCityRadius);
+    expect(t.marker.shape).toBe("box");
+    expect(t.line).toEqual({ capRounded: false, jointRounded: false });
+    expect(t.font.family).toBe("'Share Tech Mono', ui-monospace, monospace");
+  });
+
+  test("the TSpeed colours", () => {
+    expect(t.speedBands).toEqual({ bands: ["#F4FFE8", "#FFD43B", "#FF8F40", "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" });
+    expect(t.ink.paper.css).toBe("#04060C");
+    expect(t.ink.label.css).toBe("#FF8F40");
+    expect(t.ink.dotEdge.css).toBe("#FF8F40");
+    expect(t.ink.dot.rgba).toEqual([255, 143, 64, 46]);
+    expect(t.ink.originFill.css).toBe("#EAF2FF");
+    for (const k of ["trainHs", "trainConv", "trainOther"] as const) expect(t.ink[k].css).toBe("#3FE6FF");
+    // the national boxes take the fill's own alpha
+    expect(t.alpha.natCityFill).toBe(1);
+    // ink and pal agree where both exist
+    expect(t.ink.landFill.css).toBe(t.pal.landFill);
+    expect(t.ink.outline.css).toBe(t.pal.outline);
+  });
+
+  test("paper is untouched by the second skin", () => {
+    expect(mapStyle("paper", "light").enc.lineColor).toBe(LINE_COLOR.volume);
+    expect(mapStyle("paper", "dark").marker.shape).toBe("circle");
+    expect(mapStyle("paper", "light").pal).toEqual(palette(false));
+  });
+});
+
 describe("skin modes", () => {
   test("paper supports both modes and keeps the requested one", () => {
     expect(SKINS.paper.modes).toEqual(["light", "dark"]);

@@ -109,7 +109,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
     return layers;
   }
   const keep = iso ? iso.keep : nationalKeep(built.tl, view.sel);
-  const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep);
+  const f = nationalFrame(built.tl, atlas, ((st.animTime % 1440) + 1440) % 1440, st.view.scale, keep, style);
   let kept = built.tl.n;
   if (keep) {
     kept = 0;
@@ -126,7 +126,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
       hover: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
       selected: P.current.selectedTrainCode,
       isolated: iso ? isoCode : null,
-    }),
+    }, style),
   );
   return layers;
 }

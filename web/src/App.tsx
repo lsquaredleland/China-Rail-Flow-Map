@@ -499,6 +499,7 @@ export default function App() {
             <Legend
               ref={legendRef}
               national={national}
+              style={style}
               title={
                 national
                   ? "All trains of China Rail"

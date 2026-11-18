@@ -34,8 +34,9 @@ export type {
 /** Light or dark: the day/night axis, independent of the skin. */
 export type Mode = "light" | "dark";
 
-/** A registered skin. Only "paper" (today's look) exists in P1. */
-export type SkinId = "paper";
+/** A registered skin: "paper" (today's look, light and dark) or "terminal"
+    (the TSpeed look: dark only, speed-coloured lines, box cities). */
+export type SkinId = "paper" | "terminal";
 
 /** The skin used when nothing else selects one. */
 export const DEFAULT_SKIN: SkinId = "paper";
@@ -312,8 +313,86 @@ const PAPER: SkinDef = {
   },
 };
 
+/* Terminal's map colours (the TSpeed frame). */
+const T_GROUND = "#04060C";
+const T_AMBER = "#FF8F40";
+const T_WHITE = "#EAF2FF";
+const T_CYAN = "#3FE6FF";
+
+/** Terminal (skins P2, map only): a dark-only skin on the paper night style,
+    with a near-black ground, navy land under a blue hairline outline, amber
+    labels and box cities, lines coloured by posted speed limit and cyan
+    trains. Square line caps and mitred joints; no glow yet (P3). */
+const TERMINAL: SkinDef = {
+  id: "terminal",
+  modes: ["dark"],
+  defaultMode: "dark",
+  build() {
+    const base = PAPER.build("dark");
+    const pal: Palette = {
+      ...base.pal,
+      paper: T_GROUND,
+      network: "#101A36",
+      graticule: "rgba(42,92,255,0.16)",
+      flowHi: T_WHITE,
+      chord: "#3A4A6E",
+      dot: "rgba(255,143,64,0.18)",
+      dotEdge: T_AMBER,
+      label: T_AMBER,
+      labelHalo: "rgba(4,6,12,0.92)",
+      origin: T_WHITE,
+      outline: "rgba(42,92,255,0.70)",
+      landFill: "#070C1C",
+    };
+    const inks: Inks = {
+      ...base.ink,
+      paper: ink(pal.paper),
+      network: ink(pal.network),
+      graticule: ink(pal.graticule),
+      flowHi: ink(pal.flowHi),
+      chord: ink(pal.chord),
+      dot: ink(pal.dot),
+      dotEdge: ink(pal.dotEdge),
+      label: ink(pal.label),
+      labelHalo: ink(pal.labelHalo),
+      origin: ink(pal.origin),
+      outline: ink(pal.outline),
+      landFill: ink(pal.landFill),
+      ring: ink(T_WHITE),
+      originFill: ink(T_WHITE),
+      originEdge: ink(T_GROUND),
+      originMark: ink(T_GROUND),
+      labelBox: ink(T_GROUND),
+      labelBoxEdge: ink(T_AMBER),
+      labelBoxText: ink(T_AMBER),
+      trainHs: ink(T_CYAN),
+      trainConv: ink(T_CYAN),
+      trainOther: ink(T_CYAN),
+    };
+    const mono = "'Share Tech Mono', ui-monospace, monospace";
+    return {
+      pal,
+      cardPal: pal,
+      ink: inks,
+      speedBands: { bands: ["#F4FFE8", "#FFD43B", T_AMBER, "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" },
+      // The city fill carries its own alpha (pal.dot), so the national boxes take it as is.
+      alpha: { ...base.alpha, natCityFill: 1 },
+      line: { capRounded: false, jointRounded: false },
+      marker: { shape: "box", edgeWidth: 1.5 },
+      font: { family: mono, tag: mono },
+      enc: {
+        lineColor: LINE_COLOR.speedLimit,
+        nodeColor: NODE_COLOR.flat,
+        natNodeColor: NODE_COLOR.flat,
+        nodeSize: NODE_SIZE.stationRadius,
+        natNodeSize: NODE_SIZE.natCityRadius,
+      },
+    };
+  },
+};
+
 /** Every skin by id. */
-export const SKINS: Readonly<Record<SkinId, SkinDef>> = { paper: PAPER };
+export const SKINS: Readonly<Record<SkinId, SkinDef>> = { paper: PAPER, terminal: TERMINAL };
 
 /** The mode a skin actually draws for a requested mode: the request when the
     skin supports it, else the skin's default (e.g. a dark-only skin). */

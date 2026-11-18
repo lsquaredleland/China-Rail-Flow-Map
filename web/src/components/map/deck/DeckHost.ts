@@ -172,6 +172,7 @@ function buildLayers(M: MapCtx, stats: DeckStats): Layer[] {
           selectedCode: P.current.selectedTrainCode,
           hoveredCode: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,
           animTime: st.animTime,
+          style,
         }),
       );
     }
