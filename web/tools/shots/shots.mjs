@@ -5,7 +5,10 @@
 //           that is served with the Vercel headers on a free port
 //   outdir  default "shots-out"; files are <scenario>@<dpr>x.png
 //   env CHROME_PATH overrides the Chrome binary
-//   env SHOTS_QUERY appends to the page URL, e.g. '&theme=dark'. Each shot waits for
+//   env SHOTS_THEME "light" (default) or "dark": sets both ?theme= and the emulated
+//       prefers-color-scheme. (SHOTS_QUERY='&theme=dark' cannot do this: the app
+//       reads the first theme parameter, which is always the leading ?theme=.)
+//   env SHOTS_QUERY appends to the page URL, e.g. '&skin=terminal'. Each shot waits for
 //       window.__deckStats.settled (two identical frames, no pipeline compile pending) before and
 //       after the scenario.
 //
@@ -19,6 +22,8 @@ import path from "node:path";
 import { launch, parseArgs, resolveBase, sleep } from "../common.mjs";
 
 const { pos, opt } = parseArgs(process.argv.slice(2), ["dpr", "only"]);
+const THEME = process.env.SHOTS_THEME || "light";
+if (THEME !== "light" && THEME !== "dark") throw new Error(`SHOTS_THEME must be light or dark, got ${THEME}`);
 const outDir = path.resolve(pos[1] || "shots-out");
 const dprs = (opt.dpr || "1,2").split(",").map(Number);
 const only = opt.only ? new Set(opt.only.split(",")) : null;
@@ -130,9 +135,9 @@ for (const dpr of dprs) {
     const ctx = await browser.createBrowserContext();
     const pg = await ctx.newPage();
     pg.on("pageerror", (e) => { errors++; console.log(`  pageerror [${name}]`, e.message); });
-    await pg.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }, { name: "prefers-reduced-motion", value: "no-preference" }]);
+    await pg.emulateMediaFeatures([{ name: "prefers-color-scheme", value: THEME }, { name: "prefers-reduced-motion", value: "no-preference" }]);
     await pg.setViewport({ width: W, height: H, deviceScaleFactor: dpr });
-    await pg.goto(`${url}/?theme=light${process.env.SHOTS_QUERY || ""}`, { waitUntil: "networkidle0" });
+    await pg.goto(`${url}/?theme=${THEME}${process.env.SHOTS_QUERY || ""}`, { waitUntil: "networkidle0" });
     await pg.waitForFunction("window.__M && window.__M.P.current.cur && !window.__M.P.current.inLoading", { timeout: 60000 });
     await sleep(3000); // origin fade-in + staged pack loading settle
     await pg.evaluate(() => document.fonts.ready);
