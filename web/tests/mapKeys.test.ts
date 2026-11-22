@@ -29,3 +29,28 @@ describe("map keys", () => {
     expect(k(" ")).toBeNull();
   });
 });
+
+import { GLIDE, RAMP, motionAt, motionDone } from "../src/components/map/keyMotion";
+
+describe("key motion", () => {
+  test("a tap glides about one tap and stops", () => {
+    expect(motionAt(0, 30, 1)).toBe(0);
+    const end = motionAt(RAMP + 10 * GLIDE, 30, 1);
+    expect(end).toBeGreaterThan(0.99);
+    expect(end).toBeLessThanOrEqual(1);
+    expect(motionDone(RAMP + 10 * GLIDE, 30)).toBe(true);
+    expect(motionDone(RAMP, 30)).toBe(false);
+  });
+  test("holding runs at a steady speed, smoothly", () => {
+    const v1 = motionAt(1000, null, 1) - motionAt(900, null, 1);
+    const v2 = motionAt(2000, null, 1) - motionAt(1900, null, 1);
+    expect(Math.abs(v1 - v2)).toBeLessThan(1e-9);
+    // continuous at the ramp's end and at release
+    expect(Math.abs(motionAt(RAMP + 1e-6, null, 1) - motionAt(RAMP, null, 1))).toBeLessThan(1e-6);
+    expect(Math.abs(motionAt(800 + 1e-6, 800, 1) - motionAt(800, 800, 1))).toBeLessThan(1e-6);
+    expect(motionDone(800, null)).toBe(false);
+  });
+  test("distance does not depend on frame timing", () => {
+    expect(motionAt(500, 300, 2)).toBeCloseTo(2 * motionAt(500, 300, 1), 12);
+  });
+});

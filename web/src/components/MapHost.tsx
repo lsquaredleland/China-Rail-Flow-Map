@@ -10,7 +10,8 @@ import { createMapCtx } from "./map/context";
 import type { MapApi, Props } from "./map/context";
 import { createMapApi } from "./map/api";
 import { notifyAnimListeners } from "./map/anim";
-import { frameTail, mapKeyAction, panBy, resize, updateScaleBar, zoomAt } from "./map/camera";
+import { frameTail, mapKeyAction, nudgeView, resize, updateScaleBar, zoomAt } from "./map/camera";
+import { motionAt, motionDone, type Motion } from "./map/keyMotion";
 import { hideTooltip } from "./map/interaction";
 import { endPointer, onPointerDown, onPointerLeave, onPointerMove } from "./map/pointer";
 import { loadDeck } from "./map/deck/load";
@@ -81,8 +82,34 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
 
   // Keyboard: arrows / W A S D pan, + / - zoom, unless typing in a field or a
   // dialog (the train schedule) is open. Shift+arrows belong to the timeline.
+  // Motion is per frame (keyMotion): a tap glides, a hold runs smoothly, keys combine.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const motions = new Map<string, Motion>();
+    let raf = 0;
+    const frame = () => {
+      raf = 0;
+      const st = M.S.current;
+      const now = performance.now();
+      let dx = 0;
+      let dy = 0;
+      let dz = 0;
+      for (const [code, m] of motions) {
+        const t = now - m.t0;
+        const tr = m.tr === null ? null : m.tr - m.t0;
+        const d = motionAt(t, tr, 1);
+        const delta = d - m.applied;
+        m.applied = d;
+        if (m.zoom) dz += delta * m.zoom;
+        else {
+          dx += (delta * m.dir[0] * st.W) / 8;
+          dy += (delta * m.dir[1] * st.H) / 8;
+        }
+        if (motionDone(t, tr)) motions.delete(code);
+      }
+      if (dx || dy || dz) nudgeView(M, dx, dy, dz);
+      if (motions.size) raf = requestAnimationFrame(frame);
+    };
+    const onDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       const a = mapKeyAction(e);
       if (!a) return;
@@ -92,11 +119,34 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
       const st = M.S.current;
       if (st.W <= 0 || st.H <= 0) return;
       e.preventDefault();
-      if ("pan" in a) panBy(M, (a.pan[0] * st.W) / 8, (a.pan[1] * st.H) / 8);
-      else zoomAt(M, st.W / 2, st.H / 2, a.zoom);
+      const live = motions.get(e.code);
+      if (e.repeat && live && live.tr === null) return; // held: the motion already runs
+      motions.set(e.code, {
+        dir: "pan" in a ? a.pan : [0, 0],
+        zoom: "zoom" in a ? Math.log(a.zoom) : 0,
+        t0: performance.now(),
+        tr: null,
+        applied: 0,
+      });
+      if (!raf) raf = requestAnimationFrame(frame);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const release = (code: string) => {
+      const m = motions.get(code);
+      if (m && m.tr === null) m.tr = performance.now();
+    };
+    const onUp = (e: KeyboardEvent) => release(e.code);
+    const onBlur = () => {
+      for (const code of motions.keys()) release(code);
+    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", onBlur);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [M]);
 
   // Test/measurement handle for web/tools (screenshots, perf): the engine

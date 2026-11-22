@@ -77,7 +77,9 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
    straightened: parallel sections between the same two nodes (two lines sharing every
    station, a "ladder") form one bundle, and each chain of bundles through degree-2 nodes is
    redrawn as the 1- or 2-leg octilinear route between its junctions, unless that would cross
-   more lines than the current drawing; its stations are spaced by real distance. Then it
+   more lines than the current drawing; its stations are spaced by real distance. A dead-end
+   run (a branch with a free end, e.g. Zhuhai) is redrawn in its real direction and length
+   from its junction: octi gives every station a grid cell, which stretches branches. Then it
    writes the client asset:
 
 | field | content |

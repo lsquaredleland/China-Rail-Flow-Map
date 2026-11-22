@@ -110,11 +110,20 @@ export function zoomAt(M: MapCtx, px: number, py: number, factor: number) {
   M.render();
 }
 
-/** Moves the view by (dx, dy) CSS px (the map content moves the other way). */
-export function panBy(M: MapCtx, dx: number, dy: number) {
+/** Moves the view by (dx, dy) CSS px (the map content moves the other way)
+    and zooms by e^logZoom about the centre (within the zoom bounds); one render. */
+export function nudgeView(M: MapCtx, dx: number, dy: number, logZoom = 0) {
   const st = M.S.current;
   st.view.tx -= dx;
   st.view.ty -= dy;
+  if (logZoom) {
+    const { min, max } = zoomBounds(st.fitScale);
+    const ns = Math.min(max, Math.max(min, st.view.scale * Math.exp(logZoom)));
+    const k = ns / st.view.scale;
+    st.view.tx = st.W / 2 - (st.W / 2 - st.view.tx) * k;
+    st.view.ty = st.H / 2 - (st.H / 2 - st.view.ty) * k;
+    st.view.scale = ns;
+  }
   st.interacted = true;
   M.render();
 }

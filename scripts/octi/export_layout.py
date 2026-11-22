@@ -336,6 +336,13 @@ bkeys = sorted(bund)
 binc = collections.defaultdict(list)
 for bk in bkeys: binc[bk[0]].append(bk); binc[bk[1]].append(bk)
 deg2 = {k for k, L in binc.items() if len(L) == 2}
+leaf = {k for k, L in binc.items() if len(L) == 1}
+# real position of each node (plane coords of the real track end there): a dead-end run is
+# redrawn in its real direction and length from its junction (octi stretches spurs: every
+# station takes a grid cell, so Zhuhai's line ran ~110 km too far south)
+nodegeo = {}
+for s_ in nonzero:
+    nodegeo.setdefault(key(pl[s_][0]), PLf(geo[s_][0])); nodegeo.setdefault(key(pl[s_][-1]), PLf(geo[s_][-1]))
 zero_at = collections.defaultdict(list)
 for s_ in sorted(pl):
     if key(pl[s_][0]) == key(pl[s_][-1]): zero_at[key(pl[s_][0])].append(s_)
@@ -372,9 +379,19 @@ for bk0 in bkeys:
     if key(A) == key(B): sstat['loops'] += 1; continue
     members = [s_ for bk in run_b for s_ in bund[bk]]
     skip = set(members)
-    cands = [octi2pl(A, B), octi2pl(B, A)[::-1]]
-    if plen(cands[0]) >= plen(pts) - 1e-9 and len(pts) <= 3: continue      # already straight
     old_x = crossings(pts, skip)
+    lA, lB = nodes_[0] in leaf, nodes_[-1] in leaf
+    spur = None
+    if (lA or lB) and nodes_[0] in nodegeo and nodes_[-1] in nodegeo:
+        gA, gB = nodegeo[nodes_[0]], nodegeo[nodes_[-1]]
+        if lB:   # free end B: from A along the real vector
+            B2 = (A[0] + gB[0] - gA[0], A[1] + gB[1] - gA[1]); sc = [octi2pl(A, B2), octi2pl(B2, A)[::-1]]
+        else:    # free end A
+            A2 = (B[0] - gB[0] + gA[0], B[1] - gB[1] + gA[1]); sc = [octi2pl(A2, B), octi2pl(B, A2)[::-1]]
+        best_s = min(((crossings(R, skip), plen(R), i, R) for i, R in enumerate(sc)), key=lambda x: x[:3])
+        if best_s[0] <= old_x: spur = best_s[3]
+    cands = [octi2pl(A, B), octi2pl(B, A)[::-1]]
+    if spur is None and plen(cands[0]) >= plen(pts) - 1e-9 and len(pts) <= 3: continue      # already straight
     def dev(R):
         def pd(p):
             best_ = 1e18
@@ -384,9 +401,13 @@ for bk0 in bkeys:
                 best_ = min(best_, math.dist(p, (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)))
             return best_
         return max(pd(p) for p in pts)
-    best = min(((crossings(R, skip), dev(R), i, R) for i, R in enumerate(cands)), key=lambda x: x[:3])
-    if best[0] > old_x: sstat['kept_crossing'] += 1; continue
-    R = best[3]; LR = plen(R)
+    if spur is not None:
+        R = spur; sstat['spurs_to_real'] += 1
+    else:
+        best = min(((crossings(R, skip), dev(R), i, R) for i, R in enumerate(cands)), key=lambda x: x[:3])
+        if best[0] > old_x: sstat['kept_crossing'] += 1; continue
+        R = best[3]
+    LR = plen(R)
     km_ = [max(sum(glen(geo[t]) for t in bund[bk]) / len(bund[bk]), 1e-6) for bk in run_b]; tot = sum(km_)
     cum = [0.0]
     for k_ in km_: cum.append(cum[-1] + k_ / tot)
@@ -415,6 +436,9 @@ for bk0 in bkeys:
         newpt[frm] = q[0]
     for k_ in nodes_[1:-1]:
         chain_move[k_] = PLi(newpt[k_])          # keyed by plane node key
+    if spur is not None:                         # the free end moved too
+        if lB: chain_move[nodes_[-1]] = PLi(R[-1])
+        else: chain_move[nodes_[0]] = PLi(R[0])
     sstat['runs_straightened'] += 1; sstat['sections_straightened'] += len(members)
 for k_, L in zero_at.items():               # collapsed sections ride with their node
     np_ = chain_move.get(k_)
