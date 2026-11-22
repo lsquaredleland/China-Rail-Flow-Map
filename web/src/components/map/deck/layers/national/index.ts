@@ -120,7 +120,7 @@ export function nationalBuildLayers(M: MapCtx, stats: DeckStats): Layer[] {
   stats.natBuildMs = built.ms;
   stats.natDots = f.count;
   st.natPick = { tl: built.tl, count: f.count, buf: f.pos, qOf: f.qOf, m: ((st.animTime % 1440) + 1440) % 1440 };
-  layers.push(...nationalLayers(f, !st.animPlaying, !!iso));
+  layers.push(...nationalLayers(f, !st.animPlaying, !!iso, style));
   layers.push(
     ...nationalRings(f, built.tl, atlas, {
       hover: st.hover && st.hover.kind === "train" ? st.hover.train.code : null,

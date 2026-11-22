@@ -143,6 +143,11 @@ export interface LineStyle {
   readonly jointRounded: boolean;
 }
 
+/** How flows are drawn: one path per section ("section", paper), or consecutive
+    sections of the same colour and width chained into one path with mitred
+    joints and square-cut ends ("chain": angular, no round caps or seams). */
+export type FlowJoin = "section" | "chain";
+
 /** City marker shape: discs, or squares of the same area (boxSide). */
 export type MarkerShape = "circle" | "box";
 
@@ -212,6 +217,7 @@ export interface MapStyle {
   readonly speedBands: SpeedRamp;
   readonly alpha: Alphas;
   readonly line: LineStyle;
+  readonly flowJoin: FlowJoin;
   /** Flow glow underlay; null draws none (paper). */
   readonly glow: GlowStyle | null;
   readonly marker: MarkerStyle;
@@ -321,6 +327,7 @@ const PAPER: SkinDef = {
         natCityFill: dark ? 0.4 : 0.35,
       },
       line: { capRounded: true, jointRounded: true },
+      flowJoin: "section",
       glow: null,
       marker: { shape: "circle", edgeWidth: dark ? 3.0 : 1.5, minRadius: 0 },
       font: {
@@ -414,12 +421,12 @@ const TERMINAL: SkinDef = {
       speedBands: { bands: ["#F4FFE8", "#FFD43B", T_AMBER, "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" },
       // The city fill carries its own alpha (pal.dot), so the national boxes take it as is.
       alpha: { ...base.alpha, natCityFill: 1 },
-      // Mitred joints, but rounded caps: deck's non-rounded cap is flat (it
-      // stops at the vertex), so two sections meeting end to end leave an
-      // antialiased dark seam across wide corridors. Round caps overlap and
-      // hide it. True mitres between sections need them chained into one
-      // path (planned with the angular geometry, P4).
-      line: { capRounded: true, jointRounded: false },
+      // Angular: flows are chained (sections of one colour and width form one
+      // path, so corners are true mitres and there are no seams) and their
+      // ends are cut square (extended by half their width); everything else
+      // drawn with style.line (train tails, highlights) is flat and mitred.
+      line: { capRounded: false, jointRounded: false },
+      flowJoin: "chain",
       glow: { widthScale: 1.3, minPixels: 3, alpha: 0.12 },
       marker: { shape: "box", edgeWidth: 1, minRadius: 5 },
       font: { family: mono, tag: mono, caps: true, load: ["16px 'Share Tech Mono'"] },
