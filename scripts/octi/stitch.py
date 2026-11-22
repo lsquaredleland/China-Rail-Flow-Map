@@ -118,6 +118,7 @@ if STUB_KM > 0:
     for fi, f in enumerate(feats):
         if f['geometry']['type'] == 'Point': fid[f['properties']['id']] = fi
     xform = {}   # removed edge -> (J edge, function u -> J u)
+    cutnode_at = {}   # dropped cut node feature -> (J edge, fraction): sections collapsed into it
     for cid, (kc, ta, tb) in conn.items():
         fa, fb = cutfi[cid]; ca, cb = feats[fa]['properties']['id'], feats[fb]['properties']['id']
         ea = [k for k in inc[ca] if k != kc]; eb = [k for k in inc[cb] if k != kc]
@@ -140,7 +141,8 @@ if STUB_KM > 0:
         xform[ea] = (kj, lambda u, afx=afx, a_=a_: a_ * (u if afx else 1 - u))
         xform[kc] = (kj, lambda u, a_=a_, b_=b_: a_ + (b_ - a_) * u)
         xform[eb] = (kj, lambda u, bfc=bfc, b_=b_: b_ + (1 - b_) * (u if bfc else 1 - u))
-        removed |= {ea, eb, kc}; joined += 1; jlen.append(kmlen(coords) - LA - LB - LC)
+        removed |= {ea, eb, kc}; joined += 1
+        cutnode_at[fa] = (kj, a_); cutnode_at[fb] = (kj, b_); jlen.append(kmlen(coords) - LA - LB - LC)
     for si, r in smap.items():
         if r['st'] != 'mapped': continue
         out = []
@@ -171,7 +173,11 @@ if STUB_KM > 0:
         if fi in newfi: nk[k] = len(nn); nn.append([newfi[fi], i_])
     for si, r in smap.items():
         if r['st'] == 'mapped': r['p'] = [[ek[k], a, b, d] for k, a, b, d in r['p']]
-        elif r['st'] == 'node': r['n'] = nk.get(r['n'], r['n'])
+        elif r['st'] == 'node':
+            if r['n'] in nk: r['n'] = nk[r['n']]
+            else:   # collapsed into a cut node that the seam join removed: a point on the joined edge
+                kj, u = cutnode_at[nodes[r['n']][0]]
+                r['st'] = 'mapped'; r['p'] = [[ek[kj], round(u, 6), round(u, 6), 1]]; r.pop('n')
     feats, edges, nodes = nf, ne, nn
 
 # --- crossings introduced by connectors (proper segment intersections with any other edge)

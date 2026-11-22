@@ -3,6 +3,7 @@
 # The stitched national octi layout with a per-section mapping (see docs/OCTI.md):
 #   partition.py (8 disjoint tiles of ~1500 sections)
 #   -> per tile: convert2 --partition/--tile (sections cut at tile edges, shared 'cut' nodes)
+#      --join-paths (section ends that national trains run between become one node)
 #      + best of K detmalloc seeds + map_sections
 #   -> stitch.py (one web-mercator frame, octilinear connectors, short stubs joined)
 #   -> quality.py + validate_lines.py

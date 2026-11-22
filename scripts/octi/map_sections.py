@@ -227,6 +227,14 @@ for si in universe:
         r = {'st': 'lost-convert:' + s}
     elif s == 'loop-node':
         o = img.get(side['loopnode'][str(si)])
+        if not o and str(si) in side.get('looppt', {}):
+            # its node carries nothing but loops (dropped from the octi input): nearest placed node
+            lp = side['looppt'][str(si)]; best = None
+            for n_, info in nodes.items():
+                if n_ not in img: continue
+                dd = math.hypot((info['pt'][0] - lp[0]) * math.cos(math.radians(lp[1])), info['pt'][1] - lp[1]) * 111
+                if dd < 5 and (best is None or dd < best[0]): best = (dd, n_)
+            if best: o = img[best[1]]
         r = {'st': 'node', 'n': ond[o]['k'], 'loop': True} if o else {'st': 'lost-octi'}
     elif si in secpieces and any(x[1] for x in secpieces[si]):
         ps = []

@@ -24,7 +24,7 @@ city panel and the departures all work on it unchanged.
 ```sh
 brew install cmake glpk boost           # once
 scripts/octi/build_loom.sh              # clones LOOM at a pinned commit into output/octi, builds octi
-scripts/octi/stitch_pipeline.sh         # ~6 min, ~0.7 GB; writes output/octi/out/stitch_st3_j60.*
+scripts/octi/stitch_pipeline.sh         # ~7 min, ~0.7 GB; writes output/octi/out/stitch_st3_j60.*
 W=output/octi
 brotli -dc web/public/assets/atlas-v2-national-trains.json.br > $W/national-trains.json
 python3 -I scripts/octi/export_layout.py $W/shared.json $W/national-trains.json \
@@ -47,10 +47,13 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
    are cut there. Parallel tracks crossing together share one `cut` node of degree 1, so
    octi never contracts it. Degree-2 chains are pre-contracted exactly as octi would, and
    each chain gets its own line tag `#c<k>`. octi unions line sets on every merge, so the
-   tags survive into the output.
+   tags survive into the output. `--join-paths` (national trains) merges the closest end
+   pair of sections that trains run between (throats only between, real gap ≤ 5 km) into one
+   node, so octi itself draws the two sides of a station or junction as one point.
 3. **Layout** (`best_of_seeds.sh`, `run.sh`). `octi -g 21660` (grid cell 21.66 km in
    web-mercator metres), four runs with different `DETMALLOC_SEED`s, keeping the lowest
-   octi score. octi has no seed of its own: its output depends on heap addresses
+   octi score; a winding edge (drawn > 150 km and > 3× its straight line) costs as much as a
+   topology violation. octi has no seed of its own: its output depends on heap addresses
    (`std::set<Node*>` ordering). `detmalloc/detmalloc.c` (loaded with
    `DYLD_INSERT_LIBRARIES`) is a fixed-address allocator that makes runs reproducible; the
    seed varies the address order to give distinct, reproducible layouts.
@@ -64,12 +67,18 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
    Where both stubs are 60 km or shorter (76 of 88 cuts), stub + connector + stub become a
    single octilinear edge, and the pieces are remapped onto it. `quality.py` reports
    detours.
-6. **Export** (`export_layout.py`). Writes the client asset:
+6. **Export** (`export_layout.py`). A continuity pass first: section ends that trains run
+   between (real gap ≤ 12 km, the longest throat), ends at the same real point, and dangling
+   ends at one station are grouped (union-find; a group stays under 12 km wide and never loops
+   a section over 5 km). Each group gets one schematic point, and moved ends get a short
+   octilinear leg. A cleanup then erases loops, out-and-back spikes and straight-through
+   vertices, and redraws any section still longer than 1.6× its octilinear end-to-end distance
+   (+ 0.05°) as a ≤ 2-leg route; ends never move. Then it writes the client asset:
 
 | field | content |
 |---|---|
 | `sections[s]`, `in_sections[s]` | encoded polyline (precision 1e4, lat/lon order, like `g`), same ids as the pack |
-| `network` | the octi edges (backdrop only) |
+| `network` | the octi edges plus every section the continuity pass redrew (backdrop only) |
 | `throats[t]`, `extra[t]` | station throats of the shared pack and of the national trains' `extra` |
 | `station_pt[i]`, `city_pt[i]` | schematic points (`null` keeps the pack point) |
 | `fmt`, `build`, `n_*` | checked against the shared pack on load |
@@ -84,18 +93,21 @@ through one transform: the nearest section within 0.05°, by fraction along that
 schematic polyline, else the offset of the nearest mapped vertex. Cities move by the mean
 offset of their stations.
 
-## Numbers (shipped layout `st3`, stitched, `-g 21660`, best of 4 seeds)
+## Numbers (shipped layout `st3`, stitched, `-g 21660`, best of 4 seeds, with train-path joins)
 
 | | single national run (`-g 43320`, best of 6) | stitched (shipped) |
 |---|---|---|
-| sections on an octi line, count / km | 72.1% / 94.4% | 74.6% / 95.7% |
-| collapsed to a node (short throat pieces), count / km | 27.8% / 5.6% | 25.3% / 4.3% |
-| lost | 12 sections, 0 km (degenerate) | 12 sections, 0 km |
-| stations placed by octi | 2,672 of 2,694 | 2,588 as octi nodes; the rest by transform |
+| sections on an octi line, count / km | 72.1% / 94.4% | 60.3% / 94.6% |
+| collapsed to a node (short throat pieces), count / km | 27.8% / 5.6% | 39.6% / 5.4% |
+| lost | 12 sections, 0 km (degenerate) | 7 sections, 0 km |
+| stations placed by octi | 2,672 of 2,694 | 2,565 as octi nodes; the rest by transform |
 | detoured sections (schematic > 3 × geographic + 200 km) | 22 (+8,545 km) | **0** |
-| schematic / geographic km | 1.42 | 1.11 |
-| topology violations | 190 | 23 (sum of tiles) |
-| runtime | 27 min (6 seeds, 2 parallel) | 5.7 min, 0.65 GB |
+| schematic / geographic km | 1.42 | 1.14 |
+| topology violations | 190 | 32 (sum of tiles) |
+| neighbouring sections that do not meet | (not measured) | 0 |
+| train-path breaks (consecutive sections > max(3 km, 3 × real gap) apart) | (not measured) | 171 pairs (601 before the joins) |
+| octilinear legs (plane coords) | | 99.95% |
+| runtime | 27 min (6 seeds, 2 parallel) | ~7 min, 0.7 GB |
 
 "Collapsed" sections are a few hundred metres long (station throats, junction stubs);
 trains cross them instantly. The earlier "octi drops 54% of sections" figure counted
@@ -111,8 +123,16 @@ the finer grid is what removes the detours.
 - 88 tile seams. Connectors have a median of 16.5 km and a maximum of 56 km; 16 cross
   another edge. They are mostly invisible at the national view; not every seam has been
   inspected up close.
-- 23 topology violations remain inside tiles, visible as occasional zigzags or a line
+- 32 topology violations remain inside tiles, visible as occasional zigzags or a line
   passing a node it does not serve.
+- 171 consecutive-section pairs on train paths are still further apart than in reality:
+  23 have a real gap over 15 km; the rest are joins refused because they would squash a
+  real section into a point or make a group wider than 12 km. These read as octi drawing
+  the track longer than it is, not as hooks.
+
+| Before the continuity fix (broken line, hooks) | After |
+|---|---|
+| ![before](octi/ganshui-before.png) | ![after](octi/ganshui-after.png) |
 - The eastern network is dense at national zoom (fine grid).
 - On the schematic the scale bar is only indicative (the plane is mercator-stretched and
   the layout is not to scale). The Hainan ferry is drawn as ordinary track, because its

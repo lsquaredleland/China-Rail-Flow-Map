@@ -33,6 +33,9 @@ ap.add_argument('--fix-loops', action='store_true')
 ap.add_argument('--loops-as-node', action='store_true')
 ap.add_argument('--split-parallel', type=float, default=None)
 ap.add_argument('--fix-degenerate', action='store_true')
+ap.add_argument('--join-paths', help='national-trains.json: section ends that trains run between (only '
+                'throats in between) become one node, so the drawn line is continuous there')
+ap.add_argument('--join-km', type=float, default=5.0, help='max real gap for --join-paths')
 A = ap.parse_args()
 
 
@@ -173,22 +176,83 @@ def nid(key, pt, lab=None, st=None):
 
 # pieces: edges before contraction. (a, b, coords, lineset, [(si, f0, f1)])  f along section, a->b
 pieces = []; secnodes = {}; loopnode = {}; cuts = []; cutkey = {}
-for si, s, q, F0, F1, CA, CB in secs:
-    ends = []
-    for end, iscut, f in ((0, CA, F0), (-1, CB, F1)):
-        p = q[end]
-        if iscut:   # parallel tracks crossing a tile edge together share one cut node (0.02 deg bins)
-            ck = 'c%d_%d' % (round(p[0] / 0.02), round(p[1] / 0.02))
-            cutkey['%d@%.9f' % (si, f)] = ck
-            ends.append((('cut', ck), p, 'cut', None)); continue
-        nb = near(p) if deg[p] == 1 else None
-        if nb:
-            _, i, t = nb; ends.append((('st', i), tuple(t['pt']), t['en'] or t['zh'], i))
+
+# --join-paths: union section end points that a train path goes between with only throats in
+# between (e.g. two lines meeting at a station through its throats, or ends snapped to two
+# neighbouring stations). Each group becomes one node: its station if a member snaps to one
+# (most members, then lowest index), else the member point with the highest degree.
+joingrp = {}
+if A.join_paths:
+    nt = json.load(open(A.join_paths)); NS = nt['n_sec']
+    assert NS == len(d['sections']), 'national trains do not match the pack'
+    G_ = {}
+    def ge(si):
+        if si not in G_: G_[si] = dec(d['sections'][si]['g'])
+        return G_[si]
+    cand = set()
+    for path in nt['paths']:
+        prev = None
+        for x in path:
+            if abs(x) >= NS: continue          # throat / extra
+            if prev is not None and abs(prev) != abs(x):
+                qa, qb = ge(abs(prev)), ge(abs(x))
+                # the closest pair of ends (the path's signs do not reliably give the ends)
+                g_, pa, pb = min((km(u, v), u, v) for u in (qa[0], qa[-1]) for v in (qb[0], qb[-1]))
+                if pa != pb and g_ <= A.join_km: cand.add((g_, min(pa, pb), max(pa, pb)))
+            prev = x
+    # sections touching each end point; a join must not turn a real section (> 1 km) into a loop
+    secs_at = collections.defaultdict(set)
+    for si_, s_ in enumerate(d['sections']):
+        q_ = dec(s_['g'])
+        if len(set(q_)) >= 2 and plen(q_) > 1.0: secs_at[q_[0]].add(si_); secs_at[q_[-1]].add(si_)
+    par = {}; gsec = {}; gbox = {}
+    def find(x):
+        if x not in par: par[x] = x; gsec[x] = set(secs_at.get(x, ())); gbox[x] = (x[0], x[1], x[0], x[1])
+        while par[x] != x: par[x] = par[par[x]]; x = par[x]
+        return x
+    skipped = 0
+    for g_, pa, pb in sorted(cand):   # closest pairs first; deterministic
+        ra, rb = find(pa), find(pb)
+        if ra == rb: continue
+        A_, B_ = gbox[ra], gbox[rb]; bx = (min(A_[0], B_[0]), min(A_[1], B_[1]), max(A_[2], B_[2]), max(A_[3], B_[3]))
+        # never loop a real section (> 1 km), never grow a group wider than --join-km
+        if gsec[ra] & gsec[rb] or km(bx[:2], bx[2:]) > A.join_km: skipped += 1; continue
+        par[ra] = rb; gsec[rb] |= gsec.pop(ra); gbox[rb] = bx
+    members = collections.defaultdict(list)
+    for x in list(par): members[find(x)].append(x)
+    for r, ms in members.items():
+        if len(ms) < 2: continue
+        stc = collections.Counter()
+        for m in ms:
+            nb = near(m) if deg[m] == 1 else None
+            if nb: stc[nb[1]] += 1
+        if stc:
+            i = min(stc, key=lambda k: (-stc[k], k)); t = d['station_table'][i]
+            info = (('st', i), tuple(t['pt']), t['en'] or t['zh'], i)
         else:
-            ends.append((('pt', p), p, None, None))
+            rep = min(ms, key=lambda m: (-deg[m], m)); info = (('pt', rep), rep, None, None)
+        for m in ms: joingrp[m] = info
+    print('join-paths: candidate pairs', len(cand), 'skipped (loop or too wide)', skipped, file=sys.stderr)
+def end_info(si, p, iscut, f, groups=True):
+    if iscut:   # parallel tracks crossing a tile edge together share one cut node (0.02 deg bins)
+        ck = 'c%d_%d' % (round(p[0] / 0.02), round(p[1] / 0.02))
+        cutkey['%d@%.9f' % (si, f)] = ck
+        return (('cut', ck), p, 'cut', None)
+    if groups and p in joingrp: return joingrp[p]
+    nb = near(p) if deg[p] == 1 else None
+    if nb:
+        _, i, t = nb; return (('st', i), tuple(t['pt']), t['en'] or t['zh'], i)
+    return (('pt', p), p, None, None)
+
+
+for si, s, q, F0, F1, CA, CB in secs:
+    ends = [end_info(si, q[0], CA, F0), end_info(si, q[-1], CB, F1)]
+    if ends[0][0] == ends[1][0] and plen(q) > 1.0:
+        # two join groups claimed the same station: keep a real section a line, not a loop
+        ends = [end_info(si, q[0], CA, F0, False), end_info(si, q[-1], CB, F1, False)]
     coords = list(q)
-    if ends[0][0][0] == 'st': coords.insert(0, ends[0][1])
-    if ends[1][0][0] == 'st': coords.append(ends[1][1])
+    if tuple(ends[0][1]) != tuple(coords[0]): coords.insert(0, ends[0][1])
+    if tuple(ends[1][1]) != tuple(coords[-1]): coords.append(ends[1][1])
     a = nid(*ends[0]); b = nid(*ends[1])
     if (F0, F1) == (0.0, 1.0): secnodes[si] = [a, b]
     ls = s.get('l') or []
@@ -260,7 +324,7 @@ _nb = collections.defaultdict(set)
 for p in pieces: _nb[p[0]].add(p[1]); _nb[p[1]].add(p[0])
 _tot = 0
 for n, ns in _nb.items():
-    a = wm(ndinfo[n]['pt']); _tot += sum(math.dist(a, wm(ndinfo[m]['pt'])) for m in ns) / len(ns)
+    a = wm(ndinfo[n]['pt']); _tot += sum(math.dist(a, wm(ndinfo[m]['pt'])) for m in sorted(ns)) / len(ns)
 AVGDIST = _tot / max(1, len(_nb))
 
 # chain = [a, b, coords, lineset, groups]; groups ordered a->b, each group a list of
@@ -279,6 +343,7 @@ if A.tags:
         b[4][0].append((si, f0, f1))
         b[3] = tuple(list(b[3]) + [l for l in c[3] if l not in b[3]])
     chains = list(bund.values())
+    loopset = set(loopnode.values())
     alive = set(range(len(chains)))
     adj = collections.defaultdict(set)
     for k, c in enumerate(chains): adj[c[0]].add(k); adj[c[1]].add(k)
@@ -286,7 +351,7 @@ if A.tags:
     while changed:
         changed = False
         for n in list(adj):
-            if ndinfo[n]['label']: continue
+            if ndinfo[n]['label'] or n in loopset: continue   # keep stations and loop anchors as nodes
             ks = adj[n]
             if len(ks) != 2: continue
             k1, k2 = sorted(ks)
@@ -320,7 +385,7 @@ for k, (a, b, coords, ls, mem) in enumerate(chains):
     side_chains.append({'tag': tag, 'from': a, 'to': b, 'km': plen(coords),
                         'mem': [[[si, f0, f1] for (si, f0, f1) in g] for g in mem], 'lines': list(map(str, ls))})
 nst = 0
-used = {c[0] for c in chains} | {c[1] for c in chains} | set(loopnode.values())
+used = {c[0] for c in chains} | {c[1] for c in chains}   # a loop-only node would be an edgeless component octi cannot embed
 for n, info in ndinfo.items():
     if n not in used: continue
     pr = {'id': n}
@@ -334,7 +399,7 @@ for si in universe:
     raw = dec(d['sections'][si]['g']); seckm[si] = plen(raw)
 json.dump({'universe': universe, 'status': {str(k): v for k, v in status.items()}, 'km': {str(k): v for k, v in seckm.items()},
            'chains': side_chains, 'nodes': {n: v for n, v in ndinfo.items() if n in used},
-           'degenerate': [[si, list(p)] for si, p in degen], 'flags': vars(A), 'avgdist': AVGDIST, 'secnodes': {str(k): v for k, v in secnodes.items()}, 'loopnode': {str(k): v for k, v in loopnode.items()}, 'runs': cuts, 'tile': A.tile,
+           'degenerate': [[si, list(p)] for si, p in degen], 'flags': vars(A), 'avgdist': AVGDIST, 'secnodes': {str(k): v for k, v in secnodes.items()}, 'loopnode': {str(k): v for k, v in loopnode.items()}, 'looppt': {str(k): ndinfo[v]['pt'] for k, v in loopnode.items()}, 'runs': cuts, 'tile': A.tile,
            'cutnodes': {k[1]: v[0] for k, v in nodes.items() if k[0] == 'cut'}, 'cutkey': cutkey}, open(A.side, 'w'))
 c = collections.Counter(status.values())
-print('avgdist %.1f' % AVGDIST, 'universe', len(universe), 'edges', len(chains), 'nodes', len(used), 'stations', nst, dict(c), file=sys.stderr)
+print('joined groups', len({v[0] for v in joingrp.values()}), 'ends', len(joingrp), 'avgdist %.1f' % AVGDIST, 'universe', len(universe), 'edges', len(chains), 'nodes', len(used), 'stations', nst, dict(c), file=sys.stderr)
