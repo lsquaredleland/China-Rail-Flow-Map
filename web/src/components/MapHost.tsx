@@ -10,7 +10,7 @@ import { createMapCtx } from "./map/context";
 import type { MapApi, Props } from "./map/context";
 import { createMapApi } from "./map/api";
 import { notifyAnimListeners } from "./map/anim";
-import { frameTail, resize, updateScaleBar, zoomAt } from "./map/camera";
+import { frameTail, mapKeyAction, panBy, resize, updateScaleBar, zoomAt } from "./map/camera";
 import { hideTooltip } from "./map/interaction";
 import { endPointer, onPointerDown, onPointerLeave, onPointerMove } from "./map/pointer";
 import { loadDeck } from "./map/deck/load";
@@ -78,6 +78,26 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
   M.syncRendererSize = () => deckRef.current?.resize();
 
   useImperativeHandle(apiRef, () => createMapApi(M), [M]);
+
+  // Keyboard: arrows / W A S D pan, + / - zoom, unless typing in a field or a
+  // dialog (the train schedule) is open. Shift+arrows belong to the timeline.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      const a = mapKeyAction(e);
+      if (!a) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const st = M.S.current;
+      if (st.W <= 0 || st.H <= 0) return;
+      e.preventDefault();
+      if ("pan" in a) panBy(M, (a.pan[0] * st.W) / 8, (a.pan[1] * st.H) / 8);
+      else zoomAt(M, st.W / 2, st.H / 2, a.zoom);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [M]);
 
   // Test/measurement handle for web/tools (screenshots, perf): the engine
   // context and a synchronous draw. App.tsx cannot expose M (it lives

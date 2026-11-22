@@ -110,6 +110,36 @@ export function zoomAt(M: MapCtx, px: number, py: number, factor: number) {
   M.render();
 }
 
+/** Moves the view by (dx, dy) CSS px (the map content moves the other way). */
+export function panBy(M: MapCtx, dx: number, dy: number) {
+  const st = M.S.current;
+  st.view.tx -= dx;
+  st.view.ty -= dy;
+  st.interacted = true;
+  M.render();
+}
+
+/** Keyboard map control: arrows or W/A/S/D pan by an eighth of the view, +/- zoom.
+    Null when the key is not a map key (or carries a modifier: Shift+arrows scrub
+    the 24h timeline). */
+export function mapKeyAction(e: Pick<KeyboardEvent, "key" | "shiftKey" | "altKey" | "ctrlKey" | "metaKey">):
+  | { pan: [number, number] }
+  | { zoom: number }
+  | null {
+  if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) {
+    // "+" is Shift+"=" on most layouts
+    return e.key === "+" && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey ? { zoom: 1.45 } : null;
+  }
+  switch (e.key) {
+    case "ArrowLeft": case "a": case "A": return { pan: [-1, 0] };
+    case "ArrowRight": case "d": case "D": return { pan: [1, 0] };
+    case "ArrowUp": case "w": case "W": return { pan: [0, -1] };
+    case "ArrowDown": case "s": case "S": return { pan: [0, 1] };
+    case "+": case "=": return { zoom: 1.45 };
+    case "-": case "_": return { zoom: 1 / 1.45 };
+    default: return null;
+  }
+}
 
 function reportViewChange(M: MapCtx) {
   const { S, P, toLon, toLat } = M;
