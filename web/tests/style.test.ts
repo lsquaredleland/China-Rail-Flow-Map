@@ -115,7 +115,7 @@ describe("terminal skin", () => {
   });
 
   test("the TSpeed colours", () => {
-    expect(t.speedBands).toEqual({ bands: ["#F4FFE8", "#FFD43B", "#FF8F40", "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" });
+    expect(t.speedBands).toEqual({ bands: ["#F4FFE8", "#FFD43B", "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" });
     expect(t.ink.paper.css).toBe("#04060C");
     expect(t.ink.label.css).toBe("#FF8F40");
     // boxes: a dark well under a soft edge, apart from the amber 200-249 band
@@ -238,21 +238,21 @@ describe("encodings", () => {
     }
   });
 
-  test("speedBand: boundaries at 120 / 200 / 250 / 300; 0 is untagged", () => {
+  test("speedBand: boundaries at 120 / 200 / 300; 0 is untagged", () => {
     const cases: [number, number][] = [
-      [0, -1], [1, 4], [119, 4], [120, 3], [199, 3], [200, 2], [249, 2], [250, 1], [299, 1], [300, 0], [350, 0], [450, 0],
+      [0, -1], [1, 3], [119, 3], [120, 2], [199, 2], [200, 1], [249, 1], [250, 1], [299, 1], [300, 0], [350, 0], [450, 0],
     ];
     for (const [v, b] of cases) expect(speedBand(v)).toBe(b);
-    expect(SPEED_BANDS.map((b) => b.label)).toEqual(["300+", "250–299", "200–249", "120–199", "<120"]);
+    expect(SPEED_BANDS.map((b) => b.label)).toEqual(["300+", "200–299", "120–199", "<120"]);
   });
 
   test("speedLimit: the skin's band colour by the section's speed, untagged colour at 0", () => {
-    const ramp = { bands: ["#000001", "#000002", "#000003", "#000004", "#000005"], untagged: "#00000F" };
+    const ramp = { bands: ["#000001", "#000002", "#000003", "#000004"], untagged: "#00000F" };
     const style = { pal, speedBands: ramp };
     const c = (speed: number) => LINE_COLOR.speedLimit.color({ n: 10, maxN: 100, s: 0, speed }, style);
     expect(LINE_COLOR.speedLimit.by).toBe("section");
     expect([300, 299, 250, 249, 200, 199, 120, 119, 1, 0].map(c)).toEqual([
-      "#000001", "#000002", "#000002", "#000003", "#000003", "#000004", "#000004", "#000005", "#000005", "#00000F",
+      "#000001", "#000002", "#000002", "#000002", "#000002", "#000003", "#000003", "#000004", "#000004", "#00000F",
     ]);
     // the count never matters
     expect(LINE_COLOR.speedLimit.color({ n: 99, maxN: 1, s: 7, speed: 310 }, style)).toBe("#000001");

@@ -73,7 +73,7 @@ describe("buildPassData", () => {
   });
 
   test("by: section colours each path by its own section's speed band", () => {
-    const ramp = { bands: ["#010101", "#020202", "#030303", "#040404", "#050505"], untagged: "#0F0F0F" };
+    const ramp = { bands: ["#010101", "#020202", "#030303", "#040404"], untagged: "#0F0F0F" };
     const speedStyle = { ...style, key: "test|speed", speedBands: ramp, enc: { ...style.enc, lineColor: LINE_COLOR.speedLimit } } as MapStyle;
     const sp = buildPassData(set, items, speedStyle, 1, pass.maxN);
     const seen = new Set<string>();

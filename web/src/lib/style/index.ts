@@ -315,7 +315,7 @@ const PAPER: SkinDef = {
       ink: inks,
       // Unused while paper colours lines by volume: the time bands and the flow red.
       speedBands: {
-        bands: ["#8E1B17", "#C8302A", "#E3A63F", "#14746F", dark ? "#8F9CF2" : "#34488C"],
+        bands: ["#8E1B17", "#C8302A", "#14746F", dark ? "#8F9CF2" : "#34488C"],
         untagged: pal.network,
       },
       alpha: {
@@ -420,7 +420,8 @@ const TERMINAL: SkinDef = {
       pal,
       cardPal: pal,
       ink: inks,
-      speedBands: { bands: ["#F4FFE8", "#FFD43B", T_AMBER, "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" },
+      // one colour for 200-299 (the owner's call): 300+, 200-299, 120-199, <120
+      speedBands: { bands: ["#F4FFE8", "#FFD43B", "#FF3D8B", "#7A5CFF"], untagged: "#3A4A6E" },
       // The city fill carries its own alpha (pal.dot), so the national boxes take it as is.
       alpha: { ...base.alpha, natCityFill: 1 },
       // Angular: flows are chained (sections of one colour and width form one

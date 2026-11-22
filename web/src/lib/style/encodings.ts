@@ -53,8 +53,7 @@ export interface LineColorEncoding {
     untagged. Labels are km/h. */
 export const SPEED_BANDS: readonly { readonly min: number; readonly label: string }[] = [
   { min: 300, label: "300+" },
-  { min: 250, label: "250–299" },
-  { min: 200, label: "200–249" },
+  { min: 200, label: "200–299" },
   { min: 120, label: "120–199" },
   { min: 1, label: "<120" },
 ];
