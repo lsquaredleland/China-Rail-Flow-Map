@@ -260,7 +260,9 @@ cstat = dict(cstat); cstat.update({'join_pairs': len(cand), 'joins_skipped': csk
 DETOUR, DETOUR_DEG = 1.6, 0.05
 def octd(a, b):
     dx, dy = abs(b[0] - a[0]), abs(b[1] - a[1]); return min(dx, dy) * math.sqrt(2) + abs(dx - dy)
-def clean(q):
+def clean(q, real_pl=0.0):
+    """real_pl: the section's real length in plane units (a detour is drawn much longer than
+    both its octilinear end-to-end distance and its real track)"""
     P = [PLf(p) for p in q]
     out = []
     for p in P:                                   # 1. loop erasure
@@ -275,7 +277,7 @@ def clean(q):
             ab, bc = math.dist(a, b), math.dist(b, c)
             if ab < 1e-9 or bc < 1e-9 or abs((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])) < 1e-6 * ab * bc:
                 del out[i]; changed = True; break
-    if len(out) >= 2 and plen(out) > DETOUR * octd(out[0], out[-1]) + DETOUR_DEG:
+    if len(out) >= 2 and plen(out) > DETOUR * max(octd(out[0], out[-1]), real_pl) + DETOUR_DEG:
         out = octi2pl(out[0], out[-1]); cstat['detours_redrawn'] += 1
     if len(out) < 2: out = [out[0], out[0]]
     return [PLi(p) for p in out]
@@ -283,7 +285,7 @@ cstat = collections.Counter(cstat)
 for s_ in range(nsec):
     if sch[s_] is None: continue
     a, b = sch[s_][0], sch[s_][-1]
-    c = clean(sch[s_]); c[0], c[-1] = a, b
+    c = clean(sch[s_], plen([PLf(p) for p in geo[s_]])); c[0], c[-1] = a, b
     if len(c) != len(sch[s_]): cstat['cleaned'] += 1; touched.add(s_)
     sch[s_] = c
 
@@ -382,14 +384,19 @@ for bk0 in bkeys:
     old_x = crossings(pts, skip)
     lA, lB = nodes_[0] in leaf, nodes_[-1] in leaf
     spur = None
-    if (lA or lB) and nodes_[0] in nodegeo and nodes_[-1] in nodegeo:
+    # the run's real length in plane units (mean over parallel members)
+    real_run = sum(sum(plen([PLf(p) for p in geo[t]]) for t in bund[bk]) / len(bund[bk]) for bk in run_b)
+    if (lA or lB) and nodes_[0] in nodegeo and nodes_[-1] in nodegeo and \
+            math.dist(nodegeo[nodes_[0]], nodegeo[nodes_[-1]]) >= 0.5 * real_run:
+        # only a branch that is itself roughly straight: one that loops (a ring cut at a tile
+        # edge, Hainan) would collapse onto the short chord between its ends
         gA, gB = nodegeo[nodes_[0]], nodegeo[nodes_[-1]]
         if lB:   # free end B: from A along the real vector
             B2 = (A[0] + gB[0] - gA[0], A[1] + gB[1] - gA[1]); sc = [octi2pl(A, B2), octi2pl(B2, A)[::-1]]
         else:    # free end A
             A2 = (B[0] - gB[0] + gA[0], B[1] - gB[1] + gA[1]); sc = [octi2pl(A2, B), octi2pl(B, A2)[::-1]]
         best_s = min(((crossings(R, skip), plen(R), i, R) for i, R in enumerate(sc)), key=lambda x: x[:3])
-        if best_s[0] <= old_x: spur = best_s[3]
+        if best_s[0] <= old_x and plen(best_s[3]) >= 0.6 * real_run: spur = best_s[3]
     cands = [octi2pl(A, B), octi2pl(B, A)[::-1]]
     if spur is None and plen(cands[0]) >= plen(pts) - 1e-9 and len(pts) <= 3: continue      # already straight
     def dev(R):
@@ -406,6 +413,9 @@ for bk0 in bkeys:
     else:
         best = min(((crossings(R, skip), dev(R), i, R) for i, R in enumerate(cands)), key=lambda x: x[:3])
         if best[0] > old_x: sstat['kept_crossing'] += 1; continue
+        # straightening removes jogs, it never collapses a run: a route much shorter than the
+        # drawing means the run loops back near its start (Hainan's ring: both ends at Haikou)
+        if plen(best[3]) < 0.6 * plen(pts): sstat['kept_short'] += 1; continue
         R = best[3]
     LR = plen(R)
     km_ = [max(sum(glen(geo[t]) for t in bund[bk]) / len(bund[bk]), 1e-6) for bk in run_b]; tot = sum(km_)
