@@ -30,7 +30,7 @@
   --t-green: #7CF04A;
   --t-glow: 0 0 6px rgba(255, 143, 64, 0.45);
   --t-glow-bright: 0 0 8px rgba(234, 242, 255, 0.35);
-  --t-font: "Share Tech Mono", "Noto Sans SC", ui-monospace, monospace;
+  --t-font: "CRT Face", "Share Tech Mono", "Noto Sans SC", ui-monospace, monospace;
   --t-ticks: repeating-linear-gradient(to right, var(--t-ink) 0 2px, transparent 2px 5px);
   --t-ticks-dim: repeating-linear-gradient(to right, var(--t-dim) 0 2px, transparent 2px 5px);
   /* the page tokens the paper rules read */
@@ -931,4 +931,63 @@
   :root[data-skin="terminal"] .tb-track-tail,
   :root[data-skin="terminal"] .tb-track-fill { top: 1px; bottom: 1px; }
   :root[data-skin="terminal"] .tl-expand-btn.is-over-map { min-height: 36px; }
+}
+
+/* ---------- ?fx=crt: the "CRT capture" look (exploration) ----------
+   The reference video is a filmed vector display: every stroke has a red
+   ghost on one side and a green one on the other (misconvergence), blooms a
+   little, and the picture carries scanlines and grain. The map's half is a
+   GPU pass (deck/crtEffect.ts); this is the rest: a fringe on every piece of
+   chrome (text and borders alike) and one overlay over the whole page. */
+:root[data-skin="terminal"][data-fx="crt"] body {
+  /* small UI text: a faint ghost, so 11-13 px labels stay legible */
+  text-shadow:
+    -0.7px 0 0 rgba(255, 30, 40, 0.5),
+    0.6px 0 0 rgba(60, 255, 90, 0.35),
+    0 0 2px rgba(255, 140, 40, 0.3);
+  letter-spacing: 0.05em;
+}
+/* display text (16 px and up: stats, title, headlines, big numbers): the full
+   misconvergence of the filmed tube, red ghost left, green right, bloom; in em
+   so the ghosts scale with the glyphs */
+:root[data-skin="terminal"][data-fx="crt"] :is(h1, h2, header b, header .zh, .stats b, .stats span, .dep-num-lead, .dest-panel b),
+:root[data-skin="terminal"][data-fx="crt"] .stats > div:first-child b {
+  text-shadow:
+    -0.09em 0 0 rgba(255, 30, 40, 0.85),
+    0.075em 0 0 rgba(60, 255, 90, 0.65),
+    0 0 0.22em rgba(255, 140, 40, 0.5);
+}
+/* the map's labels are canvas text: the same ghosts as a filter on that canvas */
+:root[data-skin="terminal"][data-fx="crt"] #map {
+  filter: drop-shadow(-1.5px 0 0 rgba(255, 30, 40, 0.8)) drop-shadow(1.3px 0 0 rgba(60, 255, 90, 0.55))
+    drop-shadow(0 0 3px rgba(255, 140, 40, 0.4));
+}
+/* cell rules and frames: the same ghosts as a hairline on each side */
+:root[data-skin="terminal"][data-fx="crt"] :is(header, .toolbar, .legend, #legend, .dest-panel, .tl, .timeline, .dep-scroll, .map-card) {
+  box-shadow: -1px 0 0 rgba(255, 40, 60, 0.45), 1px 0 0 rgba(70, 255, 110, 0.35), 0 0 6px rgba(42, 92, 255, 0.35);
+}
+:root[data-skin="terminal"][data-fx="crt"] body::after {
+  content: "";
+  position: fixed;
+  inset: -40px;
+  pointer-events: none;
+  z-index: 2147483000;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.38) 100%),
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0 1px, transparent 1px 3px),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  /* overlay blending: grain modulates what is lit and leaves black black */
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  animation: crt-grain 0.5s steps(5) infinite;
+}
+@keyframes crt-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-13px, 7px); }
+  40% { transform: translate(9px, -11px); }
+  60% { transform: translate(-6px, -4px); }
+  80% { transform: translate(12px, 10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin="terminal"][data-fx="crt"] body::after { animation: none; }
 }

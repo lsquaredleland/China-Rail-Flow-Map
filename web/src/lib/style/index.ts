@@ -413,7 +413,9 @@ const TERMINAL: SkinDef = {
       rushTail: ink(T_AMBER),
       rushRegular: ink(T_SOFT),
     };
-    const mono = "'Share Tech Mono', 'Noto Sans SC', ui-monospace, monospace";
+    // 'CRT Face' (Hershey Simplex) exists only under ?fx=crt (lib/fx registers it);
+    // otherwise the stack starts at Share Tech Mono.
+    const mono = "'CRT Face', 'Share Tech Mono', 'Noto Sans SC', ui-monospace, monospace";
     return {
       pal,
       cardPal: pal,
@@ -429,7 +431,7 @@ const TERMINAL: SkinDef = {
       flowJoin: "chain",
       glow: { widthScale: 1.3, minPixels: 3, alpha: 0.12 },
       marker: { shape: "box", edgeWidth: 1, minRadius: 5 },
-      font: { family: mono, tag: mono, caps: true, load: ["16px 'Share Tech Mono'"] },
+      font: { family: mono, tag: mono, caps: true, load: ["16px 'Share Tech Mono'", "16px 'CRT Face'"] },
       enc: {
         lineColor: LINE_COLOR.speedLimit,
         nodeColor: NODE_COLOR.flat,

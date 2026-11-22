@@ -9,6 +9,8 @@
                      (D17), never touched here except by labelsOverlay.
    The camera stays S.current.view; deck is controlled (controller: false) and
    gets viewToViewState(view) on every render(). */
+import { crtEffect } from "./crtEffect";
+import { fxFromUrl, fxNum } from "../../../lib/fx";
 import { Deck, OrthographicView } from "@deck.gl/core";
 import type { Layer, PickingInfo } from "@deck.gl/core";
 import { dotPlaces, getSelCache, isTrainShown, originIsolatedCities, stationStates, stationT, viewToViewState } from "../../../lib";
@@ -299,6 +301,14 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement, onFatal?: () => void)
       viewState: viewToViewState(st.view, st.W || 1, st.H || 1),
       controller: false,
       useDevicePixels: (dpr = devicePixels(M)),
+      // ?fx=crt on the terminal skin: the CRT capture pass over the map (exploration)
+      effects:
+        fxFromUrl() === "crt" && M.P.current.style.skin === "terminal"
+          ? [crtEffect(typeof dpr === "number" ? dpr : window.devicePixelRatio || 1, {
+              ...(fxNum("fxSplit") !== undefined ? { split: fxNum("fxSplit")! * (window.devicePixelRatio || 1) } : {}),
+              ...(fxNum("fxGlow") !== undefined ? { glow: fxNum("fxGlow")! } : {}),
+            })]
+          : [],
       deviceProps: GPU_TIME ? { debugGPUTime: true } : {},
       pickingRadius: 14,
       // Picking proxies exist for the picking passes only.

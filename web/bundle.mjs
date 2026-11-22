@@ -195,7 +195,8 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' ${hashes.join(" ")} https://www.googletagmanager.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src https://fonts.gstatic.com",
+  // 'self': the ?fx=crt exploration's self-hosted Hershey Simplex (public/fonts)
+  "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com",
   "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
   "worker-src 'self' blob:",

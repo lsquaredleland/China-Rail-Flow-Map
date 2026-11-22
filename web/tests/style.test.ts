@@ -106,10 +106,10 @@ describe("terminal skin", () => {
     expect(t.line).toEqual({ capRounded: false, jointRounded: false });
     expect(t.flowJoin).toBe("chain");
     expect(mapStyle("paper", "light").flowJoin).toBe("section");
-    expect(t.font.family).toBe("'Share Tech Mono', 'Noto Sans SC', ui-monospace, monospace");
+    expect(t.font.family).toBe("'CRT Face', 'Share Tech Mono', 'Noto Sans SC', ui-monospace, monospace");
     // canvas labels in capitals, once the web face is loaded
     expect(t.font.caps).toBe(true);
-    expect(t.font.load).toEqual(["16px 'Share Tech Mono'"]);
+    expect(t.font.load).toEqual(["16px 'Share Tech Mono'", "16px 'CRT Face'"]);
     expect(t.glow).toEqual({ widthScale: 1.3, minPixels: 3, alpha: 0.12 });
     expect(t.marker).toEqual({ shape: "box", edgeWidth: 1, minRadius: 5 });
   });
