@@ -286,6 +286,141 @@ for s_ in range(nsec):
     c = clean(sch[s_]); c[0], c[-1] = a, b
     if len(c) != len(sch[s_]): cstat['cleaned'] += 1; touched.add(s_)
     sch[s_] = c
+
+# --- straighten runs between junctions. octi trades straightness against everything around
+# it and the continuity legs add jogs, so a line with no branch between two junctions can
+# still zigzag. Each such run (sections chained through nodes where exactly two sections
+# meet) is redrawn as the simplest octilinear route between its two junction nodes (one
+# leg, or two: diagonal first or axis first), keeping the variant that crosses no more
+# other lines than the current drawing (fewest crossings, then closest to it). Interior
+# nodes (stations) are spaced along the new route by real distance; junctions never move.
+def segx(a, b, c, d):
+    """proper crossing or collinear overlap of segments ab and cd (shared ends excluded)"""
+    if min(math.dist(a, c), math.dist(a, d), math.dist(b, c), math.dist(b, d)) < 1e-9: return False
+    o = lambda p, q, r: (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    d1, d2, d3, d4 = o(c, d, a), o(c, d, b), o(a, b, c), o(a, b, d)
+    eps = 1e-12
+    if abs(d1) < eps and abs(d2) < eps:     # collinear: overlap of positive length
+        ax = 0 if abs(b[0] - a[0]) >= abs(b[1] - a[1]) else 1
+        lo, hi = sorted((a[ax], b[ax])); lo2, hi2 = sorted((c[ax], d[ax]))
+        return min(hi, hi2) - max(lo, lo2) > 1e-7
+    return (d1 > eps) != (d2 > eps) and (d3 > eps) != (d4 > eps) and abs(d1) > eps and abs(d2) > eps and abs(d3) > eps and abs(d4) > eps
+GS = 0.25
+def cells(P):
+    out = set()
+    for i in range(len(P) - 1):
+        (x0, y0), (x1, y1) = P[i], P[i + 1]
+        for cx in range(int(math.floor(min(x0, x1) / GS)), int(math.floor(max(x0, x1) / GS)) + 1):
+            for cy in range(int(math.floor(min(y0, y1) / GS)), int(math.floor(max(y0, y1) / GS)) + 1): out.add((cx, cy))
+    return out
+pl = {s_: [PLf(p) for p in sch[s_]] for s_ in range(nsec) if sch[s_] is not None}
+nonzero = [s_ for s_ in sorted(pl) if key(pl[s_][0]) != key(pl[s_][-1])]
+sgrid2 = collections.defaultdict(set)
+for s_ in nonzero:
+    for c in cells(pl[s_]): sgrid2[c].add(s_)
+def crossings(P, skip):
+    n = 0; seen_ = set()
+    for c in cells(P):
+        for s_ in sgrid2.get(c, ()):
+            if s_ in skip or s_ in seen_: continue
+            seen_.add(s_); Q = pl[s_]
+            for i in range(len(P) - 1):
+                for j in range(len(Q) - 1):
+                    if segx(P[i], P[i + 1], Q[j], Q[j + 1]): n += 1
+    return n
+# Parallel sections between the same two nodes (a "ladder": two lines sharing every station)
+# form one bundle; runs are chains of bundles, and every member of a bundle gets the same route.
+bund = collections.defaultdict(list)
+for s_ in nonzero: bund[tuple(sorted((key(pl[s_][0]), key(pl[s_][-1]))))].append(s_)
+bkeys = sorted(bund)
+binc = collections.defaultdict(list)
+for bk in bkeys: binc[bk[0]].append(bk); binc[bk[1]].append(bk)
+deg2 = {k for k, L in binc.items() if len(L) == 2}
+zero_at = collections.defaultdict(list)
+for s_ in sorted(pl):
+    if key(pl[s_][0]) == key(pl[s_][-1]): zero_at[key(pl[s_][0])].append(s_)
+def bwalk(bk0, frm):
+    """bundles after bk0 leaving node `frm`'s far side, through degree-2 nodes: ([(bundle, from_node)], end node)"""
+    out = []; cur = bk0; at = bk0[1] if frm == bk0[0] else bk0[0]
+    while at in deg2:
+        nxt = [x for x in binc[at] if x != cur][0]
+        if nxt == bk0: return None, at
+        out.append((nxt, at)); cur = nxt; at = nxt[1] if at == nxt[0] else nxt[0]
+    return out, at
+def bpoly(bk, frm):
+    s_ = min(bund[bk]); q = pl[s_]
+    return q if key(q[0]) == frm else q[::-1]
+seen = set(); chain_move = {}; sstat = collections.Counter()
+for bk0 in bkeys:
+    if bk0 in seen: continue
+    fw, kb = bwalk(bk0, bk0[0]); bw, ka = bwalk(bk0, bk0[1])
+    if fw is None or bw is None:
+        seen.add(bk0); sstat['rings'] += 1; continue
+    # orient: run goes ka -> ... -> bk0 -> ... -> kb
+    run_b = [bk for bk, _ in reversed(bw)] + [bk0] + [bk for bk, _ in fw]
+    for bk in run_b: seen.add(bk)
+    # node sequence along the run
+    nodes_ = [ka]
+    for bk in run_b:
+        nodes_.append(bk[1] if nodes_[-1] == bk[0] else bk[0])
+    if nodes_[-1] != kb: sstat['walk_mismatch'] += 1; continue
+    pts = []
+    for bk, frm in zip(run_b, nodes_):
+        q = bpoly(bk, frm); pts += q if not pts else q[1:]
+    if len(run_b) < 2 and len(pts) <= 3: continue
+    A, B = pts[0], pts[-1]
+    if key(A) == key(B): sstat['loops'] += 1; continue
+    members = [s_ for bk in run_b for s_ in bund[bk]]
+    skip = set(members)
+    cands = [octi2pl(A, B), octi2pl(B, A)[::-1]]
+    if plen(cands[0]) >= plen(pts) - 1e-9 and len(pts) <= 3: continue      # already straight
+    old_x = crossings(pts, skip)
+    def dev(R):
+        def pd(p):
+            best_ = 1e18
+            for i in range(len(R) - 1):
+                (x0, y0), (x1, y1) = R[i], R[i + 1]; l2 = (x1 - x0) ** 2 + (y1 - y0) ** 2
+                t = 0 if l2 == 0 else max(0, min(1, ((p[0] - x0) * (x1 - x0) + (p[1] - y0) * (y1 - y0)) / l2))
+                best_ = min(best_, math.dist(p, (x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)))
+            return best_
+        return max(pd(p) for p in pts)
+    best = min(((crossings(R, skip), dev(R), i, R) for i, R in enumerate(cands)), key=lambda x: x[:3])
+    if best[0] > old_x: sstat['kept_crossing'] += 1; continue
+    R = best[3]; LR = plen(R)
+    km_ = [max(sum(glen(geo[t]) for t in bund[bk]) / len(bund[bk]), 1e-6) for bk in run_b]; tot = sum(km_)
+    cum = [0.0]
+    for k_ in km_: cum.append(cum[-1] + k_ / tot)
+    def at(u):
+        t_ = u * LR; acc = 0
+        for i in range(len(R) - 1):
+            sl = math.dist(R[i], R[i + 1])
+            if acc + sl >= t_ - 1e-12:
+                r = 0 if sl == 0 else (t_ - acc) / sl
+                return (R[i][0] + (R[i + 1][0] - R[i][0]) * r, R[i][1] + (R[i + 1][1] - R[i][1]) * r)
+            acc += sl
+        return R[-1]
+    def subr(u0, u1):
+        q = [at(u0)]; acc = 0
+        for i in range(1, len(R) - 1):
+            acc += math.dist(R[i - 1], R[i]); u = acc / LR
+            if u0 < u < u1: q.append(R[i])
+        return q + [at(u1)]
+    newpt = {}
+    for bk, frm, u0, u1 in zip(run_b, nodes_, cum, cum[1:]):
+        q = subr(u0, u1)
+        for s_ in bund[bk]:
+            qq = q if key(pl[s_][0]) == frm else q[::-1]
+            pl[s_] = qq; sch[s_] = [PLi(p) for p in qq]; touched.add(s_)
+            for c in cells(qq): sgrid2[c].add(s_)
+        newpt[frm] = q[0]
+    for k_ in nodes_[1:-1]:
+        chain_move[k_] = PLi(newpt[k_])          # keyed by plane node key
+    sstat['runs_straightened'] += 1; sstat['sections_straightened'] += len(members)
+for k_, L in zero_at.items():               # collapsed sections ride with their node
+    np_ = chain_move.get(k_)
+    if np_:
+        for s_ in L: sch[s_] = [np_, np_]
+cstat.update(sstat)
 cstat = dict(cstat)
 vimg = {}
 for s_ in range(nsec):
@@ -355,7 +490,8 @@ for f in feats:
     tile, nid = pr['tile'], pr['station_id'][3:]
     st = sides.get(tile, {}).get(nid, {}).get('st')
     if st is not None:
-        c = tuple(f['geometry']['coordinates']); stn.setdefault(int(st), tuple(node_move.get(key(c), c)))
+        c = tuple(f['geometry']['coordinates']); c = tuple(node_move.get(key(c), c))
+        stn.setdefault(int(st), tuple(chain_move.get(key(PLf(c)), c)))
 station_pt = []
 for i, t in enumerate(pack['station_table']):
     if i in stn: station_pt.append(stn[i])
@@ -389,10 +525,9 @@ def throat(g):
     q = dec(g); a, b = T(q[0]), T(q[-1]); return [a, b]
 thr = [throat(g) for g in pack['throats']]
 extra = [throat(g) for g in nat['extra']]
-network = [dp(dedup(c), SIMPLIFY_DEG) for c, _ in E]
-# sections the continuity pass or the cleanup redrew join the backdrop too, so it shows every
-# line a train is drawn on
-network += [dedup(sch[s_]) for s_ in sorted(touched) if len(dedup(sch[s_])) >= 2]
+# the backdrop is the drawn sections themselves (after continuity, cleanup and straightening),
+# so it never shows a line that trains are no longer drawn on
+network = [dedup(sch[s_]) for s_ in range(nsec) if sch[s_] is not None and len(dedup(sch[s_])) >= 2]
 
 # Output plane: octi is octilinear in web mercator, but the client draws lon/lat on an
 # equirectangular plane. So every output point is (lon, mercator y in degrees): 0/45/90

@@ -73,12 +73,17 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
    a section over 5 km). Each group gets one schematic point, and moved ends get a short
    octilinear leg. A cleanup then erases loops, out-and-back spikes and straight-through
    vertices, and redraws any section still longer than 1.6× its octilinear end-to-end distance
-   (+ 0.05°) as a ≤ 2-leg route; ends never move. Then it writes the client asset:
+   (+ 0.05°) as a ≤ 2-leg route; ends never move. Last, runs between junctions are
+   straightened: parallel sections between the same two nodes (two lines sharing every
+   station, a "ladder") form one bundle, and each chain of bundles through degree-2 nodes is
+   redrawn as the 1- or 2-leg octilinear route between its junctions, unless that would cross
+   more lines than the current drawing; its stations are spaced by real distance. Then it
+   writes the client asset:
 
 | field | content |
 |---|---|
 | `sections[s]`, `in_sections[s]` | encoded polyline (precision 1e4, lat/lon order, like `g`), same ids as the pack |
-| `network` | the octi edges plus every section the continuity pass redrew (backdrop only) |
+| `network` | the drawn section polylines (backdrop only) |
 | `throats[t]`, `extra[t]` | station throats of the shared pack and of the national trains' `extra` |
 | `station_pt[i]`, `city_pt[i]` | schematic points (`null` keeps the pack point) |
 | `fmt`, `build`, `n_*` | checked against the shared pack on load |
@@ -105,7 +110,8 @@ offset of their stations.
 | schematic / geographic km | 1.42 | 1.14 |
 | topology violations | 190 | 32 (sum of tiles) |
 | neighbouring sections that do not meet | (not measured) | 0 |
-| train-path breaks (consecutive sections > max(3 km, 3 × real gap) apart) | (not measured) | 171 pairs (601 before the joins) |
+| train-path breaks (consecutive sections > max(3 km, 3 × real gap) apart) | (not measured) | 98 pairs (601 before the joins) |
+| runs between junctions straightened | | 668 (3,423 sections); 70 kept to avoid new crossings |
 | octilinear legs (plane coords) | | 99.95% |
 | runtime | 27 min (6 seeds, 2 parallel) | ~7 min, 0.7 GB |
 
@@ -125,9 +131,11 @@ the finer grid is what removes the detours.
   inspected up close.
 - 32 topology violations remain inside tiles, visible as occasional zigzags or a line
   passing a node it does not serve.
-- 171 consecutive-section pairs on train paths are still further apart than in reality:
-  23 have a real gap over 15 km; the rest are joins refused because they would squash a
-  real section into a point or make a group wider than 12 km. These read as octi drawing
+- 98 consecutive-section pairs on train paths are still further apart than in reality:
+  real gaps over 15 km, or joins refused because they would squash a real section into a
+  point or make a group wider than 12 km.
+- Junctions stay where octi put them, so a line can still jog at 45° where another line
+  branches off. These read as octi drawing
   the track longer than it is, not as hooks.
 
 | Before the continuity fix (broken line, hooks) | After |
