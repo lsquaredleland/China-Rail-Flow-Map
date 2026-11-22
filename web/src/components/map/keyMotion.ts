@@ -1,7 +1,7 @@
 /* Smooth keyboard map motion. Every held key is one motion: it accelerates for
    RAMP ms, then runs at full speed, and after release (never before RAMP) it
    glides to rest with time constant GLIDE. So a tap is one smooth glide of
-   about `tap` (an eighth of the view, or one zoom step), a hold is a steady
+   about `tap` (a fifth of the view's shorter side, or one zoom step), a hold is a steady
    pan or zoom, and keys combine (diagonals, pan while zooming). Positions are
    a closed-form function of time, so the frame rate does not change the
    distance. Pure; MapHost drives it from requestAnimationFrame. */

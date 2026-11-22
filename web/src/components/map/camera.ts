@@ -128,7 +128,7 @@ export function nudgeView(M: MapCtx, dx: number, dy: number, logZoom = 0) {
   M.render();
 }
 
-/** Keyboard map control: arrows or W/A/S/D pan by an eighth of the view, +/- zoom.
+/** Keyboard map control: arrows or W/A/S/D pan (the same speed on both axes), +/- zoom.
     Null when the key is not a map key (or carries a modifier: Shift+arrows scrub
     the 24h timeline). */
 export function mapKeyAction(e: Pick<KeyboardEvent, "key" | "shiftKey" | "altKey" | "ctrlKey" | "metaKey">):

@@ -101,10 +101,17 @@ const MapHost = forwardRef<MapApi, Props>(function MapHost(props, apiRef) {
         m.applied = d;
         if (m.zoom) dz += delta * m.zoom;
         else {
-          dx += (delta * m.dir[0] * st.W) / 8;
-          dy += (delta * m.dir[1] * st.H) / 8;
+          // one distance for both axes (the view is wider than tall)
+          const tap = Math.min(st.W, st.H) / 5;
+          dx += delta * m.dir[0] * tap;
+          dy += delta * m.dir[1] * tap;
         }
         if (motionDone(t, tr)) motions.delete(code);
+      }
+      // diagonals at the same speed as straight moves
+      if (dx && dy) {
+        dx *= Math.SQRT1_2;
+        dy *= Math.SQRT1_2;
       }
       if (dx || dy || dz) nudgeView(M, dx, dy, dz);
       if (motions.size) raf = requestAnimationFrame(frame);
