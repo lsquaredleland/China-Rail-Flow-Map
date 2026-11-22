@@ -17,6 +17,33 @@ const scratch = natMotion();
 const fontOf = (style: MapStyle, fs: number, weight: string) =>
   weight + " " + fs + "px " + style.font.family;
 
+/** ?fx=crt (lib/fx; terminal only, data-fx on <html>): canvas text gets the
+    same misconvergence ghosts as the page's text-shadow (red 0.09em left,
+    green 0.075em right, a 0.22em bloom), which a CSS filter on this canvas
+    cannot give text inside an opaque label box. */
+const crtOn = () => typeof document !== "undefined" && document.documentElement.dataset.fx === "crt";
+function fillTextFx(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, fs: number) {
+  if (!crtOn()) {
+    ctx.fillText(text, x, y);
+    return;
+  }
+  const fill = ctx.fillStyle;
+  const a = ctx.globalAlpha;
+  ctx.globalAlpha = a * 0.85;
+  ctx.fillStyle = "rgb(255,30,40)";
+  ctx.fillText(text, x - 0.09 * fs, y);
+  ctx.globalAlpha = a * 0.65;
+  ctx.fillStyle = "rgb(60,255,90)";
+  ctx.fillText(text, x + 0.075 * fs, y);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = fill;
+  ctx.shadowColor = "rgba(255,140,40,0.5)";
+  ctx.shadowBlur = 0.22 * fs * 2;
+  ctx.fillText(text, x, y);
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+}
+
 /** A label's text as drawn: in capitals when the style says so (font.caps). */
 const cased = (style: MapStyle, text: string) => (style.font.caps ? text.toUpperCase() : text);
 
@@ -84,7 +111,7 @@ export function drawLabelsOverlay(M: MapCtx) {
       ctx.fillStyle = ink.label.css;
     }
     ctx.textAlign = align;
-    ctx.fillText(cased(style, text), x, y);
+    fillTextFx(ctx, cased(style, text), x, y, lStyle.fs);
   }
   if (national) {
     drawNationalTags(M, ctx, style);
@@ -166,7 +193,7 @@ function paintTag(ctx: CanvasRenderingContext2D, px: number, py: number, tagText
   ctx.fillStyle = style.ink.tagText.css;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(tagText, px, tagY + tagH / 2);
+  fillTextFx(ctx, tagText, px, tagY + tagH / 2, 10);
 }
 
 /** National mode: draws the code tag on the hovered / selected / isolated train's dot
