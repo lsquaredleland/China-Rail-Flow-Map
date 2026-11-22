@@ -44,7 +44,9 @@ import {
   fetchInMap,
   fetchColumns,
   fetchOutMap,
+  loadOcti,
 } from "../data";
+import { applyOcti, applyOctiTrains, geomFromUrl, octiOutline, requireOcti } from "../lib/geomOcti";
 import { initialDirection, matchesCity } from "./useUrlState";
 
 /* Staged data loading (see the phase notes in ../data.ts). Each staged
@@ -333,9 +335,11 @@ export function useAtlasData({
       if (flights.nationalTrains) return;
       flights.nationalTrains = true;
       setNationalTrainsFailed(false);
-      Promise.all([fetchData<NationalTrainsPack>(NATIONAL_TRAINS_URL), loadSchedules()])
-        .then(([d, sched]) => {
-          requireFmt(d.fmt, NATIONAL_TRAINS_URL);
+      Promise.all([fetchData<NationalTrainsPack>(NATIONAL_TRAINS_URL), loadSchedules(), loadOcti()])
+        .then(([raw, sched, octi]) => {
+          requireFmt(raw.fmt, NATIONAL_TRAINS_URL);
+          // On the schematic, the extra throat pieces move with the rest.
+          const d = octi ? applyOctiTrains(raw, octi) : raw;
           if (!sched) throw new Error(SCHEDULES_URL + ": not loaded");
           setSchedulesData(sched);
           nationalTrainsRef.current = { trains: d, schedules: sched.schedules };
@@ -424,7 +428,8 @@ export function useAtlasData({
     let cancelled = false;
     fetchData<OutlineData>(OUTLINE_URL)
       .then((d) => {
-        if (!cancelled) setOutline(prepOutline(d));
+        // The schematic's plane is (lon, mercator y): the coastline follows it.
+        if (!cancelled) setOutline(geomFromUrl() === "octi" ? octiOutline(prepOutline(d)) : prepOutline(d));
       })
       .catch(() => {});
     // A persisted inbound direction paints its map in phase 1 too, so
@@ -436,9 +441,12 @@ export function useAtlasData({
       Promise<OutMapData>,
       Promise<InMapData | null> | null,
     ] = [
-      fetchData<SharedData>(SHARED_URL).then((d) => {
+      // The schematic (?geom=octi) swaps the shared geometry before decoding.
+      Promise.all([fetchData<SharedData>(SHARED_URL), loadOcti()]).then(([d, octi]) => {
         requireFmt(d.fmt, SHARED_URL);
-        return d;
+        if (!octi) return d;
+        requireOcti(octi, d);
+        return applyOcti(d, octi);
       }),
       fetchOutMap(),
       // A failed in-map fetch must not sink phase 1: it resolves to
