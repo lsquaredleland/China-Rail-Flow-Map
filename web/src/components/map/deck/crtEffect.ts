@@ -49,12 +49,13 @@ const crtModule = {
   name: "crt",
   fs,
   uniformTypes: { split: "f32", glow: "f32", radius: "f32" },
-  defaultUniforms: { split: 1.5, glow: 0.35, radius: 2.0 },
+  defaultUniforms: { split: 1.5, glow: 0.15, radius: 1.25 },
   passes: [{ sampler: true }],
 };
 
 /** The map's CRT pass, scaled to the device pixel ratio. */
 export function crtEffect(dpr: number, p: Partial<CrtProps> = {}): Effect {
-  const props: CrtProps = { split: 1.5 * dpr, glow: 0.35, radius: 2 * dpr, ...p };
+  // a light, tight bloom: the lines stay crisp, the channel split carries the look
+  const props: CrtProps = { split: 1.5 * dpr, glow: 0.15, radius: 1.25 * dpr, ...p };
   return new PostProcessEffect(crtModule as never, props as never) as unknown as Effect;
 }
