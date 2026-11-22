@@ -497,16 +497,21 @@ for i, t in enumerate(pack['station_table']):
     if i in stn: station_pt.append(stn[i])
     elif 'pt' in t: station_pt.append(T(t['pt']))
     else: station_pt.append(None)
-# cities: shifted by the mean offset of their stations
-off = collections.defaultdict(list)
+# cities sit on one of their stations: the station at the city's own point (the pack puts a
+# city where its main station is), else the most central of its placed stations (medoid).
+# A mean offset could land between lines when octi spreads a city's stations apart.
+by_city = collections.defaultdict(list)
 for i, t in enumerate(pack['station_table']):
     if 'pt' in t and station_pt[i] is not None and t.get('city') is not None:
-        off[t['city']].append((station_pt[i][0] - t['pt'][0], station_pt[i][1] - t['pt'][1]))
-city_pt = []
+        by_city[t['city']].append((i, t['pt'], station_pt[i]))
+city_pt = []; cpstat = collections.Counter()
 for i, c in enumerate(pack['city_table']):
-    o = off.get(i)
-    if o: city_pt.append((c['pt'][0] + sum(x for x, _ in o) / len(o), c['pt'][1] + sum(y for _, y in o) / len(o)))
-    else: city_pt.append(T(c['pt']))
+    sts_ = by_city.get(i)
+    if not sts_: city_pt.append(T(c['pt'])); cpstat['transform'] += 1; continue
+    main = [sp for _, rp, sp in sts_ if abs(rp[0] - c['pt'][0]) < 1e-6 and abs(rp[1] - c['pt'][1]) < 1e-6]
+    if main: city_pt.append(main[0]); cpstat['main_station'] += 1; continue
+    city_pt.append(min((sp for _, _, sp in sts_), key=lambda a: (sum(math.dist(a, b) for _, _, b in sts_), a)))
+    cpstat['medoid'] += 1
 
 # --- in_sections: same geometry as a section -> its schematic; else T per vertex
 by_g = {}
@@ -547,5 +552,5 @@ out = {
     'station_pt': [r5(p) if p else None for p in station_pt], 'city_pt': [r5(p) for p in city_pt],
 }
 json.dump(out, open(OUT, 'w'), separators=(',', ':'))
-print(json.dumps({'continuity': cstat, 'sections': stat, 'in_sections': istat, 'T': tstat, 'stations_octi': len(stn),
+print(json.dumps({'cities_on': cpstat, 'continuity': cstat, 'sections': stat, 'in_sections': istat, 'T': tstat, 'stations_octi': len(stn),
                   'stations': len(station_pt), 'cities': len(city_pt), 'network': len(network)}), file=sys.stderr)

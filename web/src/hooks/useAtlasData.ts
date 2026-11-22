@@ -46,7 +46,7 @@ import {
   fetchOutMap,
   loadOcti,
 } from "../data";
-import { applyOcti, applyOctiTrains, geomFromUrl, octiOutline, requireOcti } from "../lib/geomOcti";
+import { applyOcti, applyOctiTrains, geomFromUrl, octiOrigins, octiOutline, requireOcti } from "../lib/geomOcti";
 import { initialDirection, matchesCity } from "./useUrlState";
 
 /* Staged data loading (see the phase notes in ../data.ts). Each staged
@@ -456,6 +456,8 @@ export function useAtlasData({
     Promise.all(phase1)
       .then(([shared, outMap, inMap]) => {
         if (cancelled) return;
+        // On the schematic the origins' own points move to their cities' too.
+        if (geomFromUrl() === "octi") octiOrigins(outMap.origins, shared.city_table);
         const data: AtlasData = {
           ...shared,
           about: aboutText(shared),

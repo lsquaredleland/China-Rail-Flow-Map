@@ -95,8 +95,9 @@ The client projects the coastline outline the same way when on the schematic
 (`octiOutline`). Points that are not on the mapping, such as throat ends, the 109
 stations octi did not place, and the 449 in-sections that differ from their section, go
 through one transform: the nearest section within 0.05°, by fraction along that section's
-schematic polyline, else the offset of the nearest mapped vertex. Cities move by the mean
-offset of their stations.
+schematic polyline, else the offset of the nearest mapped vertex. Each city sits on one of its
+stations: the one at the city's own point (its main station), else the most central one.
+Origins (out-map) take their city's point in the client (`octiOrigins`).
 
 ## Numbers (shipped layout `st3`, stitched, `-g 21660`, best of 4 seeds, with train-path joins)
 

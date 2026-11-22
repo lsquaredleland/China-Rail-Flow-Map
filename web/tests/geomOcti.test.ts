@@ -4,8 +4,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { brotliDecompressSync } from "node:zlib";
-import type { NationalTrainsPack, SharedData } from "../src/types";
-import { applyOcti, applyOctiTrains, geomFromUrl, mercDeg, requireOcti, urlWithGeom, type OctiPack } from "../src/lib/geomOcti";
+import type { NationalTrainsPack, RawCity, RawOrigin, SharedData } from "../src/types";
+import { applyOcti, applyOctiTrains, geomFromUrl, mercDeg, octiOrigins, requireOcti, urlWithGeom, type OctiPack } from "../src/lib/geomOcti";
 import { decodeFlat } from "../src/lib/decode";
 
 const load = <T>(f: string): T => JSON.parse(brotliDecompressSync(readFileSync(`public/assets/${f}.json.br`)).toString());
@@ -71,6 +71,22 @@ describe("geomOcti", () => {
     expect(shared.sections[0].g).toBe("_seK_gsR"); // input untouched
     const t = applyOctiTrains({ extra: ["x"] } as NationalTrainsPack, octi);
     expect(t.extra).toEqual(["X"]);
+  });
+
+  test("octiOrigins: origins take their city's schematic point", () => {
+    const origins = [
+      { zh: "甲", en: "A", pt: [100, 30] },
+      { zh: "丙", en: "C", pt: [1, 2] },
+    ] as unknown as RawOrigin[];
+    expect(octiOrigins(origins, [{ zh: "甲", en: "A", pt: [100.4, 31.5] }] as RawCity[])).toBe(1);
+    expect(origins[0].pt).toEqual([100.4, 31.5]);
+    expect(origins[1].pt).toEqual([1, 2]);
+  });
+
+  test("the shipped origins all have a city", () => {
+    const shared = load<SharedData>("atlas-v2-shared");
+    const out = load<{ origins: RawOrigin[] }>("atlas-v2-out-map");
+    expect(octiOrigins(out.origins, applyOcti(shared, load<OctiPack>("atlas-v2-octi")).city_table)).toBe(out.origins.length);
   });
 
   test("mercDeg", () => {

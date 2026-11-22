@@ -3,7 +3,7 @@
    a geometry twin of the shared pack: the same section, throat, station and
    city ids with schematic positions, so flows, paths, trains and tables are
    untouched. The client only swaps the arrays before decoding. */
-import type { DecodedOutline, DecodedSet, NationalTrainsPack, SharedData } from "../types";
+import type { DecodedOutline, DecodedSet, NationalTrainsPack, RawCity, RawOrigin, SharedData } from "../types";
 
 export const OCTI_URL = "assets/atlas-v2-octi.json";
 
@@ -118,4 +118,21 @@ function mercSet(set: DecodedSet): DecodedSet {
 /** The coastline outline on the schematic's plane (latitudes to mercator y). */
 export function octiOutline(o: DecodedOutline): DecodedOutline {
   return { rings: mercSet(o.rings), lines: mercSet(o.lines) };
+}
+
+/** The origins (out-map) carry their own point; on the schematic each takes
+    its city's schematic point (same zh), in place, so markers, labels and
+    the home view sit on the drawn hub. Returns how many moved. */
+export function octiOrigins(origins: RawOrigin[], cities: readonly RawCity[]): number {
+  const at = new Map<string, [number, number]>();
+  for (const c of cities) if (!at.has(c.zh)) at.set(c.zh, c.pt);
+  let moved = 0;
+  for (const o of origins) {
+    const p = at.get(o.zh);
+    if (p) {
+      o.pt = [p[0], p[1]];
+      moved++;
+    }
+  }
+  return moved;
 }
