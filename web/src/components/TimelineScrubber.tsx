@@ -243,18 +243,21 @@ export const TimelineScrubber: FC<TimelineScrubberProps> = ({
       }
 
       const totM = totalMinsRef.current || 1440;
+      // Plain arrows pan the map (MapHost); Shift+arrows step the timeline,
+      // and so do plain arrows while the slider itself has focus.
+      const scrub = e.shiftKey || activeEl === sliderRef.current;
 
       if (e.code === "Space") {
         e.preventDefault();
         mapRef.current?.togglePlaying?.();
-      } else if (e.code === "ArrowLeft") {
+      } else if (e.code === "ArrowLeft" && scrub) {
         e.preventDefault();
         const curS = timeToSlider(currentTimeRef.current, totM);
         const prevS = Math.max(0, curS - 10);
         const prevT = sliderToTime(prevS, totM);
         currentTimeRef.current = prevT;
         mapRef.current?.setTime?.(prevT);
-      } else if (e.code === "ArrowRight") {
+      } else if (e.code === "ArrowRight" && scrub) {
         e.preventDefault();
         const curS = timeToSlider(currentTimeRef.current, totM);
         const nextS = Math.min(1000, curS + 10);

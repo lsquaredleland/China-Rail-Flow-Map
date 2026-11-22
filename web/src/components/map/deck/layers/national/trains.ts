@@ -104,8 +104,8 @@ export function nationalFrame(tl: NationalTimeline, atlas: DecodedAtlas, m: numb
     objects every frame, so deck re-uploads the pooled buffers. Only the dots are pickable, and
     only while the clock is paused (P2.3 picks them). The isolated train's dot and tail are
     enlarged as in the origin view. */
-export function nationalLayers(f: NationalFrame, pickable: boolean, isolated = false): Layer[] {
-  return dotLayers("nat-", f, { pickable, isolated, trigger: f.count });
+export function nationalLayers(f: NationalFrame, pickable: boolean, isolated = false, style?: MapStyle): Layer[] {
+  return dotLayers("nat-", f, { pickable, isolated, trigger: f.count, box: style?.marker.shape === "box" });
 }
 
 /** The origin view's emphasis rings on the hovered / selected / isolated
@@ -140,7 +140,7 @@ export function nationalRings(
       col: iso ? [g[0], g[1], g[2], 255] : [255, 255, 255, 255],
     });
   }
-  return rings.length ? [ringLayer("nat-train-rings", rings, f.count)] : [];
+  return rings.length ? [ringLayer("nat-train-rings", rings, f.count, style?.marker.shape === "box")] : [];
 }
 
 /** The isolated train's whole run as a line in its class colour (the origin

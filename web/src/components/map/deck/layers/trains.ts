@@ -13,6 +13,7 @@
    shared with the entry bundle (C23): the buffer pool is private to this chunk. */
 import type { Layer } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
+import { BoxLayer } from "../BoxLayer";
 import type { ActiveTrainVM } from "../../../../types";
 import { DEFAULT_SKIN, mapStyle } from "../../../../lib";
 import type { MapStyle, RGBA } from "../../../../lib";
@@ -194,8 +195,9 @@ interface TrainLayerInput {
 }
 
 /** An unfilled ring layer, one disc per ring. `trigger` is the update-trigger of the per-frame accessors. */
-export function ringLayer(id: string, discs: Disc[], trigger: string | number): Layer {
-  return new ScatterplotLayer<Disc>({
+export function ringLayer(id: string, discs: Disc[], trigger: string | number, box = false): Layer {
+  const Ring = box ? BoxLayer : ScatterplotLayer;
+  return new Ring<Disc>({
     id,
     data: discs,
     getPosition: (d) => d.pos,
@@ -217,8 +219,10 @@ export function ringLayer(id: string, discs: Disc[], trigger: string | number): 
 export function dotLayers(
   prefix: "" | "nat-",
   b: DotBuffers,
-  o: { pickable: boolean; isolated: boolean; trigger: string | number },
+  o: { pickable: boolean; isolated: boolean; trigger: string | number; box?: boolean },
 ): Layer[] {
+  // square dots and rings with box markers (terminal), discs otherwise
+  const Dot = o.box ? BoxLayer : ScatterplotLayer;
   return [
     new TailLayer({
       id: prefix + "tails",
@@ -234,7 +238,7 @@ export function dotLayers(
       getWidth: o.isolated ? 3.5 : 2.5,
       pickable: false,
     }),
-    new ScatterplotLayer({
+    new Dot({
       id: prefix + "trains",
       data: {
         length: b.count,
@@ -254,12 +258,13 @@ export function dotLayers(
       pickable: o.pickable,
       parameters: { depthCompare: "always" },
     }),
-    ringLayer(prefix + "dwell", b.dwell, o.trigger),
+    ringLayer(prefix + "dwell", b.dwell, o.trigger, o.box),
   ];
 }
 
 export function trainLayers(inp: TrainLayerInput): Layer[] {
   const b = buildTrainBuffers(inp.trains, inp.scale, inp.isolatedCode, inp.selectedCode, inp.hoveredCode, inp.style);
   const trig = inp.animTime + "|" + inp.scale;
-  return [...dotLayers("", b, { pickable: false, isolated: !!inp.isolatedCode, trigger: trig }), ringLayer("trainring", b.rings, trig)];
+  const box = inp.style?.marker.shape === "box";
+  return [...dotLayers("", b, { pickable: false, isolated: !!inp.isolatedCode, trigger: trig, box }), ringLayer("trainring", b.rings, trig, box)];
 }

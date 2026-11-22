@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { urlWithGeom, type Geom } from "../lib/geomOcti";
 import type { RefObject } from "react";
 import type { CityPointVM, Direction, DistUnit, OriginVM, RawOrigin } from "../types";
 import { FLOW_CLASSES } from "../lib";
@@ -29,6 +30,8 @@ export default function Toolbar({
   dark,
   onSetDark,
   modeToggle = true,
+  geom = "real",
+  geomToggle = false,
   national,
   showFlows,
   onToggleFlows,
@@ -58,6 +61,10 @@ export default function Toolbar({
   onSetDark: (d: boolean) => void;
   /** False when the skin supports one mode only: the day/night pair is hidden. */
   modeToggle?: boolean;
+  /** The track geometry drawn: real (OSM) or the octi schematic (?geom=octi). */
+  geom?: Geom;
+  /** Show the Real / Schematic pair (terminal skin, or while on the schematic). */
+  geomToggle?: boolean;
   /** National mode (D11: "National · beta", D13 map-only). */
   national: boolean;
   /** National mode's flows (and city circles): a map toggle like the others, on by default. */
@@ -210,6 +217,31 @@ export default function Toolbar({
           +
         </button>
       </div>
+      {geomToggle && (
+        <>
+          <span className="tb-pop-h">Track</span>
+          <div id="geomToggle" className="group geom-toggle" role="group" aria-label="Track geometry">
+            <button
+              id="geomReal"
+              type="button"
+              aria-pressed={geom === "real" ? "true" : "false"}
+              onClick={() => geom !== "real" && window.location.assign(urlWithGeom(window.location.href, "real"))}
+              title="Tracks where they really run"
+            >
+              Real
+            </button>
+            <button
+              id="geomOcti"
+              type="button"
+              aria-pressed={geom === "octi" ? "true" : "false"}
+              onClick={() => geom !== "octi" && window.location.assign(urlWithGeom(window.location.href, "octi"))}
+              title="Schematic: tracks redrawn at 0, 45 and 90 degrees, like a metro map"
+            >
+              Schematic
+            </button>
+          </div>
+        </>
+      )}
       <span className="tb-pop-h">Map layers</span>
       <div className="group">
         <button

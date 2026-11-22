@@ -294,10 +294,148 @@ interface FlowLayersInput {
   chords: ChordVM[];
 }
 
+/* ---------- chained draw data (MapStyle.flowJoin "chain") ---------- */
+
+/** What the visible flow and glow layers draw: the pass itself, or its chains. */
+interface DrawData {
+  id: number;
+  data: BinaryData;
+  n: Float32Array;
+  rgba: Uint8Array;
+}
+
+/** `pd` with consecutive paths of the same count and colour joined into one
+    path wherever exactly two of them meet at a point (so the joint is a mitre
+    inside one path, with no seam), and every chain end pushed out by half its
+    width along its end direction (a square cap: deck's flat cap stops at the
+    vertex). Paths drawn transparent (recounted to 0) are dropped. Picking,
+    highlights and recounts keep using `pd`, one path per section. */
+const chainCache = new WeakMap<PassData, { fitScale: number; d: DrawData }>();
+function chainedDraw(pd: PassData, fitScale: number): DrawData {
+  const hit = chainCache.get(pd);
+  if (hit && hit.fitScale === fitScale) return hit.d;
+  const { length, startIndices } = pd.data;
+  const P = pd.data.attributes.getPath.value;
+  const nv = P.length / 2;
+  const first = (p: number) => startIndices[p];
+  const last = (p: number) => (p + 1 < length ? startIndices[p + 1] : nv) - 1;
+  const live = (p: number) => pd.n[p] > 0 && pd.rgba[p * 4 + 3] > 0 && last(p) > first(p);
+  const grp = (p: number) =>
+    `${pd.n[p]}|${pd.rgba[p * 4]},${pd.rgba[p * 4 + 1]},${pd.rgba[p * 4 + 2]},${pd.rgba[p * 4 + 3]}`;
+  const ptKey = (v: number) => `${P[v * 2]},${P[v * 2 + 1]}`;
+  // ends: x = p * 2 + e (e 0 = first vertex, 1 = last vertex)
+  const at = new Map<string, number[]>();
+  for (let p = 0; p < length; p++) {
+    if (!live(p)) continue;
+    const g = grp(p);
+    for (const e of [0, 1]) {
+      const k = ptKey(e ? last(p) : first(p)) + "#" + g;
+      const a = at.get(k);
+      if (a) a.push(p * 2 + e);
+      else at.set(k, [p * 2 + e]);
+    }
+  }
+  const other = (x: number): number => {
+    const p = x >> 1;
+    const a = at.get(ptKey(x & 1 ? last(p) : first(p)) + "#" + grp(p));
+    if (!a || a.length !== 2) return -1;
+    const y = a[0] === x ? a[1] : a[0];
+    return y >> 1 === p ? -1 : y;
+  };
+  const used = new Uint8Array(length);
+  const chains: number[][] = []; // entries: p * 2 + (1 if reversed)
+  for (let p0 = 0; p0 < length; p0++) {
+    if (used[p0] || !live(p0)) continue;
+    // walk back from p0's first vertex to the chain start
+    let x = p0 * 2; // leaving p0 through its first end
+    let ring = false;
+    for (;;) {
+      const y = other(x);
+      if (y < 0) break;
+      const q = y >> 1;
+      if (q === p0) { ring = true; break; }
+      x = q * 2 + (1 - (y & 1)); // leave q through its other end
+    }
+    // x is the free end of the start path: traverse forward from it
+    const chain: number[] = [];
+    let p = ring ? p0 : x >> 1;
+    let enter = ring ? 0 : x & 1; // the end we enter through
+    for (;;) {
+      if (used[p]) break;
+      used[p] = 1;
+      chain.push(p * 2 + enter); // enter through last vertex = reversed
+      const y = other(p * 2 + (1 - enter));
+      if (y < 0) break;
+      p = y >> 1;
+      enter = y & 1;
+    }
+    chains.push(chain);
+  }
+  let total = 0;
+  for (const c of chains) {
+    total += 1;
+    for (const x of c) total += last(x >> 1) - first(x >> 1);
+  }
+  const out = new Float32Array(total * 2);
+  const starts = new Uint32Array(chains.length);
+  const n = new Float32Array(chains.length);
+  const rgba = new Uint8Array(chains.length * 4);
+  let w = 0;
+  chains.forEach((c, i) => {
+    starts[i] = w / 2;
+    const p0 = c[0] >> 1;
+    n[i] = pd.n[p0];
+    rgba.set(pd.rgba.subarray(p0 * 4, p0 * 4 + 4), i * 4);
+    const s0 = w;
+    c.forEach((x, j) => {
+      const p = x >> 1;
+      const a = first(p);
+      const b = last(p);
+      const rev = x & 1;
+      for (let k = 0; k <= b - a; k++) {
+        if (j > 0 && k === 0) continue; // the shared joint vertex
+        const v = rev ? b - k : a + k;
+        out[w++] = P[v * 2];
+        out[w++] = P[v * 2 + 1];
+      }
+    });
+    // square-cut ends: push the end vertices out by half the line width
+    const half = (flowUnits(n[i]) * WIDTH_K) / fitScale / 2;
+    const push = (iv: number, jv: number) => {
+      const dx = out[iv] - out[jv];
+      const dy = out[iv + 1] - out[jv + 1];
+      const l = Math.hypot(dx, dy);
+      if (l > 0) {
+        out[iv] += (dx / l) * half;
+        out[iv + 1] += (dy / l) * half;
+      }
+    };
+    const closed = out[s0] === out[w - 2] && out[s0 + 1] === out[w - 1];
+    if (!closed && w - s0 >= 4) {
+      push(s0, s0 + 2);
+      push(w - 2, w - 4);
+    }
+  });
+  const d: DrawData = {
+    id: nextId++,
+    data: { length: chains.length, startIndices: starts, attributes: { getPath: { value: out.subarray(0, w), size: 2 } } },
+    n,
+    rgba,
+  };
+  chainCache.set(pd, { fitScale, d });
+  return d;
+}
+
+/** The data the visible flow and glow layers draw for `pd`. */
+function drawData(pd: PassData, fitScale: number, style: MapStyle): DrawData {
+  return style.flowJoin === "chain" ? chainedDraw(pd, fitScale) : pd;
+}
+
 /** Canvas flowWidth in CSS px. */
 const widthPx = (n: number, scale: number, fitScale: number) => flowWidth(n, scale, fitScale);
 
-function flowPassLayer(role: string, pd: PassData, fitScale: number, style: MapStyle) {
+function flowPassLayer(role: string, pass: PassData, fitScale: number, style: MapStyle) {
+  const pd = drawData(pass, fitScale, style);
   return new PathLayer({
     id: "flows-" + role,
     data: pd.data,
@@ -376,9 +514,11 @@ function ferryDashLayer(id: string, pd: PassData, scale: number, fitScale: numbe
     lines or changes picking. Null when the style has no glow or the pass is
     faded (its colours are pre-blended over the paper and must stay flat).
     Costs one more path draw per glowing pass. */
-export function flowGlowLayer(role: string, pd: PassData, alpha: number, fitScale: number, style: MapStyle): Layer | null {
+export function flowGlowLayer(role: string, pass: PassData, alpha: number, fitScale: number, style: MapStyle): Layer | null {
   const glow = style.glow;
   if (!glow || alpha < 1) return null;
+  const pd = drawData(pass, fitScale, style);
+  const angular = style.flowJoin === "chain";
   return new PathLayer({
     id: "flows-glow-" + role,
     data: pd.data,
@@ -386,8 +526,8 @@ export function flowGlowLayer(role: string, pd: PassData, alpha: number, fitScal
     widthUnits: "common",
     widthScale: 1,
     widthMinPixels: glow.minPixels,
-    capRounded: true,
-    jointRounded: true,
+    capRounded: !angular,
+    jointRounded: !angular,
     getWidth: (_: unknown, { index }: { index: number }) => (flowUnits(pd.n[index]) * WIDTH_K * glow.widthScale) / fitScale,
     getColor: (_: unknown, { index, target }: { index: number; target?: number[] }) => {
       const t = target ?? [0, 0, 0, 0];

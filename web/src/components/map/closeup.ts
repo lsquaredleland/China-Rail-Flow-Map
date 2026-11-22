@@ -26,10 +26,27 @@ export function stepCloseup(M: MapCtx): void {
   }
 }
 
+/** Only the origin city and the selected destination split; every other
+    city keeps one dot and one label, so zooming into a hub shows its own
+    stations, not those of every multi-station city around it. */
+let splitMemo: { all: Map<string, CloseupStation[]>; a: string; b: string; out: Map<string, CloseupStation[]> } | null = null;
+export function splitCities(all: Map<string, CloseupStation[]>, origin: string, dest: string): Map<string, CloseupStation[]> {
+  if (splitMemo && splitMemo.all === all && splitMemo.a === origin && splitMemo.b === dest) return splitMemo.out;
+  const out = new Map<string, CloseupStation[]>();
+  for (const zh of [origin, dest]) {
+    const l = zh ? all.get(zh) : undefined;
+    if (l) out.set(zh, l);
+  }
+  splitMemo = { all, a: origin, b: dest, out };
+  return out;
+}
+
 /** The close-ups of the last frame; null while nothing is split. */
 export function closeupOf(M: MapCtx): Closeup | null {
-  const atlas = M.P.current.atlas;
+  const P = M.P.current;
+  const atlas = P.atlas;
   const k = M.S.current.closeupK;
-  if (!atlas || k <= 0 || M.P.current.national) return null;
-  return { byCity: cityStations(atlas.data.station_table, atlas.data.city_table), k };
+  if (!atlas || k <= 0 || P.national) return null;
+  const all = cityStations(atlas.data.station_table, atlas.data.city_table);
+  return { byCity: splitCities(all, P.cur?.o.zh ?? "", P.panelDest?.zh ?? ""), k };
 }

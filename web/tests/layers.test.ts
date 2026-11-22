@@ -140,14 +140,46 @@ describe("buildPassData", () => {
     expect(ids.filter((i) => i.startsWith("flows-glow-"))).toEqual(["flows-glow-focus"]);
     expect(ids.indexOf("flows-glow-focus")).toBeLessThan(ids.indexOf("flows-context"));
     const g: any = layers[ids.indexOf("flows-glow-focus")];
-    const pdf = buildPassData(set, passes[1].items, term, 1, passes[1].maxN);
-    expect(g.props.data).toBe(pdf.data);
+    const f: any = layers[ids.indexOf("flows-focus")];
+    // the glow draws exactly what the (chained) flow layer draws, flat and mitred
+    expect(g.props.data).toBe(f.props.data);
+    expect(g.props.capRounded).toBe(false);
+    expect(g.props.jointRounded).toBe(false);
     expect(g.props.pickable).toBe(false);
     expect(g.props.widthMinPixels).toBe(glow.minPixels);
-    expect(g.props.getWidth(undefined, { index: 0 })).toBeCloseTo((flowUnits(pdf.n[0]) * WIDTH_K * glow.widthScale) / 12.5, 9);
+    const w0 = f.props.getWidth(undefined, { index: 0 });
+    expect(g.props.getWidth(undefined, { index: 0 })).toBeCloseTo(w0 * glow.widthScale, 9);
+    const fc = f.props.getColor(undefined, { index: 0 });
     const c = g.props.getColor(undefined, { index: 0 });
-    expect(Array.from(c.slice(0, 3))).toEqual(Array.from(pdf.rgba.slice(0, 3)));
-    expect(c[3]).toBe(Math.round(pdf.rgba[3] * glow.alpha));
+    expect(Array.from(c.slice(0, 3))).toEqual(Array.from(fc.slice(0, 3)));
+    expect(c[3]).toBe(Math.round(fc[3] * glow.alpha));
+  });
+
+  test("chained flows (terminal): same-colour, same-width sections joined, ends cut square", () => {
+    const passes = flowPasses(st({ panelDest: dest }), newModelCaches());
+    const term = mapStyle("terminal", "dark");
+    const pdf = buildPassData(set, passes[1].items, term, 1, passes[1].maxN);
+    const f: any = flowPassLayers(set, passes, term, 100, 12.5).find((l) => l.id === "flows-focus");
+    const d = f.props.data;
+    expect(f.props.capRounded).toBe(false);
+    expect(f.props.jointRounded).toBe(false);
+    // picking and recounts keep one path per section
+    expect(d).not.toBe(pdf.data);
+    expect(d.length).toBeGreaterThan(0);
+    expect(d.length).toBeLessThanOrEqual(pdf.data.length);
+    // every chain keeps one count and colour, taken from a section of the pass
+    const counts = new Set(Array.from(pdf.n));
+    for (let i = 0; i < d.length; i++) {
+      const w = f.props.getWidth(undefined, { index: i }) * 12.5 / WIDTH_K;
+      expect([...counts].some((n) => Math.abs(flowUnits(n) - w) < 1e-6)).toBe(true);
+    }
+    // vertices: each chain has its sections' vertices minus the shared joints
+    const pv = pdf.data.attributes.getPath.value.length / 2;
+    const dv = d.attributes.getPath.value.length / 2;
+    expect(dv).toBeLessThanOrEqual(pv);
+    // paper stays one path per section
+    const paper: any = flowPassLayers(set, passes, style, 100, 12.5).find((l) => l.id === "flows-focus");
+    expect(paper.props.data).toBe(buildPassData(set, passes[1].items, style, 1, passes[1].maxN).data);
   });
 });
 

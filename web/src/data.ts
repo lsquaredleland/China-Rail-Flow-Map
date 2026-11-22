@@ -2,6 +2,7 @@ import type { InMapData, OutMapData, SharedData } from "./types";
 import { decodeFlows, isSafetensors, readSafetensors, requireFmt } from "./lib";
 import type { Columns } from "./lib";
 import { maybeReloadForStale } from "./staleReload";
+import { OCTI_URL, geomFromUrl, type OctiPack } from "./lib/geomOcti";
 
 // The v2 atlas dataset ships in five split files (same origin order
 // throughout): the shared tables and geometry, and per direction a map
@@ -56,6 +57,20 @@ export const NATIONAL_INDEX_URL = "assets/atlas-v2-national-index.json";
 // National trains (P2.2): every national train's whole run, fetched only on
 // entering national mode, never for the origin view.
 export const NATIONAL_TRAINS_URL = "assets/atlas-v2-national-trains.json";
+
+// The schematic (octi) geometry twin of the shared pack: fetched once, and
+// only when the session draws the schematic (?geom=octi); null otherwise.
+let octiFetch: Promise<OctiPack> | null = null;
+export function loadOcti(): Promise<OctiPack> | null {
+  if (geomFromUrl() !== "octi") return null;
+  if (!octiFetch) {
+    octiFetch = fetchData<OctiPack>(OCTI_URL);
+    octiFetch.catch(() => {
+      octiFetch = null;
+    });
+  }
+  return octiFetch;
+}
 
 // The footer's ABOUT text: fixed prose plus the timetable source sentence.
 // The source sentence and the schedule window are pack facts: the pipeline

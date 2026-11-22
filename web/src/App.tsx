@@ -3,6 +3,7 @@ import type { DecodedAtlas, Direction, DistUnit, OriginVM } from "./types";
 import { buildOrigin, legendTitle, natCityCounts, natFlowCounts, stationName } from "./lib";
 import type { NatFilter } from "./lib";
 import { useAtlasData } from "./hooks/useAtlasData";
+import { geomFromUrl } from "./lib/geomOcti";
 import {
   initialNational,
   usePrefs,
@@ -42,6 +43,8 @@ export default function App() {
 
   const prefs = usePrefs();
   const { showInfra, distUnit, direction, dark, setDark, style, modeToggle, toggleInfra } = prefs;
+  // Track geometry is fixed per page load (the schematic swaps the decoded data).
+  const geom = useMemo(() => geomFromUrl(), []);
   const { selectedTrainCode, setSelectedTrainCode, isolatedTrainCode, setIsolatedTrainCode } =
     useTrainSelection();
   // Each click on a train opens a fresh timetable (expanded), even the same
@@ -391,6 +394,8 @@ export default function App() {
           onSetDistUnit={setDistUnit}
           dark={dark}
           modeToggle={modeToggle}
+          geom={geom}
+          geomToggle={style.skin === "terminal" || geom === "octi"}
           onSetDark={setDark}
           national={national}
           showFlows={natFlowsOn}
