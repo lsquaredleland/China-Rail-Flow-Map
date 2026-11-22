@@ -79,7 +79,10 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
    redrawn as the 1- or 2-leg octilinear route between its junctions, unless that would cross
    more lines than the current drawing; its stations are spaced by real distance. A dead-end
    run (a branch with a free end, e.g. Zhuhai) is redrawn in its real direction and length
-   from its junction: octi gives every station a grid cell, which stretches branches. Then it
+   from its junction: octi gives every station a grid cell, which stretches branches.
+   Islands joined only by the train ferry (Hainan) are redrawn from real track, moved as one
+   so the ferry lands on its schematic point, and bent only at 0/45/90 degrees: a tile edge
+   cut Hainan's ring, which octi then drew as two parallel lines. Then it
    writes the client asset:
 
 | field | content |

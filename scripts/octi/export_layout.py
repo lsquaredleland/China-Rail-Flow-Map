@@ -456,6 +456,54 @@ for k_, L in zero_at.items():               # collapsed sections ride with their
         for s_ in L: sch[s_] = [np_, np_]
 cstat.update(sstat)
 cstat = dict(cstat)
+# --- islands redrawn from real track. Hainan joins the network only through the Qiongzhou
+# train ferry, and a tile edge (109.6 E) cut its ring in two, so octi drew the east line down
+# the west side. The island (and the ferry) are redrawn from real geometry, moved as one so
+# the ferry's mainland end lands on its schematic point, then simplified (DP) and bent only at
+# 0/45/90 degrees; section ends stay shared, so the ring closes by construction.
+ISLANDS = [{'name': 'hainan', 'bbox': (108.4, 18.0, 111.3, 20.15),
+            'ferry': lambda g: min(p[1] for p in g) < 20.15 and max(p[1] for p in g) > 20.2 and all(110.0 < p[0] < 110.3 for p in g)}]
+ISLAND_TOL = 0.04   # DP tolerance in plane degrees (~4 km)
+def snap_pl(P, tol):
+    """octilinear polyline through a DP simplification of P (plane coords), ends exact"""
+    if len(P) < 2: return list(P)
+    Q = dp(P, tol); out = [Q[0]]
+    for a, b in zip(Q, Q[1:]):
+        c1 = octi2pl(a, b); c2 = octi2pl(b, a)[::-1]
+        i0 = P.index(a) if a in P else 0; i1 = P.index(b) if b in P else len(P) - 1
+        mid = P[min(i0, i1):max(i0, i1) + 1] or [a, b]
+        def dev(R):
+            return max(min(math.dist(p, (R[i][0] + (R[i + 1][0] - R[i][0]) * t, R[i][1] + (R[i + 1][1] - R[i][1]) * t))
+                           for i in range(len(R) - 1) for t in [max(0, min(1, ((p[0] - R[i][0]) * (R[i + 1][0] - R[i][0]) + (p[1] - R[i][1]) * (R[i + 1][1] - R[i][1])) / max(1e-18, math.dist(R[i], R[i + 1]) ** 2)))])
+                       for p in mid)
+        out += (c1 if dev(c1) <= dev(c2) else c2)[1:]
+    return dedup(out)
+island_secs = set(); island_bbox = []
+for isl in ISLANDS:
+    x0, y0, x1, y1 = isl['bbox']
+    inside = [s_ for s_ in range(nsec) if all(x0 < p[0] < x1 and y0 < p[1] < y1 for p in geo[s_])]
+    ferry = [s_ for s_ in range(nsec) if isl['ferry'](geo[s_])]
+    if not inside: continue
+    # the ferry's mainland end: the end north of the strait; translation = schematic - real there
+    vec = []
+    for s_ in ferry:
+        g = geo[s_]; e = 0 if g[0][1] > g[-1][1] else -1
+        if sch[s_] is None: continue
+        sp = PLf(sch[s_][e]); rp = PLf(g[e]); vec.append((sp[0] - rp[0], sp[1] - rp[1]))
+    if not vec: continue
+    dx = sum(v[0] for v in vec) / len(vec); dy = sum(v[1] for v in vec) / len(vec)
+    for s_ in inside + ferry:
+        P = [(PLf(p)[0] + dx, PLf(p)[1] + dy) for p in geo[s_]]
+        q = snap_pl(P, ISLAND_TOL)
+        if s_ in ferry:   # keep the mainland end exactly where the network has it
+            g = geo[s_]; e = 0 if g[0][1] > g[-1][1] else -1
+            tgt = PLf(sch[s_][e])
+            if e == 0: q = octi2pl(tgt, q[0])[:-1] + q if math.dist(tgt, q[0]) > 1e-9 else q
+            else: q = q + octi2pl(q[-1], tgt)[1:] if math.dist(tgt, q[-1]) > 1e-9 else q
+        if len(q) < 2: q = [q[0], q[0]]
+        sch[s_] = [PLi(p) for p in q]; touched.add(s_); island_secs.add(s_)
+    island_bbox.append(isl['bbox']); cstat['island_sections'] = cstat.get('island_sections', 0) + len(inside) + len(ferry)
+
 vimg = {}
 for s_ in range(nsec):
     if sch[s_] is None: continue
@@ -526,6 +574,9 @@ for f in feats:
     if st is not None:
         c = tuple(f['geometry']['coordinates']); c = tuple(node_move.get(key(c), c))
         stn.setdefault(int(st), tuple(chain_move.get(key(PLf(c)), c)))
+# stations on a redrawn island are placed on the new drawing (by T below), not octi's nodes
+for i_, t_ in enumerate(pack['station_table']):
+    if 'pt' in t_ and any(b[0] < t_['pt'][0] < b[2] and b[1] < t_['pt'][1] < b[3] for b in island_bbox): stn.pop(i_, None)
 station_pt = []
 for i, t in enumerate(pack['station_table']):
     if i in stn: station_pt.append(stn[i])
