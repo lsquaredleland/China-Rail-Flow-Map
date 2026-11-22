@@ -31,14 +31,14 @@ function fillTextFx(ctx: CanvasRenderingContext2D, text: string, x: number, y: n
   const a = ctx.globalAlpha;
   ctx.globalAlpha = a * 0.85;
   ctx.fillStyle = "rgb(255,30,40)";
-  ctx.fillText(text, x - 0.09 * fs, y);
+  ctx.fillText(text, x - Math.min(0.09 * fs, 2.2), y);
   ctx.globalAlpha = a * 0.65;
   ctx.fillStyle = "rgb(60,255,90)";
-  ctx.fillText(text, x + 0.075 * fs, y);
+  ctx.fillText(text, x + Math.min(0.075 * fs, 1.8), y);
   ctx.globalAlpha = a;
   ctx.fillStyle = fill;
   ctx.shadowColor = "rgba(255,140,40,0.5)";
-  ctx.shadowBlur = 0.22 * fs * 2;
+  ctx.shadowBlur = Math.min(0.22 * fs, 5) * 2;
   ctx.fillText(text, x, y);
   ctx.shadowBlur = 0;
   ctx.shadowColor = "transparent";
