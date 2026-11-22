@@ -130,6 +130,14 @@ now mapped back. Double track drawn as one line is intended: one corridor, one l
 detours, and `--geo-pen` needed 10 GB. Tiling is what makes the finer grid affordable;
 the finer grid is what removes the detours.
 
+## Survey
+
+`scripts/octi/survey.py shared.json national-trains.json atlas-v2-octi.json out.json` checks
+every section against its real track and clusters the findings by area, weighted by
+traffic: section pairs that cross in the schematic but not in reality, sections pointing
+the wrong way, drawn far too long or short, far from where their neighbours moved, and
+breaks along train routes. Run it after any layout change.
+
 ## Known limits
 
 - 88 tile seams. Connectors have a median of 16.5 km and a maximum of 56 km; 16 cross
