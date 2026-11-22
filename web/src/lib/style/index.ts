@@ -413,7 +413,7 @@ const TERMINAL: SkinDef = {
       rushTail: ink(T_AMBER),
       rushRegular: ink(T_SOFT),
     };
-    // 'CRT Face' (Hershey Simplex) exists only under ?fx=crt (lib/fx registers it);
+    // 'CRT Face' (Hershey Simplex) exists only with the CRT look on (lib/fx registers it);
     // otherwise the stack starts at Share Tech Mono.
     const mono = "'CRT Face', 'Share Tech Mono', 'Noto Sans SC', ui-monospace, monospace";
     return {

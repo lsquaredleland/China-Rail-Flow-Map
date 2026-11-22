@@ -17,7 +17,7 @@ const scratch = natMotion();
 const fontOf = (style: MapStyle, fs: number, weight: string) =>
   weight + " " + fs + "px " + style.font.family;
 
-/** ?fx=crt (lib/fx; terminal only, data-fx on <html>): canvas text gets the
+/** The CRT look (lib/fx; terminal default, data-fx on <html>): canvas text gets the
     same misconvergence ghosts as the page's text-shadow (red 0.09em left,
     green 0.075em right, a 0.22em bloom), which a CSS filter on this canvas
     cannot give text inside an opaque label box. */

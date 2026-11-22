@@ -1,4 +1,4 @@
-/* The "CRT capture" look (terminal skin, ?fx=crt; an exploration): a GPU
+/* The "CRT capture" look (terminal skin default; ?fx=off turns it off): a GPU
    post-process pass over the map, as the reference video's misconverged
    tube shows it. Each colour channel is sampled slightly apart (red ghost to
    the left, green to the right), strokes bloom a little, and edges soften.

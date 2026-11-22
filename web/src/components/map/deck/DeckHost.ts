@@ -301,7 +301,7 @@ export function mountDeck(M: MapCtx, host: HTMLDivElement, onFatal?: () => void)
       viewState: viewToViewState(st.view, st.W || 1, st.H || 1),
       controller: false,
       useDevicePixels: (dpr = devicePixels(M)),
-      // ?fx=crt on the terminal skin: the CRT capture pass over the map (exploration)
+      // the terminal skin's CRT capture pass over the map (lib/fx; ?fx=off turns it off)
       effects:
         fxFromUrl() === "crt" && M.P.current.style.skin === "terminal"
           ? [crtEffect(typeof dpr === "number" ? dpr : window.devicePixelRatio || 1, {

@@ -933,7 +933,7 @@
   :root[data-skin="terminal"] .tl-expand-btn.is-over-map { min-height: 36px; }
 }
 
-/* ---------- ?fx=crt: the "CRT capture" look (exploration) ----------
+/* ---------- the "CRT capture" look (terminal default; ?fx=off turns it off) ----------
    The reference video is a filmed vector display: every stroke has a red
    ghost on one side and a green one on the other (misconvergence), blooms a
    little, and the picture carries scanlines and grain. The map's half is a

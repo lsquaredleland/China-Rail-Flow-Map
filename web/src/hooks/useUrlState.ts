@@ -168,7 +168,7 @@ export function usePrefs() {
   useLayoutEffect(() => {
     document.documentElement.setAttribute("data-skin", skin);
     document.documentElement.setAttribute("data-theme", mode);
-    // ?fx=crt (terminal only): the CRT capture look's CSS half (terminal.css)
+    // the CRT capture look's CSS half (terminal only, default on; terminal.css)
     if (skin === "terminal" && fxFromUrl() === "crt") document.documentElement.setAttribute("data-fx", "crt");
     else document.documentElement.removeAttribute("data-fx");
   }, [skin, mode]);
