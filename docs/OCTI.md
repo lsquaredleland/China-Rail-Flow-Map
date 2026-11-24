@@ -67,7 +67,9 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
    Where both stubs are 60 km or shorter (76 of 88 cuts), stub + connector + stub become a
    single octilinear edge, and the pieces are remapped onto it. `quality.py` reports
    detours.
-6. **Export** (`export_layout.py`). octi's drawing is the starting layout. Four general
+6. **Export** (`export_layout.py`, one function per stage; the geometry, the octilinear
+   routing and the skeleton are in `octi_geom.py`, which `survey.py` shares). octi's drawing
+   is the starting layout. Four general
    rules then compare it with the real track and redraw what disagrees. There are no
    per-place cases; every rule works on the same skeleton: *nodes* (points where sections
    end), *bundles* (sections between the same two nodes whose real tracks share a corridor,
@@ -90,16 +92,28 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
       (octi gives every station a grid cell, which stretched branches). A move that would
       add a wrong meeting is not made.
    4. **Runs.** Every run is drawn as the simplest octilinear route between its two nodes
-      that stays within 1.5 grid cells of its real shape and meets only the lines it
-      really meets. Candidates, simplest first: one to three legs, routes along the real
-      shape (Douglas-Peucker at 1, 1/2 and 1/4 cell, vertices on the lattice, joined by
-      ≤ 2 legs), and octi's own route. The real shape is the real track shifted by the
-      offsets of the run's two end nodes, blended along the track. A route more than 3
-      cells off is never taken when a nearer one exists; then the fewest wrong meetings
-      count (crossing a line the run never crosses; a crossing moved to another section of
-      a line it does cross; overlapping a line outside a shared corridor of ~5 km); then
-      simplicity. Runs are routed against each other's routes in up to four sweeps.
-      Stations along a run are spaced by real distance.
+      that stays within half a grid cell (10.8 km) of its real shape, crosses only what
+      it really crosses, and keeps to its real side of every line that really runs
+      alongside. Candidates, simplest first: one to three legs, routes along the real
+      shape (Douglas-Peucker at 1, 1/2, 1/4 and 1/8 cell, vertices on the lattice, joined
+      by ≤ 2 legs), and octi's own route. The real shape is the real track shifted by the
+      offsets of the run's two end nodes, blended along the track. The choice is
+      lexicographic: never a route more than 3 cells off the real shape when a nearer one
+      exists; then the fewest false crossings; then the fewest points on the wrong side
+      of (or on top of) a neighbouring line; then the fewest overlaps outside a shared
+      corridor (real tracks within ~5 km); then the simplest route that fits, else the
+      nearest. So the tolerance is tight where there is room and loosens only where a
+      closer route would meet a neighbour wrongly. A run whose best route still has a
+      fault also tries the real shape one lattice step to either side. Runs are routed
+      against each other's routes in up to four sweeps. Stations along a run are spaced by
+      real distance.
+
+      "Side" is sampled from the real track (`octi_geom.side_samples`): every ~5 km along each
+      section, for each other track 5 to 33 km away and within 30° of parallel, which side
+      it is on. Two lines in one valley are therefore drawn side by side in the real
+      order, they swap sides where they really cross, and a line that leaves a corridor
+      for a while and rejoins it (Tongwei) is drawn as that excursion on its real side.
+      Tracks closer than 5 km are one corridor and may share one drawn line.
 
    So a line that really runs straight is drawn straight, lines leave a hub on the side
    they really leave it, two lines in one valley are drawn side by side, and any piece
@@ -138,9 +152,12 @@ Origins (out-map) take their city's point in the client (`octiOrigins`).
 | topology violations | 190 | 32 (sum of tiles) |
 | neighbouring sections that do not meet | (not measured) | 0 |
 | train-path breaks (consecutive sections > max(3 km, 3 × real gap) apart) | (not measured) | 9 pairs (601 in octi's own drawing) |
-| runs: 1–3 legs / along the real shape / octi's route / a point (ends under ~3 km apart) | | 1,215 / 88 / 22 / 27 of 1,352 |
+| runs: 1–3 legs / along the real shape (58 of them one step aside) / octi's route / a point (ends under ~3 km apart) | | 954 / 332 / 39 / 27 of 1,352 |
 | junctions moved by rule 2, median / 90% / max | | 11 / 24 / 69 km |
-| survey: false crossings / breaks / displaced / reversed / squashed | | 2 / 9 / 0 / 0 / 2 (36 / 80 / 8 / 2 / 2 before the general rules) |
+| survey: false crossings / breaks / displaced / reversed / squashed | | 0 / 9 / 0 / 0 / 2 (36 / 80 / 8 / 2 / 2 in octi's own drawing) |
+| survey: false overlaps, pairs / km | | 39 / 324 (233 / 4,854) |
+| survey: wrong side of a line alongside, pairs / share of samples | | 6 / 1.0% (76 / 7.9%) |
+| survey: fidelity, mean / 90% distance from the real track after the local shift | | 7.9 / 14.4 km (19.3 / 37.6 km) |
 | octilinear legs (plane coords, legs over 5 km) | | 100% |
 | runtime | 27 min (6 seeds, 2 parallel) | ~7 min, 0.7 GB |
 
@@ -157,9 +174,22 @@ the finer grid is what removes the detours.
 
 `scripts/octi/survey.py shared.json national-trains.json atlas-v2-octi.json out.json` checks
 every section against its real track and clusters the findings by area, weighted by
-traffic: section pairs that cross in the schematic but not in reality, sections pointing
-the wrong way, drawn far too long or short, far from where their neighbours moved, and
-breaks along train routes. Run it after any layout change.
+traffic. Run it after any layout change. It shares its geometry and its reality checks
+with the export (`scripts/octi/octi_geom.py`), so the router and the survey measure the same
+things:
+
+- **crossing**: section pairs that cross in the schematic but not in reality;
+- **overlap**: pairs drawn on top of each other for 3 km or more whose real tracks do not
+  share a corridor;
+- **side**: pairs that really run alongside each other but are drawn on the wrong side of
+  each other for half of the stretch or more (plus the share of all side samples that are
+  wrong, or drawn on one line);
+- **flipped**, **stretched**, **squashed**, **displaced**: a section pointing the wrong
+  way, drawn far too long or short, or far from where its neighbours moved;
+- **break**: consecutive sections of a train route drawn apart;
+- **fidelity** (one number for the map): the distance between the drawn and the real
+  track once the local area shift is removed, per point at the same fraction of the
+  section (mean, 90%) and per section as the Hausdorff distance, weighted by length.
 
 ## Known limits
 
@@ -170,9 +200,11 @@ breaks along train routes. Run it after any layout change.
   passing a node it does not serve.
 - 9 consecutive-section pairs on train paths are still further apart than in reality
   (joins refused because they would squash a real section into a point or make a group
-  wider than 12 km). 2 false crossings and 39 false overlaps (two lines drawn on top of
-  each other outside a shared corridor, mostly where they leave a hub in the same octant)
-  remain.
+  wider than 12 km).
+- 39 false overlaps remain (324 km in all; 20 of them are a single lattice step, 5 km,
+  where two lines leave a hub in the same octant) and 6 pairs on the wrong side.
+- Two lines in one corridor are either one drawn line (real tracks within ~5 km) or two
+  lines at least one lattice step apart; there is no thinner parallel offset.
 - A feature smaller than the lattice (5.4 km) is a point: 27 runs (stubs whose ends are under ~3 km apart and
   four loops of 10 to 15 km at one station complex). Two sections of 25 and 35 km that octi
   itself collapsed into a node stay collapsed.
