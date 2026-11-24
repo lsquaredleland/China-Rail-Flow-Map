@@ -67,38 +67,59 @@ client refuses a layout whose `build` stamp or counts differ from the shared pac
    Where both stubs are 60 km or shorter (76 of 88 cuts), stub + connector + stub become a
    single octilinear edge, and the pieces are remapped onto it. `quality.py` reports
    detours.
-6. **Export** (`export_layout.py`). A continuity pass first: section ends that trains run
-   between (real gap ≤ 12 km, the longest throat), ends at the same real point, and dangling
-   ends at one station are grouped (union-find; a group stays under 12 km wide and never loops
-   a section over 5 km). Each group gets one schematic point, and moved ends get a short
-   octilinear leg. A cleanup then erases loops, out-and-back spikes and straight-through
-   vertices, and redraws any section still longer than 1.6× its octilinear end-to-end distance
-   (+ 0.05°) as a ≤ 2-leg route; ends never move. Last, runs between junctions are
-   straightened: parallel sections between the same two nodes (two lines sharing every
-   station, a "ladder") form one bundle, and each chain of bundles through degree-2 nodes is
-   redrawn as the 1- or 2-leg octilinear route between its junctions, unless that would cross
-   more lines than the current drawing; its stations are spaced by real distance. A dead-end
-   run (a branch with a free end, e.g. Zhuhai) is redrawn in its real direction and length
-   from its junction: octi gives every station a grid cell, which stretches branches.
-   Islands joined only by the train ferry (Hainan) are redrawn from real track, moved as one
-   so the ferry lands on its schematic point, and bent only at 0/45/90 degrees: a tile edge
-   cut Hainan's ring, which octi then drew as two parallel lines. Then it
-   writes the client asset:
+6. **Export** (`export_layout.py`). octi's drawing is the starting layout. Four general
+   rules then compare it with the real track and redraw what disagrees. There are no
+   per-place cases; every rule works on the same skeleton: *nodes* (points where sections
+   end), *bundles* (sections between the same two nodes whose real tracks share a corridor,
+   drawn as one line) and *runs* (chains of bundles through stations, from junction to
+   junction or free end).
+   1. **Stations.** Section ends that real track joins inside a station are one point:
+      ends at the same real point, ends a train path goes between with only throats in
+      between, ends linked by throats (through the station's own points), and dangling ends
+      at one station (union-find; real gap ≤ 12 km, the longest throat; a group stays under
+      12 km wide and never loops a section over 5 km).
+   2. **Junctions.** The schematic should be a smooth deformation of the real map. Junction
+      positions minimise the difference between each run's drawn and real end-to-end
+      offset, weighted by 1 / run length (short runs firm, long runs loose), plus a term
+      that holds each junction to octi's point. This puts a branch back where it really
+      leaves its line and unfolds a ring that octi drew flat (Hainan). Each junction then
+      takes the nearest free point of a lattice of a quarter grid cell (5.4 km), so routes
+      coincide, touch or cross cleanly.
+   3. **Free ends.** A dead-end branch hangs on one junction, so its free end takes the real
+      offset from that junction; branches of branches follow from the trunk outwards
+      (octi gives every station a grid cell, which stretched branches). A move that would
+      add a wrong meeting is not made.
+   4. **Runs.** Every run is drawn as the simplest octilinear route between its two nodes
+      that stays within 1.5 grid cells of its real shape and meets only the lines it
+      really meets. Candidates, simplest first: one to three legs, routes along the real
+      shape (Douglas-Peucker at 1, 1/2 and 1/4 cell, vertices on the lattice, joined by
+      ≤ 2 legs), and octi's own route. The real shape is the real track shifted by the
+      offsets of the run's two end nodes, blended along the track. A route more than 3
+      cells off is never taken when a nearer one exists; then the fewest wrong meetings
+      count (crossing a line the run never crosses; a crossing moved to another section of
+      a line it does cross; overlapping a line outside a shared corridor of ~5 km); then
+      simplicity. Runs are routed against each other's routes in up to four sweeps.
+      Stations along a run are spaced by real distance.
+
+   So a line that really runs straight is drawn straight, lines leave a hub on the side
+   they really leave it, two lines in one valley are drawn side by side, and any piece
+   whose shape disagrees with reality is redrawn from the real track. Then it writes the
+   client asset:
 
 | field | content |
 |---|---|
 | `sections[s]`, `in_sections[s]` | encoded polyline (precision 1e4, lat/lon order, like `g`), same ids as the pack |
 | `network` | the drawn section polylines (backdrop only) |
-| `throats[t]`, `extra[t]` | station throats of the shared pack and of the national trains' `extra` |
+| `throats[t]`, `extra[t]` | station throats of the shared pack and of the national trains' `extra` (≤ 2 octilinear legs between the images of their ends) |
 | `station_pt[i]`, `city_pt[i]` | schematic points (`null` keeps the pack point) |
 | `fmt`, `build`, `n_*` | checked against the shared pack on load |
 | `plane` | `lon-mercdeg`: every point is (lon, web-mercator y in degrees) |
 
 octi is octilinear in web mercator, while the client draws lon/lat on an equirectangular
-plane. Writing y as mercator degrees keeps the 45° legs exact on screen (99.9% of legs).
+plane. Writing y as mercator degrees keeps the 45° legs exact on screen (100% of legs over 5 km).
 The client projects the coastline outline the same way when on the schematic
 (`octiOutline`). Points that are not on the mapping, such as throat ends, the 109
-stations octi did not place, and the 449 in-sections that differ from their section, go
+stations that are not skeleton nodes, and the 449 in-sections that differ from their section, go
 through one transform: the nearest section within 0.05°, by fraction along that section's
 schematic polyline, else the offset of the nearest mapped vertex. Each city sits on one of its
 stations: the one at the city's own point (its main station), else the most central one.
@@ -116,9 +137,11 @@ Origins (out-map) take their city's point in the client (`octiOrigins`).
 | schematic / geographic km | 1.42 | 1.14 |
 | topology violations | 190 | 32 (sum of tiles) |
 | neighbouring sections that do not meet | (not measured) | 0 |
-| train-path breaks (consecutive sections > max(3 km, 3 × real gap) apart) | (not measured) | 98 pairs (601 before the joins) |
-| runs between junctions straightened | | 668 (3,423 sections); 70 kept to avoid new crossings |
-| octilinear legs (plane coords) | | 99.95% |
+| train-path breaks (consecutive sections > max(3 km, 3 × real gap) apart) | (not measured) | 9 pairs (601 in octi's own drawing) |
+| runs: 1–3 legs / along the real shape / octi's route / a point (ends under ~3 km apart) | | 1,215 / 88 / 22 / 27 of 1,352 |
+| junctions moved by rule 2, median / 90% / max | | 11 / 24 / 69 km |
+| survey: false crossings / breaks / displaced / reversed / squashed | | 2 / 9 / 0 / 0 / 2 (36 / 80 / 8 / 2 / 2 before the general rules) |
+| octilinear legs (plane coords, legs over 5 km) | | 100% |
 | runtime | 27 min (6 seeds, 2 parallel) | ~7 min, 0.7 GB |
 
 "Collapsed" sections are a few hundred metres long (station throats, junction stubs);
@@ -145,12 +168,16 @@ breaks along train routes. Run it after any layout change.
   inspected up close.
 - 32 topology violations remain inside tiles, visible as occasional zigzags or a line
   passing a node it does not serve.
-- 98 consecutive-section pairs on train paths are still further apart than in reality:
-  real gaps over 15 km, or joins refused because they would squash a real section into a
-  point or make a group wider than 12 km.
-- Junctions stay where octi put them, so a line can still jog at 45° where another line
-  branches off. These read as octi drawing
-  the track longer than it is, not as hooks.
+- 9 consecutive-section pairs on train paths are still further apart than in reality
+  (joins refused because they would squash a real section into a point or make a group
+  wider than 12 km). 2 false crossings and 39 false overlaps (two lines drawn on top of
+  each other outside a shared corridor, mostly where they leave a hub in the same octant)
+  remain.
+- A feature smaller than the lattice (5.4 km) is a point: 27 runs (stubs whose ends are under ~3 km apart and
+  four loops of 10 to 15 km at one station complex). Two sections of 25 and 35 km that octi
+  itself collapsed into a node stay collapsed.
+- Junctions of one station complex are drawn at least one lattice step apart, so hubs are
+  a little larger than in reality and lines can jog by one step next to them.
 
 | Before the continuity fix (broken line, hooks) | After |
 |---|---|
